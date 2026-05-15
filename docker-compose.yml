@@ -1,0 +1,59 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: assethub
+      POSTGRES_PASSWORD: assethub123
+      POSTGRES_DB: assethub
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U assethub"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "4000:4000"
+    environment:
+      DATABASE_URL: "postgresql://assethub:assethub123@postgres:5432/assethub?schema=public"
+      JWT_SECRET: "assethub-jwt-secret-production"
+      LDAP_HOST: "SRV-ADDS-02.trrgroup.com"
+      LDAP_PORT: "389"
+      LDAP_BASE_DN: "dc=trrgroup,dc=com"
+      LDAP_DOMAIN: "trrgroup"
+      LDAP_SEARCH_USER: "watchara.kid"
+      LDAP_SEARCH_PASSWORD: "Jack@3751"
+      SMTP_HOST: "smtp.office365.com"
+      SMTP_PORT: "587"
+      FRONTEND_URL: "http://10.100.22.222:5173"
+      BORROW_DUE_DAYS: "3"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_BORROW_DUE_DAYS: "3"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+volumes:
+  pgdata:

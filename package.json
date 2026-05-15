@@ -1,0 +1,14 @@
+{
+  "name": "assethub-v2",
+  "private": true,
+  "scripts": {
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev": "echo 'Run \"npm run dev:backend\" and \"npm run dev:frontend\" in separate terminals.'",
+    "build": "cd backend && npm run build && cd ../frontend && npm run build",
+    "db:generate": "cd backend && npx prisma generate",
+    "db:push": "cd backend && npx prisma db push",
+    "db:migrate": "cd backend && npx prisma migrate dev",
+    "db:seed": "cd backend && npx prisma db seed"
+  }
+}

@@ -1,0 +1,446 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model AppUser {
+  id                Int               @id @default(autoincrement())
+  adUsername        String            @unique
+  displayName       String?
+  email             String?
+  department        String?
+  role              UserRole          @default(USER)
+  isActive          Boolean           @default(true)
+  lastLoginAt       DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  assetHistory      AssetHistory[]    @relation("ActorUser")
+  assetHistoryOwner AssetHistory[]    @relation("OwnerUser")
+  borrowApprovals   BorrowApproval[]
+  extensionRequests BorrowExtension[]
+  borrowRequests    BorrowRequest[]
+  checkouts         Checkout[]
+  pmRunsPerformed   PMRun[]           @relation("PMRunPerformedBy")
+  returns           Return[]
+
+  @@map("app_users")
+}
+
+model Asset {
+  id                 Int                 @id @default(autoincrement())
+  assetCode          String              @unique
+  serialNo           String              @unique
+  type               String?
+  brand              String?
+  model              String?
+  cpu                String?
+  ram                String?
+  osVersion          String?
+  windowsLicense     String?
+  officeLicense      String?
+  antivirusStatus    String?
+  vendor             String?
+  poNumber           String?
+  prNumber           String?
+  purchaseDate       DateTime?
+  age                Int?
+  ownerName          String?
+  departmentId       String?
+  location           String?
+  status             AssetStatus         @default(Available)
+  remark             String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  company            String?
+  cpuGeneration      String?
+  domainName         String?
+  floor              String?
+  poDate             DateTime?
+  ramDetail          String?
+  gpu                String?
+  osType             String?
+  ramSlot1           String?
+  ramSlot2           String?
+  snComputer         String?
+  storage1           String?
+  storage2           String?
+  assetHistory       AssetHistory[]      @relation("AssetHistoryAsset")
+  borrowRequestItems BorrowRequestItem[]
+  pmRuns             PMRun[]
+
+  @@index([status, departmentId, location])
+  @@map("assets")
+}
+
+model DeviceType {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("device_types")
+}
+
+model Company {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("companies")
+}
+
+model AssetLocation {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  company     String?
+
+  @@map("asset_locations")
+}
+
+model Vendor {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("vendors")
+}
+
+model AssetStatusMaster {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("asset_status_masters")
+}
+
+model AssetHistory {
+  id          Int      @id @default(autoincrement())
+  assetId     Int
+  actionType  String
+  fromStatus  String?
+  toStatus    String?
+  fromOwner   String?
+  toOwner     String?
+  fromDept    String?
+  toDept      String?
+  fromLoc     String?
+  toLoc       String?
+  note        String?
+  actorUserId Int?
+  ownerUserId Int?
+  createdAt   DateTime @default(now())
+  actor       AppUser? @relation("ActorUser", fields: [actorUserId], references: [id])
+  asset       Asset    @relation("AssetHistoryAsset", fields: [assetId], references: [id])
+  owner       AppUser? @relation("OwnerUser", fields: [ownerUserId], references: [id])
+
+  @@index([assetId])
+  @@map("asset_history")
+}
+
+model BorrowRequest {
+  id              Int                 @id @default(autoincrement())
+  requestNo       String              @unique
+  requesterUserId Int
+  departmentId    String?
+  purpose         String?
+  status          BorrowRequestStatus @default(Pending)
+  note            String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  approvals       BorrowApproval[]
+  extensions      BorrowExtension[]
+  items           BorrowRequestItem[]
+  requester       AppUser             @relation(fields: [requesterUserId], references: [id])
+  checkouts       Checkout[]
+
+  @@index([requesterUserId, status])
+  @@map("borrow_requests")
+}
+
+model BorrowRequestItem {
+  id         Int                   @id @default(autoincrement())
+  requestId  Int
+  assetId    Int
+  borrowDate DateTime?
+  dueDate    DateTime?
+  itemStatus BorrowItemStatus      @default(Pending)
+  note       String?
+  extensions BorrowExtensionItem[]
+  asset      Asset                 @relation(fields: [assetId], references: [id])
+  request    BorrowRequest         @relation(fields: [requestId], references: [id])
+  returns    Return[]
+
+  @@index([assetId, itemStatus, dueDate])
+  @@map("borrow_request_items")
+}
+
+model BorrowApproval {
+  id             Int           @id @default(autoincrement())
+  requestId      Int
+  approverUserId Int
+  action         String
+  note           String?
+  actedAt        DateTime      @default(now())
+  approver       AppUser       @relation(fields: [approverUserId], references: [id])
+  request        BorrowRequest @relation(fields: [requestId], references: [id])
+
+  @@map("borrow_approvals")
+}
+
+model Checkout {
+  id           Int           @id @default(autoincrement())
+  requestId    Int
+  checkoutBy   Int
+  receivedBy   String?
+  checkoutAt   DateTime      @default(now())
+  handoverNote String?
+  checker      AppUser       @relation(fields: [checkoutBy], references: [id])
+  request      BorrowRequest @relation(fields: [requestId], references: [id])
+
+  @@map("checkouts")
+}
+
+model Return {
+  id              Int               @id @default(autoincrement())
+  requestItemId   Int
+  returnBy        Int
+  returnedAt      DateTime          @default(now())
+  condition       ReturnCondition
+  damageNote      String?
+  accessoriesNote String?
+  requestItem     BorrowRequestItem @relation(fields: [requestItemId], references: [id])
+  returner        AppUser           @relation(fields: [returnBy], references: [id])
+
+  @@map("returns")
+}
+
+model BorrowExtension {
+  id           Int                   @id @default(autoincrement())
+  requestId    Int
+  requestedBy  Int
+  status       ExtensionStatus       @default(Pending)
+  reason       String?
+  createdAt    DateTime              @default(now())
+  decidedAt    DateTime?
+  decidedBy    Int?
+  decisionNote String?
+  items        BorrowExtensionItem[]
+  request      BorrowRequest         @relation(fields: [requestId], references: [id])
+  requester    AppUser               @relation(fields: [requestedBy], references: [id])
+
+  @@map("borrow_extensions")
+}
+
+model BorrowExtensionItem {
+  id               Int               @id @default(autoincrement())
+  extensionId      Int
+  requestItemId    Int
+  oldDueDate       DateTime
+  requestedDueDate DateTime
+  extraDays        Int
+  extension        BorrowExtension   @relation(fields: [extensionId], references: [id])
+  requestItem      BorrowRequestItem @relation(fields: [requestItemId], references: [id])
+
+  @@map("borrow_extension_items")
+}
+
+model PMTemplate {
+  id            Int              @id @default(autoincrement())
+  year          Int
+  name          String
+  active        Boolean          @default(true)
+  plans         PMPlan[]
+  templateItems PMTemplateItem[]
+
+  @@map("pm_templates")
+}
+
+model PMTemplateItem {
+  id         Int           @id @default(autoincrement())
+  templateId Int
+  key        String
+  label      String
+  type       String
+  required   Boolean       @default(false)
+  group      String?
+  answers    PMRunAnswer[]
+  template   PMTemplate    @relation(fields: [templateId], references: [id])
+
+  @@map("pm_template_items")
+}
+
+model PMPlan {
+  id                 Int        @id @default(autoincrement())
+  year               Int
+  site               String?
+  deptTask           String?
+  lead               String?
+  plannedDeviceCount Int
+  startDate          DateTime?
+  endDate            DateTime?
+  templateId         Int
+  template           PMTemplate @relation(fields: [templateId], references: [id])
+  runs               PMRun[]
+
+  @@map("pm_plans")
+}
+
+model PMRun {
+  id          Int           @id @default(autoincrement())
+  planId      Int
+  assetId     Int
+  year        Int
+  status      PMRunStatus   @default(DRAFT)
+  performedBy Int?
+  performedAt DateTime?
+  completedAt DateTime?
+  answers     PMRunAnswer[]
+  asset       Asset         @relation(fields: [assetId], references: [id])
+  performer   AppUser?      @relation("PMRunPerformedBy", fields: [performedBy], references: [id])
+  plan        PMPlan        @relation(fields: [planId], references: [id])
+
+  @@unique([assetId, year], name: "unique_asset_year_completed")
+  @@index([planId, status])
+  @@index([assetId, year])
+  @@map("pm_runs")
+}
+
+model PMRunAnswer {
+  id     Int            @id @default(autoincrement())
+  runId  Int
+  itemId Int
+  value  String?
+  item   PMTemplateItem @relation(fields: [itemId], references: [id])
+  run    PMRun          @relation(fields: [runId], references: [id])
+
+  @@map("pm_run_answers")
+}
+
+model NotificationTemplate {
+  id        Int                 @id @default(autoincrement())
+  key       String              @unique
+  channel   NotificationChannel
+  subjectTh String
+  bodyTh    String
+
+  @@map("notification_templates")
+}
+
+model NotificationOutbox {
+  id          Int                 @id @default(autoincrement())
+  eventType   String
+  channel     NotificationChannel
+  recipient   String
+  payloadJson String
+  status      NotificationStatus  @default(PENDING)
+  retryCount  Int                 @default(0)
+  lastError   String?
+  createdAt   DateTime            @default(now())
+  sentAt      DateTime?
+
+  @@map("notification_outbox")
+}
+
+model NotificationSetting {
+  id               Int     @id @default(autoincrement())
+  enableEmail      Boolean @default(true)
+  enableTeams      Boolean @default(false)
+  teamsWebhookUrl  String?
+  enabledEventKeys String  @default("borrow_request_pending,borrow_approved,borrow_rejected,checkout_completed,return_recorded,overdue_borrow,extension_pending,extension_approved,extension_rejected,pm_overdue")
+
+  @@map("notification_settings")
+}
+
+model ScheduledJob {
+  id          Int       @id @default(autoincrement())
+  jobType     String
+  status      String
+  result      String?
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@map("scheduled_jobs")
+}
+
+enum UserRole {
+  SUPERADMIN
+  IT_ADMIN
+  USER
+}
+
+enum AssetStatus {
+  Available
+  Borrowed
+  InUse
+  Maintenance
+  Retired
+  Lost
+}
+
+enum BorrowItemStatus {
+  Pending
+  Approved
+  Rejected
+  CheckedOut
+  Returned
+  PartiallyReturned
+}
+
+enum BorrowRequestStatus {
+  Pending
+  Approved
+  Rejected
+  CheckedOut
+  PartiallyReturned
+  Returned
+}
+
+enum ExtensionStatus {
+  Pending
+  Approved
+  Rejected
+}
+
+enum PMRunStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum ReturnCondition {
+  Normal
+  Damaged
+  Repairing
+  AccessoryIncomplete
+}
+
+enum NotificationChannel {
+  EMAIL
+  TEAMS
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
