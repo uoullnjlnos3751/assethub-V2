@@ -47,18 +47,33 @@ const parseDate = (val: any): Date | null => {
   return null;
 };
 
+const ALLOWED_ASSET_FIELDS = new Set([
+  'id', 'assetCode', 'serialNo', 'type', 'brand', 'model', 'cpu', 'ram',
+  'osVersion', 'windowsLicense', 'officeLicense', 'antivirusStatus', 'vendor',
+  'poNumber', 'prNumber', 'purchaseDate', 'age', 'ownerName', 'departmentId',
+  'location', 'status', 'remark', 'company', 'cpuGeneration', 'domainName',
+  'floor', 'poDate', 'ramDetail', 'gpu', 'osType', 'ramSlot1', 'ramSlot2',
+  'snComputer', 'storage1', 'storage2', 'createdAt', 'updatedAt',
+]);
+
 const normalizeAssetPayload = (data: any) => {
   const purchaseDate = parseDate(data.purchaseDate);
   const poDate = parseDate(data.poDate);
   
-  // If owner exists and status is Available or not set, default to InUse
   let status = data.status;
   if (data.ownerName && data.ownerName.trim() !== '' && (!status || status === 'Available')) {
     status = 'InUse';
   }
 
+  const filtered: any = {};
+  for (const key of Object.keys(data)) {
+    if (ALLOWED_ASSET_FIELDS.has(key)) {
+      filtered[key] = data[key];
+    }
+  }
+
   return {
-    ...data,
+    ...filtered,
     status,
     purchaseDate,
     poDate,

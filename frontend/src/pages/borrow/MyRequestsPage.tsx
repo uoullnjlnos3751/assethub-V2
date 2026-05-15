@@ -21,7 +21,7 @@ const statusMeta: Record<string, { color: 'warning' | 'success' | 'error' | 'inf
   Returned: { color: 'default', label: 'คืนแล้ว' },
 };
 
-const tabStatuses = ['Pending', 'Approved', 'CheckedOut', 'Returned'];
+const tabStatuses = ['Pending', 'Approved', 'CheckedOut', 'Returned', 'Rejected'];
 
 export default function MyRequestsPage() {
   const navigate = useNavigate();
@@ -78,6 +78,7 @@ export default function MyRequestsPage() {
           { status: 'Approved', label: 'อนุมัติแล้ว', color: 'info' as const },
           { status: 'CheckedOut', label: 'ส่งมอบแล้ว', color: 'success' as const },
           { status: 'Returned', label: 'คืนแล้ว', color: 'default' as const },
+          { status: 'Rejected', label: 'ไม่อนุมัติ', color: 'error' as const },
         ].map((s) => (
           <Grid item xs={6} md={3} key={s.status}>
             <Card><CardContent>
@@ -102,6 +103,7 @@ export default function MyRequestsPage() {
           <Tab label={`อนุมัติแล้ว (${countByStatus('Approved')})`} />
           <Tab label={`ส่งมอบแล้ว (${countByStatus('CheckedOut')})`} />
           <Tab label={`คืนแล้ว (${countByStatus('Returned')})`} />
+          <Tab label={`ไม่อนุมัติ (${countByStatus('Rejected')})`} />
         </Tabs>
       </Box>
 
@@ -172,8 +174,16 @@ export default function MyRequestsPage() {
                 <Typography variant="caption" color="text.secondary" display="block">ขอเมื่อ: {new Date(selectedRequest.createdAt).toLocaleString('th-TH')}</Typography>
                 {selectedRequest.approvals?.length > 0 && (
                   <Typography variant="caption" color="text.secondary" display="block">
-                    อนุมัติเมื่อ: {new Date(selectedRequest.approvals[0].actedAt).toLocaleString('th-TH')}
+                    {selectedRequest.approvals[0].action === 'Rejected' ? 'ปฏิเสธเมื่อ' : 'อนุมัติเมื่อ'}: {new Date(selectedRequest.approvals[0].actedAt).toLocaleString('th-TH')}
                   </Typography>
+                )}
+                {selectedRequest.status === 'Rejected' && (
+                  <Box sx={{ mt: 2, p: 2, bgcolor: 'rgba(239, 68, 68, 0.05)', borderRadius: 2, border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                    <Typography variant="caption" fontWeight={700} color="error.main" display="block" sx={{ mb: 0.5 }}>เหตุผลการไม่อนุมัติ</Typography>
+                    <Typography variant="body2" color="error.dark" sx={{ whiteSpace: 'pre-wrap' }}>
+                      {selectedRequest.approvals?.find((a: any) => a.action === 'Rejected')?.note || selectedRequest.approvals?.[0]?.note || selectedRequest.note || 'ไม่ระบุเหตุผล'}
+                    </Typography>
+                  </Box>
                 )}
               </Box>
             </Box>

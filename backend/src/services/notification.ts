@@ -1,5 +1,22 @@
 import { prisma } from '../index';
 
+let cachedSettings: any = null;
+let settingsCacheTime = 0;
+
+export function invalidateSettingsCache() {
+  cachedSettings = null;
+  settingsCacheTime = 0;
+}
+
+async function getSettings() {
+  const now = Date.now();
+  if (!cachedSettings || now - settingsCacheTime > 30000) {
+    cachedSettings = await prisma.notificationSetting.findFirst();
+    settingsCacheTime = now;
+  }
+  return cachedSettings;
+}
+
 export async function createNotification(
   eventType: string,
   channel: 'EMAIL' | 'TEAMS',
@@ -7,6 +24,27 @@ export async function createNotification(
   payload: Record<string, any>
 ) {
   try {
+    const settings = await getSettings();
+
+    if (channel === 'EMAIL' && settings?.enableEmail === false) {
+      console.log(`Email notifications disabled. Skipping: ${eventType} -> ${recipient}`);
+      return;
+    }
+
+    if (channel === 'TEAMS' && settings?.enableTeams === false) {
+      console.log(`Teams notifications disabled. Skipping: ${eventType} -> ${recipient}`);
+      return;
+    }
+
+    const enabledKeys = settings?.enabledEventKeys
+      ? settings.enabledEventKeys.split(',').map((k: string) => k.trim())
+      : [];
+
+    if (enabledKeys.length > 0 && !enabledKeys.includes(eventType)) {
+      console.log(`Event ${eventType} is not in enabledEventKeys. Skipping.`);
+      return;
+    }
+
     await prisma.notificationOutbox.create({
       data: {
         eventType,
@@ -64,9 +102,62 @@ async function sendEmail(to: string, eventType: string, payload: Record<string, 
   }
 
   let body = template.bodyTh;
-  for (const [key, val] of Object.entries(payload)) {
-    body = body.replace(`{{${key}}}`, String(val));
+
+  if (payload.items && Array.isArray(payload.items)) {
+    const statusColors: Record<string, { bg: string; text: string }> = {
+      'รอการอนุมัติ': { bg: '#fef3c7', text: '#92400e' },
+      'อนุมัติ': { bg: '#d1fae5', text: '#065f46' },
+      'ไม่อนุมัติ': { bg: '#fee2e2', text: '#991b1b' },
+      'ส่งมอบแล้ว': { bg: '#dbeafe', text: '#1e40af' },
+      'คืนแล้ว': { bg: '#dcfce7', text: '#166534' },
+    };
+
+    const itemsHtml = payload.items.map((item: any) => {
+      const colors = statusColors[item.status] || { bg: '#f1f5f9', text: '#475569' };
+      return `
+        <tr>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; font-size: 13px;">
+            <div style="font-weight: 600; color: #1e293b;">${item.assetCode || 'N/A'}</div>
+            <div style="color: #64748b; font-size: 12px;">${item.serialNo || ''} ${item.brand || ''} ${item.model || ''}</div>
+          </td>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; font-size: 13px; text-align: center;">
+            <span style="background: ${colors.bg}; color: ${colors.text}; padding: 3px 10px; border-radius: 12px; font-weight: 600; font-size: 11px;">${item.status || '-'}</span>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    const itemsTableHtml = `
+      <table class="items-table" style="width: 100%; border-collapse: collapse; margin-top: 8px;">
+        <thead>
+          <tr>
+            <th style="background: #f1f5f9; padding: 10px 12px; text-align: left; font-size: 12px; color: #475569; font-weight: 600; border-bottom: 2px solid #e2e8f0;">ทรัพย์สิน</th>
+            <th style="background: #f1f5f9; padding: 10px 12px; text-align: center; font-size: 12px; color: #475569; font-weight: 600; border-bottom: 2px solid #e2e8f0;">สถานะ</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemsHtml}
+        </tbody>
+      </table>
+    `;
+    body = body.replace('{{itemsTable}}', itemsTableHtml);
   }
+
+  if (payload.note && payload.note !== '-' && payload.note !== '') {
+    const noteHtml = `<div class="note-box" style="background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 14px; margin-top: 16px;"><p style="margin: 0; color: #92400e; font-size: 13px;"><b>หมายเหตุ:</b> ${payload.note}</p></div>`;
+    body = body.replace('{{note}}', noteHtml);
+  } else {
+    body = body.replace(/{{note}}/g, '');
+  }
+
+  for (const [key, val] of Object.entries(payload)) {
+    if (key !== 'items' && key !== 'note') {
+      body = body.replace(new RegExp(`{{${key}}}`, 'g'), String(val));
+    }
+  }
+
+  body = body.replace(/{{\w+}}/g, '-');
+
   await sendSimpleEmail(to, template.subjectTh, body);
 }
 
@@ -83,12 +174,14 @@ async function sendSimpleEmail(to: string, subject: string, body: string) {
     from: process.env.SMTP_FROM || process.env.SMTP_USER,
     to,
     subject,
-    text: body,
+    html: body,
+    text: body.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/\n{3,}/g, '\n\n'),
   });
 }
 
 async function sendTeams(eventType: string, payload: Record<string, any>) {
-  const webhookUrl = process.env.TEAMS_WEBHOOK_URL;
+  const settings = await getSettings();
+  const webhookUrl = settings?.teamsWebhookUrl || process.env.TEAMS_WEBHOOK_URL;
   if (!webhookUrl) return;
 
   const template = await prisma.notificationTemplate.findFirst({

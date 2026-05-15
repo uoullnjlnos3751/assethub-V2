@@ -36,6 +36,8 @@ import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import { useAuth } from '../contexts/AuthContext';
+import Breadcrumbs from '../components/Breadcrumbs';
+import PageTransition from '../components/PageTransition';
 
 const drawerWidth = 280;
 
@@ -60,6 +62,7 @@ const userNavItems: NavItem[] = [
   { label: 'ยืมทรัพย์สิน', path: '/borrow/new', icon: <AddBoxIcon /> },
   { label: 'คำขอของฉัน', path: '/borrow/my-requests', icon: <ListAltIcon /> },
   { label: 'รายการที่ยืม', path: '/borrow/my-items', icon: <ShoppingCartIcon /> },
+  { label: 'คำขอขยายวัน', path: '/borrow/my-extensions', icon: <ExtensionIcon /> },
   { label: 'ประวัติการยืม', path: '/borrow/my-history', icon: <HistoryIcon /> },
 ];
 
@@ -246,32 +249,32 @@ export default function Layout() {
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Toolbar sx={{ 
         mb: 2,
-        minHeight: '70px !important',
-        borderBottom: '1px solid #E5E7EB',
+        minHeight: '72px !important',
+        borderBottom: '1px solid #E2E8F0',
         gap: 1.5,
-        px: 2
+        px: 2.5
       }}>
         <Box sx={{
-          width: 36, height: 36, borderRadius: 1,
+          width: 40, height: 40, borderRadius: 2,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: '#FF6B00',
-          boxShadow: '0 2px 8px rgba(255,107,0,0.3)',
+          background: 'linear-gradient(135deg, #FF6B00 0%, #FF8C00 100%)',
+          boxShadow: '0 4px 12px rgba(255,107,0,0.3)',
           color: '#fff',
           fontSize: 18,
           flexShrink: 0,
         }}>
-          <img src="/vite.svg" alt="logo" style={{ width: 20, height: 20, filter: 'brightness(0) invert(1)' }} />
+          <img src="/vite.svg" alt="logo" style={{ width: 22, height: 22, filter: 'brightness(0) invert(1)' }} />
         </Box>
         <Box>
-          <Typography variant="body1" noWrap sx={{ fontWeight: 800, lineHeight: 1.2, color: '#1A1A1A', fontSize: '0.9rem' }}>
+          <Typography variant="body1" noWrap sx={{ fontWeight: 800, lineHeight: 1.2, color: '#0F172A', fontSize: '0.95rem' }}>
             IT Asset
           </Typography>
-          <Typography variant="caption" noWrap sx={{ color: '#6B7280', fontSize: '0.65rem', lineHeight: 1 }}>
+          <Typography variant="caption" noWrap sx={{ color: '#64748B', fontSize: '0.7rem', lineHeight: 1, fontWeight: 500 }}>
             TRR Group
           </Typography>
         </Box>
       </Toolbar>
-      <Box sx={{ overflowY: 'auto', flexGrow: 1 }}>
+      <Box sx={{ overflowY: 'auto', flexGrow: 1, pb: 2 }}>
         {renderNav()}
       </Box>
     </Box>
@@ -286,17 +289,17 @@ export default function Layout() {
         ml: { md: `${drawerWidth}px` },
         zIndex: (theme) => theme.zIndex.drawer + 1,
       }}>
-        <Toolbar sx={{ minHeight: '70px !important' }}>
+        <Toolbar sx={{ minHeight: '72px !important', px: 3 }}>
           <IconButton color="inherit" edge="start" onClick={() => setMobileOpen(!mobileOpen)} sx={{ mr: 2, display: { md: 'none' } }}>
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" noWrap sx={{ flexGrow: 1, fontWeight: 800, color: theme.palette.text.primary, letterSpacing: '-0.01em' }}>
+          <Typography variant="h6" noWrap sx={{ flexGrow: 1, fontWeight: 700, color: theme.palette.text.primary, letterSpacing: '-0.01em', fontSize: '1.1rem' }}>
             ระบบบริหารทรัพย์สิน IT
           </Typography>
           <Button 
             variant="text"
             onClick={(e) => setAnchorEl(e.currentTarget)} 
-            startIcon={<Avatar sx={{ width: 34, height: 34, bgcolor: theme.palette.primary.main, fontWeight: 800, fontSize: '0.9rem', border: `2px solid ${alpha('#fff', 0.8)}` }}>{user?.displayName?.charAt(0) || 'U'}</Avatar>}
+            startIcon={<Avatar sx={{ width: 36, height: 36, bgcolor: 'linear-gradient(135deg, #FF6B00, #FF8C00)', fontWeight: 800, fontSize: '0.95rem', border: `2px solid ${alpha('#fff', 0.9)}`, background: 'linear-gradient(135deg, #FF6B00, #FF8C00)' }}>{user?.displayName?.charAt(0) || 'U'}</Avatar>}
             sx={{ 
               borderRadius: 4,
               px: 2,
@@ -360,7 +363,10 @@ export default function Layout() {
         position: 'relative',
         minHeight: 'calc(100vh - 70px)'
       }}>
-        <Outlet />
+        <Breadcrumbs />
+        <PageTransition>
+          <Outlet />
+        </PageTransition>
       </Box>
     </Box>
   );

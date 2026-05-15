@@ -23,6 +23,7 @@ export default function BorrowRequestPage() {
   const [selectedAssets, setSelectedAssets] = useState<any[]>([]);
   const [purpose, setPurpose] = useState('');
   const [notes, setNotes] = useState('');
+  const [location, setLocation] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -83,6 +84,7 @@ export default function BorrowRequestPage() {
         assetIds: selected,
         purpose,
         notes,
+        location,
         dueDate: dueDate || new Date(Date.now() + borrowDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       });
       setSuccess('สร้างคำขอยืมสำเร็จ');
@@ -146,6 +148,17 @@ export default function BorrowRequestPage() {
                   placeholder="เช่น ใช้ในการประชุม, ใช้สำหรับ Project XYZ"
                   error={purpose.trim() === '' && submitting}
                   helperText={purpose.trim() === '' && submitting ? 'จำเป็นต้องกรอก' : ''}
+                />
+              </Box>
+
+              <Box sx={{ mb: 3 }}>
+                <TextField
+                  label="สถานที่/หน่วยงานที่ใช้งาน"
+                  fullWidth
+                  size="small"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="เช่น สำนักงานใหญ่ ชั้น 5, โรงงาน A"
                 />
               </Box>
 

@@ -3,6 +3,7 @@ import { prisma } from '../index';
 import { authenticate, authorize } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { searchADUsers } from '../services/ldap';
+import { invalidateSettingsCache } from '../services/notification';
 
 const router = Router();
 
@@ -142,16 +143,41 @@ router.get('/settings', authenticate, authorize('SUPERADMIN'), async (_req: Requ
 
 router.put('/settings', authenticate, authorize('SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { enableEmail, enableTeams, teamsWebhookUrl, enabledEventKeys } = req.body;
+    const {
+      systemName, organizationName, timezone, darkMode, showWelcomeBanner,
+      borrowDays, maxItemsPerRequest, allowExtension,
+      enableEmail, enableTeams, teamsWebhookUrl, enabledEventKeys,
+      requireStrongPassword, passwordExpiryDays, sessionTimeoutHours,
+    } = req.body;
+
     let settings = await prisma.notificationSetting.findFirst();
+
+    const data: any = {};
+    if (systemName !== undefined) data.systemName = systemName;
+    if (organizationName !== undefined) data.organizationName = organizationName;
+    if (timezone !== undefined) data.timezone = timezone;
+    if (darkMode !== undefined) data.darkMode = darkMode;
+    if (showWelcomeBanner !== undefined) data.showWelcomeBanner = showWelcomeBanner;
+    if (borrowDays !== undefined) data.borrowDays = parseInt(borrowDays);
+    if (maxItemsPerRequest !== undefined) data.maxItemsPerRequest = parseInt(maxItemsPerRequest);
+    if (allowExtension !== undefined) data.allowExtension = allowExtension;
+    if (enableEmail !== undefined) data.enableEmail = enableEmail;
+    if (enableTeams !== undefined) data.enableTeams = enableTeams;
+    if (teamsWebhookUrl !== undefined) data.teamsWebhookUrl = teamsWebhookUrl;
+    if (enabledEventKeys !== undefined) data.enabledEventKeys = enabledEventKeys;
+    if (requireStrongPassword !== undefined) data.requireStrongPassword = requireStrongPassword;
+    if (passwordExpiryDays !== undefined) data.passwordExpiryDays = parseInt(passwordExpiryDays);
+    if (sessionTimeoutHours !== undefined) data.sessionTimeoutHours = parseInt(sessionTimeoutHours);
+
     if (!settings) {
-      settings = await prisma.notificationSetting.create({ data: req.body });
+      settings = await prisma.notificationSetting.create({ data });
     } else {
       settings = await prisma.notificationSetting.update({
         where: { id: settings.id },
-        data: { enableEmail, enableTeams, teamsWebhookUrl, enabledEventKeys },
+        data,
       });
     }
+    invalidateSettingsCache();
     res.json(settings);
   } catch (err) { next(err); }
 });

@@ -184,7 +184,7 @@ async function main() {
 
     for (const t of templates) {
       await prisma.notificationTemplate.upsert({
-        where: { key: t.key },
+        where: { key_channel: { key: t.key, channel: t.channel } },
         update: { subjectTh: t.subjectTh, bodyTh: t.bodyTh },
         create: t,
       });

@@ -3,15 +3,33 @@ import { prisma } from '../index';
 import { authenticate, authorize } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { createNotification } from '../services/notification';
+import { validate, borrowRequestSchema, approveSchema, checkoutSchema, returnSchema, extensionSchema } from '../middleware/validation';
 
 const router = Router();
 
+async function getBorrowDays(): Promise<number> {
+  const settings = await prisma.notificationSetting.findFirst();
+  return settings?.borrowDays ?? parseInt(process.env.BORROW_DUE_DAYS || '3');
+}
+
+async function getMaxItems(): Promise<number> {
+  const settings = await prisma.notificationSetting.findFirst();
+  return settings?.maxItemsPerRequest ?? 5;
+}
+
+async function getAllowExtension(): Promise<boolean> {
+  const settings = await prisma.notificationSetting.findFirst();
+  return settings?.allowExtension ?? true;
+}
+
 // ── User: Create borrow request (multi-item) ──
-router.post('/requests', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/requests', authenticate, validate(borrowRequestSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { assetIds, purpose } = req.body;
-    if (!assetIds || !Array.isArray(assetIds) || assetIds.length === 0) {
-      throw new AppError('กรุณาเลือกทรัพย์สินอย่างน้อย 1 รายการ');
+    const { assetIds, purpose, notes, location } = req.body;
+
+    const maxItems = await getMaxItems();
+    if (assetIds.length > maxItems) {
+      throw new AppError(`จำนวนรายการเกินกำหนด (สูงสุด ${maxItems} รายการ)`);
     }
 
     const assets = await prisma.asset.findMany({
@@ -21,8 +39,10 @@ router.post('/requests', authenticate, async (req: Request, res: Response, next:
       throw new AppError('ทรัพย์สินบางรายการไม่พร้อมให้ยืม');
     }
 
+    const borrowDays = await getBorrowDays();
+    const borrowDate = new Date();
     const dueDate = new Date();
-    dueDate.setDate(dueDate.getDate() + parseInt(process.env.BORROW_DUE_DAYS || '3'));
+    dueDate.setDate(dueDate.getDate() + borrowDays);
 
     const user = await prisma.appUser.findUnique({ where: { id: req.user!.userId } });
 
@@ -32,11 +52,12 @@ router.post('/requests', authenticate, async (req: Request, res: Response, next:
         requesterUserId: req.user!.userId,
         departmentId: user?.department || '',
         purpose,
+        note: notes || null,
         status: 'Pending',
         items: {
           create: assets.map(a => ({
             assetId: a.id,
-            borrowDate: new Date(),
+            borrowDate,
             dueDate,
             itemStatus: 'Pending',
           })),
@@ -45,6 +66,17 @@ router.post('/requests', authenticate, async (req: Request, res: Response, next:
       include: { items: { include: { asset: true } } },
     });
 
+    const itemsPayload = request.items.map(item => ({
+      assetCode: item.asset.assetCode,
+      serialNo: item.asset.serialNo,
+      brand: item.asset.brand,
+      model: item.asset.model,
+      status: 'รอการอนุมัติ',
+    }));
+
+    const borrowDateStr = borrowDate.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+    const dueDateStr = dueDate.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+
     // Notify IT Admins
     const admins = await prisma.appUser.findMany({ where: { role: { in: ['IT_ADMIN', 'SUPERADMIN'] } } });
     for (const admin of admins) {
@@ -52,7 +84,17 @@ router.post('/requests', authenticate, async (req: Request, res: Response, next:
         await createNotification('borrow_request_pending', 'EMAIL', admin.email, {
           requestNo: request.requestNo,
           requester: user?.displayName || req.user!.adUsername,
-          purpose,
+          department: user?.department || '-',
+          email: user?.email || '-',
+          purpose: purpose || '-',
+          location: location || '-',
+          notes: notes || '-',
+          borrowDate: borrowDateStr,
+          dueDate: dueDateStr,
+          borrowDays: String(borrowDays),
+          itemsCount: String(request.items.length),
+          itemsTable: '',
+          items: itemsPayload,
         });
       }
     }
@@ -112,6 +154,21 @@ router.get('/my-history', authenticate, async (req: Request, res: Response, next
   } catch (err) { next(err); }
 });
 
+// ── User: My extension requests ──
+router.get('/my-extensions', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const extensions = await prisma.borrowExtension.findMany({
+      where: { requestedBy: req.user!.userId },
+      include: {
+        request: true,
+        items: { include: { requestItem: { include: { asset: true } } } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json(extensions);
+  } catch (err) { next(err); }
+});
+
 // ── IT Admin: Get all requests (approval queue) ──
 router.get('/all-requests', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -136,11 +193,10 @@ router.get('/all-requests', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), a
 });
 
 // ── IT Admin: Approve / Reject ──
-router.post('/requests/:id/approve', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/requests/:id/approve', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), validate(approveSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
-    const { action, note } = req.body; // action = Approved | Rejected
-    if (!['Approved', 'Rejected'].includes(action)) throw new AppError('การกระทำไม่ถูกต้อง');
+    const { action, note } = req.body;
 
     const request = await prisma.borrowRequest.findUnique({
       where: { id },
@@ -181,11 +237,38 @@ router.post('/requests/:id/approve', authenticate, authorize('IT_ADMIN', 'SUPERA
     });
 
     if (request.requester.email) {
+      const itemsPayload = request.items.map(item => ({
+        assetCode: item.asset.assetCode,
+        serialNo: item.asset.serialNo,
+        brand: item.asset.brand,
+        model: item.asset.model,
+        status: action === 'Approved' ? 'อนุมัติ' : 'ไม่อนุมัติ',
+      }));
+
+      const borrowDateStr = request.items[0]?.borrowDate
+        ? new Date(request.items[0].borrowDate).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })
+        : '-';
+      const dueDateStr = request.items[0]?.dueDate
+        ? new Date(request.items[0].dueDate).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })
+        : '-';
+
       await createNotification(
         action === 'Approved' ? 'borrow_approved' : 'borrow_rejected',
         'EMAIL',
         request.requester.email,
-        { requestNo: request.requestNo, note }
+        {
+          requestNo: request.requestNo,
+          requester: request.requester.displayName || request.requester.adUsername,
+          department: request.requester.department || '-',
+          purpose: request.purpose || '-',
+          location: '-',
+          notes: request.note || '-',
+          borrowDate: borrowDateStr,
+          dueDate: dueDateStr,
+          note: note || (action === 'Rejected' ? 'ไม่ระบุเหตุผล' : ''),
+          itemsCount: String(request.items.length),
+          items: itemsPayload,
+        }
       );
     }
 
@@ -198,7 +281,7 @@ router.post('/requests/:id/approve', authenticate, authorize('IT_ADMIN', 'SUPERA
 });
 
 // ── IT Admin: Check-out ──
-router.post('/requests/:id/checkout', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/requests/:id/checkout', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), validate(checkoutSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
     const { receivedBy, handoverNote } = req.body;
@@ -247,9 +330,27 @@ router.post('/requests/:id/checkout', authenticate, authorize('IT_ADMIN', 'SUPER
     });
 
     if (request.requester?.email) {
+      const itemsPayload = request.items.map(item => ({
+        assetCode: item.asset.assetCode,
+        serialNo: item.asset.serialNo,
+        brand: item.asset.brand,
+        model: item.asset.model,
+        status: 'ส่งมอบแล้ว',
+      }));
+      const borrowDateStr = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+      const dueDateStr = request.items[0]?.dueDate ? new Date(request.items[0].dueDate).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }) : '-';
       await createNotification('checkout_completed', 'EMAIL', request.requester.email, {
         requestNo: request.requestNo,
-        handoverNote,
+        requester: request.requester.displayName || request.requester.adUsername,
+        department: request.requester.department || '-',
+        purpose: request.purpose || '-',
+        location: '-',
+        notes: request.note || '-',
+        borrowDate: borrowDateStr,
+        dueDate: dueDateStr,
+        handoverNote: handoverNote || '-',
+        itemsCount: String(request.items.length),
+        items: itemsPayload,
       });
     }
 
@@ -258,15 +359,14 @@ router.post('/requests/:id/checkout', authenticate, authorize('IT_ADMIN', 'SUPER
 });
 
 // ── IT Admin: Return item ──
-router.post('/items/:itemId/return', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/items/:itemId/return', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), validate(returnSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const itemId = parseInt(req.params.itemId);
     const { condition, damageNote, accessoriesNote } = req.body;
-    if (!condition) throw new AppError('กรุณาเลือกสภาพเครื่อง');
 
     const item = await prisma.borrowRequestItem.findUnique({
       where: { id: itemId },
-      include: { request: { include: { requester: true } } },
+      include: { request: { include: { requester: true } }, asset: true },
     });
     if (!item) throw new AppError('ไม่พบรายการยืม', 404);
     if (!['CheckedOut', 'PartiallyReturned'].includes(item.itemStatus)) {
@@ -323,9 +423,21 @@ router.post('/items/:itemId/return', authenticate, authorize('IT_ADMIN', 'SUPERA
     });
 
     if (item.request.requester?.email) {
+      const conditionLabel = condition === 'Normal' ? 'ปกติ' : condition === 'Damaged' ? 'ชำรุด' : condition === 'Repairing' ? 'ต้องซ่อม' : 'อุปกรณ์ไม่ครบ';
+      const returnDateStr = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
       await createNotification('return_recorded', 'EMAIL', item.request.requester.email, {
         requestNo: item.request.requestNo,
-        condition,
+        requester: item.request.requester.displayName || item.request.requester.adUsername,
+        department: item.request.requester.department || '-',
+        purpose: item.request.purpose || '-',
+        assetCode: item.asset?.assetCode || '-',
+        serialNo: item.asset?.serialNo || '-',
+        brand: item.asset?.brand || '',
+        model: item.asset?.model || '',
+        condition: conditionLabel,
+        damageNote: damageNote || '-',
+        accessoriesNote: accessoriesNote || '-',
+        returnDate: returnDateStr,
       });
     }
 
@@ -334,10 +446,16 @@ router.post('/items/:itemId/return', authenticate, authorize('IT_ADMIN', 'SUPERA
 });
 
 // ── Extension: Request extension ──
-router.post('/extensions', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/extensions', authenticate, validate(extensionSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const allowExtension = await getAllowExtension();
+    if (!allowExtension) {
+      throw new AppError('ระบบไม่อนุญาตให้ขยายวันยืม');
+    }
+
     const { requestId, itemIds, extraDays, reason } = req.body;
-    if (!requestId || !itemIds || !extraDays) throw new AppError('ข้อมูลไม่ครบถ้วน');
+
+    const user = await prisma.appUser.findUnique({ where: { id: req.user!.userId } });
 
     const borrowRequest = await prisma.borrowRequest.findUnique({
       where: { id: requestId },
@@ -379,8 +497,16 @@ router.post('/extensions', authenticate, async (req: Request, res: Response, nex
       if (admin.email) {
         await createNotification('extension_pending', 'EMAIL', admin.email, {
           requestNo: borrowRequest.requestNo,
-          extraDays,
-          reason,
+          requester: user?.displayName || req.user!.adUsername,
+          department: user?.department || '-',
+          extraDays: String(extraDays),
+          reason: reason || '-',
+          oldDueDate: extension.items[0]?.oldDueDate
+            ? new Date(extension.items[0].oldDueDate).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })
+            : '-',
+          newDueDate: extension.items[0]?.requestedDueDate
+            ? new Date(extension.items[0].requestedDueDate).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })
+            : '-',
         });
       }
     }
@@ -390,11 +516,10 @@ router.post('/extensions', authenticate, async (req: Request, res: Response, nex
 });
 
 // ── Extension: Approve/Reject ──
-router.put('/extensions/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/extensions/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), validate(approveSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
-    const { action, note } = req.body; // Approved | Rejected
-    if (!['Approved', 'Rejected'].includes(action)) throw new AppError('การกระทำไม่ถูกต้อง');
+    const { action, note } = req.body;
 
     const extension = await prisma.borrowExtension.findUnique({
       where: { id },
@@ -420,11 +545,27 @@ router.put('/extensions/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'),
     });
 
     if (extension.request.requester.email) {
+      const newDueDate = action === 'Approved' && extension.items.length > 0
+        ? new Date(extension.items[0].requestedDueDate).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })
+        : '-';
+      const oldDueDate = extension.items.length > 0
+        ? new Date(extension.items[0].oldDueDate).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })
+        : '-';
       await createNotification(
         action === 'Approved' ? 'extension_approved' : 'extension_rejected',
         'EMAIL',
         extension.request.requester.email,
-        { requestNo: extension.request.requestNo, note }
+        {
+          requestNo: extension.request.requestNo,
+          requester: extension.request.requester.displayName || extension.request.requester.adUsername,
+          department: extension.request.requester.department || '-',
+          purpose: extension.request.purpose || '-',
+          note: note || (action === 'Rejected' ? 'ไม่ระบุเหตุผล' : ''),
+          reason: extension.reason,
+          extraDays: String(extension.items[0]?.extraDays || '-'),
+          oldDueDate,
+          newDueDate,
+        }
       );
     }
 

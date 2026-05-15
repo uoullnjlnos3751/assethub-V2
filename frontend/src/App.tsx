@@ -12,6 +12,7 @@ import BorrowRequestPage from './pages/borrow/BorrowRequestPage';
 import MyRequestsPage from './pages/borrow/MyRequestsPage';
 import MyItemsPage from './pages/borrow/MyItemsPage';
 import MyHistoryPage from './pages/borrow/MyHistoryPage';
+import MyExtensionsPage from './pages/borrow/MyExtensionsPage';
 import ApprovalQueuePage from './pages/borrow/ApprovalQueuePage';
 import CheckoutPage from './pages/borrow/CheckoutPage';
 import ReturnPage from './pages/borrow/ReturnPage';
@@ -69,6 +70,7 @@ export default function App() {
         <Route path="borrow/my-requests" element={<MyRequestsPage />} />
         <Route path="borrow/my-items" element={<MyItemsPage />} />
         <Route path="borrow/my-history" element={<MyHistoryPage />} />
+        <Route path="borrow/my-extensions" element={<MyExtensionsPage />} />
         {/* Borrow - IT Admin */}
         <Route path="borrow/approval-queue" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><ApprovalQueuePage /></ProtectedRoute>} />
         <Route path="borrow/overdue" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><BorrowOverduePage /></ProtectedRoute>} />

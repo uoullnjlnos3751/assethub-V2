@@ -25,6 +25,8 @@ import {
   Tooltip,
   Typography,
   Menu,
+  alpha,
+  useTheme,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
@@ -38,11 +40,17 @@ import TableViewIcon from '@mui/icons-material/TableView';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import ReturnIcon from '@mui/icons-material/AssignmentReturn';
 import ExtensionIcon from '@mui/icons-material/Extension';
+import SearchIcon from '@mui/icons-material/Search';
+import FilterListIcon from '@mui/icons-material/FilterList';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { assetAPI, borrowAPI } from '../../services/api';
 import ExportAssetsButton from '../../components/ExportAssetsButton';
 import ImportAssetsButton from '../../components/ImportAssetsButton';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
+import StatusChip from '../../components/StatusChip';
+import LoadingSkeleton from '../../components/LoadingSkeleton';
+import EmptyState from '../../components/EmptyState';
 
 type ColumnConfig = {
   field: string;
@@ -102,27 +110,6 @@ const statusLabels: Record<string, string> = {
   Lost: 'สูญหาย',
 };
 
-const chipStyles = {
-  Available: { bg: '#D1FAE5', dot: '#059669', text: '#059669' },
-  Borrowed: { bg: '#FEF3C7', dot: '#D97706', text: '#D97706' },
-  InUse: { bg: '#DBEAFE', dot: '#2563EB', text: '#2563EB' },
-  Maintenance: { bg: '#FEE2E2', dot: '#DC2626', text: '#DC2626' },
-  Retired: { bg: '#F3F4F6', dot: '#9CA3AF', text: '#6B7280' },
-  Lost: { bg: '#FEE2E2', dot: '#991B1B', text: '#991B1B' },
-};
-
-function StatusChip({ status }: { status: string }) {
-  const style = chipStyles[status as keyof typeof chipStyles] || chipStyles.Retired;
-  return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-      <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: style.dot, flexShrink: 0 }} />
-      <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: style.text }}>
-        {statusLabels[status] || status}
-      </Typography>
-    </Box>
-  );
-}
-
 const columnDefaultsByField = new Map(defaultColumnConfig.map((config) => [config.field, config]));
 
 const formatDate = (value: unknown) => {
@@ -158,6 +145,8 @@ const loadColumnConfig = () => {
 
 export default function AssetListPage() {
   const { user } = useAuth();
+  const toast = useToast();
+  const theme = useTheme();
   const [searchParams] = useSearchParams();
   const [assets, setAssets] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
@@ -174,6 +163,7 @@ export default function AssetListPage() {
   const [myBorrowedItems, setMyBorrowedItems] = useState<any[]>([]);
   const [extendDialog, setExtendDialog] = useState<{ open: boolean; item: any }>({ open: false, item: null });
   const [extendDays, setExtendDays] = useState(3);
+  const [extendReason, setExtendReason] = useState('');
   const navigate = useNavigate();
 
   const isAdmin = user?.role === 'IT_ADMIN' || user?.role === 'SUPERADMIN';
@@ -231,10 +221,13 @@ export default function AssetListPage() {
         requestId: extendDialog.item.requestId,
         itemIds: [extendDialog.item.id],
         extraDays: extendDays,
+        reason: extendReason || 'ต้องการขยายวันยืม',
       });
+      toast.success('ส่งคำขอขยายวันเรียบร้อย รอ IT Admin อนุมัติ');
       setExtendDialog({ open: false, item: null });
+      setExtendReason('');
     } catch (err: any) {
-      alert(err.response?.data?.error || 'ไม่สามารถขยายวันได้');
+      toast.error(err.response?.data?.error || 'ไม่สามารถขยายวันได้');
     }
   };
 
@@ -242,9 +235,10 @@ export default function AssetListPage() {
     if (window.confirm('ต้องการลบทรัพย์สินนี้ใช่หรือไม่?')) {
       try {
         await assetAPI.delete(id);
+        toast.success('ลบทรัพย์สินเรียบร้อย');
         fetchAssets();
       } catch (err) {
-        alert('ไม่สามารถลบทรัพย์สินได้');
+        toast.error('ไม่สามารถลบทรัพย์สินได้');
       }
     }
   };
@@ -400,11 +394,16 @@ export default function AssetListPage() {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, gap: 2, flexWrap: 'wrap' }}>
-        <Typography variant="h4" fontWeight={600}>
-          {isAvailableOnlyView ? 'รายการอุปกรณ์พร้อมยืม' : 'ทะเบียนทรัพย์สิน'}
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, gap: 2, flexWrap: 'wrap' }}>
+        <Box>
+          <Typography variant="h4" fontWeight={700}>
+            {isAvailableOnlyView ? 'รายการอุปกรณ์พร้อมยืม' : 'ทะเบียนทรัพย์สิน'}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            {isAvailableOnlyView ? 'เลือกอุปกรณ์ที่ต้องการยืม' : `ทั้งหมด ${total} รายการ`}
+          </Typography>
+        </Box>
+        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
           {isAdmin && <ImportAssetsButton />}
           {isAdmin && <ExportAssetsButton />}
           {isAdmin && <Button variant="outlined" startIcon={<TableViewIcon />} onClick={() => setColumnDialogOpen(true)}>จัดคอลัมน์</Button>}
@@ -412,68 +411,78 @@ export default function AssetListPage() {
         </Box>
       </Box>
 
-      <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
-        <TextField label="ค้นหา" size="small" value={search} onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} sx={{ minWidth: 300 }} />
-        {!isAvailableOnlyView && (
-          <FormControl size="small" sx={{ minWidth: 160 }}>
-            <InputLabel>สถานะ</InputLabel>
-            <Select value={status} label="สถานะ" onChange={(e) => { setStatus(e.target.value); setPage(0); }}>
+      <Card sx={{ p: 2.5, mb: 3 }}>
+        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+          <TextField
+            label="ค้นหา"
+            size="small"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            sx={{ minWidth: 300, flex: 1 }}
+            InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} /> }}
+          />
+          {!isAvailableOnlyView && (
+            <FormControl size="small" sx={{ minWidth: 160 }}>
+              <InputLabel>สถานะ</InputLabel>
+              <Select value={status} label="สถานะ" onChange={(e) => { setStatus(e.target.value); setPage(0); }}>
+                <MenuItem value="">ทั้งหมด</MenuItem>
+                <MenuItem value="Available">พร้อมใช้งาน</MenuItem>
+                <MenuItem value="Borrowed">กำลังยืม</MenuItem>
+                <MenuItem value="InUse">ใช้งานประจำ</MenuItem>
+                <MenuItem value="Maintenance">ซ่อมบำรุง</MenuItem>
+                <MenuItem value="Retired">ปลดระวาง</MenuItem>
+                <MenuItem value="Lost">สูญหาย</MenuItem>
+              </Select>
+            </FormControl>
+          )}
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel>ประเภท</InputLabel>
+            <Select value={type} label="ประเภท" onChange={(e) => { setType(e.target.value); setPage(0); }}>
               <MenuItem value="">ทั้งหมด</MenuItem>
-              <MenuItem value="Available">พร้อมใช้งาน</MenuItem>
-              <MenuItem value="Borrowed">กำลังยืม</MenuItem>
-              <MenuItem value="InUse">ใช้งานประจำ</MenuItem>
-              <MenuItem value="Maintenance">ซ่อมบำรุง</MenuItem>
-              <MenuItem value="Retired">ปลดระวาง</MenuItem>
-              <MenuItem value="Lost">สูญหาย</MenuItem>
+              {typeOptions.map((option) => (
+                <MenuItem key={option} value={option}>{option}</MenuItem>
+              ))}
             </Select>
           </FormControl>
-        )}
-        <FormControl size="small" sx={{ minWidth: 180 }}>
-          <InputLabel>ประเภท</InputLabel>
-          <Select value={type} label="ประเภท" onChange={(e) => { setType(e.target.value); setPage(0); }}>
-            <MenuItem value="">ทั้งหมด</MenuItem>
-            {typeOptions.map((option) => (
-              <MenuItem key={option} value={option}>{option}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <Button variant="outlined" onClick={handleSearch}>ค้นหา</Button>
-      </Box>
+          <Button variant="contained" startIcon={<SearchIcon />} onClick={handleSearch}>ค้นหา</Button>
+        </Box>
+      </Card>
 
       {/* Borrowed Items Section — for user available-view */}
       {isAvailableOnlyView && myBorrowedItems.length > 0 && (
-        <Box sx={{ mb: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+        <Box sx={{ mb: 4 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
             <Typography variant="h6" fontWeight={700}>รายการที่กำลังยืม</Typography>
-            <Chip label={`${myBorrowedItems.length} รายการ`} size="small" color="warning" />
+            <Chip label={`${myBorrowedItems.length} รายการ`} size="small" sx={{ bgcolor: alpha(theme.palette.warning.main, 0.1), color: theme.palette.warning.dark, fontWeight: 700 }} />
           </Box>
-          <Grid container spacing={2}>
+          <Grid container spacing={2.5}>
             {myBorrowedItems.map((item: any) => {
               const isOverdue = new Date(item.dueDate) < new Date();
               return (
                 <Grid item xs={12} sm={6} lg={4} key={item.id}>
                   <Card sx={{
                     height: '100%', display: 'flex', flexDirection: 'column',
-                    borderLeft: `4px solid ${isOverdue ? '#ef4444' : '#10b981'}`,
+                    borderLeft: `4px solid ${isOverdue ? theme.palette.error.main : theme.palette.success.main}`,
+                    '&:hover': { boxShadow: isOverdue ? `0 8px 24px ${alpha(theme.palette.error.main, 0.15)}` : `0 8px 24px ${alpha(theme.palette.success.main, 0.15)}` },
                   }}>
                     <CardContent sx={{ flex: 1, pb: 1 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 1 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 1.5 }}>
                         <Box>
-                          <Typography fontWeight={700}>{item.assetCode}</Typography>
-                          <Typography variant="caption" color="text.secondary">{item.brand} {item.model}</Typography>
+                          <Typography fontWeight={700} fontSize="1rem">{item.asset?.assetCode || item.assetCode}</Typography>
+                          <Typography variant="caption" color="text.secondary">{item.asset?.brand || item.brand} {item.asset?.model || item.model}</Typography>
                         </Box>
-                        <Chip label={isOverdue ? 'เกินกำหนด' : 'กำลังยืม'} size="small" color={isOverdue ? 'error' : 'success'} />
+                        <Chip label={isOverdue ? 'เกินกำหนด' : 'กำลังยืม'} size="small" color={isOverdue ? 'error' : 'success'} sx={{ fontWeight: 700 }} />
                       </Box>
-                      <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
-                        <Box><Typography variant="caption" color="text.secondary">วันที่ยืม</Typography><Typography variant="body2" fontWeight={600}>{new Date(item.borrowDate).toLocaleDateString('th-TH')}</Typography></Box>
-                        <Box><Typography variant="caption" color="text.secondary">กำหนดคืน</Typography><Typography variant="body2" fontWeight={600} color={isOverdue ? 'error' : 'inherit'}>{new Date(item.dueDate).toLocaleDateString('th-TH')}</Typography></Box>
+                      <Box sx={{ display: 'flex', gap: 3, mt: 1.5 }}>
+                        <Box><Typography variant="caption" color="text.secondary" fontWeight={600}>วันที่ยืม</Typography><Typography variant="body2" fontWeight={600}>{new Date(item.borrowDate).toLocaleDateString('th-TH')}</Typography></Box>
+                        <Box><Typography variant="caption" color="text.secondary" fontWeight={600}>กำหนดคืน</Typography><Typography variant="body2" fontWeight={600} color={isOverdue ? 'error.main' : 'inherit'}>{new Date(item.dueDate).toLocaleDateString('th-TH')}</Typography></Box>
                       </Box>
                     </CardContent>
                     <Divider />
-                    <Box sx={{ display: 'flex', gap: 0.5, p: 1 }}>
-                      <Button size="small" variant="outlined" startIcon={<PageviewIcon />} onClick={() => navigate(`/assets/${item.assetId}`)} sx={{ flex: 1, fontSize: '0.7rem' }}>ดูรายละเอียด</Button>
-                      <Button size="small" variant="outlined" color="warning" startIcon={<ExtensionIcon />} onClick={() => { setExtendDialog({ open: true, item }); setExtendDays(3); }} sx={{ flex: 1, fontSize: '0.7rem' }}>ขยายวัน</Button>
-                      <Button size="small" variant="contained" color="error" startIcon={<ReturnIcon />} onClick={() => navigate(`/borrow/return?itemId=${item.id}`)} sx={{ flex: 1, fontSize: '0.7rem' }}>รับคืน</Button>
+                    <Box sx={{ display: 'flex', gap: 0.5, p: 1.5 }}>
+                      <Button size="small" variant="outlined" startIcon={<PageviewIcon />} onClick={() => navigate(`/assets/${item.assetId}`)} sx={{ flex: 1 }}>รายละเอียด</Button>
+                      <Button size="small" variant="outlined" color="warning" startIcon={<ExtensionIcon />} onClick={() => { setExtendDialog({ open: true, item }); setExtendDays(3); }} sx={{ flex: 1 }}>ขยายวัน</Button>
                     </Box>
                   </Card>
                 </Grid>
@@ -484,7 +493,7 @@ export default function AssetListPage() {
       )}
 
       {/* Extend Dialog */}
-      <Dialog open={extendDialog.open} onClose={() => setExtendDialog({ open: false, item: null })} maxWidth="xs" fullWidth>
+      <Dialog open={extendDialog.open} onClose={() => { setExtendDialog({ open: false, item: null }); setExtendReason(''); }} maxWidth="xs" fullWidth>
         <DialogTitle>ขยายวันยืม</DialogTitle>
         <DialogContent dividers>
           {extendDialog.item && (
@@ -495,91 +504,114 @@ export default function AssetListPage() {
               <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
                 วันสิ้นสุดใหม่: {new Date(new Date(extendDialog.item.dueDate).getTime() + extendDays * 86400000).toLocaleDateString('th-TH')}
               </Typography>
+              <TextField
+                label="เหตุผลในการขยายวัน"
+                fullWidth
+                multiline
+                rows={2}
+                value={extendReason}
+                onChange={(e) => setExtendReason(e.target.value)}
+                placeholder="เช่น ยังใช้งานไม่เสร็จ, ต้องการทำงานต่อ"
+                sx={{ mt: 2 }}
+              />
             </Box>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setExtendDialog({ open: false, item: null })}>ยกเลิก</Button>
-          <Button variant="contained" onClick={handleExtendSubmit}>ยืนยัน</Button>
+          <Button onClick={() => { setExtendDialog({ open: false, item: null }); setExtendReason(''); }}>ยกเลิก</Button>
+          <Button variant="contained" onClick={handleExtendSubmit}>ส่งคำขอ</Button>
         </DialogActions>
       </Dialog>
 
       {isAvailableOnlyView && (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
           <Typography variant="h6" fontWeight={700}>อุปกรณ์พร้อมให้ยืม</Typography>
-          <Chip label={`${total} รายการ`} size="small" color="success" />
+          <Chip label={`${total} รายการ`} size="small" sx={{ bgcolor: alpha(theme.palette.success.main, 0.1), color: theme.palette.success.dark, fontWeight: 700 }} />
         </Box>
       )}
 
-      {isAvailableOnlyView && user?.role === 'USER' ? (
-        <Grid container spacing={2}>
-          {assets.map((asset) => (
-            <Grid item xs={12} sm={6} lg={4} key={asset.id}>
-              <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'visible' }}>
-                {/* Top accent bar */}
-                <Box sx={{ height: 4, bgcolor: '#FF6B00', borderRadius: '8px 8px 0 0' }} />
-                <CardContent sx={{ flex: 1, p: 2.5 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 1.5 }}>
-                    <Box>
-                      <Typography fontWeight={800} fontSize="1.05rem" color="#111827">{asset.assetCode}</Typography>
-                      <Typography variant="caption" color="#6B7280">{asset.brand} {asset.model}</Typography>
+      {loading ? (
+        isAvailableOnlyView && user?.role === 'USER' ? (
+          <LoadingSkeleton type="cards" count={6} />
+        ) : (
+          <LoadingSkeleton type="table" count={10} />
+        )
+      ) : isAvailableOnlyView && user?.role === 'USER' ? (
+        assets.length === 0 ? (
+          <EmptyState title="ไม่มีอุปกรณ์พร้อมยืม" description="ขณะนี้ไม่มีอุปกรณ์ว่างในระบบ" />
+        ) : (
+          <Grid container spacing={2.5}>
+            {assets.map((asset) => (
+              <Grid item xs={12} sm={6} lg={4} key={asset.id}>
+                <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'visible' }}>
+                  <Box sx={{ height: 4, bgcolor: 'linear-gradient(90deg, #FF6B00, #FF8C00)', borderRadius: '16px 16px 0 0', background: 'linear-gradient(90deg, #FF6B00, #FF8C00)' }} />
+                  <CardContent sx={{ flex: 1, p: 3 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 2 }}>
+                      <Box>
+                        <Typography fontWeight={800} fontSize="1.1rem" color="#0F172A">{asset.assetCode}</Typography>
+                        <Typography variant="body2" color="text.secondary">{asset.brand} {asset.model}</Typography>
+                      </Box>
+                      <StatusChip status={asset.status} />
                     </Box>
-                    <StatusChip status={asset.status} />
-                  </Box>
 
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 2 }}>
-                    <Box sx={{ flex: '1 0 45%' }}>
-                      <Typography variant="caption" color="#9CA3AF" fontWeight={600}>Serial</Typography>
-                      <Typography variant="body2" fontWeight={600} color="#374151">{asset.serialNo}</Typography>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2.5 }}>
+                      <Box sx={{ flex: '1 0 45%' }}>
+                        <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ display: 'block' }}>Serial</Typography>
+                        <Typography variant="body2" fontWeight={600}>{asset.serialNo}</Typography>
+                      </Box>
+                      {asset.cpu && <Box sx={{ flex: '1 0 45%' }}>
+                        <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ display: 'block' }}>CPU</Typography>
+                        <Typography variant="body2" fontWeight={600}>{asset.cpu}</Typography>
+                      </Box>}
+                      {asset.ram && <Box sx={{ flex: '1 0 45%' }}>
+                        <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ display: 'block' }}>RAM</Typography>
+                        <Typography variant="body2" fontWeight={600}>{asset.ram}</Typography>
+                      </Box>}
+                      {asset.storage1 && <Box sx={{ flex: '1 0 45%' }}>
+                        <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ display: 'block' }}>Storage</Typography>
+                        <Typography variant="body2" fontWeight={600}>{asset.storage1}</Typography>
+                      </Box>}
                     </Box>
-                    {asset.cpu && <Box sx={{ flex: '1 0 45%' }}>
-                      <Typography variant="caption" color="#9CA3AF" fontWeight={600}>CPU</Typography>
-                      <Typography variant="body2" fontWeight={600} color="#374151">{asset.cpu}</Typography>
-                    </Box>}
-                    {asset.ram && <Box sx={{ flex: '1 0 45%' }}>
-                      <Typography variant="caption" color="#9CA3AF" fontWeight={600}>RAM</Typography>
-                      <Typography variant="body2" fontWeight={600} color="#374151">{asset.ram}</Typography>
-                    </Box>}
-                    {asset.storage1 && <Box sx={{ flex: '1 0 45%' }}>
-                      <Typography variant="caption" color="#9CA3AF" fontWeight={600}>Storage</Typography>
-                      <Typography variant="body2" fontWeight={600} color="#374151">{asset.storage1}</Typography>
-                    </Box>}
-                  </Box>
 
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, pt: 0.5, borderTop: '1px solid #F0E6DE' }}>
-                    <Typography variant="caption" color="#6B7280">ผู้ถือครอง:</Typography>
-                    <Typography variant="caption" fontWeight={600} color="#374151">{asset.ownerName || '-'}</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, pt: 1.5, borderTop: `1px solid ${theme.palette.divider}` }}>
+                      <Typography variant="caption" color="text.secondary">ผู้ถือครอง:</Typography>
+                      <Typography variant="caption" fontWeight={600}>{asset.ownerName || '-'}</Typography>
+                    </Box>
+                  </CardContent>
+                  <Box sx={{ p: 2, pt: 0 }}>
+                    <Button
+                      variant="contained"
+                      fullWidth
+                      size="large"
+                      onClick={() => navigate(`/borrow/new?assetId=${asset.id}`)}
+                      sx={{ borderRadius: 2, py: 1.5, fontWeight: 700, fontSize: '0.95rem', boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}` }}
+                    >
+                      ขอยืมอุปกรณ์
+                    </Button>
                   </Box>
-                </CardContent>
-                <Box sx={{ p: 1.5, pt: 0 }}>
-                  <Button
-                    variant="contained"
-                    fullWidth
-                    size="large"
-                    onClick={() => navigate(`/borrow/new?assetId=${asset.id}`)}
-                    sx={{ borderRadius: 1, py: 1.2, fontWeight: 700, fontSize: '0.9rem', boxShadow: '0 2px 8px rgba(255,107,0,0.25)' }}
-                  >
-                    ขอยืม
-                  </Button>
-                </Box>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        )
       ) : (
-        <DataGrid
-        rows={assets}
-        columns={columns}
-        loading={loading}
-        rowCount={total}
-        pageSizeOptions={[25, 50, 100]}
-        paginationMode="server"
-        paginationModel={{ page, pageSize }}
-        onPaginationModelChange={(m) => { setPage(m.page); setPageSize(m.pageSize); }}
-        getRowId={(r) => r.id}
-        autoHeight
-        disableRowSelectionOnClick
-      />
+        assets.length === 0 ? (
+          <EmptyState title="ไม่พบข้อมูลทรัพย์สิน" description="ลองปรับเงื่อนไขการค้นหาหรือตัวกรอง" secondaryActionLabel="รีเซ็ตตัวกรอง" onSecondaryAction={() => { setSearch(''); setStatus(''); setType(''); setPage(0); }} />
+        ) : (
+          <DataGrid
+            rows={assets}
+            columns={columns}
+            loading={loading}
+            rowCount={total}
+            pageSizeOptions={[25, 50, 100]}
+            paginationMode="server"
+            paginationModel={{ page, pageSize }}
+            onPaginationModelChange={(m) => { setPage(m.page); setPageSize(m.pageSize); }}
+            getRowId={(r) => r.id}
+            autoHeight
+            disableRowSelectionOnClick
+          />
+        )
       )}
 
       <Dialog open={columnDialogOpen} onClose={() => setColumnDialogOpen(false)} fullWidth maxWidth="sm">
@@ -660,9 +692,6 @@ export default function AssetListPage() {
                 </MenuItem>
                 <MenuItem onClick={() => { handleMenuClose(); navigate(`/assets/${menuAnchor.row.id}/edit`); }}>
                   <EditIcon fontSize="small" sx={{ mr: 1, color: 'info.main' }} /> แก้ไขข้อมูล
-                </MenuItem>
-                <MenuItem onClick={() => { handleMenuClose(); navigate(`/pm/run?assetId=${menuAnchor.row.id}`); }}>
-                  <SettingsIcon fontSize="small" sx={{ mr: 1, color: 'success.main' }} /> จัดการ PM
                 </MenuItem>
                 {user?.role === 'IT_ADMIN' && (
                   <MenuItem onClick={() => { handleMenuClose(); navigate(`/borrow/checkout?assetId=${menuAnchor.row.id}`); }}>

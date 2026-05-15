@@ -157,7 +157,6 @@ export default function ImportAssetsButton() {
                     ramSlot2: row['RAM Slot 2'] || row['ramSlot2'],
                     gpu: row['GPU'] || row['gpu'],
                     osType: row['OS Type'] || row['osType'] || row['OS'],
-                    macosVersion: row['macOS Version'] || row['macosVersion'] || row['macOS'],
                     snComputer: row['S/N Computer'] || row['snComputer'],
                     osVersion: row['OS Version'] || row['osVersion'] || row['Windows'],
                     windowsLicense: row['Windows License'] || row['windowsLicense'] || row['Window License No.'],

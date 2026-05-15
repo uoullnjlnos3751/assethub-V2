@@ -23,6 +23,9 @@ interface Extension {
   currentDueDate: string;
   requestedExtraDays: number;
   reason: string;
+  status: string;
+  decisionNote: string | null;
+  decidedBy: string | null;
   createdAt: string;
 }
 
@@ -49,8 +52,30 @@ export default function ExtensionQueuePage() {
     setLoading(true);
     try {
       const res = await borrowAPI.extensions();
-      setExtensions(res.data.data || []);
-      setFilteredExtensions(res.data.data || []);
+      const raw = Array.isArray(res.data) ? res.data : (res.data.data || []);
+      
+      const mapped: Extension[] = raw.map((ext: any) => {
+        const item = ext.items?.[0];
+        return {
+          id: ext.id,
+          requestNo: ext.request?.requestNo || '',
+          requester: ext.request?.requester || { displayName: 'N/A', adUsername: '' },
+          assetCode: item?.requestItem?.asset?.assetCode || '',
+          brand: item?.requestItem?.asset?.brand || '',
+          model: item?.requestItem?.asset?.model || '',
+          serialNo: item?.requestItem?.asset?.serialNo || '',
+          currentDueDate: item?.oldDueDate || '',
+          requestedExtraDays: item?.extraDays || ext.items?.[0]?.extraDays || 0,
+          reason: ext.reason || '',
+          status: ext.status || '',
+          decisionNote: ext.decisionNote || null,
+          decidedBy: ext.decidedBy || null,
+          createdAt: ext.createdAt,
+        };
+      });
+
+      setExtensions(mapped);
+      setFilteredExtensions(mapped);
     } catch (err) {
       setExtensions([]);
     } finally {
@@ -354,39 +379,68 @@ export default function ExtensionQueuePage() {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>
-          {dialog.action === 'approve' ? 'ยืนยันการอนุมัติ' : 'ยืนยันการปฏิเสธ'}
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          {dialog.action === 'approve' ? (
+            <>
+              <CheckCircleIcon color="success" /> ยืนยันการอนุมัติ
+            </>
+          ) : (
+            <>
+              <CancelIcon color="error" /> ยืนยันการปฏิเสธ
+            </>
+          )}
         </DialogTitle>
         <DialogContent dividers>
           {dialog.extension && (
             <Box sx={{ pt: 1 }}>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                คำขอ: <strong>{dialog.extension.requestNo}</strong> | ผู้ขอ:{' '}
-                <strong>{dialog.extension.requester?.displayName}</strong>
-              </Typography>
+              <Box sx={{ mb: 2, p: 2, bgcolor: '#F8FAFC', borderRadius: 2 }}>
+                <Typography variant="body2" sx={{ mb: 0.5 }}>
+                  คำขอ: <strong>{dialog.extension.requestNo}</strong>
+                </Typography>
+                <Typography variant="body2">
+                  ผู้ขอ: <strong>{dialog.extension.requester?.displayName}</strong>
+                </Typography>
+                <Typography variant="body2">
+                  ทรัพย์สิน: <strong>{dialog.extension.assetCode}</strong> {dialog.extension.brand} {dialog.extension.model}
+                </Typography>
+              </Box>
 
               <Typography variant="body2" sx={{ mb: 2 }}>
-                ขอเพิ่มเติม:{' '}
+                ขอขยายเวลา:{' '}
                 <Chip
-                  label={`${dialog.extension.requestedExtraDays} วัน`}
+                  label={`+${dialog.extension.requestedExtraDays} วัน`}
                   color="primary"
                   size="small"
                 />
+                <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                  (กำหนดคืนเดิม: {new Date(dialog.extension.currentDueDate).toLocaleDateString('th-TH')})
+                </Typography>
               </Typography>
 
-              <TextField
-                label="หมายเหตุ"
-                fullWidth
-                multiline
-                rows={3}
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder={
-                  dialog.action === 'approve'
-                    ? 'เพิ่มหมายเหตุสำหรับอนุมัติ (ถ้ามี)'
-                    : 'ระบุเหตุผลการปฏิเสธ'
-                }
-              />
+              {dialog.action === 'reject' ? (
+                <TextField
+                  label="เหตุผลการไม่อนุมัติ *"
+                  fullWidth
+                  multiline
+                  rows={3}
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  error={note.trim() === ''}
+                  helperText="กรุณาระบุเหตุผลการไม่อนุมัติ เพื่อให้ผู้ขอรับทราบ"
+                  placeholder="เช่น ทรัพย์สินมีความจำเป็นต้องใช้งานต่อ, ไม่สามารถขยายเวลาได้เนื่องจาก..."
+                  sx={{ mb: 1 }}
+                />
+              ) : (
+                <TextField
+                  label="หมายเหตุ (ถ้ามี)"
+                  fullWidth
+                  multiline
+                  rows={2}
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="เพิ่มหมายเหตุสำหรับอนุมัติ"
+                />
+              )}
             </Box>
           )}
         </DialogContent>
@@ -398,14 +452,14 @@ export default function ExtensionQueuePage() {
             variant="contained"
             color={dialog.action === 'approve' ? 'success' : 'error'}
             onClick={handleAction}
-            disabled={processing}
+            disabled={processing || (dialog.action === 'reject' && note.trim() === '')}
           >
             {processing ? (
               <CircularProgress size={20} />
             ) : dialog.action === 'approve' ? (
               'ยืนยันอนุมัติ'
             ) : (
-              'ยืนยันปฏิเสธ'
+              'ยืนยันไม่อนุมัติ'
             )}
           </Button>
         </DialogActions>

@@ -27,6 +27,8 @@ model AppUser {
   pmRunsPerformed   PMRun[]           @relation("PMRunPerformedBy")
   returns           Return[]
 
+  @@index([role, isActive])
+  @@index([department])
   @@map("app_users")
 }
 
@@ -73,6 +75,9 @@ model Asset {
   pmRuns             PMRun[]
 
   @@index([status, departmentId, location])
+  @@index([type, brand])
+  @@index([status, createdAt])
+  @@index([departmentId])
   @@map("assets")
 }
 
@@ -174,6 +179,8 @@ model BorrowRequest {
   checkouts       Checkout[]
 
   @@index([requesterUserId, status])
+  @@index([status, createdAt])
+  @@index([departmentId])
   @@map("borrow_requests")
 }
 
@@ -191,6 +198,8 @@ model BorrowRequestItem {
   returns    Return[]
 
   @@index([assetId, itemStatus, dueDate])
+  @@index([requestId, itemStatus])
+  @@index([dueDate, itemStatus])
   @@map("borrow_request_items")
 }
 
@@ -322,6 +331,7 @@ model PMRun {
   @@unique([assetId, year], name: "unique_asset_year_completed")
   @@index([planId, status])
   @@index([assetId, year])
+  @@index([status, performedAt])
   @@map("pm_runs")
 }
 
@@ -338,11 +348,12 @@ model PMRunAnswer {
 
 model NotificationTemplate {
   id        Int                 @id @default(autoincrement())
-  key       String              @unique
+  key       String
   channel   NotificationChannel
   subjectTh String
   bodyTh    String
 
+  @@unique([key, channel])
   @@map("notification_templates")
 }
 
@@ -358,15 +369,36 @@ model NotificationOutbox {
   createdAt   DateTime            @default(now())
   sentAt      DateTime?
 
+  @@index([status, channel])
+  @@index([createdAt])
   @@map("notification_outbox")
 }
 
 model NotificationSetting {
   id               Int     @id @default(autoincrement())
+
+  // General
+  systemName       String  @default("AssetHub")
+  organizationName String  @default("TRR Group")
+  timezone         String  @default("Asia/Bangkok")
+  darkMode         Boolean @default(false)
+  showWelcomeBanner Boolean @default(true)
+
+  // Borrow Rules
+  borrowDays       Int     @default(3)
+  maxItemsPerRequest Int   @default(5)
+  allowExtension   Boolean @default(true)
+
+  // Notifications
   enableEmail      Boolean @default(true)
   enableTeams      Boolean @default(false)
   teamsWebhookUrl  String?
   enabledEventKeys String  @default("borrow_request_pending,borrow_approved,borrow_rejected,checkout_completed,return_recorded,overdue_borrow,extension_pending,extension_approved,extension_rejected,pm_overdue")
+
+  // Security
+  requireStrongPassword Boolean @default(true)
+  passwordExpiryDays    Int     @default(90)
+  sessionTimeoutHours   Int     @default(8)
 
   @@map("notification_settings")
 }

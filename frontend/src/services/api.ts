@@ -77,6 +77,7 @@ export const borrowAPI = {
   myRequests: (params?: any) => api.get('/borrow/requests', { params }),
   myItems: () => api.get('/borrow/my-items'),
   myHistory: () => api.get('/borrow/my-history'),
+  myExtensions: () => api.get('/borrow/my-extensions'),
   allRequests: (params?: any) => api.get('/borrow/all-requests', { params }),
   approve: (id: number, data: any) => api.post(`/borrow/requests/${id}/approve`, data),
   checkout: (id: number, data: any) => api.post(`/borrow/requests/${id}/checkout`, data),

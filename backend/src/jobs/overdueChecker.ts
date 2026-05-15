@@ -10,19 +10,21 @@ export async function checkOverdueBorrows() {
       itemStatus: { in: ['CheckedOut', 'PartiallyReturned'] },
       dueDate: { lt: now },
     },
-    include: { request: { include: { requester: true } } },
+    include: { request: { include: { requester: true } }, asset: true },
   });
 
   for (const item of overdueItems) {
     const requester = item.request.requester;
     if (!item.dueDate) continue;
     const daysOverdue = Math.floor((now.getTime() - item.dueDate.getTime()) / (1000 * 60 * 60 * 24));
+    const dueDateStr = item.dueDate.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
 
     if (requester.email) {
       await createNotification('overdue_borrow', 'EMAIL', requester.email, {
-        assetCode: `Asset#${item.assetId}`,
+        requester: requester.displayName || requester.adUsername,
+        assetCode: item.asset?.assetCode || `Asset#${item.assetId}`,
         daysOverdue: String(daysOverdue),
-        dueDate: item.dueDate.toISOString(),
+        dueDate: dueDateStr,
       });
     }
 
@@ -33,8 +35,9 @@ export async function checkOverdueBorrows() {
       if (admin.email) {
         await createNotification('overdue_borrow', 'EMAIL', admin.email, {
           requester: requester.displayName || requester.adUsername,
+          assetCode: item.asset?.assetCode || `Asset#${item.assetId}`,
           daysOverdue: String(daysOverdue),
-          dueDate: item.dueDate.toISOString(),
+          dueDate: dueDateStr,
         });
       }
     }
