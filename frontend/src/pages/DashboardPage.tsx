@@ -1,19 +1,25 @@
 import React, { useEffect, useState } from 'react';
-import { Grid, Card, CardContent, Typography, Box, CircularProgress, alpha, useTheme, LinearProgress } from '@mui/material';
+import {
+  Grid, Card, CardContent, Typography, Box, CircularProgress,
+  LinearProgress, Chip, Divider, alpha, useTheme,
+} from '@mui/material';
 import { motion } from 'framer-motion';
-import { 
-  Boxes, 
-  ShoppingCart, 
-  Wrench, 
-  AlertTriangle, 
-  TrendingUp, 
-  CheckCircle2, 
+import {
+  Boxes,
+  ShoppingCart,
+  Wrench,
+  AlertTriangle,
+  TrendingUp,
+  CheckCircle2,
   Clock,
   ArrowRight,
   Activity,
   Users,
   Calendar,
   ListTodo as ListAltIcon,
+  ArrowUpRight,
+  ArrowDownRight,
+  MoreHorizontal,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { dashboardAPI } from '../services/api';
@@ -27,14 +33,40 @@ const container = {
   hidden: { opacity: 0 },
   show: {
     opacity: 1,
-    transition: { staggerChildren: 0.08 }
+    transition: { staggerChildren: 0.06 }
   }
 } as const;
 
 const item = {
-  hidden: { opacity: 0, y: 16 },
-  show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 120, damping: 14 } }
+  hidden: { opacity: 0, y: 12 },
+  show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 100, damping: 12 } }
 } as const;
+
+const cardSx = {
+  borderRadius: 3,
+  border: 'none',
+  boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03)',
+  transition: 'box-shadow 0.2s ease, transform 0.2s ease',
+  '&:hover': {
+    boxShadow: '0 2px 6px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.05)',
+  },
+};
+
+const statCardSx = (bgColor: string) => ({
+  ...cardSx,
+  background: bgColor,
+  p: 3,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 1,
+});
+
+const sectionTitleSx = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  mb: 3,
+};
 
 export default function DashboardPage() {
   const theme = useTheme();
@@ -64,7 +96,7 @@ export default function DashboardPage() {
 
   if (loading) return (
     <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
-      <CircularProgress thickness={5} size={48} sx={{ color: theme.palette.primary.main }} />
+      <CircularProgress size={32} sx={{ color: '#66BB6A' }} />
     </Box>
   );
 
@@ -72,34 +104,59 @@ export default function DashboardPage() {
     return (
       <MotionBox initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
         <Box sx={{ mb: 4 }}>
-          <Typography variant="h3" sx={{ mb: 1, color: '#0F172A' }}>
-            ยินดีต้อนรับ, {user?.displayName || user?.adUsername} 👋
+          <Typography variant="h4" fontWeight={600} sx={{ mb: 0.5, color: '#1a1a2e' }}>
+            สวัสดี, {user?.displayName || user?.adUsername} 
           </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 600 }}>
+          <Typography variant="body2" color="text.secondary">
             ระบบบริหารจัดการทรัพย์สิน IT พร้อมให้บริการคุณแล้ว
           </Typography>
         </Box>
 
-        <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid container spacing={2.5} sx={{ mb: 4 }}>
           {[
-            { label: 'รายการอุปกรณ์พร้อมยืม', path: '/assets?status=Available', icon: CheckCircle2, color: theme.palette.success.main },
-            { label: 'ยืมทรัพย์สินใหม่', path: '/borrow/new', icon: ShoppingCart, color: theme.palette.primary.main },
-            { label: 'คำขอของฉัน', path: '/borrow/my-requests', icon: ListAltIcon, color: theme.palette.info.main },
+            { label: 'อุปกรณ์พร้อมยืม', path: '/assets?status=Available', icon: CheckCircle2, bg: '#E8F5E9', color: '#43A047' },
+            { label: 'ยืมทรัพย์สินใหม่', path: '/borrow/new', icon: ShoppingCart, bg: '#E3F2FD', color: '#1976D2' },
+            { label: 'คำขอของฉัน', path: '/borrow/my-requests', icon: ListAltIcon, bg: '#FFF3E0', color: '#F57C00' },
           ].map((action, idx) => (
             <Grid item xs={12} md={4} key={idx}>
-              <StatCard title={action.label} value="คลิกเลย" icon={action.icon} color={action.color} onClick={() => window.location.href = action.path} />
+              <Card
+                sx={{
+                  ...cardSx,
+                  background: action.bg,
+                  cursor: 'pointer',
+                  p: 2.5,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 2,
+                  '&:hover': { transform: 'translateY(-2px)' },
+                }}
+                onClick={() => window.location.href = action.path}
+              >
+                <Box sx={{
+                  p: 1.5,
+                  borderRadius: 2.5,
+                  bgcolor: alpha(action.color, 0.15),
+                  color: action.color,
+                }}>
+                  <action.icon size={22} />
+                </Box>
+                <Typography variant="body2" fontWeight={600} sx={{ color: action.color }}>
+                  {action.label}
+                </Typography>
+                <ArrowRight size={16} style={{ marginLeft: 'auto', opacity: 0.5 }} />
+              </Card>
             </Grid>
           ))}
         </Grid>
 
-        <Card sx={{ p: 4, border: `1px dashed ${alpha(theme.palette.primary.main, 0.3)}`, bgcolor: alpha(theme.palette.primary.main, 0.02) }}>
+        <Card sx={{ p: 3, border: `1px dashed ${alpha(theme.palette.primary.main, 0.2)}`, bgcolor: alpha(theme.palette.primary.main, 0.02), borderRadius: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Box sx={{ p: 1.5, borderRadius: 3, bgcolor: alpha(theme.palette.primary.main, 0.1), color: theme.palette.primary.main }}>
-              <ArrowRight size={24} />
+            <Box sx={{ p: 1.5, borderRadius: 2.5, bgcolor: alpha(theme.palette.primary.main, 0.1), color: theme.palette.primary.main }}>
+              <ArrowRight size={20} />
             </Box>
             <Box>
-              <Typography variant="h6" fontWeight={700} sx={{ mb: 0.5 }}>เริ่มต้นใช้งาน</Typography>
-              <Typography variant="body2" color="text.secondary">ใช้เมนูด้านซ้ายเพื่อเริ่มทำรายการยืมอุปกรณ์ หรือตรวจสอบประวัติการยืมของคุณ</Typography>
+              <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 0.25 }}>เริ่มต้นใช้งาน</Typography>
+              <Typography variant="caption" color="text.secondary">ใช้เมนูด้านซ้ายเพื่อเริ่มทำรายการยืมอุปกรณ์ หรือตรวจสอบประวัติการยืมของคุณ</Typography>
             </Box>
           </Box>
         </Card>
@@ -117,84 +174,182 @@ export default function DashboardPage() {
   };
 
   const statusColors: Record<string, string> = {
-    Available: theme.palette.success.main,
-    Borrowed: theme.palette.warning.main,
-    InUse: theme.palette.info.main,
-    Maintenance: theme.palette.error.main,
-    Retired: theme.palette.grey[500],
-    Lost: theme.palette.error.dark,
+    Available: '#66BB6A',
+    Borrowed: '#FFA726',
+    InUse: '#42A5F5',
+    Maintenance: '#EF5350',
+    Retired: '#9E9E9E',
+    Lost: '#C62828',
+  };
+
+  const statusBgs: Record<string, string> = {
+    Available: '#E8F5E9',
+    Borrowed: '#FFF3E0',
+    InUse: '#E3F2FD',
+    Maintenance: '#FFEBEE',
+    Retired: '#F5F5F5',
+    Lost: '#FFEBEE',
   };
 
   return (
     <Box sx={{ pb: 4 }}>
+      {/* Header */}
       <MotionBox initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} sx={{ mb: 4 }}>
-        <Typography variant="h3" sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-          แดชบอร์ด
-          <Box sx={{ px: 2, py: 0.5, borderRadius: 2, bgcolor: alpha(theme.palette.success.main, 0.1), display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: theme.palette.success.main, animation: 'pulse 2s infinite' }} />
-            <Typography variant="caption" fontWeight={700} color="success.dark">Live</Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Box>
+            <Typography variant="h4" fontWeight={600} sx={{ color: '#1a1a2e', mb: 0.5 }}>
+              แดชบอร์ด
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              ภาพรวมข้อมูลทรัพย์สินและสถานะการดำเนินงาน
+            </Typography>
           </Box>
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          ภาพรวมข้อมูลทรัพย์สินและสถานะการดำเนินงานแบบเรียลไทม์
-        </Typography>
+          <Chip
+            label="Live"
+            size="small"
+            sx={{
+              bgcolor: '#E8F5E9',
+              color: '#43A047',
+              fontWeight: 600,
+              fontSize: '0.75rem',
+              '& .MuiChip-label': { px: 1.5 },
+            }}
+          />
+        </Box>
       </MotionBox>
 
-      <Grid container spacing={3} component={motion.div} variants={container} initial="hidden" animate="show">
+      {/* Stat Cards */}
+      <Grid container spacing={2.5} component={motion.div} variants={container} initial="hidden" animate="show" sx={{ mb: 3 }}>
         <Grid item xs={12} sm={6} md={3} component={motion.div} variants={item}>
-          <StatCard title="ทรัพย์สินทั้งหมด" value={assetSummary?.total || 0} icon={Boxes} color={theme.palette.primary.main} />
+          <Card sx={statCardSx('#E8F5E9')}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box sx={{
+                p: 1.5,
+                borderRadius: 2.5,
+                bgcolor: alpha('#43A047', 0.15),
+                color: '#43A047',
+              }}>
+                <Boxes size={22} />
+              </Box>
+              <Typography variant="h3" fontWeight={700} sx={{ color: '#1a1a2e', m: 0 }}>
+                {assetSummary?.total || 0}
+              </Typography>
+            </Box>
+            <Typography variant="caption" color="text.secondary" fontWeight={500}>
+              ทรัพย์สินทั้งหมด
+            </Typography>
+          </Card>
         </Grid>
+
         <Grid item xs={12} sm={6} md={3} component={motion.div} variants={item}>
-          <StatCard title="ยืมเกินกำหนด" value={borrowSummary?.overdue || 0} icon={AlertTriangle} color={theme.palette.error.main} />
+          <Card sx={statCardSx('#FFEBEE')}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box sx={{
+                p: 1.5,
+                borderRadius: 2.5,
+                bgcolor: alpha('#EF5350', 0.15),
+                color: '#EF5350',
+              }}>
+                <AlertTriangle size={22} />
+              </Box>
+              <Typography variant="h3" fontWeight={700} sx={{ color: '#1a1a2e', m: 0 }}>
+                {borrowSummary?.overdue || 0}
+              </Typography>
+            </Box>
+            <Typography variant="caption" color="text.secondary" fontWeight={500}>
+              ยืมเกินกำหนด
+            </Typography>
+          </Card>
         </Grid>
+
         <Grid item xs={12} sm={6} md={3} component={motion.div} variants={item}>
-          <StatCard title="รออนุมัติ" value={borrowSummary?.pendingApproval || 0} icon={ShoppingCart} color={theme.palette.warning.main} />
+          <Card sx={statCardSx('#FFF3E0')}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box sx={{
+                p: 1.5,
+                borderRadius: 2.5,
+                bgcolor: alpha('#FFA726', 0.15),
+                color: '#FFA726',
+              }}>
+                <ShoppingCart size={22} />
+              </Box>
+              <Typography variant="h3" fontWeight={700} sx={{ color: '#1a1a2e', m: 0 }}>
+                {borrowSummary?.pendingApproval || 0}
+              </Typography>
+            </Box>
+            <Typography variant="caption" color="text.secondary" fontWeight={500}>
+              รออนุมัติ
+            </Typography>
+          </Card>
         </Grid>
+
         <Grid item xs={12} sm={6} md={3} component={motion.div} variants={item}>
-          <StatCard
-            title="PM Completion"
-            value={pmSummary ? `${Math.round((pmSummary.completed / pmSummary.total) * 100)}%` : '0%'}
-            icon={CheckCircle2}
-            color={theme.palette.success.main}
-          />
+          <Card sx={statCardSx('#E3F2FD')}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box sx={{
+                p: 1.5,
+                borderRadius: 2.5,
+                bgcolor: alpha('#42A5F5', 0.15),
+                color: '#42A5F5',
+              }}>
+                <CheckCircle2 size={22} />
+              </Box>
+              <Typography variant="h3" fontWeight={700} sx={{ color: '#1a1a2e', m: 0 }}>
+                {pmSummary ? `${Math.round((pmSummary.completed / pmSummary.total) * 100)}%` : '0%'}
+              </Typography>
+            </Box>
+            <Typography variant="caption" color="text.secondary" fontWeight={500}>
+              PM Completion
+            </Typography>
+          </Card>
         </Grid>
       </Grid>
 
-      <Grid container spacing={3} sx={{ mt: 1 }}>
-        {assetSummary && (
+      {/* Asset Status Breakdown */}
+      {assetSummary && (
+        <Grid container spacing={2.5} sx={{ mt: 1 }}>
           <Grid item xs={12} md={8}>
-            <Card sx={{ height: '100%' }}>
+            <Card sx={{ ...cardSx, p: 0 }}>
               <CardContent sx={{ p: 3 }}>
-                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
-                  <TrendingUp size={20} color={theme.palette.primary.main} />
-                  สรุปทรัพย์สินตามสถานะ
-                </Typography>
+                <Box sx={sectionTitleSx}>
+                  <Typography variant="subtitle2" fontWeight={600} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.8 }}>
+                    สรุปทรัพย์สินตามสถานะ
+                  </Typography>
+                  <MoreHorizontal size={18} style={{ opacity: 0.4, cursor: 'pointer' }} />
+                </Box>
                 <Grid container spacing={2}>
                   {assetSummary.byStatus?.map((s: any) => {
-                    const color = statusColors[s.status] || theme.palette.grey[500];
+                    const color = statusColors[s.status] || '#9E9E9E';
+                    const bg = statusBgs[s.status] || '#F5F5F5';
                     const percentage = assetSummary.total > 0 ? (s._count / assetSummary.total) * 100 : 0;
                     return (
                       <Grid item xs={12} sm={6} md={4} key={s.status}>
-                        <Box sx={{ p: 2.5, borderRadius: 3, border: `1px solid ${alpha(color, 0.15)}`, bgcolor: alpha(color, 0.03) }}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-                            <StatusChip status={s.status} />
-                            <Typography variant="h4" fontWeight={800} sx={{ color }}>{s._count}</Typography>
+                        <Box sx={{
+                          p: 2.5,
+                          borderRadius: 2.5,
+                          background: bg,
+                          border: `1px solid ${alpha(color, 0.1)}`,
+                        }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
+                            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                              {statusLabels[s.status] || s.status}
+                            </Typography>
+                            <Typography variant="h4" fontWeight={700} sx={{ color, m: 0, lineHeight: 1 }}>
+                              {s._count}
+                            </Typography>
                           </Box>
-                          <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ display: 'block', mb: 1 }}>
-                            {statusLabels[s.status] || s.status}
-                          </Typography>
                           <LinearProgress
                             variant="determinate"
                             value={percentage}
                             sx={{
-                              height: 8,
-                              borderRadius: 4,
+                              height: 6,
+                              borderRadius: 3,
                               bgcolor: alpha(color, 0.1),
-                              '& .MuiLinearProgress-bar': { borderRadius: 4, bgcolor: color },
+                              '& .MuiLinearProgress-bar': { borderRadius: 3, bgcolor: color },
                             }}
                           />
-                          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                            {percentage.toFixed(1)}% ของทั้งหมด
+                          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block', fontWeight: 500 }}>
+                            {percentage.toFixed(1)}%
                           </Typography>
                         </Box>
                       </Grid>
@@ -204,62 +359,74 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           </Grid>
-        )}
 
-        {pmSummary && (
-          <Grid item xs={12} md={4}>
-            <Card sx={{ height: '100%', background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', color: 'white', border: 'none' }}>
-              <CardContent sx={{ p: 3 }}>
-                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
-                  <Wrench size={20} color={theme.palette.primary.light} />
-                  สรุป PM {new Date().getFullYear()}
-                </Typography>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-                  {[
-                    { label: 'แผนงานทั้งหมด', value: pmSummary.total, icon: Calendar, color: theme.palette.grey[300] },
-                    { label: 'ดำเนินการเสร็จสิ้น', value: pmSummary.completed, icon: CheckCircle2, color: theme.palette.success.light },
-                    { label: 'คงเหลือรายการ', value: pmSummary.remaining, icon: Clock, color: theme.palette.warning.light },
-                  ].map((row, idx) => (
-                    <Box key={idx} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Box sx={{ p: 1, borderRadius: 2, bgcolor: alpha('#fff', 0.1) }}>
-                          <row.icon size={18} />
+          {/* PM Summary */}
+          {pmSummary && (
+            <Grid item xs={12} md={4}>
+              <Card sx={{ ...cardSx, p: 0, height: '100%' }}>
+                <CardContent sx={{ p: 3 }}>
+                  <Box sx={sectionTitleSx}>
+                    <Typography variant="subtitle2" fontWeight={600} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.8 }}>
+                      PM {new Date().getFullYear()}
+                    </Typography>
+                    <MoreHorizontal size={18} style={{ opacity: 0.4, cursor: 'pointer' }} />
+                  </Box>
+
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {[
+                      { label: 'แผนงานทั้งหมด', value: pmSummary.total, icon: Calendar, color: '#1a1a2e' },
+                      { label: 'ดำเนินการเสร็จสิ้น', value: pmSummary.completed, icon: CheckCircle2, color: '#43A047' },
+                      { label: 'คงเหลือรายการ', value: pmSummary.remaining, icon: Clock, color: '#FFA726' },
+                    ].map((row, idx) => (
+                      <Box key={idx} sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        p: 1.5,
+                        borderRadius: 2,
+                        bgcolor: idx === 1 ? alpha('#43A047', 0.06) : 'transparent',
+                      }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Box sx={{
+                            p: 1,
+                            borderRadius: 2,
+                            bgcolor: alpha(row.color, 0.1),
+                            color: row.color,
+                          }}>
+                            <row.icon size={16} />
+                          </Box>
+                          <Typography variant="body2" fontWeight={500} color="text.secondary">{row.label}</Typography>
                         </Box>
-                        <Typography variant="body1" fontWeight={500}>{row.label}</Typography>
+                        <Typography variant="h6" fontWeight={700} sx={{ color: row.color, m: 0 }}>{row.value}</Typography>
                       </Box>
-                      <Typography variant="h5" fontWeight={800} sx={{ color: row.color }}>{row.value}</Typography>
-                    </Box>
-                  ))}
-                </Box>
-                <Box sx={{ mt: 4, p: 3, borderRadius: 3, bgcolor: alpha(theme.palette.primary.main, 0.2), border: `1px solid ${alpha(theme.palette.primary.main, 0.3)}` }}>
-                  <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>ความคืบหน้าภาพรวม</Typography>
-                  <Typography variant="h3" fontWeight={800}>
-                    {pmSummary.total > 0 ? Math.round((pmSummary.completed / pmSummary.total) * 100) : 0}%
-                  </Typography>
-                  <LinearProgress
-                    variant="determinate"
-                    value={pmSummary.total > 0 ? (pmSummary.completed / pmSummary.total) * 100 : 0}
-                    sx={{
-                      mt: 1.5,
-                      height: 6,
-                      borderRadius: 3,
-                      bgcolor: alpha('#fff', 0.1),
-                      '& .MuiLinearProgress-bar': { borderRadius: 3, bgcolor: theme.palette.primary.main },
-                    }}
-                  />
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        )}
-      </Grid>
+                    ))}
+                  </Box>
 
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.4; }
-        }
-      `}</style>
+                  <Box sx={{ mt: 3, p: 2.5, borderRadius: 2.5, bgcolor: alpha('#43A047', 0.06), border: `1px solid ${alpha('#43A047', 0.1)}` }}>
+                    <Typography variant="caption" color="text.secondary" fontWeight={500} sx={{ display: 'block', mb: 1 }}>
+                      ความคืบหน้าภาพรวม
+                    </Typography>
+                    <Typography variant="h3" fontWeight={700} sx={{ color: '#43A047', m: 0, lineHeight: 1 }}>
+                      {pmSummary.total > 0 ? Math.round((pmSummary.completed / pmSummary.total) * 100) : 0}%
+                    </Typography>
+                    <LinearProgress
+                      variant="determinate"
+                      value={pmSummary.total > 0 ? (pmSummary.completed / pmSummary.total) * 100 : 0}
+                      sx={{
+                        mt: 1.5,
+                        height: 6,
+                        borderRadius: 3,
+                        bgcolor: alpha('#43A047', 0.1),
+                        '& .MuiLinearProgress-bar': { borderRadius: 3, bgcolor: '#43A047' },
+                      }}
+                    />
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+          )}
+        </Grid>
+      )}
     </Box>
   );
 }

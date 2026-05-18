@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import {
   Box, Typography, Card, CardContent, Grid, TextField, Switch, FormControlLabel,
   Button, Alert, CircularProgress, Divider, Stack, Chip, Paper, Tabs, Tab, Fade,
-  Select, MenuItem, InputLabel, FormControl,
+  Select, MenuItem, InputLabel, FormControl, IconButton, Table, TableBody,
+  TableCell, TableContainer, TableHead, TableRow,
 } from '@mui/material';
 import {
   Settings as SettingsIcon,
@@ -18,6 +19,10 @@ import {
   AlertTriangle as AlertTriangleIcon,
   Server as ServerIcon,
   Lock as LockIcon,
+  Smartphone as SmartphoneIcon,
+  Send as SendIcon,
+  RefreshCw as RefreshIcon,
+  MessageCircle as MessageCircleIcon,
 } from 'lucide-react';
 import { adminAPI } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
@@ -372,9 +377,20 @@ export default function SettingsPage() {
   const [templates, setTemplates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [logs, setLogs] = useState<any[]>([]);
+  const [logTotal, setLogTotal] = useState(0);
+  const [logLoading, setLogLoading] = useState(false);
 
   const borrowDays = parseInt(settings?.borrowDays || '3');
   const maxItems = parseInt(settings?.maxItemsPerRequest || '5');
+
+  const fetchLogs = () => {
+    setLogLoading(true);
+    adminAPI.notificationLogs({ page: 1, limit: 30 })
+      .then((res) => { setLogs(res.data.data || []); setLogTotal(res.data.total || 0); })
+      .catch(() => {})
+      .finally(() => setLogLoading(false));
+  };
 
   useEffect(() => {
     Promise.all([adminAPI.settings(), adminAPI.notificationTemplates()])
@@ -384,6 +400,7 @@ export default function SettingsPage() {
       })
       .catch(() => toast.error('ไม่สามารถโหลดการตั้งค่าได้'))
       .finally(() => setLoading(false));
+    fetchLogs();
   }, []);
 
   const handleSave = async () => {
@@ -399,12 +416,25 @@ export default function SettingsPage() {
         maxItemsPerRequest: parseInt(settings?.maxItemsPerRequest || '5'),
         allowExtension: settings?.allowExtension ?? true,
         enableEmail: settings?.enableEmail ?? true,
+        smtpHost: settings?.smtpHost || '',
+        smtpPort: settings?.smtpPort || '587',
+        smtpUser: settings?.smtpUser || '',
+        smtpPass: settings?.smtpPass || '',
+        smtpFromEmail: settings?.smtpFromEmail || '',
+        smtpFromName: settings?.smtpFromName || '',
         enableTeams: settings?.enableTeams ?? false,
         teamsWebhookUrl: settings?.teamsWebhookUrl || '',
         enabledEventKeys: settings?.enabledEventKeys || '',
         requireStrongPassword: settings?.requireStrongPassword ?? true,
         passwordExpiryDays: parseInt(settings?.passwordExpiryDays || '90'),
         sessionTimeoutHours: parseInt(settings?.sessionTimeoutHours || '8'),
+        enableLine: settings?.enableLine ?? false,
+        lineChannelAccessToken: settings?.lineChannelAccessToken || '',
+        lineWebhookUrl: settings?.lineWebhookUrl || '',
+        lineWebhookVerifyToken: settings?.lineWebhookVerifyToken || '',
+        lineSendMode: settings?.lineSendMode || 'broadcast',
+        lineUserIds: settings?.lineUserIds || '',
+        lineEnabledStatuses: settings?.lineEnabledStatuses || '',
       });
       toast.success('บันทึกการตั้งค่าเรียบร้อยแล้ว');
     } catch {
@@ -498,39 +528,408 @@ export default function SettingsPage() {
       </TabPanel>
 
       <TabPanel value={tabValue} index={2}>
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>ช่องทางการส่ง</Typography>
-                <Box sx={{ p: 2, borderRadius: 2, bgcolor: settings?.enableEmail ? 'rgba(16, 185, 129, 0.1)' : 'grey.100', mb: 2 }}>
-                  <FormControlLabel control={<Switch checked={settings?.enableEmail} onChange={(e) => setSettings({ ...settings, enableEmail: e.target.checked })} color="success" />} label={<Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><MailIcon size={18} /> เปิดใช้งาน Email</Box>} />
-                </Box>
-                <Box sx={{ p: 2, borderRadius: 2, bgcolor: settings?.enableTeams ? 'rgba(99, 102, 241, 0.1)' : 'grey.100' }}>
-                  <FormControlLabel control={<Switch checked={settings?.enableTeams} onChange={(e) => setSettings({ ...settings, enableTeams: e.target.checked })} color="primary" />} label={<Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><TeamsIcon size={18} /> เปิดใช้งาน MS Teams</Box>} />
-                </Box>
-                {settings?.enableTeams && <TextField label="Teams Webhook URL" fullWidth size="small" value={settings?.teamsWebhookUrl || ''} onChange={(e) => setSettings({ ...settings, teamsWebhookUrl: e.target.value })} sx={{ mt: 2 }} />}
-              </CardContent>
-            </Card>
+        <Box>
+          {/* ── Header Banner ── */}
+          <Paper sx={{
+            background: 'linear-gradient(135deg, #00B900 0%, #009900 100%)',
+            borderRadius: 3, p: 3, mb: 3, color: '#fff',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2,
+          }}>
+            <Box>
+              <Typography variant="h5" fontWeight={800} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
+                <SmartphoneIcon size={28} /> การแจ้งเตือน LINE
+              </Typography>
+              <Typography variant="body2" sx={{ opacity: 0.85 }}>จัดการการแจ้งเตือนผ่าน LINE Messaging API</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+              <Box sx={{ textAlign: 'right' }}>
+                <Typography variant="caption" sx={{ opacity: 0.7, display: 'block' }}>{new Date().toLocaleDateString('th-TH', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}</Typography>
+                <Typography variant="body2" fontWeight={600}>{new Date().toLocaleTimeString('th-TH')}</Typography>
+              </Box>
+              <Chip label={settings?.enableLine ? 'เปิดใช้งาน' : 'ปิดใช้งาน'} size="small" sx={{ bgcolor: settings?.enableLine ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.15)', color: '#fff', fontWeight: 600, backdropFilter: 'blur(4px)' }} />
+              <Button variant="contained" size="small" sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: '#fff', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' }, backdropFilter: 'blur(4px)' }}>
+                ทดสอบส่ง
+              </Button>
+            </Box>
+          </Paper>
+
+          {/* ── Stats ── */}
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            {[
+              { label: 'การแจ้งเตือนทั้งหมด', value: logTotal, color: '#6366f1', icon: '📊' },
+              { label: 'ส่งสำเร็จ', value: logs.filter(l => l.status === 'SENT').length, color: '#10b981', icon: '✅' },
+              { label: 'ส่งไม่สำเร็จ', value: logs.filter(l => l.status === 'FAILED').length, color: '#ef4444', icon: '❌' },
+              { label: 'วันนี้', value: logs.filter(l => new Date(l.createdAt).toDateString() === new Date().toDateString()).length, color: '#f59e0b', icon: '📅' },
+            ].map(stat => (
+              <Grid item xs={6} sm={3} key={stat.label}>
+                <Card sx={{ borderRadius: 2.5, border: '1px solid', borderColor: 'divider' }}>
+                  <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                    <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                      <Box>
+                        <Typography variant="caption" color="text.secondary" fontWeight={600}>{stat.label}</Typography>
+                        <Typography variant="h4" fontWeight={800} sx={{ color: stat.color, lineHeight: 1.2, mt: 0.5 }}>{stat.value}</Typography>
+                      </Box>
+                      <Box sx={{ fontSize: '1.8rem' }}>{stat.icon}</Box>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
           </Grid>
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>เหตุการณ์ที่แจ้งเตือน</Typography>
-                <TextField fullWidth multiline rows={8} value={settings?.enabledEventKeys || ''} onChange={(e) => setSettings({ ...settings, enabledEventKeys: e.target.value })} placeholder="คั่นด้วยเครื่องหมาย ," sx={{ mb: 2 }} />
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                  {['borrow_request_pending', 'borrow_approved', 'borrow_rejected', 'checkout_completed', 'return_recorded', 'overdue_borrow', 'extension_pending', 'pm_overdue'].map(k => (
-                    <Chip key={k} label={k} size="small" variant="outlined" onClick={() => {
-                      const keys = settings?.enabledEventKeys ? settings.enabledEventKeys.split(',').map((s: string) => s.trim()) : [];
-                      const newKeys = keys.includes(k) ? keys.filter((x: string) => x !== k) : [...keys, k];
-                      setSettings({ ...settings, enabledEventKeys: newKeys.join(', ') });
-                    }} sx={{ cursor: 'pointer' }} />
+
+          {/* ── Channel Configuration ── */}
+          <Grid container spacing={3} sx={{ mb: 3 }}>
+            {/* LINE Config */}
+            <Grid item xs={12}>
+              <Card sx={{ borderRadius: 2.5 }}>
+                <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <SmartphoneIcon size={18} color="#00B900" />
+                  <Typography variant="subtitle2" fontWeight={700}>ตั้งค่าช่องทาง LINE</Typography>
+                </Box>
+                <CardContent sx={{ p: 2.5 }}>
+                  <Grid container spacing={2} sx={{ mb: 0 }}>
+                    <Grid item xs={12}>
+                      <TextField
+                        label="LINE Channel Access Token"
+                        fullWidth size="small"
+                        type={settings?.lineChannelAccessToken ? 'password' : 'text'}
+                        value={settings?.lineChannelAccessToken || ''}
+                        onChange={(e) => setSettings({ ...settings, lineChannelAccessToken: e.target.value })}
+                        InputProps={{
+                          startAdornment: settings?.lineChannelAccessToken
+                            ? <Box component="span" sx={{ mr: 1, color: '#10b981', fontSize: '1rem' }}>✓</Box>
+                            : null,
+                        }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={8}>
+                      <TextField
+                        label="LINE Webhook URL"
+                        fullWidth size="small"
+                        value={settings?.lineWebhookUrl || ''}
+                        onChange={(e) => setSettings({ ...settings, lineWebhookUrl: e.target.value })}
+                        placeholder="https://your-domain.com/api/line/webhook"
+                        helperText="ใส่ URL สำหรับรับ webhook จาก LINE Platform"
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <TextField
+                        label="Verify Token"
+                        fullWidth size="small"
+                        value={settings?.lineWebhookVerifyToken || ''}
+                        onChange={(e) => setSettings({ ...settings, lineWebhookVerifyToken: e.target.value })}
+                        placeholder="your-verify-token"
+                        helperText="สำหรับ verify request"
+                      />
+                    </Grid>
+                  </Grid>
+
+                  <Divider sx={{ my: 2.5 }} />
+                  <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>รูปแบบการส่ง</Typography>
+                  <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                    <Chip
+                      label="📢 Broadcast (ทุกคนที่ Add บอท)"
+                      variant={settings?.lineSendMode === 'broadcast' ? 'filled' : 'outlined'}
+                      color={settings?.lineSendMode === 'broadcast' ? 'success' : 'default'}
+                      onClick={() => setSettings({ ...settings, lineSendMode: 'broadcast' })}
+                      sx={{ cursor: 'pointer', fontWeight: 600 }}
+                    />
+                    <Chip
+                      label="📨 Push (ระบุ User ID)"
+                      variant={settings?.lineSendMode === 'push' ? 'filled' : 'outlined'}
+                      color={settings?.lineSendMode === 'push' ? 'primary' : 'default'}
+                      onClick={() => setSettings({ ...settings, lineSendMode: 'push' })}
+                      sx={{ cursor: 'pointer', fontWeight: 600 }}
+                    />
+                  </Box>
+
+                  {settings?.lineSendMode === 'push' && (
+                    <TextField
+                      label="LINE User/Group IDs (สำหรับ Push)"
+                      fullWidth size="small" multiline rows={2} sx={{ mb: 1 }}
+                      value={settings?.lineUserIds || ''}
+                      onChange={(e) => setSettings({ ...settings, lineUserIds: e.target.value })}
+                      placeholder="U123..., U456..."
+                    />
+                  )}
+
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                    💡 Broadcast: ผู้ใช้ต้อง Add บอทเป็นเพื่อนก่อน | Push: ต้องมี User ID จากการ webhook ของ LINE
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* EMAIL Config */}
+            <Grid item xs={12} md={6}>
+              <Card sx={{ borderRadius: 2.5, height: '100%' }}>
+                <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <MailIcon size={18} color="#e74c3c" />
+                  <Typography variant="subtitle2" fontWeight={700}>ช่องทางอีเมล</Typography>
+                </Box>
+                <CardContent sx={{ p: 2.5 }}>
+                  <FormControlLabel
+                    control={<Switch checked={settings?.enableEmail ?? true} onChange={(e) => setSettings({ ...settings, enableEmail: e.target.checked })} color="success" />}
+                    label={<Typography variant="body2" fontWeight={600}>เปิดการแจ้งเตือนอีเมล</Typography>}
+                    sx={{ mb: 1.5 }}
+                  />
+                  <Divider sx={{ mb: 1.5 }} />
+                  <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ mb: 1, display: 'block' }}>ตั้งค่า SMTP Server</Typography>
+                  <Grid container spacing={1.5}>
+                    <Grid item xs={8}>
+                      <TextField label="Host" fullWidth size="small" value={settings?.smtpHost || ''} onChange={(e) => setSettings({ ...settings, smtpHost: e.target.value })} placeholder="smtp.gmail.com" />
+                    </Grid>
+                    <Grid item xs={4}>
+                      <TextField label="Port" fullWidth size="small" value={settings?.smtpPort || '587'} onChange={(e) => setSettings({ ...settings, smtpPort: e.target.value })} placeholder="587" />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <TextField label="Username" fullWidth size="small" value={settings?.smtpUser || ''} onChange={(e) => setSettings({ ...settings, smtpUser: e.target.value })} placeholder="user@company.com" />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <TextField label="Password" fullWidth size="small" type="password" value={settings?.smtpPass || ''} onChange={(e) => setSettings({ ...settings, smtpPass: e.target.value })} placeholder="••••••••" />
+                    </Grid>
+                    <Grid item xs={7}>
+                      <TextField label="From Email" fullWidth size="small" value={settings?.smtpFromEmail || ''} onChange={(e) => setSettings({ ...settings, smtpFromEmail: e.target.value })} placeholder="noreply@company.com" />
+                    </Grid>
+                    <Grid item xs={5}>
+                      <TextField label="From Name" fullWidth size="small" value={settings?.smtpFromName || ''} onChange={(e) => setSettings({ ...settings, smtpFromName: e.target.value })} placeholder="AssetHub" />
+                    </Grid>
+                  </Grid>
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                    เว้นว่างไว้เพื่อใช้ค่าเริ่มต้นจาก environment variables
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* TEAMS Config */}
+            <Grid item xs={12} md={6}>
+              <Card sx={{ borderRadius: 2.5, height: '100%' }}>
+                <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <TeamsIcon size={18} color="#6366f1" />
+                  <Typography variant="subtitle2" fontWeight={700}>ช่องทาง Microsoft Teams</Typography>
+                </Box>
+                <CardContent sx={{ p: 2.5 }}>
+                  <FormControlLabel
+                    control={<Switch checked={settings?.enableTeams ?? false} onChange={(e) => setSettings({ ...settings, enableTeams: e.target.checked })} color="primary" />}
+                    label={<Typography variant="body2" fontWeight={600}>เปิดการแจ้งเตือน Teams</Typography>}
+                    sx={{ mb: 1.5 }}
+                  />
+                  {settings?.enableTeams && (
+                    <TextField
+                      label="Teams Webhook URL"
+                      fullWidth size="small"
+                      value={settings?.teamsWebhookUrl || ''}
+                      onChange={(e) => setSettings({ ...settings, teamsWebhookUrl: e.target.value })}
+                      placeholder="https://outlook.office.com/webhook/..."
+                    />
+                  )}
+                  {!settings?.enableTeams && (
+                    <Typography variant="caption" color="text.secondary">เปิดใช้งานเพื่อตั้งค่า Webhook URL</Typography>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+
+          {/* ── Notification Conditions ── */}
+          <Card sx={{ borderRadius: 2.5, mb: 3 }}>
+            <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box component="span" sx={{ fontSize: '1rem' }}>🔔</Box>
+              <Typography variant="subtitle2" fontWeight={700}>เงื่อนไขการแจ้งเตือน</Typography>
+            </Box>
+            <CardContent sx={{ p: 2.5 }}>
+              {/* Master LINE toggle */}
+              <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: settings?.enableLine ? 'rgba(0, 185, 0, 0.05)' : 'grey.50', mb: 2.5 }}>
+                <FormControlLabel
+                  control={<Switch checked={settings?.enableLine ?? false} onChange={(e) => setSettings({ ...settings, enableLine: e.target.checked })} color="success" />}
+                  label={
+                    <Box>
+                      <Typography variant="body2" fontWeight={700}>เปิดการแจ้งเตือน LINE</Typography>
+                      <Typography variant="caption" color="text.secondary">เปิด/ปิดการส่งแจ้งเตือนผ่าน LINE ทั้งหมด</Typography>
+                    </Box>
+                  }
+                  sx={{ m: 0, width: '100%', '& .MuiFormControlLabel-label': { flex: 1 } }}
+                />
+              </Paper>
+
+              {/* Per-event toggles */}
+              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box component="span" sx={{ fontSize: '1.1rem' }}>📋</Box> เหตุการณ์ที่ต้องการแจ้งเตือน
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
+                {Object.entries(EVENT_LABELS).map(([key, label]) => {
+                  const keys = settings?.enabledEventKeys ? settings.enabledEventKeys.split(',').map((s: string) => s.trim()) : [];
+                  const enabled = keys.includes(key);
+                  return (
+                    <Chip
+                      key={key}
+                      icon={<Box component="span" sx={{ fontSize: '0.9rem', ml: 0.5 }}>{EVENT_ICONS[key]}</Box>}
+                      label={label}
+                      variant={enabled ? 'filled' : 'outlined'}
+                      color={enabled ? 'success' : 'default'}
+                      onClick={() => {
+                        const newKeys = enabled ? keys.filter((x: string) => x !== key) : [...keys, key];
+                        setSettings({ ...settings, enabledEventKeys: newKeys.join(', ') });
+                      }}
+                      sx={{ cursor: 'pointer', fontWeight: 600, borderRadius: 2, height: 32 }}
+                    />
+                  );
+                })}
+              </Box>
+
+              {/* Status notification preferences */}
+              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box component="span" sx={{ fontSize: '1.1rem' }}>📋</Box> สถานะที่ต้องการแจ้งเตือน (เมื่อเปลี่ยนสถานะ)
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+                {[
+                  { icon: '🆕', label: 'รอรับเรื่อง', key: 'รอรับเรื่อง', color: '#f97316' },
+                  { icon: '🤝', label: 'รับเรื่องแล้ว', key: 'รับเรื่องแล้ว', color: '#6366f1' },
+                  { icon: '🔧', label: 'กำลังดำเนินการ', key: 'กำลังดำเนินการ', color: '#3b82f6' },
+                  { icon: '📦', label: 'รอชิ้นส่วน', key: 'รอชิ้นส่วน', color: '#f59e0b' },
+                  { icon: '✅', label: 'เสร็จสิ้น', key: 'เสร็จสิ้น', color: '#10b981' },
+                  { icon: '❌', label: 'ยกเลิก', key: 'ยกเลิก', color: '#ef4444' },
+                ].map(status => {
+                  const statuses = settings?.lineEnabledStatuses ? settings.lineEnabledStatuses.split(',').map((s: string) => s.trim()) : [];
+                  const enabled = statuses.includes(status.key);
+                  return (
+                    <Chip
+                      key={status.key}
+                      icon={<Box component="span" sx={{ fontSize: '0.9rem' }}>{status.icon}</Box>}
+                      label={status.label}
+                      variant={enabled ? 'filled' : 'outlined'}
+                      color={enabled ? 'success' : 'default'}
+                      onClick={() => {
+                        const newStatuses = enabled ? statuses.filter((s: string) => s !== status.key) : [...statuses, status.key];
+                        setSettings({ ...settings, lineEnabledStatuses: newStatuses.join(',') });
+                      }}
+                      sx={{ cursor: 'pointer', fontWeight: 600, borderRadius: 2, height: 32 }}
+                    />
+                  );
+                })}
+              </Box>
+            </CardContent>
+          </Card>
+
+          {/* ── Save ── */}
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
+            <Button variant="contained" size="large" startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />} onClick={handleSave} disabled={saving}
+              sx={{ borderRadius: 2, px: 4, fontWeight: 700 }}>
+              บันทึกการตั้งค่า
+            </Button>
+          </Box>
+
+          {/* ── Send Announcement ── */}
+          <Card sx={{ borderRadius: 2.5, mb: 3 }}>
+            <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1 }}>
+              <SendIcon size={18} color="#f59e0b" />
+              <Typography variant="subtitle2" fontWeight={700}>ส่งข้อความประกาศ</Typography>
+            </Box>
+            <CardContent sx={{ p: 2.5 }}>
+              <TextField label="หัวข้อ เช่น 'แจ้งปิดระบบบำรุงรักษา'" fullWidth size="small" sx={{ mb: 2 }} />
+              <TextField label="เนื้อหาข้อความ..." fullWidth size="small" multiline rows={3} sx={{ mb: 2 }} />
+              <Button variant="contained" color="warning" startIcon={<SendIcon size={16} />} disabled={!settings?.enableLine}>
+                ส่งข้อความเลย
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* ── Theme ── */}
+          <Card sx={{ borderRadius: 2.5, mb: 3 }}>
+            <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1 }}>
+              <MessageCircleIcon size={18} color="#8b5cf6" />
+              <Typography variant="subtitle2" fontWeight={700}>ธีมการแจ้งเตือน</Typography>
+            </Box>
+            <CardContent sx={{ p: 2.5 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>สีและไอคอนสำหรับแต่ละสถานะใน Flex Message</Typography>
+              <Grid container spacing={2}>
+                {[
+                  { icon: '🆕', label: 'รอรับเรื่อง', en: 'New Request', color: '#f97316', bg: '#fff7ed' },
+                  { icon: '🤝', label: 'รับเรื่องแล้ว', en: 'Accepted', color: '#6366f1', bg: '#eef2ff' },
+                  { icon: '🔧', label: 'กำลังดำเนินการ', en: 'In Progress', color: '#3b82f6', bg: '#eff6ff' },
+                  { icon: '📦', label: 'รอชิ้นส่วน', en: 'Waiting Parts', color: '#f59e0b', bg: '#fffbeb' },
+                  { icon: '✅', label: 'เสร็จสิ้น', en: 'Completed', color: '#10b981', bg: '#f0fdf4' },
+                  { icon: '❌', label: 'ยกเลิก', en: 'Cancelled', color: '#ef4444', bg: '#fef2f2' },
+                ].map(s => (
+                  <Grid item xs={6} sm={4} md={2} key={s.label}>
+                    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, textAlign: 'center', bgcolor: s.bg, borderColor: s.color + '30' }}>
+                      <Typography variant="h5" sx={{ mb: 0.5 }}>{s.icon}</Typography>
+                      <Typography variant="caption" fontWeight={700} sx={{ color: s.color, display: 'block' }}>{s.label}</Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem' }}>{s.en}</Typography>
+                    </Paper>
+                  </Grid>
+                ))}
+              </Grid>
+            </CardContent>
+          </Card>
+
+          {/* ── Tips ── */}
+          <Alert severity="info" sx={{ borderRadius: 2, mb: 3 }} icon={<SmartphoneIcon size={20} />}>
+            <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>💡 คำแนะนำ</Typography>
+            <Typography variant="caption" color="text.secondary">
+              • Broadcast: ผู้ใช้ต้อง Add บอทเป็นเพื่อนก่อน | • Push: ต้องมี User ID จากการ webhook ของ LINE | • Flex Message รองรับเฉพาะ LINE app เท่านั้น | • Logging ทุกการแจ้งเตือนถูกบันทึกไว้ด้านล่าง
+            </Typography>
+          </Alert>
+
+          {/* ── History Log ── */}
+          <Card sx={{ borderRadius: 2.5 }}>
+            <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <NotificationsIcon size={18} color="#6366f1" />
+                <Typography variant="subtitle2" fontWeight={700}>ประวัติการแจ้งเตือนล่าสุด (30)</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Chip label={`ทั้งหมด ${logTotal}`} size="small" variant="outlined" />
+                <IconButton size="small" onClick={fetchLogs} disabled={logLoading}>
+                  <RefreshIcon size={16} />
+                </IconButton>
+              </Box>
+            </Box>
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 700, fontSize: '0.7rem', color: 'text.secondary' }}>เวลา</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: '0.7rem', color: 'text.secondary' }}>Channel</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: '0.7rem', color: 'text.secondary' }}>ผู้รับ</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: '0.7rem', color: 'text.secondary' }}>หัวข้อ</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: '0.7rem', color: 'text.secondary' }}>RequestID</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: '0.7rem', color: 'text.secondary' }}>สถานะ</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: '0.7rem', color: 'text.secondary' }}>ข้อผิดพลาด</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {logLoading ? (
+                    <TableRow><TableCell colSpan={7} align="center" sx={{ py: 4 }}><CircularProgress size={24} /></TableCell></TableRow>
+                  ) : logs.length === 0 ? (
+                    <TableRow><TableCell colSpan={7} align="center" sx={{ py: 4, color: 'text.secondary' }}>ไม่มีประวัติการแจ้งเตือน</TableCell></TableRow>
+                  ) : logs.map((log: any) => (
+                    <TableRow key={log.id} hover>
+                      <TableCell sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>{new Date(log.createdAt).toLocaleString('th-TH', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</TableCell>
+                      <TableCell>
+                        <Chip label={log.channel === 'EMAIL' ? 'email' : log.channel === 'TEAMS' ? 'teams' : log.channel} size="small" variant="outlined"
+                          sx={{ fontSize: '0.65rem', height: 20, bgcolor: log.channel === 'EMAIL' ? '#fef3c7' : log.channel === 'TEAMS' ? '#eef2ff' : '#f0fdf4', border: 'none' }} />
+                      </TableCell>
+                      <TableCell sx={{ fontSize: '0.75rem', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.recipient || '-'}</TableCell>
+                      <TableCell sx={{ fontSize: '0.75rem', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.eventType || '-'}</TableCell>
+                      <TableCell sx={{ fontSize: '0.75rem' }}>{log.requestNo || '-'}</TableCell>
+                      <TableCell>
+                        <Chip
+                          label={log.status === 'PENDING' ? 'รอส่ง' : log.status === 'SENT' ? 'sent' : 'failed'}
+                          size="small"
+                          color={log.status === 'SENT' ? 'success' : log.status === 'FAILED' ? 'error' : 'warning' as any}
+                          sx={{ fontSize: '0.65rem', height: 20, fontWeight: 600 }}
+                        />
+                      </TableCell>
+                      <TableCell sx={{ fontSize: '0.75rem', color: 'text.secondary', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.lastError || '-'}</TableCell>
+                    </TableRow>
                   ))}
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Card>
+        </Box>
       </TabPanel>
 
       <TabPanel value={tabValue} index={3}>

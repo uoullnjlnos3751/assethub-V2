@@ -205,6 +205,50 @@ router.get('/options/statuses', authenticate, async (_req: Request, res: Respons
   } catch (err) { next(err); }
 });
 
+router.get('/options/os-types', authenticate, async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const defaults = ['Windows', 'macOS', 'Linux', 'ChromeOS', 'Android', 'iOS'];
+    const rows = await prisma.asset.findMany({ where: { osType: { not: null } }, distinct: ['osType'], select: { osType: true }, orderBy: { osType: 'asc' } });
+    const existing = new Set(rows.map((r) => r.osType));
+    defaults.forEach((d) => existing.add(d));
+    res.json(Array.from(existing).sort((a, b) => a.localeCompare(b)));
+  } catch (err) { next(err); }
+});
+
+router.get('/options/departments', authenticate, async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const rows = await prisma.asset.findMany({ where: { departmentId: { not: null } }, distinct: ['departmentId'], select: { departmentId: true }, orderBy: { departmentId: 'asc' } });
+    res.json(rows.map((r) => r.departmentId));
+  } catch (err) { next(err); }
+});
+
+router.get('/options/domains', authenticate, async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const rows = await prisma.asset.findMany({ where: { domainName: { not: null } }, distinct: ['domainName'], select: { domainName: true }, orderBy: { domainName: 'asc' } });
+    res.json(rows.map((r) => r.domainName));
+  } catch (err) { next(err); }
+});
+
+router.get('/options/companies', authenticate, async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const defaults = ['PS', 'TRR', 'TRR Corp', 'TRRL', 'TRRP', 'TRRT', 'TRW', 'TRRSK', 'SSEC', 'TMI', 'TRM'];
+    const rows = await prisma.asset.findMany({ where: { company: { not: null } }, distinct: ['company'], select: { company: true }, orderBy: { company: 'asc' } });
+    const existing = new Set(rows.map((r) => r.company).filter(Boolean));
+    defaults.forEach((d) => existing.add(d));
+    res.json(Array.from(existing).sort((a, b) => a.localeCompare(b)));
+  } catch (err) { next(err); }
+});
+
+router.get('/options/antivirus', authenticate, async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const defaults = ['Trend Micro Apex One', 'Sangfor Endpoint Secure', 'ESET Endpoint Security'];
+    const rows = await prisma.asset.findMany({ where: { antivirusStatus: { not: null } }, distinct: ['antivirusStatus'], select: { antivirusStatus: true }, orderBy: { antivirusStatus: 'asc' } });
+    const existing = new Set(rows.map((r) => r.antivirusStatus).filter(Boolean));
+    defaults.forEach((d) => existing.add(d));
+    res.json(Array.from(existing).sort((a, b) => a.localeCompare(b)));
+  } catch (err) { next(err); }
+});
+
 router.get('/device-types', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const [types, assetCounts] = await Promise.all([

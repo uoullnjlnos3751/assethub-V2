@@ -147,7 +147,9 @@ router.put('/settings', authenticate, authorize('SUPERADMIN'), async (req: Reque
       systemName, organizationName, timezone, darkMode, showWelcomeBanner,
       borrowDays, maxItemsPerRequest, allowExtension,
       enableEmail, enableTeams, teamsWebhookUrl, enabledEventKeys,
+      smtpHost, smtpPort, smtpUser, smtpPass, smtpFromEmail, smtpFromName,
       requireStrongPassword, passwordExpiryDays, sessionTimeoutHours,
+      enableLine, lineChannelAccessToken, lineWebhookUrl, lineWebhookVerifyToken, lineSendMode, lineUserIds, lineEnabledStatuses,
     } = req.body;
 
     let settings = await prisma.notificationSetting.findFirst();
@@ -165,6 +167,19 @@ router.put('/settings', authenticate, authorize('SUPERADMIN'), async (req: Reque
     if (enableTeams !== undefined) data.enableTeams = enableTeams;
     if (teamsWebhookUrl !== undefined) data.teamsWebhookUrl = teamsWebhookUrl;
     if (enabledEventKeys !== undefined) data.enabledEventKeys = enabledEventKeys;
+    if (smtpHost !== undefined) data.smtpHost = smtpHost;
+    if (smtpPort !== undefined) data.smtpPort = smtpPort;
+    if (smtpUser !== undefined) data.smtpUser = smtpUser;
+    if (smtpPass !== undefined) data.smtpPass = smtpPass;
+    if (smtpFromEmail !== undefined) data.smtpFromEmail = smtpFromEmail;
+    if (smtpFromName !== undefined) data.smtpFromName = smtpFromName;
+    if (enableLine !== undefined) data.enableLine = enableLine;
+    if (lineChannelAccessToken !== undefined) data.lineChannelAccessToken = lineChannelAccessToken;
+    if (lineWebhookUrl !== undefined) data.lineWebhookUrl = lineWebhookUrl;
+    if (lineWebhookVerifyToken !== undefined) data.lineWebhookVerifyToken = lineWebhookVerifyToken;
+    if (lineSendMode !== undefined) data.lineSendMode = lineSendMode;
+    if (lineUserIds !== undefined) data.lineUserIds = lineUserIds;
+    if (lineEnabledStatuses !== undefined) data.lineEnabledStatuses = lineEnabledStatuses;
     if (requireStrongPassword !== undefined) data.requireStrongPassword = requireStrongPassword;
     if (passwordExpiryDays !== undefined) data.passwordExpiryDays = parseInt(passwordExpiryDays);
     if (sessionTimeoutHours !== undefined) data.sessionTimeoutHours = parseInt(sessionTimeoutHours);

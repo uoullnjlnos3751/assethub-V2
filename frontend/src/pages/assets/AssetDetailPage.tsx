@@ -3,9 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Card, CardContent, Grid, Chip, Button, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, Paper, CircularProgress,
+  Divider, Stack,
 } from '@mui/material';
-import EditIcon from '@mui/icons-material/Edit';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import {
+  Edit as EditIcon,
+  ArrowBack as ArrowBackIcon,
+} from '@mui/icons-material';
 import { assetAPI } from '../../services/api';
 
 const statusColors: Record<string, string> = {
@@ -27,6 +30,40 @@ const pmStatusLabels: Record<string, string> = {
   DRAFT: 'ร่าง', IN_PROGRESS: 'กำลังดำเนินการ', COMPLETED: 'เสร็จสิ้น',
 };
 
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <Typography
+      variant="subtitle2"
+      sx={{
+        fontWeight: 600,
+        textTransform: 'uppercase',
+        letterSpacing: 1.2,
+        color: 'text.secondary',
+        mb: 2,
+        pb: 1,
+        borderBottom: 1,
+        borderColor: 'divider',
+      }}
+    >
+      {children}
+    </Typography>
+  );
+}
+
+function InfoItem({ label, value, fullWidth }: { label: string; value: string | number | null | undefined; fullWidth?: boolean }) {
+  if (value === null || value === undefined || value === '') return null;
+  return (
+    <Grid item xs={12} sm={6} md={fullWidth ? 12 : 4}>
+      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 400, display: 'block', mb: 0.25, fontSize: '0.75rem' }}>
+        {label}
+      </Typography>
+      <Typography variant="body2" sx={{ fontWeight: 500, fontSize: '0.875rem' }}>
+        {value}
+      </Typography>
+    </Grid>
+  );
+}
+
 export default function AssetDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -39,149 +76,219 @@ export default function AssetDetailPage() {
     }
   }, [id]);
 
-  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}><CircularProgress /></Box>;
+  if (loading) return (
+    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+      <CircularProgress size={32} />
+    </Box>
+  );
   if (!asset) return <Typography>ไม่พบทรัพย์สิน</Typography>;
 
-  const infoRow = (label: string, value: string | number | null | undefined) => value !== null && value !== undefined && value !== '' ? (
-    <Grid item xs={12} sm={6} md={4}>
-      <Typography variant="caption" color="text.secondary">{label}</Typography>
-      <Typography variant="body1">{value}</Typography>
-    </Grid>
-  ) : null;
-
   return (
-    <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-        <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/assets')}>กลับ</Button>
-        <Typography variant="h4" fontWeight={600} sx={{ flexGrow: 1 }}>รายละเอียดทรัพย์สิน</Typography>
-        <Button variant="contained" startIcon={<EditIcon />} onClick={() => navigate(`/assets/${id}/edit`)}>แก้ไข</Button>
+    <Box sx={{ maxWidth: 1200, mx: 'auto', px: { xs: 2, md: 4 }, py: 3 }}>
+      {/* Header */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+        <Button
+          size="small"
+          startIcon={<ArrowBackIcon sx={{ fontSize: 18 }} />}
+          onClick={() => navigate('/assets')}
+          sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary' } }}
+        >
+          กลับ
+        </Button>
+        <Typography variant="h5" fontWeight={500} sx={{ letterSpacing: -0.3 }}>
+          รายละเอียดทรัพย์สิน
+        </Typography>
+        <Button
+          variant="contained"
+          size="small"
+          startIcon={<EditIcon sx={{ fontSize: 18 }} />}
+          onClick={() => navigate(`/assets/${id}/edit`)}
+          sx={{
+            borderRadius: 1,
+            fontWeight: 500,
+            textTransform: 'none',
+            px: 2,
+            boxShadow: 'none',
+            '&:hover': { boxShadow: 'none' },
+          }}
+        >
+          แก้ไข
+        </Button>
       </Box>
 
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3, flexWrap: 'wrap' }}>
-            <Typography variant="h5" fontWeight="bold">{asset.assetCode}</Typography>
-            <Chip label={statusLabels[asset.status] || asset.status} color={(statusColors[asset.status] as any) || 'default'} />
-          </Box>
+      {/* Asset Code & Status */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 4, pb: 3, borderBottom: 1, borderColor: 'divider' }}>
+        <Typography variant="h4" fontWeight={600} sx={{ letterSpacing: -0.5 }}>
+          {asset.assetCode}
+        </Typography>
+        <Chip
+          label={statusLabels[asset.status] || asset.status}
+          color={(statusColors[asset.status] as any) || 'default'}
+          size="small"
+          sx={{ fontWeight: 500 }}
+        />
+        {asset.brand && asset.model && (
+          <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+            {asset.brand} {asset.model}
+          </Typography>
+        )}
+      </Box>
 
-          <Typography variant="h6" gutterBottom color="primary">ข้อมูลทั่วไป</Typography>
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            {infoRow('Serial Number', asset.serialNo)}
-            {infoRow('ประเภทอุปกรณ์', asset.type)}
-            {infoRow('ยี่ห้อ (Brand)', asset.brand)}
-            {infoRow('รุ่น (Model)', asset.model)}
-            {infoRow('Company', asset.company)}
-            {infoRow('ผู้ถือครอง', asset.ownerName)}
-            {infoRow('แผนก', asset.departmentId)}
-            {infoRow('Location', asset.location)}
-            {infoRow('Floor', asset.floor)}
-            {infoRow('สถานะ', statusLabels[asset.status] || asset.status)}
-            {infoRow('Domain Name', asset.domainName)}
-          </Grid>
-
-          <Typography variant="h6" gutterBottom color="primary">OS และ Software</Typography>
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            {infoRow('OS', asset.osType)}
-            {infoRow('Windows', asset.osVersion)}
-            {infoRow('MS Office', asset.officeLicense)}
-            {infoRow('Antivirus', asset.antivirusStatus)}
-          </Grid>
-
-          <Typography variant="h6" gutterBottom color="primary">Processor & Graphics</Typography>
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            {infoRow('CPU', asset.cpu)}
-            {infoRow('Generation', asset.cpuGeneration)}
-            {infoRow('GPU', asset.gpu)}
-          </Grid>
-
-          <Typography variant="h6" gutterBottom color="primary">Memory & Storage</Typography>
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            {infoRow('Storage 1', asset.storage1)}
-            {infoRow('Storage 2', asset.storage2)}
-            {infoRow('RAM', asset.ram)}
-            {infoRow('RAM Slot1', asset.ramSlot1)}
-            {infoRow('RAM Slot2', asset.ramSlot2)}
-          </Grid>
-
-          <Typography variant="h6" gutterBottom color="primary">ข้อมูลจัดซื้อและสถานที่</Typography>
-          <Grid container spacing={2}>
-            {infoRow('PR No.', asset.prNumber)}
-            {infoRow('PO Date', asset.poDate ? new Date(asset.poDate).toLocaleDateString('th-TH') : null)}
-            {infoRow('PO No.', asset.poNumber)}
-            {infoRow('Vendor', asset.vendor)}
-            {infoRow('วันที่ซื้อ', asset.purchaseDate ? new Date(asset.purchaseDate).toLocaleDateString('th-TH') : null)}
-            {infoRow('อายุ (ปี)', asset.age)}
-            {infoRow('หมายเหตุ', asset.remark)}
-          </Grid>
-        </CardContent>
-      </Card>
-
-      {asset.assetHistory?.length > 0 && (
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>ประวัติการเปลี่ยนแปลง</Typography>
-            <TableContainer component={Paper} variant="outlined">
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>วันที่</TableCell>
-                    <TableCell>การกระทำ</TableCell>
-                    <TableCell>จาก</TableCell>
-                    <TableCell>ไป</TableCell>
-                    <TableCell>หมายเหตุ</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {asset.assetHistory.map((h: any) => (
-                    <TableRow key={h.id}>
-                      <TableCell>{new Date(h.createdAt).toLocaleString('th-TH')}</TableCell>
-                      <TableCell>{historyActionLabels[h.actionType] || h.actionType}</TableCell>
-                      <TableCell>{h.fromStatus || h.fromOwner || h.fromLoc || '-'}</TableCell>
-                      <TableCell>{h.toStatus || h.toOwner || h.toLoc || '-'}</TableCell>
-                      <TableCell>{h.note || '-'}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+      <Stack spacing={3}>
+        {/* ข้อมูลทั่วไป */}
+        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
+          <CardContent sx={{ p: 3 }}>
+            <SectionTitle>ข้อมูลทั่วไป</SectionTitle>
+            <Grid container spacing={2.5}>
+              <InfoItem label="Serial Number" value={asset.serialNo} />
+              <InfoItem label="ประเภทอุปกรณ์" value={asset.type} />
+              <InfoItem label="ยี่ห้อ (Brand)" value={asset.brand} />
+              <InfoItem label="รุ่น (Model)" value={asset.model} />
+              <InfoItem label="Company" value={asset.company} />
+              <InfoItem label="Computer Name เดิม" value={asset.oldAssetCode} />
+              <InfoItem label="Domain Name" value={asset.domainName} />
+            </Grid>
           </CardContent>
         </Card>
-      )}
 
-      {asset.pmRuns?.length > 0 && (
-        <Card>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>ประวัติการทำ PM</Typography>
-            <TableContainer component={Paper} variant="outlined">
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>ปี</TableCell>
-                    <TableCell>สถานะ</TableCell>
-                    <TableCell>ผู้ดำเนินการ</TableCell>
-                    <TableCell>วันที่ดำเนินการ</TableCell>
-                    <TableCell>แล้วเสร็จ</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {asset.pmRuns.map((r: any) => (
-                    <TableRow key={r.id}>
-                      <TableCell sx={{ fontWeight: 600 }}>{r.year}</TableCell>
-                      <TableCell>
-                        <Chip label={pmStatusLabels[r.status] || r.status} size="small"
-                          color={r.status === 'COMPLETED' ? 'success' : r.status === 'IN_PROGRESS' ? 'warning' : 'default'} />
-                      </TableCell>
-                      <TableCell>{r.performer?.displayName || r.performer?.adUsername || '-'}</TableCell>
-                      <TableCell>{r.performedAt ? new Date(r.performedAt).toLocaleString('th-TH') : '-'}</TableCell>
-                      <TableCell>{r.completedAt ? new Date(r.completedAt).toLocaleString('th-TH') : '-'}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+        {/* ผู้ถือครองและสถานที่ */}
+        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
+          <CardContent sx={{ p: 3 }}>
+            <SectionTitle>ผู้ถือครองและสถานที่</SectionTitle>
+            <Grid container spacing={2.5}>
+              <InfoItem label="ผู้ถือครอง" value={asset.ownerName} />
+              <InfoItem label="แผนก" value={asset.departmentId} />
+              <InfoItem label="Location" value={asset.location} />
+              <InfoItem label="Floor" value={asset.floor} />
+            </Grid>
           </CardContent>
         </Card>
-      )}
+
+        {/* OS/Software และ Hardware */}
+        <Grid container spacing={3}>
+          <Grid item xs={12} lg={5}>
+            <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider', height: '100%' }}>
+              <CardContent sx={{ p: 3 }}>
+                <SectionTitle>OS และ Software</SectionTitle>
+                <Grid container spacing={2.5}>
+                  <InfoItem label="OS" value={asset.osType} />
+                  <InfoItem label="Windows" value={asset.osVersion} />
+                  <InfoItem label="MS Office" value={asset.officeLicense} />
+                  <InfoItem label="Antivirus" value={asset.antivirusStatus} />
+                </Grid>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} lg={7}>
+            <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider', height: '100%' }}>
+              <CardContent sx={{ p: 3 }}>
+                <SectionTitle>Hardware</SectionTitle>
+                <Grid container spacing={2.5}>
+                  <InfoItem label="CPU" value={asset.cpu} />
+                  <InfoItem label="Generation" value={asset.cpuGeneration} />
+                  <InfoItem label="GPU" value={asset.gpu} />
+                  <InfoItem label="RAM" value={asset.ram} />
+                  <InfoItem label="RAM Slot1" value={asset.ramSlot1} />
+                  <InfoItem label="RAM Slot2" value={asset.ramSlot2} />
+                  <InfoItem label="Storage 1" value={asset.storage1} />
+                  <InfoItem label="Storage 2" value={asset.storage2} />
+                </Grid>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+
+        {/* ข้อมูลจัดซื้อ */}
+        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
+          <CardContent sx={{ p: 3 }}>
+            <SectionTitle>ข้อมูลจัดซื้อ</SectionTitle>
+            <Grid container spacing={2.5}>
+              <InfoItem label="PR No." value={asset.prNumber} />
+              <InfoItem label="งบประมาณ" value={asset.budget} />
+              <InfoItem label="PO Date" value={asset.poDate ? new Date(asset.poDate).toLocaleDateString('th-TH') : null} />
+              <InfoItem label="PO No." value={asset.poNumber} />
+              <InfoItem label="Vendor" value={asset.vendor} />
+              <InfoItem label="วันที่ซื้อ" value={asset.purchaseDate ? new Date(asset.purchaseDate).toLocaleDateString('th-TH') : null} />
+              <InfoItem label="อายุ (ปี)" value={asset.age} />
+              <InfoItem label="หมายเหตุ" value={asset.remark} fullWidth />
+            </Grid>
+          </CardContent>
+        </Card>
+
+        {/* ประวัติการเปลี่ยนแปลง */}
+        {asset.assetHistory?.length > 0 && (
+          <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
+            <CardContent sx={{ p: 3 }}>
+              <SectionTitle>ประวัติการเปลี่ยนแปลง</SectionTitle>
+              <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 1, border: 'none' }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 500, fontSize: '0.75rem', color: 'text.secondary', py: 1.5 }}>วันที่</TableCell>
+                      <TableCell sx={{ fontWeight: 500, fontSize: '0.75rem', color: 'text.secondary', py: 1.5 }}>การกระทำ</TableCell>
+                      <TableCell sx={{ fontWeight: 500, fontSize: '0.75rem', color: 'text.secondary', py: 1.5 }}>จาก</TableCell>
+                      <TableCell sx={{ fontWeight: 500, fontSize: '0.75rem', color: 'text.secondary', py: 1.5 }}>ไป</TableCell>
+                      <TableCell sx={{ fontWeight: 500, fontSize: '0.75rem', color: 'text.secondary', py: 1.5 }}>หมายเหตุ</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {asset.assetHistory.map((h: any) => (
+                      <TableRow key={h.id}>
+                        <TableCell sx={{ fontSize: '0.875rem', py: 1.5 }}>{new Date(h.createdAt).toLocaleString('th-TH')}</TableCell>
+                        <TableCell sx={{ fontSize: '0.875rem', py: 1.5 }}>{historyActionLabels[h.actionType] || h.actionType}</TableCell>
+                        <TableCell sx={{ fontSize: '0.875rem', py: 1.5 }}>{h.fromStatus || h.fromOwner || h.fromLoc || '-'}</TableCell>
+                        <TableCell sx={{ fontSize: '0.875rem', py: 1.5 }}>{h.toStatus || h.toOwner || h.toLoc || '-'}</TableCell>
+                        <TableCell sx={{ fontSize: '0.875rem', py: 1.5 }}>{h.note || '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ประวัติการทำ PM */}
+        {asset.pmRuns?.length > 0 && (
+          <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
+            <CardContent sx={{ p: 3 }}>
+              <SectionTitle>ประวัติการทำ PM</SectionTitle>
+              <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 1, border: 'none' }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 500, fontSize: '0.75rem', color: 'text.secondary', py: 1.5 }}>ปี</TableCell>
+                      <TableCell sx={{ fontWeight: 500, fontSize: '0.75rem', color: 'text.secondary', py: 1.5 }}>สถานะ</TableCell>
+                      <TableCell sx={{ fontWeight: 500, fontSize: '0.75rem', color: 'text.secondary', py: 1.5 }}>ผู้ดำเนินการ</TableCell>
+                      <TableCell sx={{ fontWeight: 500, fontSize: '0.75rem', color: 'text.secondary', py: 1.5 }}>วันที่ดำเนินการ</TableCell>
+                      <TableCell sx={{ fontWeight: 500, fontSize: '0.75rem', color: 'text.secondary', py: 1.5 }}>แล้วเสร็จ</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {asset.pmRuns.map((r: any) => (
+                      <TableRow key={r.id}>
+                        <TableCell sx={{ fontWeight: 500, fontSize: '0.875rem', py: 1.5 }}>{r.year}</TableCell>
+                        <TableCell sx={{ py: 1.5 }}>
+                          <Chip
+                            label={pmStatusLabels[r.status] || r.status}
+                            size="small"
+                            color={r.status === 'COMPLETED' ? 'success' : r.status === 'IN_PROGRESS' ? 'warning' : 'default'}
+                            sx={{ fontWeight: 500, fontSize: '0.75rem' }}
+                          />
+                        </TableCell>
+                        <TableCell sx={{ fontSize: '0.875rem', py: 1.5 }}>{r.performer?.displayName || r.performer?.adUsername || '-'}</TableCell>
+                        <TableCell sx={{ fontSize: '0.875rem', py: 1.5 }}>{r.performedAt ? new Date(r.performedAt).toLocaleString('th-TH') : '-'}</TableCell>
+                        <TableCell sx={{ fontSize: '0.875rem', py: 1.5 }}>{r.completedAt ? new Date(r.completedAt).toLocaleString('th-TH') : '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </CardContent>
+          </Card>
+        )}
+      </Stack>
     </Box>
   );
 }

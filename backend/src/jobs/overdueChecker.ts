@@ -13,34 +13,70 @@ export async function checkOverdueBorrows() {
     include: { request: { include: { requester: true } }, asset: true },
   });
 
+  // Group items by requester
+  const byRequester = new Map<number, { requester: any; items: any[] }>();
+  // Group items for admins (all items)
+  const allItems: any[] = [];
+
   for (const item of overdueItems) {
-    const requester = item.request.requester;
     if (!item.dueDate) continue;
-    const daysOverdue = Math.floor((now.getTime() - item.dueDate.getTime()) / (1000 * 60 * 60 * 24));
-    const dueDateStr = item.dueDate.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+    const requester = item.request.requester;
+    allItems.push(item);
 
-    if (requester.email) {
-      await createNotification('overdue_borrow', 'EMAIL', requester.email, {
-        requester: requester.displayName || requester.adUsername,
-        assetCode: item.asset?.assetCode || `Asset#${item.assetId}`,
-        daysOverdue: String(daysOverdue),
-        dueDate: dueDateStr,
-      });
+    if (!byRequester.has(requester.id)) {
+      byRequester.set(requester.id, { requester, items: [] });
     }
+    byRequester.get(requester.id)!.items.push(item);
+  }
 
-    const admins = await prisma.appUser.findMany({
-      where: { role: { in: ['IT_ADMIN', 'SUPERADMIN'] }, isActive: true },
+  // Send one email per requester with ALL their overdue items
+  for (const [, group] of byRequester) {
+    const { requester, items } = group;
+    if (!requester.email) continue;
+
+    const maxOverdueDays = Math.max(...items.map(i =>
+      i.dueDate ? Math.floor((now.getTime() - i.dueDate.getTime()) / (1000 * 60 * 60 * 24)) : 0
+    ));
+
+    const itemsPayload = items.map(item => ({
+      assetCode: item.asset?.assetCode || `Asset#${item.assetId}`,
+      serialNo: item.asset?.serialNo || '',
+      brand: item.asset?.brand || '',
+      model: item.asset?.model || '',
+      status: `เกิน ${Math.floor((now.getTime() - item.dueDate!.getTime()) / (1000 * 60 * 60 * 24))} วัน`,
+    }));
+
+    await createNotification('overdue_borrow', 'EMAIL', requester.email, {
+      requester: requester.displayName || requester.adUsername,
+      itemsCount: String(items.length),
+      daysOverdue: String(maxOverdueDays),
+      items: itemsPayload,
     });
-    for (const admin of admins) {
-      if (admin.email) {
-        await createNotification('overdue_borrow', 'EMAIL', admin.email, {
-          requester: requester.displayName || requester.adUsername,
-          assetCode: item.asset?.assetCode || `Asset#${item.assetId}`,
-          daysOverdue: String(daysOverdue),
-          dueDate: dueDateStr,
-        });
-      }
-    }
+  }
+
+  // Send ONE email per admin with ALL overdue items across requesters
+  const admins = await prisma.appUser.findMany({
+    where: { role: { in: ['IT_ADMIN', 'SUPERADMIN'] }, isActive: true },
+  });
+
+  for (const admin of admins) {
+    if (!admin.email) continue;
+
+    const itemsPayload = allItems.map(item => ({
+      assetCode: item.asset?.assetCode || `Asset#${item.assetId}`,
+      serialNo: item.asset?.serialNo || '',
+      brand: item.asset?.brand || '',
+      model: item.asset?.model || '',
+      requester: item.request.requester?.displayName || item.request.requester?.adUsername || '-',
+      status: `เกิน ${Math.floor((now.getTime() - item.dueDate!.getTime()) / (1000 * 60 * 60 * 24))} วัน`,
+    }));
+
+    await createNotification('overdue_borrow', 'EMAIL', admin.email, {
+      requester: 'ผู้ดูแลระบบ',
+      itemsCount: String(allItems.length),
+      daysOverdue: '-',
+      items: itemsPayload,
+    });
   }
 
   await prisma.scheduledJob.create({
@@ -51,7 +87,7 @@ export async function checkOverdueBorrows() {
 }
 
 export function startOverdueChecker() {
-  checkOverdueBorrows(); // Run immediately on start
-  setInterval(checkOverdueBorrows, 60 * 60 * 1000); // Every hour
+  checkOverdueBorrows();
+  setInterval(checkOverdueBorrows, 60 * 60 * 1000);
   console.log('[OverdueChecker] Scheduled (interval: 1hr)');
 }

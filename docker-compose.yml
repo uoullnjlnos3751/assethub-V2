@@ -31,7 +31,7 @@ services:
         condition: service_healthy
     volumes:
       - ./backend:/app
-      - /app/node_modules
+      - backend_node:/app/node_modules
 
   frontend:
     build:
@@ -45,7 +45,11 @@ services:
       - backend
     volumes:
       - ./frontend:/app
-      - /app/node_modules
+      - frontend_node:/app/node_modules
 
 volumes:
   pgdata:
+  backend_node:
+    external: true
+  frontend_node:
+    external: true

@@ -58,6 +58,7 @@ model Asset {
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   company            String?
+  oldAssetCode       String?
   cpuGeneration      String?
   domainName         String?
   floor              String?
@@ -65,6 +66,7 @@ model Asset {
   ramDetail          String?
   gpu                String?
   osType             String?
+  budget             String?
   ramSlot1           String?
   ramSlot2           String?
   snComputer         String?
@@ -394,6 +396,23 @@ model NotificationSetting {
   enableTeams      Boolean @default(false)
   teamsWebhookUrl  String?
   enabledEventKeys String  @default("borrow_request_pending,borrow_approved,borrow_rejected,checkout_completed,return_recorded,overdue_borrow,extension_pending,extension_approved,extension_rejected,pm_overdue")
+
+  // SMTP (can override env vars)
+  smtpHost      String?
+  smtpPort      String  @default("587")
+  smtpUser      String?
+  smtpPass      String?
+  smtpFromEmail String?
+  smtpFromName  String?
+
+  // LINE
+  enableLine              Boolean @default(false)
+  lineChannelAccessToken  String?
+  lineWebhookUrl          String?
+  lineWebhookVerifyToken  String?
+  lineSendMode            String  @default("broadcast")
+  lineUserIds             String? 
+  lineEnabledStatuses     String  @default("รอรับเรื่อง,รับเรื่องแล้ว,กำลังดำเนินการ,รอชิ้นส่วน,เสร็จสิ้น,ยกเลิก")
 
   // Security
   requireStrongPassword Boolean @default(true)

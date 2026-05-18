@@ -76,8 +76,33 @@ export async function authenticateLDAP(username: string, password: string): Prom
   const searchBindUser = buildBindUser(LDAP_SEARCH_USER);
 
   try {
-    await bind(client, searchBindUser, LDAP_SEARCH_PASSWORD);
-    
+    try {
+      await bind(client, searchBindUser, LDAP_SEARCH_PASSWORD);
+    } catch {
+      // Search bind failed (e.g. password expired), fallback to direct bind
+      const directBindUser = buildBindUser(username);
+      await bind(client, directBindUser, password);
+      
+      // Search for user entry using the user's own bind
+      const safeUsername = escapeFilter(username);
+      const entries = await search(client, LDAP_BASE_DN, {
+        scope: 'sub',
+        filter: `(&(objectClass=user)(|(sAMAccountName=${safeUsername})(userPrincipalName=${safeUsername})(mail=${safeUsername})))`,
+        attributes: ['dn', 'displayName', 'mail', 'department', 'sAMAccountName'],
+      });
+
+      const entry = entries[0];
+      if (!entry) return null;
+
+      const userObj = entry.object;
+      return {
+        displayName: userObj.displayName || userObj.sAMAccountName || username,
+        email: userObj.mail || '',
+        department: userObj.department || '',
+        sAMAccountName: userObj.sAMAccountName
+      };
+    }
+
     const safeUsername = escapeFilter(username);
     const entries = await search(client, LDAP_BASE_DN, {
       scope: 'sub',

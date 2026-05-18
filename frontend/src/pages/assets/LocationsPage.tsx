@@ -8,16 +8,17 @@ export default function LocationsPage() {
     <Box>
       <Grid container spacing={4}>
         <Grid item xs={12} md={6}>
-          <MasterDataPage
-            title="สถานที่ตั้ง (Location)"
-            subtitle="จัดการสถานที่ตั้งหรือไซต์สำหรับทรัพย์สิน"
-            itemLabel="สถานที่ตั้ง (Location)"
-            fetchItems={assetAPI.locations}
-            createItem={assetAPI.createLocation}
-            updateItem={assetAPI.updateLocation}
-            deleteItem={assetAPI.deleteLocation}
-            importItems={assetAPI.importLocationsFromAssets}
-          />
+            <MasterDataPage
+              title="สถานที่ตั้ง (Location)"
+              subtitle="จัดการสถานที่ตั้งหรือไซต์สำหรับทรัพย์สิน"
+              itemLabel="สถานที่ตั้ง (Location)"
+              showCompanyField
+              fetchItems={assetAPI.locations}
+              createItem={assetAPI.createLocation}
+              updateItem={assetAPI.updateLocation}
+              deleteItem={assetAPI.deleteLocation}
+              importItems={assetAPI.importLocationsFromAssets}
+            />
         </Grid>
         <Grid item xs={12} md={6}>
           <MasterDataPage

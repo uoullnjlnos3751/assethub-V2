@@ -113,24 +113,42 @@ async function sendEmail(to: string, eventType: string, payload: Record<string, 
     };
 
     const itemsHtml = payload.items.map((item: any) => {
-      const colors = statusColors[item.status] || { bg: '#f1f5f9', text: '#475569' };
+      let bgColor = '#f1f5f9';
+      let textColor = '#475569';
+      if (statusColors[item.status]) {
+        bgColor = statusColors[item.status].bg;
+        textColor = statusColors[item.status].text;
+      } else if (item.status?.startsWith('เกิน')) {
+        bgColor = '#fee2e2';
+        textColor = '#991b1b';
+      } else if (item.requester) {
+        bgColor = '#fef3c7';
+        textColor = '#92400e';
+      }
+      const requesterCell = item.requester
+        ? `<td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; font-size: 13px;"><span style="font-weight: 600; color: #1e293b;">${item.requester}</span></td>`
+        : '';
       return `
         <tr>
+          ${requesterCell}
           <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; font-size: 13px;">
             <div style="font-weight: 600; color: #1e293b;">${item.assetCode || 'N/A'}</div>
             <div style="color: #64748b; font-size: 12px;">${item.serialNo || ''} ${item.brand || ''} ${item.model || ''}</div>
           </td>
           <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; font-size: 13px; text-align: center;">
-            <span style="background: ${colors.bg}; color: ${colors.text}; padding: 3px 10px; border-radius: 12px; font-weight: 600; font-size: 11px;">${item.status || '-'}</span>
+            <span style="background: ${bgColor}; color: ${textColor}; padding: 3px 10px; border-radius: 12px; font-weight: 600; font-size: 11px;">${item.status || '-'}</span>
           </td>
         </tr>
       `;
     }).join('');
 
+    const hasRequester = payload.items.some((item: any) => item.requester);
+    const requesterHeader = hasRequester ? '<th style="background: #f1f5f9; padding: 10px 12px; text-align: left; font-size: 12px; color: #475569; font-weight: 600; border-bottom: 2px solid #e2e8f0;">ผู้ยืม</th>' : '';
     const itemsTableHtml = `
       <table class="items-table" style="width: 100%; border-collapse: collapse; margin-top: 8px;">
         <thead>
           <tr>
+            ${requesterHeader}
             <th style="background: #f1f5f9; padding: 10px 12px; text-align: left; font-size: 12px; color: #475569; font-weight: 600; border-bottom: 2px solid #e2e8f0;">ทรัพย์สิน</th>
             <th style="background: #f1f5f9; padding: 10px 12px; text-align: center; font-size: 12px; color: #475569; font-weight: 600; border-bottom: 2px solid #e2e8f0;">สถานะ</th>
           </tr>

@@ -1,42 +1,55 @@
-import { PrismaClient } from '@prisma/client';
-import * as XLSX from 'xlsx';
+import { PrismaClient, AssetStatus } from '@prisma/client';
 import * as fs from 'fs';
 
 const prisma = new PrismaClient();
 
-interface ExcelRow {
-  [key: string]: any;
+function parseCsvLine(line: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') {
+      if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+      else { inQuotes = !inQuotes; }
+    } else if (c === ',' && !inQuotes) {
+      result.push(current.trim()); current = '';
+    } else { current += c; }
+  }
+  result.push(current.trim());
+  return result;
 }
 
-function mapStatusToAssetStatus(status: string): 'Available' | 'Borrowed' | 'Maintenance' | 'Retired' | 'Lost' {
-  const statusLower = (status || '').toLowerCase();
-  if (statusLower.includes('ใช้งาน')) return 'Available';
-  if (statusLower.includes('ยืม')) return 'Borrowed';
-  if (statusLower.includes('ซ่อม')) return 'Maintenance';
-  if (statusLower.includes('โอน') || statusLower.includes('ปลด')) return 'Retired';
-  if (statusLower.includes('หาย')) return 'Lost';
+function mapStatus(status: string): AssetStatus {
+  const s = (status || '').toLowerCase();
+  if (s === 'inuse') return 'InUse';
+  if (s.includes('ใช้งาน')) return 'InUse';
+  if (s.includes('ยืม')) return 'Borrowed';
+  if (s.includes('ซ่อม')) return 'Maintenance';
+  if (s.includes('โอน') || s.includes('ปลด') || s === 'retired') return 'Retired';
+  if (s.includes('หาย')) return 'Lost';
+  if (s.includes('สำรอง')) return 'Available';
   return 'Available';
 }
 
-function parseDate(excelDate: any): Date | null {
-  if (!excelDate) return null;
-  try {
-    if (typeof excelDate === 'number') {
-      const date = new Date((excelDate - 25569) * 86400 * 1000);
-      if (!isNaN(date.getTime())) return date;
-    } else if (typeof excelDate === 'string') {
-      const date = new Date(excelDate);
-      if (!isNaN(date.getTime())) return date;
-    }
-  } catch (e) {}
-  return null;
+function parseDate(val: string): Date | null {
+  if (!val) return null;
+  val = val.trim();
+  if (!val || val === '#N/A' || val === '0') return null;
+  const parts = val.split('/');
+  if (parts.length === 3) {
+    const d = parseInt(parts[0]), m = parseInt(parts[1]) - 1, y = parseInt(parts[2]);
+    const date = new Date(y, m, d);
+    if (!isNaN(date.getTime())) return date;
+  }
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? null : d;
 }
 
 async function main() {
-  console.log('\n🌱 Starting seed with asset data from Excel...');
+  console.log('\n🌱 Starting seed from assets-2026-05-18.csv...');
 
   try {
-    // Clear existing data
     console.log('\n🗑️  Clearing existing assets...');
     await prisma.assetHistory.deleteMany({});
     await prisma.borrowExtensionItem.deleteMany({});
@@ -52,7 +65,6 @@ async function main() {
     await prisma.asset.deleteMany({});
     console.log('✓ Cleared all existing assets');
 
-    // Setup users
     console.log('\n👥 Setting up users...');
     const admin = await prisma.appUser.upsert({
       where: { adUsername: 'admin' },
@@ -75,103 +87,107 @@ async function main() {
         displayName: 'วัฒนา เด็กสวย',
         email: 'watchara.kid@trrgroup.com',
         department: 'IT',
-        role: 'IT_ADMIN',
+        role: 'SUPERADMIN',
         isActive: true,
       },
     });
     console.log('✓ Users created');
 
-    // Read Excel and import assets
-    console.log('\n📂 Reading assets from Excel...');
-    const excelFile = '/app/AssetIT41.xlsx';
-    
-    if (!fs.existsSync(excelFile)) {
-      throw new Error(`File not found: ${excelFile}`);
-    }
+    console.log('\n📂 Reading assets from CSV...');
+    const csvFile = '/app/assets-2026-05-18.csv';
+    if (!fs.existsSync(csvFile)) throw new Error(`File not found: ${csvFile}`);
 
-    const workbook = XLSX.readFile(excelFile);
-    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(worksheet, { defval: '' }) as ExcelRow[];
+    const content = fs.readFileSync(csvFile, 'utf-8');
+    const lines = content.split('\n').filter((l) => l.trim());
+    if (lines.length < 2) throw new Error('CSV has no data rows');
 
-    console.log(`✓ Found ${rows.length} records in Excel`);
+    const headers = parseCsvLine(lines[0]);
+    console.log(`✓ Found ${lines.length - 1} records in CSV`);
 
     let successCount = 0;
     let skipCount = 0;
+    const seenSerials = new Set<string>();
 
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
+    for (let i = 1; i < lines.length; i++) {
+      const vals = parseCsvLine(lines[i]);
+      if (vals.length < 6) { skipCount++; continue; }
 
-      try {
-        const assetCode = (row['New Comname'] || '').toString().trim();
-        const serialNo = (row['S/N Computer'] || '').toString().trim();
+      const row: Record<string, string> = {};
+      headers.forEach((h, idx) => { row[h] = vals[idx] || ''; });
 
-        if (!assetCode || !serialNo) {
-          skipCount++;
-          continue;
-        }
+        let assetCode = row['Computer Name']?.trim();
+        const serialNo = row['Serial Number']?.trim();
+        const oldAssetCode = row['Old Computer Name']?.trim() || null;
+        if (!assetCode && !serialNo) { skipCount++; continue; }
+        if (!serialNo || serialNo === '-' || seenSerials.has(serialNo)) { skipCount++; continue; }
+        seenSerials.add(serialNo);
+        if (!assetCode && oldAssetCode) assetCode = oldAssetCode;
 
-        // Check if already exists
-        const existing = await prisma.asset.findFirst({
-          where: { OR: [{ assetCode }, { serialNo }] },
-        });
+        try {
+          const company = row['Company']?.trim() || '';
+          const brand = row['Brand']?.trim() || '';
+          const model = row['Model']?.trim() || '';
+          const type = row['Type PC/Notebook']?.trim() || 'PC';
+          const ownerName = row['ผู้ถือครอง']?.trim() || '';
+          const departmentId = row['แผนก']?.trim() || '';
+          const floor = row['Floor']?.trim() || '';
+          const domainName = row['Join Domain']?.trim() || '';
+          const osType = row['OS']?.trim() || '';
+          const osVersion = row['Windows']?.trim() || '';
+          const windowsLicense = row['Windows']?.trim() || '';
+          const officeLicense = row['MS Office']?.trim() || '';
+          const antivirusRaw = row['Antivirus']?.trim() || '';
+          const cpu = row['CPU']?.trim() || '';
+          const cpuGeneration = row['Generation']?.trim() || '';
+          const storage1 = row['Storage 1']?.trim() || '';
+          const storage2 = row['Storage 2']?.trim() || '';
+          const ram = row['RAM']?.trim() || '';
+          const ramSlot1 = row['RAM Slot1']?.trim() || '';
+          const ramSlot2 = row['RAM Slot2']?.trim() || '';
+          const prNumber = row['PR No.']?.trim() || '';
+          const budget = row['งบประมาณ']?.trim() || '';
+          const poDate = parseDate(row['PO Date']);
+          const poNumber = row['PO No.']?.trim() || '';
+          const vendor = row['Vendor']?.trim() || '';
+          const remark = row['หมายเหตุ']?.trim() || '';
 
-        if (existing) {
-          skipCount++;
-          continue;
-        }
+          const status = mapStatus(row['Status']?.trim() || 'Available');
+          const antivirusStatus = antivirusRaw && antivirusRaw !== '-' ? 'Active' : 'Inactive';
 
-        // Create asset
-        const asset = await prisma.asset.create({
-          data: {
-            assetCode,
-            serialNo,
-            type: (row['Type PC/Notebook'] || 'PC').toString().trim(),
-            brand: (row['Brand'] || '').toString().trim(),
-            model: (row['Model'] || '').toString().trim(),
-            cpu: (row['CPU'] || '').toString().trim(),
-            ram: (row['Ram'] || '').toString().trim(),
-            storage1: (row['SSD'] || row['HD'] || '').toString().trim(),
-            storage2: '',
-            osVersion: (row['Windows'] || '').toString().trim(),
-            windowsLicense: (row['Window License No.'] || '').toString().trim(),
-            officeLicense: (row['Office License No.'] || '').toString().trim(),
-            antivirusStatus: row['Antivirus'] ? 'Active' : 'Inactive',
-            vendor: (row['Vendor'] || '').toString().trim(),
-            poNumber: (row['PO No.'] || '').toString().trim(),
-            purchaseDate: parseDate(row['PO Date']),
-            ownerName: (row['Name'] || '').toString().trim(),
-            departmentId: (row['Dep.'] || '').toString().trim(),
-            location: `Floor ${row['Floor'] || 'Unknown'}`,
-            status: mapStatusToAssetStatus(row['Status']),
-            remark: (row['User Owner'] || '').toString().trim(),
-          },
-        });
+          const asset = await prisma.asset.create({
+            data: {
+              assetCode,
+              serialNo,
+              type, brand, model, cpu, ram, osType, osVersion,
+              windowsLicense, officeLicense, antivirusStatus,
+              vendor, poNumber, prNumber, poDate,
+              ownerName, departmentId,
+              location: 'HQ',
+              floor, company, oldAssetCode, domainName, cpuGeneration,
+              ramSlot1, ramSlot2, storage1, storage2, budget,
+              status, remark,
+            },
+          });
 
-        // Create CREATE history entry for every imported asset
         await prisma.assetHistory.create({
           data: {
             assetId: asset.id,
             actionType: 'CREATE',
             toStatus: asset.status,
             actorUserId: itAdmin.id,
-            note: 'นำเข้าข้อมูลจาก Excel ครั้งแรก',
+            note: 'นำเข้าข้อมูลจาก CSV ครั้งแรก',
           },
         });
 
         successCount++;
-
-        if (successCount % 100 === 0) {
-          console.log(`  ⏳ Imported ${successCount} assets...`);
-        }
+        if (successCount % 100 === 0) console.log(`  ⏳ Imported ${successCount} assets...`);
       } catch (err: any) {
         skipCount++;
       }
     }
 
     console.log(`\n✓ Successfully imported ${successCount} assets`);
-    if (skipCount > 0) {
-      console.log(`⚠️  Skipped ${skipCount} rows (duplicates or invalid)`);
-    }
+    if (skipCount > 0) console.log(`⚠️  Skipped ${skipCount} rows (duplicates or invalid)`);
 
     // Setup notification templates
     console.log('\n📧 Setting up notification templates...');
