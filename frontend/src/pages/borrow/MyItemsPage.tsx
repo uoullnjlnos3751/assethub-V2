@@ -138,9 +138,22 @@ export default function MyItemsPage() {
                           '&:hover': { borderColor: theme.palette.primary.main, bgcolor: '#FFFFFF' },
                         }}>
                           <Box sx={{ flex: 1 }}>
-                            <Typography fontWeight={700} fontSize="0.95rem">{item.asset?.assetCode || 'N/A'}</Typography>
-                            <Typography variant="caption" color="text.secondary">{item.asset?.brand || ''} {item.asset?.model || ''}</Typography>
-                            {item.dueDate && (
+                            {item.isQuantityBased && item.inventoryItem ? (
+                              <>
+                                <Typography fontWeight={700} fontSize="0.95rem">{item.inventoryItem.name}</Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  จำนวน {item.quantity} {item.inventoryItem.unit}
+                                </Typography>
+                              </>
+                            ) : (
+                              <>
+                                <Typography fontWeight={700} fontSize="0.95rem">{item.asset?.assetCode || 'N/A'}</Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {item.asset?.brand || ''} {item.asset?.model || ''}
+                                </Typography>
+                              </>
+                            )}
+                            {!item.isQuantityBased && item.dueDate && (
                               <Typography variant="caption" display="block" color={new Date(item.dueDate) < new Date() ? 'error.main' : 'text.secondary'} fontWeight={600}>
                                 คืนภายใน: {new Date(item.dueDate).toLocaleDateString('th-TH')}
                               </Typography>
@@ -149,13 +162,15 @@ export default function MyItemsPage() {
                           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, alignItems: 'flex-end' }}>
                             <StatusChip status={item.itemStatus} />
                             <Box sx={{ display: 'flex', gap: 0.5 }}>
-                              <Button size="small" variant="outlined" startIcon={<VisibilityIcon />}
-                                onClick={() => navigate(`/assets/${item.assetId}`)} sx={{ fontSize: '0.75rem' }}>
-                                ดู
-                              </Button>
+                              {!item.isQuantityBased && item.assetId && (
+                                <Button size="small" variant="outlined" startIcon={<VisibilityIcon />}
+                                  onClick={() => navigate('/assets/' + item.assetId)} sx={{ fontSize: '0.75rem' }}>
+                                  ดู
+                                </Button>
+                              )}
                               {item.itemStatus === 'CheckedOut' && (
                                 <Button size="small" variant="contained" color="error" startIcon={<ReturnIcon />}
-                                  onClick={() => navigate(`/borrow/return?itemId=${item.id}`)} sx={{ fontSize: '0.75rem' }}>
+                                  onClick={() => navigate('/borrow/return?itemId=' + item.id)} sx={{ fontSize: '0.75rem' }}>
                                   คืน
                                 </Button>
                               )}

@@ -42,6 +42,8 @@ import ReturnIcon from '@mui/icons-material/AssignmentReturn';
 import ExtensionIcon from '@mui/icons-material/Extension';
 import SearchIcon from '@mui/icons-material/Search';
 import FilterListIcon from '@mui/icons-material/FilterList';
+import ImageIcon from '@mui/icons-material/Image';
+import ImageOffIcon from '@mui/icons-material/ImageNotSupported';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { assetAPI, borrowAPI } from '../../services/api';
 import ExportAssetsButton from '../../components/ExportAssetsButton';
@@ -62,6 +64,7 @@ const COLUMN_PREF_KEY = 'assethub.assetList.columns.v2';
 
 const defaultColumnConfig: ColumnConfig[] = [
   { field: 'id', label: 'ID', visible: false },
+  { field: 'hasImage', label: '📷', visible: true },
   { field: 'assetCode', label: 'รหัสทรัพย์สิน (Computer Name)', visible: true },
   { field: 'serialNo', label: 'Serial No.', visible: true },
   { field: 'type', label: 'ประเภท', visible: true },
@@ -252,6 +255,48 @@ export default function AssetListPage() {
 
   const columnMap = useMemo<Record<string, GridColDef>>(() => ({
     id: textColumn('id', 'ID', 90),
+    hasImage: {
+      field: 'hasImage',
+      headerName: '📷',
+      width: 50,
+      sortable: false,
+      filterable: false,
+      renderCell: ({ row }) => (
+        <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+          {row.image ? (
+            <Box
+              sx={{
+                width: 28,
+                height: 28,
+                borderRadius: 1.5,
+                bgcolor: alpha(theme.palette.success.main, 0.1),
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: theme.palette.success.main,
+              }}
+            >
+              <ImageIcon fontSize="small" sx={{ fontSize: 16 }} />
+            </Box>
+          ) : (
+            <Box
+              sx={{
+                width: 28,
+                height: 28,
+                borderRadius: 1.5,
+                bgcolor: alpha(theme.palette.grey[500], 0.08),
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: theme.palette.grey[400],
+              }}
+            >
+              <ImageOffIcon fontSize="small" sx={{ fontSize: 16 }} />
+            </Box>
+          )}
+        </Box>
+      ),
+    },
     assetCode: textColumn('assetCode', 'รหัสทรัพย์สิน', 140),
     serialNo: textColumn('serialNo', 'Serial No.', 140),
     type: textColumn('type', 'ประเภท', 120),

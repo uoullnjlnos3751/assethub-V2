@@ -32,6 +32,7 @@ import AssignmentIcon from '@mui/icons-material/Assignment';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import DescriptionIcon from '@mui/icons-material/Description';
 import InventoryIcon from '@mui/icons-material/Inventory';
+import CategoryManagementIcon from '@mui/icons-material/Category';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
@@ -78,6 +79,8 @@ const adminNav: NavEntry[] = [
       { label: 'ผู้จำหน่าย (Vendor)', path: '/assets/vendors', icon: <StoreIcon /> },
       { label: 'สถานะอุปกรณ์ (Asset Status)', path: '/assets/statuses', icon: <CheckCircleOutlineIcon /> },
       { label: 'นำเข้า/ส่งออก (Import/Export)', path: '/assets/import-export', icon: <ImportExportIcon /> },
+      { label: 'Inventory (Cables/Consumables)', path: '/inventory', icon: <InventoryIcon /> },
+      { label: 'จัดการหมวดหมู่ (Categories)', path: '/categories', icon: <CategoryManagementIcon /> },
     ],
   },
   {

@@ -16,7 +16,7 @@ interface Request {
   requestNo: string;
   requester: { displayName: string; adUsername: string };
   purpose: string;
-  items: Array<{ id: number; asset: { assetCode: string; brand: string; model: string } }>;
+  items: Array<{ id: number; quantity: number; isQuantityBased: boolean; asset?: { assetCode: string; brand: string; model: string }; inventoryItem?: { id: number; name: string; unit: string } }>;
   createdAt: string;
 }
 
@@ -56,7 +56,9 @@ export default function CheckoutPage() {
         r.requestNo.includes(searchLower) ||
         r.requester?.displayName?.toLowerCase().includes(searchLower) ||
         r.purpose.toLowerCase().includes(searchLower) ||
-        r.items.some((item) => (item.asset?.assetCode || '').toLowerCase().includes(searchLower))
+        r.items.some((item) =>
+          (item.asset?.assetCode || item.inventoryItem?.name || '').toLowerCase().includes(searchLower)
+        )
       );
     });
     setFilteredRequests(filtered);
@@ -265,10 +267,21 @@ export default function CheckoutPage() {
                     borderRadius: 1,
                   }}
                 >
-                  <Typography fontWeight={600}>{item.asset?.assetCode}</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {item.asset?.brand} {item.asset?.model}
-                  </Typography>
+                  {item.isQuantityBased && item.inventoryItem ? (
+                    <>
+                      <Typography fontWeight={600}>{item.inventoryItem.name}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        จำนวน: {item.quantity} {item.inventoryItem.unit}
+                      </Typography>
+                    </>
+                  ) : (
+                    <>
+                      <Typography fontWeight={600}>{item.asset?.assetCode}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {item.asset?.brand} {item.asset?.model}
+                      </Typography>
+                    </>
+                  )}
                 </Box>
               ))}
             </Box>

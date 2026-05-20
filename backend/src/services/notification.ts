@@ -61,6 +61,11 @@ export async function createNotification(
 }
 
 export async function processNotificationQueue() {
+  const settings = await getSettings();
+  const enabledKeys = settings?.enabledEventKeys
+    ? settings.enabledEventKeys.split(',').map((k: string) => k.trim())
+    : [];
+
   const pending = await prisma.notificationOutbox.findMany({
     where: { status: 'PENDING' },
     take: 20,
@@ -68,6 +73,19 @@ export async function processNotificationQueue() {
 
   for (const notif of pending) {
     try {
+      const emailDisabled = notif.channel === 'EMAIL' && settings?.enableEmail === false;
+      const teamsDisabled = notif.channel === 'TEAMS' && settings?.enableTeams === false;
+      const eventDisabled = enabledKeys.length > 0 && !enabledKeys.includes(notif.eventType);
+
+      if (emailDisabled || teamsDisabled || eventDisabled) {
+        const reason = emailDisabled ? 'email notifications disabled' : teamsDisabled ? 'teams notifications disabled' : `event ${notif.eventType} not in enabledEventKeys`;
+        await prisma.notificationOutbox.update({
+          where: { id: notif.id },
+          data: { status: 'FAILED', retryCount: notif.retryCount + 1, lastError: `Skipped: ${reason}` },
+        });
+        continue;
+      }
+
       if (notif.channel === 'EMAIL') {
         await sendEmail(notif.recipient, notif.eventType, JSON.parse(notif.payloadJson));
       } else if (notif.channel === 'TEAMS') {

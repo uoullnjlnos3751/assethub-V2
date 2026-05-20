@@ -76,6 +76,114 @@ export default function AssetDetailPage() {
     }
   }, [id]);
 
+  function renderDetailSection(type: string, detail: any) {
+    const t = type?.toLowerCase() || '';
+
+    if (['phone', 'tablet'].includes(t)) {
+      return (
+        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
+          <CardContent sx={{ p: 3 }}>
+            <SectionTitle>ข้อมูลอุปกรณ์สื่อสาร</SectionTitle>
+            <Grid container spacing={2.5}>
+              <InfoItem label="IMEI" value={detail.imei} />
+              <InfoItem label="Carrier" value={detail.carrier} />
+              <InfoItem label="เบอร์โทรศัพท์" value={detail.phoneNumber} />
+              <InfoItem label="ความจุ" value={detail.storageCapacity} />
+              <InfoItem label="สี" value={detail.color} />
+              <InfoItem label="OS" value={detail.osType} />
+            </Grid>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    if (['monitor'].includes(t)) {
+      return (
+        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
+          <CardContent sx={{ p: 3 }}>
+            <SectionTitle>ข้อมูลจอภาพ</SectionTitle>
+            <Grid container spacing={2.5}>
+              <InfoItem label="ขนาดจอ" value={detail.screenSize} />
+              <InfoItem label="ความละเอียด" value={detail.resolution} />
+              <InfoItem label="ช่องสัญญาณ" value={detail.connectionType} />
+              <InfoItem label="อัตรารีเฟรช" value={detail.refreshRate} />
+            </Grid>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    if (['projector', 'device', 'accessory'].includes(t)) {
+      return (
+        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
+          <CardContent sx={{ p: 3 }}>
+            <SectionTitle>ข้อมูลอุปกรณ์</SectionTitle>
+            <Grid container spacing={2.5}>
+              <InfoItem label="ประเภท" value={detail.subType} />
+              <InfoItem label="กำลังไฟ" value={detail.powerRating} />
+              <InfoItem label="Lamp Hours" value={detail.lampHours} />
+              <InfoItem label="ช่องสัญญาณ" value={detail.connectionType} />
+            </Grid>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    if (['network', 'switch', 'router'].includes(t)) {
+      return (
+        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
+          <CardContent sx={{ p: 3 }}>
+            <SectionTitle>ข้อมูลอุปกรณ์เครือข่าย</SectionTitle>
+            <Grid container spacing={2.5}>
+              <InfoItem label="จำนวน Port" value={detail.portCount} />
+              <InfoItem label="ความเร็ว Port" value={detail.portSpeed} />
+              <InfoItem label="IP Address" value={detail.ipAddress} />
+              <InfoItem label="MAC Address" value={detail.macAddress} />
+              <InfoItem label="Firmware" value={detail.firmwareVersion} />
+              <InfoItem label="Managed" value={detail.isManaged === true ? 'Managed' : detail.isManaged === false ? 'Unmanaged' : null} />
+              <InfoItem label="PoE" value={detail.hasPoE === true ? 'มี PoE' : detail.hasPoE === false ? 'ไม่มี PoE' : null} />
+            </Grid>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    if (['rack', 'enclosure', 'pdu'].includes(t)) {
+      return (
+        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
+          <CardContent sx={{ p: 3 }}>
+            <SectionTitle>ข้อมูล Rack / Enclosure / PDU</SectionTitle>
+            <Grid container spacing={2.5}>
+              <InfoItem label="ประเภท" value={detail.subType} />
+              <InfoItem label="Rack Units" value={detail.rackUnits} />
+              <InfoItem label="Power Capacity" value={detail.powerCapacity} />
+              <InfoItem label="ตำแหน่ง" value={detail.rackLocation} />
+            </Grid>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    if (['printer'].includes(t)) {
+      return (
+        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
+          <CardContent sx={{ p: 3 }}>
+            <SectionTitle>ข้อมูลเครื่องพิมพ์</SectionTitle>
+            <Grid container spacing={2.5}>
+              <InfoItem label="ประเภท" value={detail.printerType} />
+              <InfoItem label="สี" value={detail.isColor === true ? 'Color' : detail.isColor === false ? 'Mono' : null} />
+              <InfoItem label="ขนาดกระดาษ" value={detail.paperSizes} />
+              <InfoItem label="รุ่น Cartridge" value={detail.cartridgeModel} />
+              <InfoItem label="Network" value={detail.isNetworkEnabled === true ? 'เชื่อมต่อได้' : detail.isNetworkEnabled === false ? 'ไม่ได้เชื่อมต่อ' : null} />
+            </Grid>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    return null;
+  }
+
   if (loading) return (
     <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
       <CircularProgress size={32} />
@@ -133,6 +241,32 @@ export default function AssetDetailPage() {
           </Typography>
         )}
       </Box>
+
+      {/* รูปภาพทะเบียนทรัพย์สิน */}
+      {asset.image && (
+        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider', mb: 3 }}>
+          <CardContent sx={{ p: 3 }}>
+            <SectionTitle>รูปภาพทะเบียนทรัพย์สิน</SectionTitle>
+            <Box
+              sx={{
+                width: '100%',
+                maxWidth: 600,
+                mx: 'auto',
+                borderRadius: 2,
+                overflow: 'hidden',
+                border: '1px solid',
+                borderColor: 'divider',
+              }}
+            >
+              <img
+                src={asset.image}
+                alt="Asset registration"
+                style={{ width: '100%', height: 'auto', display: 'block' }}
+              />
+            </Box>
+          </CardContent>
+        </Card>
+      )}
 
       <Stack spacing={3}>
         {/* ข้อมูลทั่วไป */}
@@ -198,6 +332,9 @@ export default function AssetDetailPage() {
             </Card>
           </Grid>
         </Grid>
+
+        {/* Type-specific detail */}
+        {asset.detail && renderDetailSection(asset.type, asset.detail)}
 
         {/* ข้อมูลจัดซื้อ */}
         <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>

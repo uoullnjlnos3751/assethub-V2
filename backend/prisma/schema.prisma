@@ -33,10 +33,11 @@ model AppUser {
 }
 
 model Asset {
-  id                 Int                 @id @default(autoincrement())
-  assetCode          String              @unique
-  serialNo           String              @unique
+  id                 Int                     @id @default(autoincrement())
+  assetCode          String                  @unique
+  serialNo           String                  @unique
   type               String?
+  categoryId         Int?
   brand              String?
   model              String?
   cpu                String?
@@ -53,10 +54,10 @@ model Asset {
   ownerName          String?
   departmentId       String?
   location           String?
-  status             AssetStatus         @default(Available)
+  status             AssetStatus             @default(Available)
   remark             String?
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
   company            String?
   oldAssetCode       String?
   cpuGeneration      String?
@@ -72,15 +73,166 @@ model Asset {
   snComputer         String?
   storage1           String?
   storage2           String?
-  assetHistory       AssetHistory[]      @relation("AssetHistoryAsset")
+  image              String?
+  assetHistory       AssetHistory[]          @relation("AssetHistoryAsset")
   borrowRequestItems BorrowRequestItem[]
   pmRuns             PMRun[]
+  computerDetail     ComputerDetail?
+  phoneDetail        PhoneDetail?
+  monitorDetail      MonitorDetail?
+  deviceDetail       DeviceDetail?
+  networkDeviceDetail NetworkDeviceDetail?
+  rackDetail         RackDetail?
+  printerDetail      PrinterDetail?
+  category           Category?               @relation(fields: [categoryId], references: [id])
 
   @@index([status, departmentId, location])
   @@index([type, brand])
   @@index([status, createdAt])
   @@index([departmentId])
   @@map("assets")
+}
+
+model ComputerDetail {
+  id              Int     @id @default(autoincrement())
+  assetId         Int     @unique
+  asset           Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  cpu             String?
+  cpuGeneration   String?
+  ram             String?
+  ramSlot1        String?
+  ramSlot2        String?
+  storage1        String?
+  storage2        String?
+  gpu             String?
+  osType          String?
+  osVersion       String?
+  windowsLicense  String?
+  officeLicense   String?
+  antivirusStatus String?
+  domainName      String?
+  snComputer      String?
+
+  @@map("computer_details")
+}
+
+model PhoneDetail {
+  id              Int     @id @default(autoincrement())
+  assetId         Int     @unique
+  asset           Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  imei            String?
+  carrier         String?
+  phoneNumber     String?
+  storageCapacity String?
+  color           String?
+  osType          String?
+
+  @@map("phone_details")
+}
+
+model MonitorDetail {
+  id             Int     @id @default(autoincrement())
+  assetId        Int     @unique
+  asset          Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  screenSize     String?
+  resolution     String?
+  connectionType String?
+  refreshRate    String?
+
+  @@map("monitor_details")
+}
+
+model DeviceDetail {
+  id             Int     @id @default(autoincrement())
+  assetId        Int     @unique
+  asset          Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  subType        String?  // Projector, Speaker, Dock, Webcam, etc.
+  powerRating    String?
+  lampHours      Int?
+  connectionType String?
+
+  @@map("device_details")
+}
+
+model NetworkDeviceDetail {
+  id              Int     @id @default(autoincrement())
+  assetId         Int     @unique
+  asset           Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  portCount       Int?
+  portSpeed       String?
+  isManaged       Boolean?
+  ipAddress       String?
+  macAddress      String?
+  firmwareVersion String?
+  hasPoE          Boolean?
+
+  @@map("network_device_details")
+}
+
+model RackDetail {
+  id            Int     @id @default(autoincrement())
+  assetId       Int     @unique
+  asset         Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  subType       String?  // Rack, Enclosure, PDU
+  rackUnits     String?
+  powerCapacity String?
+  rackLocation  String?
+
+  @@map("rack_details")
+}
+
+model PrinterDetail {
+  id               Int     @id @default(autoincrement())
+  assetId          Int     @unique
+  asset            Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  printerType      String?  // Laser, Inkjet, Thermal
+  isColor          Boolean?
+  paperSizes       String?
+  cartridgeModel   String?
+  isNetworkEnabled Boolean?
+
+  @@map("printer_details")
+}
+
+model InventoryItem {
+  id              Int                    @id @default(autoincrement())
+  name            String
+  category        String                 // Cable, Cartridge, Consumable, Other
+  brand           String?
+  model           String?
+  totalQuantity   Int                    @default(0)
+  availableQuantity Int                  @default(0)
+  minStockLevel   Int                    @default(0)
+  unit            String                 // ชิ้น, ม้วน, เส้น, ตลับ, etc.
+  location        String?
+  remark          String?
+  image           String?
+  isActive        Boolean                @default(true)
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  transactions    InventoryTransaction[]
+  borrowItems     BorrowRequestItem[]    @relation("InventoryBorrowItems")
+
+  @@index([category, isActive])
+  @@index([name])
+  @@map("inventory_items")
+}
+
+model InventoryTransaction {
+  id          Int           @id @default(autoincrement())
+  itemId      Int
+  item        InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  action      String        // checkin, checkout
+  quantity    Int
+  userId      Int?
+  userName    String?
+  note        String?
+  refNo       String?       // Reference number (e.g. borrow request no)
+  createdAt   DateTime      @default(now())
+
+  @@index([itemId])
+  @@index([createdAt])
+  @@map("inventory_transactions")
 }
 
 model DeviceType {
@@ -103,6 +255,40 @@ model Company {
   updatedAt   DateTime @updatedAt
 
   @@map("companies")
+}
+
+model Category {
+  id          Int            @id @default(autoincrement())
+  name        String         @unique
+  icon        String
+  description String?
+  sortOrder   Int            @default(0)
+  isActive    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  types       CategoryType[]
+  assets      Asset[]
+
+  @@map("categories")
+}
+
+model CategoryType {
+  id            Int      @id @default(autoincrement())
+  categoryId    Int
+  category      Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  name          String
+  description   String?
+  detailTable   String?  // "computer_details", "phone_details", etc.
+  isBorrowable  Boolean  @default(true)
+  isAssignable  Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([categoryId, name])
+  @@map("category_types")
 }
 
 model AssetLocation {
@@ -187,21 +373,26 @@ model BorrowRequest {
 }
 
 model BorrowRequestItem {
-  id         Int                   @id @default(autoincrement())
-  requestId  Int
-  assetId    Int
-  borrowDate DateTime?
-  dueDate    DateTime?
-  itemStatus BorrowItemStatus      @default(Pending)
-  note       String?
-  extensions BorrowExtensionItem[]
-  asset      Asset                 @relation(fields: [assetId], references: [id])
-  request    BorrowRequest         @relation(fields: [requestId], references: [id])
-  returns    Return[]
+  id               Int                   @id @default(autoincrement())
+  requestId        Int
+  assetId          Int?
+  inventoryItemId  Int?
+  isQuantityBased  Boolean               @default(false)
+  quantity         Int                   @default(1)
+  borrowDate       DateTime?
+  dueDate          DateTime?
+  itemStatus       BorrowItemStatus      @default(Pending)
+  note             String?
+  extensions       BorrowExtensionItem[]
+  asset            Asset?                @relation(fields: [assetId], references: [id])
+  inventoryItem    InventoryItem?        @relation("InventoryBorrowItems", fields: [inventoryItemId], references: [id])
+  request          BorrowRequest         @relation(fields: [requestId], references: [id])
+  returns          Return[]
 
   @@index([assetId, itemStatus, dueDate])
   @@index([requestId, itemStatus])
   @@index([dueDate, itemStatus])
+  @@index([inventoryItemId])
   @@map("borrow_request_items")
 }
 
@@ -239,6 +430,7 @@ model Return {
   condition       ReturnCondition
   damageNote      String?
   accessoriesNote String?
+  receiverName    String?
   requestItem     BorrowRequestItem @relation(fields: [requestItemId], references: [id])
   returner        AppUser           @relation(fields: [returnBy], references: [id])
 

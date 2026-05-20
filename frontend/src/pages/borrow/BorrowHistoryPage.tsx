@@ -17,7 +17,22 @@ interface HistoryRecord {
   department: string;
   purpose: string;
   status: 'pending' | 'approved' | 'rejected' | 'checked_out' | 'returned';
-  items: Array<{ asset: { assetCode: string; brand: string; model: string; serialNo: string }; assetCode: string; brand: string; model: string; serialNo: string; condition?: string }>;
+  items: Array<{
+    asset?: { assetCode: string; brand: string; model: string; serialNo: string } | null;
+    assetCode?: string;
+    brand?: string;
+    model?: string;
+    serialNo?: string;
+    inventoryItem?: { id: number; name: string; unit: string } | null;
+    quantity?: number;
+    isQuantityBased?: boolean;
+    condition?: string;
+    returns?: Array<{
+      receiverName?: string;
+      returnedAt?: string;
+      returner?: { displayName: string; adUsername: string };
+    }>;
+  }>;
   createdAt: string;
   approvedAt?: string;
   checkedOutAt?: string;
@@ -78,8 +93,9 @@ export default function BorrowHistoryPage() {
           r.purpose.toLowerCase().includes(searchLower) ||
           r.items.some(
             (item) =>
-              item.assetCode?.toLowerCase().includes(searchLower) ||
-              item.serialNo?.toLowerCase().includes(searchLower)
+              (item.assetCode || item.asset?.assetCode || '').toLowerCase().includes(searchLower) ||
+              (item.serialNo || item.asset?.serialNo || '').toLowerCase().includes(searchLower) ||
+              (item.inventoryItem?.name || '').toLowerCase().includes(searchLower)
           )
       );
     }
@@ -210,6 +226,7 @@ export default function BorrowHistoryPage() {
                 <TableCell>วัตถุประสงค์</TableCell>
                 <TableCell align="center">จำนวน</TableCell>
                 <TableCell>สถานะ</TableCell>
+                <TableCell>ผู้รับคืน</TableCell>
                 <TableCell>วันที่ขอ</TableCell>
                 <TableCell align="right">การกระทำ</TableCell>
               </TableRow>
@@ -217,7 +234,7 @@ export default function BorrowHistoryPage() {
             <TableBody>
               {filteredRecords.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
                     <Typography color="text.secondary">
                       {records.length === 0 ? 'ไม่มีประวัติการยืม' : 'ไม่พบผลการค้นหา'}
                     </Typography>
@@ -226,6 +243,13 @@ export default function BorrowHistoryPage() {
               ) : (
                 filteredRecords.map((record) => {
                   const statusInfo = getStatusColor(record.status);
+                  const receivers = record.items
+                    .flatMap(item => item.returns || [])
+                    .map(ret => ret.receiverName || ret.returner?.displayName || ret.returner?.adUsername)
+                    .filter(Boolean);
+                  const uniqueReceivers = [...new Set(receivers)];
+                  const receiverDisplay = uniqueReceivers.length > 0 ? uniqueReceivers.join(', ') : '-';
+
                   return (
                     <TableRow key={record.id} hover>
                       <TableCell sx={{ fontWeight: 600 }}>{record.requestNo}</TableCell>
@@ -236,6 +260,7 @@ export default function BorrowHistoryPage() {
                       <TableCell>
                         <Chip label={statusInfo.label} color={statusInfo.color} size="small" />
                       </TableCell>
+                      <TableCell sx={{ fontSize: '0.85rem' }}>{receiverDisplay}</TableCell>
                       <TableCell>{new Date(record.createdAt).toLocaleDateString('th-TH')}</TableCell>
                       <TableCell align="right">
                         <Button
@@ -308,20 +333,49 @@ export default function BorrowHistoryPage() {
                 <Box
                   key={index}
                   sx={{
-                    p: 1,
+                    p: 1.5,
                     mb: 1,
                     backgroundColor: 'rgba(37, 99, 235, 0.05)',
                     borderRadius: 1,
+                    border: '1px solid',
+                    borderColor: 'divider',
                   }}
                 >
-                  <Typography fontWeight={600}>{item.asset?.assetCode}</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {item.asset?.serialNo} | {item.asset?.brand} {item.asset?.model}
-                  </Typography>
-                  {item.condition && (
-                    <Typography variant="caption" color="text.secondary" display="block">
-                      สภาพ: {item.condition}
-                    </Typography>
+                  {item.isQuantityBased && item.inventoryItem ? (
+                    <Box sx={{ mb: 0.5 }}>
+                      <Typography fontWeight={600}>{item.inventoryItem.name}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        จำนวน: {item.quantity} {item.inventoryItem.unit}
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
+                        <Typography fontWeight={600}>{item.asset?.assetCode || item.assetCode}</Typography>
+                        {item.condition && (
+                          <Chip label={item.condition} size="small" color={item.condition === 'Normal' ? 'success' : 'warning'} />
+                        )}
+                      </Box>
+                      <Typography variant="caption" color="text.secondary">
+                        {item.asset?.serialNo || item.serialNo} | {item.asset?.brand || item.brand} {item.asset?.model || item.model}
+                      </Typography>
+                    </>
+                  )}
+                  {item.returns && item.returns.length > 0 && (
+                    <Box sx={{ mt: 1, pt: 1, borderTop: '1px dashed', borderColor: 'divider' }}>
+                      {item.returns.map((ret, rIdx) => (
+                        <Box key={rIdx} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 0.5 }}>
+                          <Typography variant="caption" color="text.secondary">
+                            📥 ผู้รับคืน: <strong>{ret.receiverName || ret.returner?.displayName || ret.returner?.adUsername || '-'}</strong>
+                          </Typography>
+                          {ret.returnedAt && (
+                            <Typography variant="caption" color="text.secondary">
+                              {new Date(ret.returnedAt).toLocaleDateString('th-TH')}
+                            </Typography>
+                          )}
+                        </Box>
+                      ))}
+                    </Box>
                   )}
                 </Box>
               ))}

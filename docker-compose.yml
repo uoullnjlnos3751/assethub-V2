@@ -29,9 +29,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    volumes:
-      - ./backend:/app
-      - backend_node:/app/node_modules
 
   frontend:
     build:

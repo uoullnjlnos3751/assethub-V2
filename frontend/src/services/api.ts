@@ -40,6 +40,15 @@ export const assetAPI = {
   upsert: (data: any) => api.post('/assets/upsert', data),
   update: (id: number, data: any) => api.put(`/assets/${id}`, data),
   delete: (id: number) => api.delete(`/assets/${id}`),
+  uploadImage: (id: number, formData: FormData) => {
+    const token = localStorage.getItem('token');
+    return axios.post(`/api/assets/${id}/image`, formData, {
+      headers: {
+        Authorization: token ? `Bearer ${token}` : undefined,
+      },
+    });
+  },
+  deleteImage: (id: number) => api.delete(`/assets/${id}/image`),
   searchOwners: (q: string) => api.get('/assets/owners/search-ad', { params: { q } }),
   typeOptions: () => api.get('/assets/options/types'),
   locationOptions: () => api.get('/assets/options/locations'),
@@ -126,4 +135,29 @@ export const dashboardAPI = {
   borrowSummary: () => api.get('/dashboard/borrow-summary'),
   pmSummary: () => api.get('/dashboard/pm-summary'),
   recentActivity: () => api.get('/dashboard/recent-activity'),
+};
+
+// Inventory
+export const inventoryAPI = {
+  list: (params?: any) => api.get('/inventory', { params }),
+  get: (id: number) => api.get(`/inventory/${id}`),
+  create: (data: any) => api.post('/inventory', data),
+  update: (id: number, data: any) => api.put(`/inventory/${id}`, data),
+  delete: (id: number) => api.delete(`/inventory/${id}`),
+  checkin: (id: number, data: any) => api.post(`/inventory/${id}/checkin`, data),
+  checkout: (id: number, data: any) => api.post(`/inventory/${id}/checkout`, data),
+  categories: () => api.get('/inventory/categories/list'),
+};
+
+// Categories
+export const categoryAPI = {
+  list: () => api.get('/categories'),
+  all: () => api.get('/categories/all'),
+  create: (data: any) => api.post('/categories', data),
+  update: (id: number, data: any) => api.put(`/categories/${id}`, data),
+  delete: (id: number) => api.delete(`/categories/${id}`),
+  createType: (categoryId: number, data: any) => api.post(`/categories/${categoryId}/types`, data),
+  updateType: (typeId: number, data: any) => api.put(`/categories/types/${typeId}`, data),
+  deleteType: (typeId: number) => api.delete(`/categories/types/${typeId}`),
+  reorderTypes: (categoryId: number, typeIds: number[]) => api.post(`/categories/${categoryId}/types/reorder`, { typeIds }),
 };

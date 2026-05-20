@@ -26,6 +26,8 @@ import LocationsPage from './pages/assets/LocationsPage';
 import VendorsPage from './pages/assets/VendorsPage';
 import AssetStatusesPage from './pages/assets/AssetStatusesPage';
 import ImportExportPage from './pages/assets/ImportExportPage';
+import InventoryPage from './pages/inventory/InventoryPage';
+import CategoryPage from './pages/categories/CategoryPage';
 import BorrowOverduePage from './pages/borrow/BorrowOverduePage';
 import PMTemplatePage from './pages/pm/PMTemplatePage';
 import ReportAssetsPage from './pages/reports/ReportAssetsPage';
@@ -65,6 +67,8 @@ export default function App() {
         <Route path="assets/vendors" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><VendorsPage /></ProtectedRoute>} />
         <Route path="assets/statuses" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><AssetStatusesPage /></ProtectedRoute>} />
         <Route path="assets/import-export" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><ImportExportPage /></ProtectedRoute>} />
+        <Route path="inventory" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><InventoryPage /></ProtectedRoute>} />
+        <Route path="categories" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><CategoryPage /></ProtectedRoute>} />
         {/* Borrow - User */}
         <Route path="borrow/new" element={<BorrowRequestPage />} />
         <Route path="borrow/my-requests" element={<MyRequestsPage />} />

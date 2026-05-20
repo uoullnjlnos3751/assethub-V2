@@ -8,7 +8,11 @@ export const loginSchema = z.object({
 });
 
 export const borrowRequestSchema = z.object({
-  assetIds: z.array(z.number()).min(1, 'กรุณาเลือกทรัพย์สินอย่างน้อย 1 รายการ'),
+  assetIds: z.array(z.number()).optional().default([]),
+  inventoryItems: z.array(z.object({
+    inventoryItemId: z.number(),
+    quantity: z.number().min(1),
+  })).optional().default([]),
   purpose: z.string().optional(),
   notes: z.string().optional(),
   location: z.string().optional(),
@@ -31,6 +35,7 @@ export const returnSchema = z.object({
   }),
   damageNote: z.string().optional(),
   accessoriesNote: z.string().optional(),
+  receiverName: z.string().optional(),
 });
 
 export const extensionSchema = z.object({

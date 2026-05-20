@@ -26,14 +26,19 @@ const conditions = [
 
 interface BorrowItem {
   id: number;
-  assetId: number;
+  assetId?: number;
   assetCode: string;
-  serialNo: string;
+  serialNo?: string;
   brand: string;
   model: string;
   borrowDate: string;
-  dueDate: string;
+  dueDate?: string;
   itemStatus: string;
+  isQuantityBased?: boolean;
+  inventoryItemName?: string;
+  inventoryQty?: number;
+  inventoryUnit?: string;
+  receiverName?: string;
 }
 
 interface RequestGroup {
@@ -47,28 +52,37 @@ interface RequestGroup {
   items: BorrowItem[];
   returnedCount: number;
   pendingCount: number;
+  receiverNames: string[];
 }
 
 interface FlatItem {
   id: number;
-  assetId: number;
+  assetId?: number;
   assetCode: string;
-  serialNo: string;
+  serialNo?: string;
   brand: string;
   model: string;
   borrowDate: string;
-  dueDate: string;
+  dueDate?: string;
   itemStatus: string;
   requestNo: string;
   requesterName: string;
   requesterDept: string;
+  isQuantityBased?: boolean;
+  inventoryItemName?: string;
+  inventoryQty?: number;
+  inventoryUnit?: string;
 }
 
 function RequestRow({ group, onReturn, defaultOpen = false }: { group: RequestGroup; onReturn: (items: BorrowItem[]) => void; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   const [selected, setSelected] = useState<number[]>([]);
   const theme = useTheme();
-  const isOverdue = group.items.some(i => new Date(i.dueDate) < new Date() && i.itemStatus === 'CheckedOut');
+  const isOverdue = group.items.some(i => i.dueDate && new Date(i.dueDate) < new Date() && i.itemStatus === 'CheckedOut');
+  const earliestDueDate = group.items
+    .filter(i => i.itemStatus === 'CheckedOut' && i.dueDate)
+    .map(i => new Date(i.dueDate).getTime())
+    .sort((a, b) => a - b)[0];
 
   const toggleSelect = (itemId: number) => {
     setSelected(prev => prev.includes(itemId) ? prev.filter(id => id !== itemId) : [...prev, itemId]);
@@ -101,6 +115,11 @@ function RequestRow({ group, onReturn, defaultOpen = false }: { group: RequestGr
           <Typography variant="caption" color="text.secondary">{group.requesterDept}</Typography>
         </TableCell>
         <TableCell>
+          <Typography variant="body2" sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {group.purpose || '-'}
+          </Typography>
+        </TableCell>
+        <TableCell>
           <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
             <Chip
               label={`${group.returnedCount}/${group.items.length} คืนแล้ว`}
@@ -117,7 +136,24 @@ function RequestRow({ group, onReturn, defaultOpen = false }: { group: RequestGr
           </Box>
         </TableCell>
         <TableCell>
+          {earliestDueDate ? (
+            <Typography variant="body2" sx={{ fontWeight: isOverdue ? 700 : 'inherit', color: isOverdue ? 'error.main' : 'inherit' }}>
+              {new Date(earliestDueDate).toLocaleDateString('th-TH')}
+              {isOverdue && ' ⚠️'}
+            </Typography>
+          ) : (
+            <Typography variant="body2" color="text.secondary">-</Typography>
+          )}
+        </TableCell>
+        <TableCell>
           <StatusChip status={group.status} />
+        </TableCell>
+        <TableCell>
+          {group.receiverNames.length > 0 ? (
+            <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>{group.receiverNames.join(', ')}</Typography>
+          ) : (
+            <Typography variant="body2" color="text.secondary">-</Typography>
+          )}
         </TableCell>
         <TableCell align="right">
           {group.pendingCount > 0 && (
@@ -135,7 +171,7 @@ function RequestRow({ group, onReturn, defaultOpen = false }: { group: RequestGr
         </TableCell>
       </TableRow>
       <TableRow>
-        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={6}>
+        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={9}>
           <Collapse in={open} timeout="auto" unmountOnExit>
             <Box sx={{ p: 2.5, bgcolor: '#F8FAFC', borderRadius: '0 0 12px 12px' }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -161,7 +197,7 @@ function RequestRow({ group, onReturn, defaultOpen = false }: { group: RequestGr
                   </TableHead>
                   <TableBody>
                     {group.items.map((item) => {
-                      const isItemOverdue = new Date(item.dueDate) < new Date() && item.itemStatus === 'CheckedOut';
+                      const isItemOverdue = item.dueDate && new Date(item.dueDate) < new Date() && item.itemStatus === 'CheckedOut';
                       return (
                         <TableRow key={item.id} sx={{ bgcolor: isItemOverdue ? alpha('#EF4444', 0.05) : 'inherit' }}>
                           <TableCell padding="checkbox">
@@ -174,12 +210,16 @@ function RequestRow({ group, onReturn, defaultOpen = false }: { group: RequestGr
                             )}
                           </TableCell>
                           <TableCell sx={{ fontWeight: 600, fontSize: '0.85rem' }}>{item.assetCode}</TableCell>
-                          <TableCell sx={{ fontSize: '0.85rem' }}>{item.serialNo}</TableCell>
+                          <TableCell sx={{ fontSize: '0.85rem' }}>{item.isQuantityBased ? '-' : (item.serialNo || '-')}</TableCell>
                           <TableCell sx={{ fontSize: '0.85rem' }}>{item.brand} {item.model}</TableCell>
                           <TableCell sx={{ fontSize: '0.85rem' }}>{new Date(item.borrowDate).toLocaleDateString('th-TH')}</TableCell>
                           <TableCell sx={{ color: isItemOverdue ? 'error.main' : 'inherit', fontWeight: isItemOverdue ? 700 : 'inherit', fontSize: '0.85rem' }}>
-                            {new Date(item.dueDate).toLocaleDateString('th-TH')}
-                            {isItemOverdue && ' ⚠️'}
+                            {item.dueDate ? (
+                              <>{new Date(item.dueDate).toLocaleDateString('th-TH')}
+                              {isItemOverdue && ' ⚠️'}</>
+                            ) : (
+                              '-'
+                            )}
                           </TableCell>
                           <TableCell>
                             <StatusChip status={item.itemStatus === 'Returned' ? 'Returned' : 'CheckedOut'} />
@@ -225,6 +265,7 @@ export default function ReturnPage() {
   const [condition, setCondition] = useState('Normal');
   const [damageNote, setDamageNote] = useState('');
   const [accessoriesNote, setAccessoriesNote] = useState('');
+  const [receiverName, setReceiverName] = useState('');
   const [processing, setProcessing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTab, setFilterTab] = useState(0);
@@ -242,36 +283,51 @@ export default function ReturnPage() {
       const grouped: RequestGroup[] = requests
         .filter((r: any) => r.items?.some((i: any) => ['CheckedOut', 'PartiallyReturned', 'Returned'].includes(i.itemStatus)))
         .map((r: any) => {
-          const items: BorrowItem[] = (r.items || []).map((i: any) => {
+          const items: BorrowItem[] = (r.items || []).map((i: any): BorrowItem => {
+            const isInv = i.isQuantityBased && i.inventoryItem;
+            const returns = i.returns || [];
+            const receiverName = returns.length > 0
+              ? (returns[0].receiverName || returns[0].returner?.displayName || returns[0].returner?.adUsername || '')
+              : '';
             const flatItem: FlatItem = {
               id: i.id,
-              assetId: i.assetId,
-              assetCode: i.asset?.assetCode || '',
-              serialNo: i.asset?.serialNo || '',
-              brand: i.asset?.brand || '',
-              model: i.asset?.model || '',
+              assetId: i.assetId || undefined,
+              assetCode: isInv ? i.inventoryItem.name : (i.asset?.assetCode || ''),
+              serialNo: isInv ? undefined : (i.asset?.serialNo || ''),
+              brand: isInv ? i.inventoryItem.name : (i.asset?.brand || ''),
+              model: isInv ? `จำนวน ${i.quantity} ${i.inventoryItem.unit}` : (i.asset?.model || ''),
               borrowDate: i.borrowDate || r.createdAt,
-              dueDate: i.dueDate || '',
+              dueDate: isInv ? undefined : (i.dueDate || ''),
               itemStatus: i.itemStatus,
               requestNo: r.requestNo,
               requesterName: r.requester?.displayName || 'N/A',
               requesterDept: r.requester?.department || '',
+              isQuantityBased: !!isInv,
+              inventoryItemName: isInv ? i.inventoryItem.name : undefined,
+              inventoryQty: isInv ? i.quantity : undefined,
+              inventoryUnit: isInv ? i.inventoryItem.unit : undefined,
             };
             flat.push(flatItem);
             return {
               id: i.id,
-              assetId: i.assetId,
-              assetCode: i.asset?.assetCode || '',
-              serialNo: i.asset?.serialNo || '',
-              brand: i.asset?.brand || '',
-              model: i.asset?.model || '',
+              assetId: i.assetId || undefined,
+              assetCode: isInv ? i.inventoryItem.name : (i.asset?.assetCode || ''),
+              serialNo: isInv ? undefined : (i.asset?.serialNo || ''),
+              brand: isInv ? i.inventoryItem.name : (i.asset?.brand || ''),
+              model: isInv ? `จำนวน ${i.quantity} ${i.inventoryItem.unit}` : (i.asset?.model || ''),
               borrowDate: i.borrowDate || r.createdAt,
-              dueDate: i.dueDate || '',
+              dueDate: isInv ? undefined : (i.dueDate || ''),
               itemStatus: i.itemStatus,
+              isQuantityBased: !!isInv,
+              inventoryItemName: isInv ? i.inventoryItem.name : undefined,
+              inventoryQty: isInv ? i.quantity : undefined,
+              inventoryUnit: isInv ? i.inventoryItem.unit : undefined,
+              receiverName,
             };
           });
           const returnedCount = items.filter((i: BorrowItem) => i.itemStatus === 'Returned').length;
           const pendingCount = items.filter((i: BorrowItem) => i.itemStatus === 'CheckedOut').length;
+          const receiverNames = [...new Set(items.map(i => i.receiverName).filter(Boolean))];
 
           return {
             id: r.id,
@@ -284,6 +340,7 @@ export default function ReturnPage() {
             items,
             returnedCount,
             pendingCount,
+            receiverNames,
           };
         })
         .filter((g: RequestGroup) => g.pendingCount > 0 || g.returnedCount > 0)
@@ -309,7 +366,7 @@ export default function ReturnPage() {
     let filtered = groups;
 
     if (filterTab === 1) {
-      filtered = filtered.filter(g => g.items.some(i => new Date(i.dueDate) < new Date() && i.itemStatus === 'CheckedOut'));
+      filtered = filtered.filter(g => g.items.some(i => !i.isQuantityBased && i.dueDate && new Date(i.dueDate) < new Date() && i.itemStatus === 'CheckedOut'));
     } else if (filterTab === 2) {
       filtered = filtered.filter(g => g.pendingCount > 0);
     } else if (filterTab === 3) {
@@ -323,7 +380,7 @@ export default function ReturnPage() {
           g.requestNo.toLowerCase().includes(search) ||
           g.requesterName.toLowerCase().includes(search) ||
           g.requesterDept.toLowerCase().includes(search) ||
-          g.items.some(i => i.assetCode.toLowerCase().includes(search) || i.serialNo.toLowerCase().includes(search))
+          g.items.some(i => i.assetCode.toLowerCase().includes(search) || (i.serialNo || '').toLowerCase().includes(search))
         );
       });
     }
@@ -336,9 +393,10 @@ export default function ReturnPage() {
       const search = quickSearch.toLowerCase();
       const results = flatItems.filter(i =>
         i.assetCode.toLowerCase().includes(search) ||
-        i.serialNo.toLowerCase().includes(search) ||
+        (i.serialNo || '').toLowerCase().includes(search) ||
         i.brand.toLowerCase().includes(search) ||
-        i.model.toLowerCase().includes(search)
+        i.model.toLowerCase().includes(search) ||
+        (i.inventoryItemName || '').toLowerCase().includes(search)
       );
       setQuickResults(results);
     } else {
@@ -351,6 +409,7 @@ export default function ReturnPage() {
     setCondition('Normal');
     setDamageNote('');
     setAccessoriesNote('');
+    setReceiverName('');
   };
 
   const handleReturnSubmit = async () => {
@@ -359,7 +418,7 @@ export default function ReturnPage() {
     setProcessing(true);
     try {
       for (const item of dialog.items) {
-        await borrowAPI.returnItem(item.id, { condition, damageNote, accessoriesNote });
+        await borrowAPI.returnItem(item.id, { condition, damageNote, accessoriesNote, receiverName });
       }
       toast.success(`คืนทรัพย์สิน ${dialog.items.length} รายการสำเร็จ`);
       setDialog({ open: false, items: [] });
@@ -388,7 +447,7 @@ export default function ReturnPage() {
   };
 
   const totalPending = groups.reduce((sum, g) => sum + g.pendingCount, 0);
-  const totalOverdue = groups.filter(g => g.items.some(i => new Date(i.dueDate) < new Date() && i.itemStatus === 'CheckedOut')).length;
+  const totalOverdue = groups.filter(g => g.items.some(i => !i.isQuantityBased && i.dueDate && new Date(i.dueDate) < new Date() && i.itemStatus === 'CheckedOut')).length;
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}><CircularProgress /></Box>;
 
@@ -487,7 +546,7 @@ export default function ReturnPage() {
                 <TextField
                   {...params}
                   size="small"
-                  placeholder="พิมพ์รหัสทรัพย์สิน หรือ Serial No."
+                  placeholder="พิมพ์รหัสทรัพย์สิน, Serial No., หรือชื่อวัสดุ"
                   InputProps={{
                     ...params.InputProps,
                     startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment>,
@@ -498,7 +557,7 @@ export default function ReturnPage() {
                 <Box component="li" {...props} key={option.id} sx={{ py: 1 }}>
                   <Box sx={{ flex: 1 }}>
                     <Typography fontWeight={700}>{option.assetCode}</Typography>
-                    <Typography variant="caption" color="text.secondary">{option.brand} {option.model} | {option.serialNo}</Typography>
+                    <Typography variant="caption" color="text.secondary">{option.isQuantityBased ? `${option.inventoryItemName} x${option.inventoryQty} ${option.inventoryUnit}` : `${option.brand} ${option.model} | ${option.serialNo}`}</Typography>
                   </Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Typography variant="caption" color="text.secondary">{option.requestNo}</Typography>
@@ -519,15 +578,18 @@ export default function ReturnPage() {
               <TableCell sx={{ width: 50 }} />
               <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>เลขที่คำขอ</TableCell>
               <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>ผู้ยืม</TableCell>
+              <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>วัตถุประสงค์</TableCell>
               <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>สถานะการคืน</TableCell>
+              <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>กำหนดคืน</TableCell>
               <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>สถานะคำขอ</TableCell>
+              <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>ผู้รับคืน</TableCell>
               <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.75rem' }}>การกระทำ</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {filteredGroups.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
                   <Typography color="text.secondary">{groups.length === 0 ? 'ไม่มีรายการรอการคืน' : 'ไม่พบผลการค้นหา'}</Typography>
                 </TableCell>
               </TableRow>
@@ -561,7 +623,7 @@ export default function ReturnPage() {
             {dialog.items.map(item => (
               <Box key={item.id} sx={{ display: 'flex', justifyContent: 'space-between', py: 1, px: 1.5, bgcolor: '#F8FAFC', borderRadius: 1, mb: 0.5 }}>
                 <Typography fontWeight={600}>{item.assetCode}</Typography>
-                <Typography variant="body2" color="text.secondary">{item.brand} {item.model}</Typography>
+                <Typography variant="body2" color="text.secondary">{item.isQuantityBased ? `${item.inventoryQty} ${item.inventoryUnit}` : `${item.brand} ${item.model}`}</Typography>
               </Box>
             ))}
           </Box>
@@ -572,6 +634,16 @@ export default function ReturnPage() {
               {conditions.map(c => <MenuItem key={c.value} value={c.value}>{c.label}</MenuItem>)}
             </Select>
           </FormControl>
+
+          <TextField
+            label="ผู้รับคืน"
+            fullWidth
+            value={receiverName}
+            onChange={(e) => setReceiverName(e.target.value)}
+            placeholder="ชื่อผู้รับคืนอุปกรณ์"
+            sx={{ mb: 2 }}
+            helperText="ระบุชื่อผู้ที่รับคืนอุปกรณ์ (ถ้ามี)"
+          />
 
           {(condition === 'Damaged' || condition === 'Repairing') && (
             <TextField label="รายละเอียดความเสียหาย" fullWidth multiline rows={2} value={damageNote} onChange={(e) => setDamageNote(e.target.value)} placeholder="บรรยายสภาพเสียหาย" sx={{ mb: 2 }} />

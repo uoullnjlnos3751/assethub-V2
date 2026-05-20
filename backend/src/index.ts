@@ -7,6 +7,8 @@ import borrowRoutes from './routes/borrow';
 import pmRoutes from './routes/pm';
 import adminRoutes from './routes/admin';
 import dashboardRoutes from './routes/dashboard';
+import inventoryRoutes from './routes/inventory';
+import categoryRoutes from './routes/categories';
 import { errorHandler } from './middleware/errorHandler';
 import { startNotificationWorker } from './services/notification';
 import { startOverdueChecker } from './jobs/overdueChecker';
@@ -27,6 +29,8 @@ app.use('/api/borrow', borrowRoutes);
 app.use('/api/pm', pmRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/inventory', inventoryRoutes);
+app.use('/api/categories', categoryRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

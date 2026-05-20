@@ -25,18 +25,47 @@ async function getAllowExtension(): Promise<boolean> {
 // ── User: Create borrow request (multi-item) ──
 router.post('/requests', authenticate, validate(borrowRequestSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { assetIds, purpose, notes, location } = req.body;
+    const { assetIds, inventoryItems, purpose, notes, location } = req.body;
 
     const maxItems = await getMaxItems();
-    if (assetIds.length > maxItems) {
+    const totalItems = (assetIds?.length || 0) + (inventoryItems?.length || 0);
+    if (totalItems > maxItems) {
       throw new AppError(`จำนวนรายการเกินกำหนด (สูงสุด ${maxItems} รายการ)`);
     }
 
-    const assets = await prisma.asset.findMany({
-      where: { id: { in: assetIds }, status: 'Available' },
-    });
-    if (assets.length !== assetIds.length) {
-      throw new AppError('ทรัพย์สินบางรายการไม่พร้อมให้ยืม');
+    // Validate asset availability
+    const assets: any[] = [];
+    if (assetIds?.length > 0) {
+      const found = await prisma.asset.findMany({
+        where: { id: { in: assetIds }, status: 'Available' },
+      });
+      if (found.length !== assetIds.length) {
+        throw new AppError('ทรัพย์สินบางรายการไม่พร้อมให้ยืม');
+      }
+      assets.push(...found);
+    }
+
+    // Validate inventory items
+    const inventoryItemRecords: any[] = [];
+    if (inventoryItems?.length > 0) {
+      const invIds = inventoryItems.map((i: any) => i.inventoryItemId);
+      const found = await prisma.inventoryItem.findMany({
+        where: { id: { in: invIds }, isActive: true },
+      });
+      if (found.length !== invIds.length) {
+        throw new AppError('ไม่พบวัสดุสิ้นเปลืองบางรายการ');
+      }
+      for (const inv of inventoryItems) {
+        const item = found.find((f: any) => f.id === inv.inventoryItemId);
+        if (!item || item.availableQuantity < inv.quantity) {
+          throw new AppError(`วัสดุ "${item?.name || inv.inventoryItemId}" คงเหลือไม่พอ`);
+        }
+      }
+      inventoryItemRecords.push(...found);
+    }
+
+    if (totalItems === 0) {
+      throw new AppError('กรุณาเลือกทรัพย์สินหรือวัสดุอย่างน้อย 1 รายการ');
     }
 
     const borrowDays = await getBorrowDays();
@@ -55,24 +84,46 @@ router.post('/requests', authenticate, validate(borrowRequestSchema), async (req
         note: notes || null,
         status: 'Pending',
         items: {
-          create: assets.map(a => ({
-            assetId: a.id,
-            borrowDate,
-            dueDate,
-            itemStatus: 'Pending',
-          })),
+          create: [
+            ...assets.map((a: any) => ({
+              assetId: a.id,
+              isQuantityBased: false,
+              quantity: 1,
+              borrowDate,
+              dueDate,
+              itemStatus: 'Pending',
+            })),
+            ...inventoryItems.map((inv: any) => ({
+              inventoryItemId: inv.inventoryItemId,
+              isQuantityBased: true,
+              quantity: inv.quantity,
+              borrowDate,
+              dueDate,
+              itemStatus: 'Pending',
+            })),
+          ],
         },
       },
-      include: { items: { include: { asset: true } } },
+      include: { items: { include: { asset: true, inventoryItem: true } } },
     });
 
-    const itemsPayload = request.items.map(item => ({
-      assetCode: item.asset.assetCode,
-      serialNo: item.asset.serialNo,
-      brand: item.asset.brand,
-      model: item.asset.model,
-      status: 'รอการอนุมัติ',
-    }));
+    const itemsPayload = request.items.map(item => {
+      if (item.inventoryItem) {
+        return {
+          name: item.inventoryItem.name,
+          quantity: item.quantity,
+          unit: item.inventoryItem.unit,
+          status: 'รอการอนุมัติ',
+        };
+      }
+      return {
+        assetCode: item.asset!.assetCode,
+        serialNo: item.asset!.serialNo,
+        brand: item.asset!.brand,
+        model: item.asset!.model,
+        status: 'รอการอนุมัติ',
+      };
+    });
 
     const borrowDateStr = borrowDate.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
     const dueDateStr = dueDate.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -118,7 +169,7 @@ router.get('/requests', authenticate, async (req: Request, res: Response, next: 
         skip: (pageNum - 1) * limitNum,
         take: limitNum,
         orderBy: { createdAt: 'desc' },
-        include: { items: { include: { asset: true } }, approvals: { orderBy: { actedAt: 'desc' } } },
+        include: { items: { include: { asset: true, inventoryItem: true } }, approvals: { orderBy: { actedAt: 'desc' } } },
       }),
       prisma.borrowRequest.count({ where }),
     ]);
@@ -134,7 +185,7 @@ router.get('/my-items', authenticate, async (req: Request, res: Response, next: 
         request: { requesterUserId: req.user!.userId },
         itemStatus: { in: ['CheckedOut', 'PartiallyReturned'] },
       },
-      include: { asset: true, request: true },
+      include: { asset: true, inventoryItem: true, request: true },
       orderBy: { dueDate: 'asc' },
     });
     res.json(items);
@@ -146,7 +197,7 @@ router.get('/my-history', authenticate, async (req: Request, res: Response, next
   try {
     const items = await prisma.borrowRequestItem.findMany({
       where: { request: { requesterUserId: req.user!.userId }, itemStatus: 'Returned' },
-      include: { asset: true, request: true, returns: true },
+      include: { asset: true, inventoryItem: true, request: true, returns: true },
       orderBy: { request: { createdAt: 'desc' } },
       take: 100,
     });
@@ -184,7 +235,7 @@ router.get('/all-requests', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), a
         skip: (pageNum - 1) * limitNum,
         take: limitNum,
         orderBy: { createdAt: 'desc' },
-        include: { items: { include: { asset: true } }, approvals: true, requester: { select: { id: true, displayName: true, adUsername: true, department: true } } },
+        include: { items: { include: { asset: true, inventoryItem: true, returns: true } }, approvals: true, requester: { select: { id: true, displayName: true, adUsername: true, department: true } } },
       }),
       prisma.borrowRequest.count({ where }),
     ]);
@@ -200,16 +251,17 @@ router.post('/requests/:id/approve', authenticate, authorize('IT_ADMIN', 'SUPERA
 
     const request = await prisma.borrowRequest.findUnique({
       where: { id },
-      include: { items: { include: { asset: true } }, requester: true },
+      include: { items: { include: { asset: true, inventoryItem: true } }, requester: true },
     });
     if (!request) throw new AppError('ไม่พบคำขอ', 404);
     if (request.status !== 'Pending') throw new AppError('คำขอนี้ได้รับการดำเนินการแล้ว');
 
     // Check assets still available for approval
     if (action === 'Approved') {
-      const unavailable = request.items.filter(i => i.asset.status !== 'Available');
+      const serializedItems = request.items.filter(i => !i.isQuantityBased && i.asset);
+      const unavailable = serializedItems.filter(i => i.asset!.status !== 'Available');
       if (unavailable.length > 0) {
-        throw new AppError(`ทรัพย์สินบางรายการไม่พร้อมให้ยืมแล้ว: ${unavailable.map(i => i.asset.assetCode).join(', ')}`);
+        throw new AppError(`ทรัพย์สินบางรายการไม่พร้อมให้ยืมแล้ว: ${unavailable.map(i => i.asset!.assetCode).join(', ')}`);
       }
     }
 
@@ -238,10 +290,10 @@ router.post('/requests/:id/approve', authenticate, authorize('IT_ADMIN', 'SUPERA
 
     if (request.requester.email) {
       const itemsPayload = request.items.map(item => ({
-        assetCode: item.asset.assetCode,
-        serialNo: item.asset.serialNo,
-        brand: item.asset.brand,
-        model: item.asset.model,
+        assetCode: item.asset!.assetCode,
+        serialNo: item.asset!.serialNo,
+        brand: item.asset!.brand,
+        model: item.asset!.model,
         status: action === 'Approved' ? 'อนุมัติ' : 'ไม่อนุมัติ',
       }));
 
@@ -274,7 +326,7 @@ router.post('/requests/:id/approve', authenticate, authorize('IT_ADMIN', 'SUPERA
 
     const updated = await prisma.borrowRequest.findUnique({
       where: { id },
-      include: { items: { include: { asset: true } }, approvals: true, requester: true },
+      include: { items: { include: { asset: true, inventoryItem: true } }, approvals: true, requester: true },
     });
     res.json(updated);
   } catch (err) { next(err); }
@@ -289,7 +341,7 @@ router.post('/requests/:id/checkout', authenticate, authorize('IT_ADMIN', 'SUPER
     const request = await prisma.borrowRequest.findUnique({
       where: { id },
       include: { 
-        items: { include: { asset: true } },
+        items: { include: { asset: true, inventoryItem: true } },
         requester: true
       },
     });
@@ -311,32 +363,47 @@ router.post('/requests/:id/checkout', authenticate, authorize('IT_ADMIN', 'SUPER
           where: { id: item.id },
           data: { itemStatus: 'CheckedOut', borrowDate: new Date() },
         });
-        await tx.asset.update({
-          where: { id: item.assetId },
-          data: { status: 'Borrowed' },
-        });
-        await tx.assetHistory.create({
-          data: {
-            assetId: item.assetId,
-            actionType: 'CHECKOUT',
-            fromStatus: 'Available',
-            toStatus: 'Borrowed',
-            actorUserId: req.user!.userId,
-            ownerUserId: request.requesterUserId,
-            note: `Check-out to request ${request.requestNo}`,
-          },
-        });
+
+        if (item.isQuantityBased && item.inventoryItem) {
+          // Inventory item: decrement stock
+          await tx.inventoryItem.update({
+            where: { id: item.inventoryItemId! },
+            data: { availableQuantity: { decrement: item.quantity } },
+          });
+        } else if (item.asset) {
+          // Serialized asset: update status
+          await tx.asset.update({
+            where: { id: item.assetId! },
+            data: { status: 'Borrowed' },
+          });
+          await tx.assetHistory.create({
+            data: {
+              assetId: item.assetId!,
+              actionType: 'CHECKOUT',
+              fromStatus: 'Available',
+              toStatus: 'Borrowed',
+              actorUserId: req.user!.userId,
+              ownerUserId: request.requesterUserId,
+              note: `Check-out to request ${request.requestNo}`,
+            },
+          });
+        }
       }
     });
 
     if (request.requester?.email) {
-      const itemsPayload = request.items.map(item => ({
-        assetCode: item.asset.assetCode,
-        serialNo: item.asset.serialNo,
-        brand: item.asset.brand,
-        model: item.asset.model,
-        status: 'ส่งมอบแล้ว',
-      }));
+      const itemsPayload = request.items.map(item => {
+        if (item.inventoryItem) {
+          return { name: item.inventoryItem.name, quantity: item.quantity, unit: item.inventoryItem.unit, status: 'ส่งมอบแล้ว' };
+        }
+        return {
+          assetCode: item.asset!.assetCode,
+          serialNo: item.asset!.serialNo,
+          brand: item.asset!.brand,
+          model: item.asset!.model,
+          status: 'ส่งมอบแล้ว',
+        };
+      });
       const borrowDateStr = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
       const dueDateStr = request.items[0]?.dueDate ? new Date(request.items[0].dueDate).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }) : '-';
       await createNotification('checkout_completed', 'EMAIL', request.requester.email, {
@@ -362,11 +429,11 @@ router.post('/requests/:id/checkout', authenticate, authorize('IT_ADMIN', 'SUPER
 router.post('/items/:itemId/return', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), validate(returnSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const itemId = parseInt(req.params.itemId);
-    const { condition, damageNote, accessoriesNote } = req.body;
+    const { condition, damageNote, accessoriesNote, receiverName } = req.body;
 
     const item = await prisma.borrowRequestItem.findUnique({
       where: { id: itemId },
-      include: { request: { include: { requester: true } }, asset: true },
+      include: { request: { include: { requester: true } }, asset: true, inventoryItem: true },
     });
     if (!item) throw new AppError('ไม่พบรายการยืม', 404);
     if (!['CheckedOut', 'PartiallyReturned'].includes(item.itemStatus)) {
@@ -381,6 +448,7 @@ router.post('/items/:itemId/return', authenticate, authorize('IT_ADMIN', 'SUPERA
           condition,
           damageNote: damageNote || null,
           accessoriesNote: accessoriesNote || null,
+          receiverName: receiverName || null,
         },
       });
 
@@ -389,21 +457,29 @@ router.post('/items/:itemId/return', authenticate, authorize('IT_ADMIN', 'SUPERA
         data: { itemStatus: 'Returned' },
       });
 
-      await tx.asset.update({
-        where: { id: item.assetId },
-        data: { status: 'Available' },
-      });
-
-      await tx.assetHistory.create({
-        data: {
-          assetId: item.assetId,
-          actionType: 'RETURN',
-          fromStatus: 'Borrowed',
-          toStatus: 'Available',
-          actorUserId: req.user!.userId,
-          note: `Return - ${condition}${damageNote ? ': ' + damageNote : ''}`,
-        },
-      });
+      if (item.isQuantityBased && item.inventoryItem) {
+        // Inventory item: increment stock
+        await tx.inventoryItem.update({
+          where: { id: item.inventoryItemId! },
+          data: { availableQuantity: { increment: item.quantity } },
+        });
+      } else if (item.asset) {
+        // Serialized asset: update status
+        await tx.asset.update({
+          where: { id: item.assetId! },
+          data: { status: 'Available' },
+        });
+        await tx.assetHistory.create({
+          data: {
+            assetId: item.assetId!,
+            actionType: 'RETURN',
+            fromStatus: 'Borrowed',
+            toStatus: 'Available',
+            actorUserId: req.user!.userId,
+            note: `Return - ${condition}${damageNote ? ': ' + damageNote : ''}`,
+          },
+        });
+      }
 
       // Update request status
       const remaining = await tx.borrowRequestItem.count({
@@ -596,7 +672,17 @@ router.get('/history', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async 
         skip: (pageNum - 1) * limitNum,
         take: limitNum,
         orderBy: { updatedAt: 'desc' },
-        include: { items: { include: { asset: true } }, requester: true, approvals: true },
+        include: {
+          items: {
+            include: {
+              asset: true,
+              inventoryItem: true,
+              returns: { include: { returner: { select: { displayName: true, adUsername: true } } } },
+            },
+          },
+          requester: true,
+          approvals: true,
+        },
       }),
       prisma.borrowRequest.count(),
     ]);

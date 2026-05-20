@@ -100,7 +100,6 @@ async function main() {
     const poDate = parseDate(row['PO Date']);
     const poNumber = row['PO No.']?.trim() || '';
     const vendor = row['Vendor']?.trim() || '';
-    const oldAssetCode = row['Old Computer Name']?.trim() || null;
     const remark = row['หมายเหตุ']?.trim() || '';
 
     const location = 'HQ';

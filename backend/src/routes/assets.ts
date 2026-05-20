@@ -4,6 +4,27 @@ import { authenticate, authorize } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { Prisma } from '@prisma/client';
 import { searchADUsers } from '../services/ldap';
+import multer from 'multer';
+
+declare global {
+  namespace Express {
+    interface Request {
+      file?: Express.Multer.File;
+    }
+  }
+}
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req: any, file: any, cb: any) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  },
+});
 
 const router = Router();
 
@@ -54,14 +75,15 @@ const ALLOWED_ASSET_FIELDS = new Set([
   'location', 'status', 'remark', 'company', 'cpuGeneration', 'domainName',
   'floor', 'poDate', 'ramDetail', 'gpu', 'osType', 'ramSlot1', 'ramSlot2',
   'snComputer', 'storage1', 'storage2', 'createdAt', 'updatedAt',
+  'oldAssetCode', 'budget', 'image', 'categoryId',
 ]);
 
-const normalizeAssetPayload = (data: any) => {
+const normalizeAssetPayload = (data: any, isCreate = false) => {
   const purchaseDate = parseDate(data.purchaseDate);
   const poDate = parseDate(data.poDate);
   
   let status = data.status;
-  if (data.ownerName && data.ownerName.trim() !== '' && (!status || status === 'Available')) {
+  if (isCreate && data.ownerName && data.ownerName.trim() !== '' && (!status || status === 'Available')) {
     status = 'InUse';
   }
 
@@ -80,6 +102,66 @@ const normalizeAssetPayload = (data: any) => {
     age: calculateAssetAge(purchaseDate),
   };
 };
+
+async function upsertAssetDetail(prisma: any, assetId: number, type: string, detail: any) {
+  if (!detail || Object.keys(detail).length === 0) return null;
+  const typeLower = type.toLowerCase();
+  const cleanDetail = Object.fromEntries(
+    Object.entries(detail).filter(([_, v]) => v !== undefined && v !== null && v !== '')
+  );
+  if (Object.keys(cleanDetail).length === 0) return null;
+
+  if (['computer', 'notebook'].includes(typeLower)) {
+    return prisma.computerDetail.upsert({
+      where: { assetId },
+      create: { assetId, ...cleanDetail },
+      update: cleanDetail,
+    });
+  }
+  if (['phone', 'tablet'].includes(typeLower)) {
+    return prisma.phoneDetail.upsert({
+      where: { assetId },
+      create: { assetId, ...cleanDetail },
+      update: cleanDetail,
+    });
+  }
+  if (['monitor'].includes(typeLower)) {
+    return prisma.monitorDetail.upsert({
+      where: { assetId },
+      create: { assetId, ...cleanDetail },
+      update: cleanDetail,
+    });
+  }
+  if (['projector', 'device', 'accessory'].includes(typeLower)) {
+    return prisma.deviceDetail.upsert({
+      where: { assetId },
+      create: { assetId, ...cleanDetail },
+      update: cleanDetail,
+    });
+  }
+  if (['network', 'switch', 'router'].includes(typeLower)) {
+    return prisma.networkDeviceDetail.upsert({
+      where: { assetId },
+      create: { assetId, ...cleanDetail },
+      update: cleanDetail,
+    });
+  }
+  if (['rack', 'enclosure', 'pdu'].includes(typeLower)) {
+    return prisma.rackDetail.upsert({
+      where: { assetId },
+      create: { assetId, ...cleanDetail },
+      update: cleanDetail,
+    });
+  }
+  if (['printer'].includes(typeLower)) {
+    return prisma.printerDetail.upsert({
+      where: { assetId },
+      create: { assetId, ...cleanDetail },
+      update: cleanDetail,
+    });
+  }
+  return null;
+}
 
 const ASSET_STATUS_OPTIONS = new Set(['Available', 'Borrowed', 'InUse', 'Maintenance', 'Retired', 'Lost']);
 
@@ -209,7 +291,7 @@ router.get('/options/os-types', authenticate, async (_req: Request, res: Respons
   try {
     const defaults = ['Windows', 'macOS', 'Linux', 'ChromeOS', 'Android', 'iOS'];
     const rows = await prisma.asset.findMany({ where: { osType: { not: null } }, distinct: ['osType'], select: { osType: true }, orderBy: { osType: 'asc' } });
-    const existing = new Set(rows.map((r) => r.osType));
+    const existing = new Set(rows.map((r) => r.osType).filter((v): v is string => v !== null));
     defaults.forEach((d) => existing.add(d));
     res.json(Array.from(existing).sort((a, b) => a.localeCompare(b)));
   } catch (err) { next(err); }
@@ -233,7 +315,7 @@ router.get('/options/companies', authenticate, async (_req: Request, res: Respon
   try {
     const defaults = ['PS', 'TRR', 'TRR Corp', 'TRRL', 'TRRP', 'TRRT', 'TRW', 'TRRSK', 'SSEC', 'TMI', 'TRM'];
     const rows = await prisma.asset.findMany({ where: { company: { not: null } }, distinct: ['company'], select: { company: true }, orderBy: { company: 'asc' } });
-    const existing = new Set(rows.map((r) => r.company).filter(Boolean));
+    const existing = new Set(rows.map((r) => r.company).filter((v): v is string => v !== null && v !== ''));
     defaults.forEach((d) => existing.add(d));
     res.json(Array.from(existing).sort((a, b) => a.localeCompare(b)));
   } catch (err) { next(err); }
@@ -243,7 +325,7 @@ router.get('/options/antivirus', authenticate, async (_req: Request, res: Respon
   try {
     const defaults = ['Trend Micro Apex One', 'Sangfor Endpoint Secure', 'ESET Endpoint Security'];
     const rows = await prisma.asset.findMany({ where: { antivirusStatus: { not: null } }, distinct: ['antivirusStatus'], select: { antivirusStatus: true }, orderBy: { antivirusStatus: 'asc' } });
-    const existing = new Set(rows.map((r) => r.antivirusStatus).filter(Boolean));
+    const existing = new Set(rows.map((r) => r.antivirusStatus).filter((v): v is string => v !== null && v !== ''));
     defaults.forEach((d) => existing.add(d));
     res.json(Array.from(existing).sort((a, b) => a.localeCompare(b)));
   } catch (err) { next(err); }
@@ -569,29 +651,84 @@ router.delete('/asset-statuses/:statusId', authenticate, authorize('IT_ADMIN', '
   }
 });
 
+const detailIncludeMap: Record<string, any> = {
+  Computer: { computerDetail: true },
+  Notebook: { computerDetail: true },
+  Phone: { phoneDetail: true },
+  Tablet: { phoneDetail: true },
+  Monitor: { monitorDetail: true },
+  Projector: { deviceDetail: true },
+  Device: { deviceDetail: true },
+  Accessory: { deviceDetail: true },
+  Network: { networkDeviceDetail: true },
+  Switch: { networkDeviceDetail: true },
+  Router: { networkDeviceDetail: true },
+  Rack: { rackDetail: true },
+  Enclosure: { rackDetail: true },
+  PDU: { rackDetail: true },
+  Printer: { printerDetail: true },
+};
+
+function getDetailInclude(type?: string | null): any {
+  if (!type) return {};
+  const key = Object.keys(detailIncludeMap).find(
+    (k) => k.toLowerCase() === type.toLowerCase()
+  );
+  return key ? detailIncludeMap[key] : {};
+}
+
+function getAssetDetail(prisma: any, assetId: number, type?: string | null) {
+  if (!type) return null;
+  const typeLower = type.toLowerCase();
+  if (['computer', 'notebook'].includes(typeLower)) {
+    return prisma.computerDetail.findUnique({ where: { assetId } });
+  }
+  if (['phone', 'tablet'].includes(typeLower)) {
+    return prisma.phoneDetail.findUnique({ where: { assetId } });
+  }
+  if (['monitor'].includes(typeLower)) {
+    return prisma.monitorDetail.findUnique({ where: { assetId } });
+  }
+  if (['projector', 'device', 'accessory'].includes(typeLower)) {
+    return prisma.deviceDetail.findUnique({ where: { assetId } });
+  }
+  if (['network', 'switch', 'router'].includes(typeLower)) {
+    return prisma.networkDeviceDetail.findUnique({ where: { assetId } });
+  }
+  if (['rack', 'enclosure', 'pdu'].includes(typeLower)) {
+    return prisma.rackDetail.findUnique({ where: { assetId } });
+  }
+  if (['printer'].includes(typeLower)) {
+    return prisma.printerDetail.findUnique({ where: { assetId } });
+  }
+  return null;
+}
+
 router.get('/:id', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const id = parseInt(req.params.id);
     const asset = await prisma.asset.findUnique({
-      where: { id: parseInt(req.params.id) },
+      where: { id },
       include: {
         assetHistory: { orderBy: { createdAt: 'desc' }, take: 50 },
         pmRuns: { orderBy: { completedAt: 'desc' }, take: 20, include: { plan: true, performer: true } },
+        category: true,
       },
     });
     if (!asset) throw new AppError('ไม่พบทรัพย์สิน', 404);
-    res.json(withCalculatedAge(asset));
+
+    const detail = await getAssetDetail(prisma, id, asset.type);
+    res.json({ ...withCalculatedAge(asset), detail });
   } catch (err) { next(err); }
 });
 
 router.post('/upsert', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    console.log('--- [DEBUG] Upsert Asset Request ---');
-    console.log('Payload:', JSON.stringify(req.body, null, 2));
-    const data = normalizeAssetPayload(req.body);
+    const { detail, ...assetData } = req.body;
+    const data = normalizeAssetPayload(assetData);
     const { assetCode, serialNo } = data;
 
     if (!assetCode && !serialNo) {
-      console.warn('[DEBUG] Validation failed: Missing both assetCode and serialNo');
       throw new AppError('กรุณาระบุ Asset Code หรือ Serial Number');
     }
 
@@ -606,11 +743,13 @@ router.post('/upsert', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async 
     });
 
     if (existing) {
-      console.log(`[DEBUG] Found existing asset (ID: ${existing.id}). Updating...`);
-      // Update
       const old = existing;
       const asset = await prisma.asset.update({ where: { id: old.id }, data });
       
+      if (detail && asset.type) {
+        await upsertAssetDetail(prisma, asset.id, asset.type, detail);
+      }
+
       const changes: any[] = [];
       if (data.status && data.status !== old.status) changes.push({ actionType: 'STATUS_CHANGE', fromStatus: old.status, toStatus: data.status });
       if (data.ownerName && data.ownerName !== old.ownerName) changes.push({ actionType: 'OWNER_CHANGE', fromOwner: old.ownerName, toOwner: data.ownerName });
@@ -623,9 +762,12 @@ router.post('/upsert', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async 
       }
       return res.json({ action: 'updated', asset });
     } else {
-      console.log(`[DEBUG] No existing asset found. Creating new...`);
-      // Create
       const asset = await prisma.asset.create({ data });
+
+      if (detail && asset.type) {
+        await upsertAssetDetail(prisma, asset.id, asset.type, detail);
+      }
+
       await prisma.assetHistory.create({
         data: {
           assetId: asset.id,
@@ -638,14 +780,14 @@ router.post('/upsert', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async 
       return res.status(201).json({ action: 'created', asset });
     }
   } catch (err: any) {
-    console.error('[DEBUG] Upsert Error:', err.message);
     next(err);
   }
 });
 
 router.post('/', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const data = normalizeAssetPayload(req.body);
+    const { detail, ...assetData } = req.body;
+    const data = normalizeAssetPayload(assetData);
     const existing = await prisma.asset.findFirst({
       where: { OR: [{ assetCode: data.assetCode }, { serialNo: data.serialNo }] },
     });
@@ -660,7 +802,14 @@ router.post('/', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: 
         actorUserId: req.user!.userId,
       },
     });
-    res.status(201).json(asset);
+
+    // Create type-specific detail
+    if (detail && asset.type) {
+      await upsertAssetDetail(prisma, asset.id, asset.type, detail);
+    }
+
+    const fullAsset = await prisma.asset.findUnique({ where: { id: asset.id } });
+    res.status(201).json(fullAsset);
   } catch (err) { next(err); }
 });
 
@@ -670,8 +819,15 @@ router.put('/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req
     const old = await prisma.asset.findUnique({ where: { id } });
     if (!old) throw new AppError('ไม่พบทรัพย์สิน', 404);
 
-    const data = normalizeAssetPayload(req.body);
+    const { detail, ...assetData } = req.body;
+    const data = normalizeAssetPayload(assetData);
+    
     const asset = await prisma.asset.update({ where: { id }, data });
+
+    // Upsert type-specific detail
+    if (detail && asset.type) {
+      await upsertAssetDetail(prisma, id, asset.type, detail);
+    }
 
     const changes: any[] = [];
     if (data.status && data.status !== old.status) changes.push({ actionType: 'STATUS_CHANGE', fromStatus: old.status, toStatus: data.status });
@@ -693,6 +849,41 @@ router.delete('/:id', authenticate, authorize('SUPERADMIN'), async (req: Request
     const id = parseInt(req.params.id);
     await prisma.asset.delete({ where: { id } });
     res.json({ message: 'ลบทรัพย์สินเรียบร้อย' });
+  } catch (err) { next(err); }
+});
+
+router.post('/:id/image', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), upload.single('image'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const asset = await prisma.asset.findUnique({ where: { id } });
+    if (!asset) throw new AppError('ไม่พบทรัพย์สิน', 404);
+
+    if (!req.file) throw new AppError('ไม่พบไฟล์รูปภาพ', 400);
+
+    const base64 = req.file.buffer.toString('base64');
+    const dataUrl = `data:${req.file.mimetype};base64,${base64}`;
+
+    const updated = await prisma.asset.update({
+      where: { id },
+      data: { image: dataUrl },
+    });
+
+    res.json({ message: 'อัพโหลดรูปภาพเรียบร้อย', image: updated.image });
+  } catch (err) { next(err); }
+});
+
+router.delete('/:id/image', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const asset = await prisma.asset.findUnique({ where: { id } });
+    if (!asset) throw new AppError('ไม่พบทรัพย์สิน', 404);
+
+    await prisma.asset.update({
+      where: { id },
+      data: { image: null },
+    });
+
+    res.json({ message: 'ลบรูปภาพเรียบร้อย' });
   } catch (err) { next(err); }
 });
 

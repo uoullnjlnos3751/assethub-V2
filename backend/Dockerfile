@@ -3,7 +3,7 @@ FROM node:20-alpine AS builder
 RUN apk add --no-cache openssl
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci
 COPY prisma ./prisma/
 RUN npx prisma generate
 COPY src ./src/
@@ -25,4 +25,4 @@ EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:4000/api/health || exit 1
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node dist/index.js"]
