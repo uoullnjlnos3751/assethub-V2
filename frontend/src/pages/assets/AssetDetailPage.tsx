@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Card, CardContent, Grid, Chip, Button, Table, TableBody,
@@ -70,6 +70,25 @@ export default function AssetDetailPage() {
   const [asset, setAsset] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  const categoryName = asset?.category?.name || '';
+  const typeLower = asset?.type?.toLowerCase() || '';
+
+  const isComputer = useMemo(() => {
+    if (categoryName) {
+      return categoryName === 'คอมพิวเตอร์';
+    }
+    const t = typeLower.trim();
+    if (t === 'pc') return true;
+    return ['notebook', 'pc desktop', 'macbook', 'mini pc', 'all-in-one', 'thin client', 'computer'].some(k => t.includes(k));
+  }, [categoryName, typeLower]);
+
+  const isMonitor = useMemo(() => {
+    if (categoryName) {
+      return categoryName === 'จอภาพ';
+    }
+    return typeLower.includes('monitor');
+  }, [categoryName, typeLower]);
+
   useEffect(() => {
     if (id) {
       assetAPI.get(parseInt(id)).then((res) => setAsset(res.data)).finally(() => setLoading(false));
@@ -78,103 +97,276 @@ export default function AssetDetailPage() {
 
   function renderDetailSection(type: string, detail: any) {
     const t = type?.toLowerCase() || '';
+    const cat = categoryName?.toLowerCase() || '';
 
-    if (['phone', 'tablet'].includes(t)) {
+    // อุปกรณ์สื่อสาร (Phone / Tablet / IPAD)
+    if (
+      cat === 'อุปกรณ์สื่อสาร' ||
+      ['smartphone', 'tablet', 'mobile hotspot', 'ipad'].some(k => t.includes(k))
+    ) {
       return (
         <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
           <CardContent sx={{ p: 3 }}>
             <SectionTitle>ข้อมูลอุปกรณ์สื่อสาร</SectionTitle>
             <Grid container spacing={2.5}>
-              <InfoItem label="IMEI" value={detail.imei} />
-              <InfoItem label="Carrier" value={detail.carrier} />
+              <InfoItem label="IMEI 1" value={detail.imei1} />
+              <InfoItem label="IMEI 2" value={detail.imei2} />
               <InfoItem label="เบอร์โทรศัพท์" value={detail.phoneNumber} />
-              <InfoItem label="ความจุ" value={detail.storageCapacity} />
-              <InfoItem label="สี" value={detail.color} />
               <InfoItem label="OS" value={detail.osType} />
+              <InfoItem label="OS Version" value={detail.osVersion} />
+              <InfoItem label="ความจุ (Storage)" value={detail.storageCapacity} />
+              <InfoItem label="RAM" value={detail.ram} />
+              <InfoItem label="สี" value={detail.color} />
+              <InfoItem label="ผู้ให้บริการ (SIM/Carrier)" value={detail.simProvider} />
+              <InfoItem label="MDM Enrolled" value={detail.mdmEnrolled === true ? 'ลงทะเบียนแล้ว' : detail.mdmEnrolled === false ? 'ยังไม่ได้ลงทะเบียน' : null} />
             </Grid>
           </CardContent>
         </Card>
       );
     }
 
-    if (['monitor'].includes(t)) {
+    // จอภาพ (Monitor)
+    if (
+      cat === 'จอภาพ' ||
+      t.includes('monitor')
+    ) {
       return (
         <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
           <CardContent sx={{ p: 3 }}>
             <SectionTitle>ข้อมูลจอภาพ</SectionTitle>
             <Grid container spacing={2.5}>
-              <InfoItem label="ขนาดจอ" value={detail.screenSize} />
+              <InfoItem label="ขนาดจอ (นิ้ว)" value={detail.screenSize} />
               <InfoItem label="ความละเอียด" value={detail.resolution} />
-              <InfoItem label="ช่องสัญญาณ" value={detail.connectionType} />
+              <InfoItem label="ประเภทแผง (Panel Type)" value={detail.panelType} />
               <InfoItem label="อัตรารีเฟรช" value={detail.refreshRate} />
+              <InfoItem label="พอร์ตเชื่อมต่อ" value={detail.ports} />
+              <InfoItem label="มีลำโพง" value={detail.hasSpeaker === true ? 'มี' : detail.hasSpeaker === false ? 'ไม่มี' : null} />
+              <InfoItem label="Curved" value={detail.curved === true ? 'จอโค้ง' : detail.curved === false ? 'จอแบน' : null} />
             </Grid>
           </CardContent>
         </Card>
       );
     }
 
-    if (['projector', 'device', 'accessory'].includes(t)) {
+    // อุปกรณ์นำเสนอ/AV
+    if (
+      cat === 'อุปกรณ์นำเสนอ/av' ||
+      ['projector', 'conference speaker', 'webcam', 'docking station', 'presentation clicker', 'speaker', 'docking'].some(k => t.includes(k))
+    ) {
+      if (t.includes('projector')) {
+        return (
+          <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
+            <CardContent sx={{ p: 3 }}>
+              <SectionTitle>ข้อมูล Projector</SectionTitle>
+              <Grid container spacing={2.5}>
+                <InfoItem label="ความสว่าง (Lumens)" value={detail.lumens} />
+                <InfoItem label="ความละเอียด" value={detail.resolution} />
+                <InfoItem label="Throw Ratio" value={detail.throwRatio} />
+                <InfoItem label="ชั่วโมงหลอดที่ใช้แล้ว" value={detail.lampHours} />
+                <InfoItem label="ช่องสัญญาณเข้า (Input)" value={detail.connectionType} />
+              </Grid>
+            </CardContent>
+          </Card>
+        );
+      }
+      if (t.includes('webcam')) {
+        return (
+          <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
+            <CardContent sx={{ p: 3 }}>
+              <SectionTitle>ข้อมูล Webcam</SectionTitle>
+              <Grid container spacing={2.5}>
+                <InfoItem label="ความละเอียด" value={detail.resolution} />
+                <InfoItem label="FPS" value={detail.fps} />
+                <InfoItem label="การเชื่อมต่อ" value={detail.connectionType} />
+              </Grid>
+            </CardContent>
+          </Card>
+        );
+      }
+      if (t.includes('docking')) {
+        return (
+          <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
+            <CardContent sx={{ p: 3 }}>
+              <SectionTitle>ข้อมูล Docking Station</SectionTitle>
+              <Grid container spacing={2.5}>
+                <InfoItem label="มาตรฐานเชื่อมต่อ" value={detail.usbStandard} />
+                <InfoItem label="จำนวนพอร์ต" value={detail.portCount} />
+                <InfoItem label="Power Delivery (W)" value={detail.powerDelivery} />
+              </Grid>
+            </CardContent>
+          </Card>
+        );
+      }
+      if (t.includes('conference speaker') || t.includes('speaker')) {
+        return (
+          <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
+            <CardContent sx={{ p: 3 }}>
+              <SectionTitle>ข้อมูล Conference Speaker</SectionTitle>
+              <Grid container spacing={2.5}>
+                <InfoItem label="การเชื่อมต่อ" value={detail.connectionType} />
+                <InfoItem label="กำลังไฟ (W)" value={detail.powerRating} />
+              </Grid>
+            </CardContent>
+          </Card>
+        );
+      }
+      if (t.includes('clicker') || t.includes('presentation clicker')) {
+        return (
+          <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
+            <CardContent sx={{ p: 3 }}>
+              <SectionTitle>ข้อมูล Presentation Clicker</SectionTitle>
+              <Grid container spacing={2.5}>
+                <InfoItem label="ช่วงระยะ (Range)" value={detail.range} />
+                <InfoItem label="ประเภท Receiver" value={detail.receiverType} />
+                <InfoItem label="แบตเตอรี่" value={detail.batteryType} />
+              </Grid>
+            </CardContent>
+          </Card>
+        );
+      }
+      // Generic AV
       return (
         <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
           <CardContent sx={{ p: 3 }}>
-            <SectionTitle>ข้อมูลอุปกรณ์</SectionTitle>
+            <SectionTitle>ข้อมูลอุปกรณ์ AV</SectionTitle>
             <Grid container spacing={2.5}>
-              <InfoItem label="ประเภท" value={detail.subType} />
-              <InfoItem label="กำลังไฟ" value={detail.powerRating} />
-              <InfoItem label="Lamp Hours" value={detail.lampHours} />
-              <InfoItem label="ช่องสัญญาณ" value={detail.connectionType} />
+              <InfoItem label="การเชื่อมต่อ" value={detail.connectionType} />
+              <InfoItem label="กำลังไฟ (W)" value={detail.powerRating} />
             </Grid>
           </CardContent>
         </Card>
       );
     }
 
-    if (['network', 'switch', 'router'].includes(t)) {
+    // Network / อุปกรณ์เครือข่าย
+    if (
+      cat === 'อุปกรณ์เครือข่าย' ||
+      ['switch', 'router', 'access point', 'firewall', 'modem', 'network'].some(k => t.includes(k))
+    ) {
       return (
         <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
           <CardContent sx={{ p: 3 }}>
             <SectionTitle>ข้อมูลอุปกรณ์เครือข่าย</SectionTitle>
             <Grid container spacing={2.5}>
+              {t.includes('access point') && (
+                <>
+                  <InfoItem label="WiFi Standard" value={detail.wifiStandard} />
+                  <InfoItem label="ย่านความถี่ (Band)" value={detail.band} />
+                </>
+              )}
               <InfoItem label="จำนวน Port" value={detail.portCount} />
               <InfoItem label="ความเร็ว Port" value={detail.portSpeed} />
               <InfoItem label="IP Address" value={detail.ipAddress} />
               <InfoItem label="MAC Address" value={detail.macAddress} />
               <InfoItem label="Firmware" value={detail.firmwareVersion} />
-              <InfoItem label="Managed" value={detail.isManaged === true ? 'Managed' : detail.isManaged === false ? 'Unmanaged' : null} />
-              <InfoItem label="PoE" value={detail.hasPoE === true ? 'มี PoE' : detail.hasPoE === false ? 'ไม่มี PoE' : null} />
+              <InfoItem label="ตำแหน่งในตู้ Rack" value={detail.locationRack} />
+              {t.includes('switch') && (
+                <>
+                  <InfoItem label="PoE Support" value={detail.hasPoE === true ? 'รองรับ' : detail.hasPoE === false ? 'ไม่รองรับ' : null} />
+                  <InfoItem label="VLAN Support" value={detail.vlanSupport === true ? 'รองรับ' : detail.vlanSupport === false ? 'ไม่รองรับ' : null} />
+                </>
+              )}
+              <InfoItem label="จัดการได้ (Managed)" value={detail.isManaged === true ? 'Managed' : detail.isManaged === false ? 'Unmanaged' : null} />
             </Grid>
           </CardContent>
         </Card>
       );
     }
 
-    if (['rack', 'enclosure', 'pdu'].includes(t)) {
+    // Rack & Infrastructure / UPS
+    if (
+      cat === 'rack & infrastructure' ||
+      ['server rack', 'pdu', 'ups', 'enclosure', 'rack'].some(k => t.includes(k))
+    ) {
+      const isUPS = t.includes('ups');
       return (
         <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
           <CardContent sx={{ p: 3 }}>
-            <SectionTitle>ข้อมูล Rack / Enclosure / PDU</SectionTitle>
+            <SectionTitle>ข้อมูล {isUPS ? 'UPS' : 'Rack / Infrastructure'}</SectionTitle>
             <Grid container spacing={2.5}>
               <InfoItem label="ประเภท" value={detail.subType} />
-              <InfoItem label="Rack Units" value={detail.rackUnits} />
-              <InfoItem label="Power Capacity" value={detail.powerCapacity} />
-              <InfoItem label="ตำแหน่ง" value={detail.rackLocation} />
+              {isUPS ? (
+                <>
+                  <InfoItem label="ความจุ (VA)" value={detail.vaCapacity} />
+                  <InfoItem label="Watt ที่รองรับ" value={detail.wattCapacity} />
+                  <InfoItem label="Runtime (นาที)" value={detail.batteryRuntime} />
+                  <InfoItem label="ประเภทแบตเตอรี่" value={detail.batteryType} />
+                  <InfoItem label="จำนวน Outlet" value={detail.outletCount} />
+                  <InfoItem label="ตำแหน่งติดตั้ง" value={detail.rackLocation} />
+                </>
+              ) : (
+                <>
+                  <InfoItem label="Rack Units" value={detail.rackUnits} />
+                  <InfoItem label="Power Capacity" value={detail.powerCapacity} />
+                  <InfoItem label="ตำแหน่งติดตั้ง" value={detail.rackLocation} />
+                </>
+              )}
             </Grid>
           </CardContent>
         </Card>
       );
     }
 
-    if (['printer'].includes(t)) {
+    // เครื่องพิมพ์ (Printer)
+    if (
+      cat === 'เครื่องพิมพ์' ||
+      t.includes('printer')
+    ) {
       return (
         <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
           <CardContent sx={{ p: 3 }}>
             <SectionTitle>ข้อมูลเครื่องพิมพ์</SectionTitle>
             <Grid container spacing={2.5}>
-              <InfoItem label="ประเภท" value={detail.printerType} />
-              <InfoItem label="สี" value={detail.isColor === true ? 'Color' : detail.isColor === false ? 'Mono' : null} />
+              <InfoItem label="ประเภทเครื่องพิมพ์" value={detail.printerType} />
+              <InfoItem label="พิมพ์สี/ขาวดำ" value={detail.isColor === true ? 'สี (Color)' : detail.isColor === false ? 'ขาวดำ (Mono)' : null} />
               <InfoItem label="ขนาดกระดาษ" value={detail.paperSizes} />
-              <InfoItem label="รุ่น Cartridge" value={detail.cartridgeModel} />
-              <InfoItem label="Network" value={detail.isNetworkEnabled === true ? 'เชื่อมต่อได้' : detail.isNetworkEnabled === false ? 'ไม่ได้เชื่อมต่อ' : null} />
+              <InfoItem label="พิมพ์สองหน้า (Duplex)" value={detail.duplexSupport === true ? 'รองรับ' : detail.duplexSupport === false ? 'ไม่รองรับ' : null} />
+              <InfoItem label="เชื่อมต่อเครือข่าย" value={detail.isNetworkEnabled === true ? 'มี Network' : detail.isNetworkEnabled === false ? 'ไม่มี' : (detail.networkReady === true ? 'มี Network' : detail.networkReady === false ? 'ไม่มี' : null)} />
+              <InfoItem label="รุ่นหมึก/Cartridge" value={detail.cartridgeModel} />
+              <InfoItem label="IP Address" value={detail.ipAddress} />
+              <InfoItem label="MAC Address" value={detail.macAddress} />
+              <InfoItem label="จำนวนหน้าที่พิมพ์แล้ว" value={detail.pageCount} />
+            </Grid>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    // สายสัญญาณ (Cable)
+    if (
+      cat === 'สายสัญญาณ' ||
+      ['hdmi', 'displayport', 'usb-c', 'lan cable', 'power cable', 'audio cable'].some(k => t.includes(k))
+    ) {
+      return (
+        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
+          <CardContent sx={{ p: 3 }}>
+            <SectionTitle>ข้อมูลสายสัญญาณ</SectionTitle>
+            <Grid container spacing={2.5}>
+              <InfoItem label="ประเภทสาย" value={detail.cableType} />
+              <InfoItem label="ความยาว" value={detail.length} />
+              <InfoItem label="จำนวนคงเหลือ" value={detail.stockQuantity} />
+              <InfoItem label="จุดสั่งซื้อ (Min Stock)" value={detail.minimumStock} />
+            </Grid>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    // Consumable / วัสดุสิ้นเปลือง
+    if (
+      cat === 'วัสดุสิ้นเปลือง' ||
+      ['toner', 'ink', 'cartridge', 'battery', 'adapter', 'charger', 'consumable', 'paper', 'drum', 'ribbon'].some(k => t.includes(k))
+    ) {
+      return (
+        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
+          <CardContent sx={{ p: 3 }}>
+            <SectionTitle>ข้อมูลวัสดุสิ้นเปลือง</SectionTitle>
+            <Grid container spacing={2.5}>
+              <InfoItem label="ประเภทวัสดุสิ้นเปลือง" value={detail.consumableType} />
+              <InfoItem label="ใช้งานร่วมกับ" value={detail.compatibleWith} />
+              <InfoItem label="จำนวนคงเหลือ" value={detail.stockQuantity} />
+              <InfoItem label="จุดสั่งซื้อ (Min Stock)" value={detail.minimumStock} />
+              <InfoItem label="วันหมดอายุ" value={detail.expiryDate ? new Date(detail.expiryDate).toLocaleDateString('th-TH') : null} />
             </Grid>
           </CardContent>
         </Card>
@@ -227,7 +419,7 @@ export default function AssetDetailPage() {
       {/* Asset Code & Status */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 4, pb: 3, borderBottom: 1, borderColor: 'divider' }}>
         <Typography variant="h4" fontWeight={600} sx={{ letterSpacing: -0.5 }}>
-          {asset.assetCode}
+          {asset.assetCode}{asset.assetName ? ` - ${asset.assetName}` : ''}
         </Typography>
         <Chip
           label={statusLabels[asset.status] || asset.status}
@@ -274,6 +466,7 @@ export default function AssetDetailPage() {
           <CardContent sx={{ p: 3 }}>
             <SectionTitle>ข้อมูลทั่วไป</SectionTitle>
             <Grid container spacing={2.5}>
+              <InfoItem label="ชื่อทรัพย์สิน" value={asset.assetName} />
               <InfoItem label="Serial Number" value={asset.serialNo} />
               <InfoItem label="ประเภทอุปกรณ์" value={asset.type} />
               <InfoItem label="ยี่ห้อ (Brand)" value={asset.brand} />
@@ -299,39 +492,41 @@ export default function AssetDetailPage() {
         </Card>
 
         {/* OS/Software และ Hardware */}
-        <Grid container spacing={3}>
-          <Grid item xs={12} lg={5}>
-            <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider', height: '100%' }}>
-              <CardContent sx={{ p: 3 }}>
-                <SectionTitle>OS และ Software</SectionTitle>
-                <Grid container spacing={2.5}>
-                  <InfoItem label="OS" value={asset.osType} />
-                  <InfoItem label="Windows" value={asset.osVersion} />
-                  <InfoItem label="MS Office" value={asset.officeLicense} />
-                  <InfoItem label="Antivirus" value={asset.antivirusStatus} />
-                </Grid>
-              </CardContent>
-            </Card>
-          </Grid>
+        {isComputer && !isMonitor && (
+          <Grid container spacing={3}>
+            <Grid item xs={12} lg={5}>
+              <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider', height: '100%' }}>
+                <CardContent sx={{ p: 3 }}>
+                  <SectionTitle>OS และ Software</SectionTitle>
+                  <Grid container spacing={2.5}>
+                    <InfoItem label="OS" value={asset.osType} />
+                    <InfoItem label="Windows" value={asset.osVersion} />
+                    <InfoItem label="MS Office" value={asset.officeLicense} />
+                    <InfoItem label="Antivirus" value={asset.antivirusStatus} />
+                  </Grid>
+                </CardContent>
+              </Card>
+            </Grid>
 
-          <Grid item xs={12} lg={7}>
-            <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider', height: '100%' }}>
-              <CardContent sx={{ p: 3 }}>
-                <SectionTitle>Hardware</SectionTitle>
-                <Grid container spacing={2.5}>
-                  <InfoItem label="CPU" value={asset.cpu} />
-                  <InfoItem label="Generation" value={asset.cpuGeneration} />
-                  <InfoItem label="GPU" value={asset.gpu} />
-                  <InfoItem label="RAM" value={asset.ram} />
-                  <InfoItem label="RAM Slot1" value={asset.ramSlot1} />
-                  <InfoItem label="RAM Slot2" value={asset.ramSlot2} />
-                  <InfoItem label="Storage 1" value={asset.storage1} />
-                  <InfoItem label="Storage 2" value={asset.storage2} />
-                </Grid>
-              </CardContent>
-            </Card>
+            <Grid item xs={12} lg={7}>
+              <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider', height: '100%' }}>
+                <CardContent sx={{ p: 3 }}>
+                  <SectionTitle>Hardware</SectionTitle>
+                  <Grid container spacing={2.5}>
+                    <InfoItem label="CPU" value={asset.cpu} />
+                    <InfoItem label="Generation" value={asset.cpuGeneration} />
+                    <InfoItem label="GPU" value={asset.gpu} />
+                    <InfoItem label="RAM" value={asset.ram} />
+                    <InfoItem label="RAM Slot1" value={asset.ramSlot1} />
+                    <InfoItem label="RAM Slot2" value={asset.ramSlot2} />
+                    <InfoItem label="Storage 1" value={asset.storage1} />
+                    <InfoItem label="Storage 2" value={asset.storage2} />
+                  </Grid>
+                </CardContent>
+              </Card>
+            </Grid>
           </Grid>
-        </Grid>
+        )}
 
         {/* Type-specific detail */}
         {asset.detail && renderDetailSection(asset.type, asset.detail)}
@@ -347,6 +542,8 @@ export default function AssetDetailPage() {
               <InfoItem label="PO No." value={asset.poNumber} />
               <InfoItem label="Vendor" value={asset.vendor} />
               <InfoItem label="วันที่ซื้อ" value={asset.purchaseDate ? new Date(asset.purchaseDate).toLocaleDateString('th-TH') : null} />
+              <InfoItem label="วันหมดประกัน" value={asset.warrantyEndDate ? new Date(asset.warrantyEndDate).toLocaleDateString('th-TH') : null} />
+              <InfoItem label="ราคาจัดซื้อ" value={asset.purchasePrice !== null && asset.purchasePrice !== undefined ? `${asset.purchasePrice.toLocaleString('th-TH')} บาท` : null} />
               <InfoItem label="อายุ (ปี)" value={asset.age} />
               <InfoItem label="หมายเหตุ" value={asset.remark} fullWidth />
             </Grid>

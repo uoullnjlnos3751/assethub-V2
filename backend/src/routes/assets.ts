@@ -5,6 +5,7 @@ import { AppError } from '../middleware/errorHandler';
 import { Prisma } from '@prisma/client';
 import { searchADUsers } from '../services/ldap';
 import multer from 'multer';
+import * as xlsx from 'xlsx';
 
 declare global {
   namespace Express {
@@ -24,6 +25,11 @@ const upload = multer({
       cb(new Error('Only image files are allowed'));
     }
   },
+});
+
+const uploadExcel = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
 });
 
 const router = Router();
@@ -69,9 +75,9 @@ const parseDate = (val: any): Date | null => {
 };
 
 const ALLOWED_ASSET_FIELDS = new Set([
-  'id', 'assetCode', 'serialNo', 'type', 'brand', 'model', 'cpu', 'ram',
+  'id', 'assetCode', 'assetName', 'serialNo', 'type', 'brand', 'model', 'cpu', 'ram',
   'osVersion', 'windowsLicense', 'officeLicense', 'antivirusStatus', 'vendor',
-  'poNumber', 'prNumber', 'purchaseDate', 'age', 'ownerName', 'departmentId',
+  'poNumber', 'prNumber', 'purchaseDate', 'purchasePrice', 'warrantyEndDate', 'age', 'ownerName', 'departmentId',
   'location', 'status', 'remark', 'company', 'cpuGeneration', 'domainName',
   'floor', 'poDate', 'ramDetail', 'gpu', 'osType', 'ramSlot1', 'ramSlot2',
   'snComputer', 'storage1', 'storage2', 'createdAt', 'updatedAt',
@@ -81,6 +87,8 @@ const ALLOWED_ASSET_FIELDS = new Set([
 const normalizeAssetPayload = (data: any, isCreate = false) => {
   const purchaseDate = parseDate(data.purchaseDate);
   const poDate = parseDate(data.poDate);
+  const warrantyEndDate = parseDate(data.warrantyEndDate);
+  const purchasePrice = data.purchasePrice ? parseFloat(data.purchasePrice) : undefined;
   
   let status = data.status;
   if (isCreate && data.ownerName && data.ownerName.trim() !== '' && (!status || status === 'Available')) {
@@ -99,65 +107,190 @@ const normalizeAssetPayload = (data: any, isCreate = false) => {
     status,
     purchaseDate,
     poDate,
+    purchasePrice,
+    warrantyEndDate,
     age: calculateAssetAge(purchaseDate),
   };
 };
+
+function parseBoolean(val: any): boolean | undefined {
+  if (val === undefined || val === null || val === '') return undefined;
+  if (typeof val === 'boolean') return val;
+  if (typeof val === 'string') {
+    return val.toLowerCase() === 'true';
+  }
+  return !!val;
+}
+
+function parseIntOrUndefined(val: any): number | undefined {
+  if (val === undefined || val === null || val === '') return undefined;
+  const parsed = parseInt(val, 10);
+  return isNaN(parsed) ? undefined : parsed;
+}
+
+function parseDateOrUndefined(val: any): Date | undefined {
+  if (val === undefined || val === null || val === '') return undefined;
+  const date = new Date(val);
+  return isNaN(date.getTime()) ? undefined : date;
+}
 
 async function upsertAssetDetail(prisma: any, assetId: number, type: string, detail: any) {
   if (!detail || Object.keys(detail).length === 0) return null;
   const typeLower = type.toLowerCase();
   const cleanDetail = Object.fromEntries(
-    Object.entries(detail).filter(([_, v]) => v !== undefined && v !== null && v !== '')
+    Object.entries(detail).filter(([, v]) => v !== '' && v !== null && v !== undefined)
   );
   if (Object.keys(cleanDetail).length === 0) return null;
 
-  if (['computer', 'notebook'].includes(typeLower)) {
+  if (['notebook', 'pc desktop', 'macbook', 'mini pc', 'all-in-one', 'thin client', 'computer'].some(t => typeLower.includes(t))) {
+    const data = {
+      cpu: cleanDetail.cpu,
+      cpuGeneration: cleanDetail.cpuGeneration,
+      ram: cleanDetail.ram,
+      ramSlot1: cleanDetail.ramSlot1,
+      ramSlot2: cleanDetail.ramSlot2,
+      storage1: cleanDetail.storage1,
+      storage2: cleanDetail.storage2,
+      gpu: cleanDetail.gpu,
+      osType: cleanDetail.osType,
+      osVersion: cleanDetail.osVersion,
+      windowsLicense: cleanDetail.windowsLicense,
+      officeLicense: cleanDetail.officeLicense,
+      antivirusStatus: cleanDetail.antivirusStatus,
+      domainName: cleanDetail.domainName,
+      snComputer: cleanDetail.snComputer,
+    };
+    const finalData = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));
     return prisma.computerDetail.upsert({
       where: { assetId },
-      create: { assetId, ...cleanDetail },
-      update: cleanDetail,
+      create: { assetId, ...finalData },
+      update: finalData,
     });
   }
-  if (['phone', 'tablet'].includes(typeLower)) {
+  if (['smartphone', 'tablet', 'mobile hotspot'].some(t => typeLower.includes(t))) {
+    const data = {
+      imei1: cleanDetail.imei1,
+      imei2: cleanDetail.imei2,
+      osVersion: cleanDetail.osVersion,
+      storageCapacity: cleanDetail.storageCapacity,
+      ram: cleanDetail.ram,
+      phoneNumber: cleanDetail.phoneNumber,
+      simProvider: cleanDetail.simProvider,
+      mdmEnrolled: parseBoolean(cleanDetail.mdmEnrolled),
+    };
+    const finalData = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));
     return prisma.phoneDetail.upsert({
       where: { assetId },
-      create: { assetId, ...cleanDetail },
-      update: cleanDetail,
+      create: { assetId, ...finalData },
+      update: finalData,
     });
   }
-  if (['monitor'].includes(typeLower)) {
+  if (typeLower.includes('monitor')) {
+    const data = {
+      screenSize: cleanDetail.screenSize,
+      resolution: cleanDetail.resolution,
+      panelType: cleanDetail.panelType,
+      refreshRate: cleanDetail.refreshRate,
+      ports: cleanDetail.ports,
+      hasSpeaker: parseBoolean(cleanDetail.hasSpeaker),
+      curved: parseBoolean(cleanDetail.curved),
+    };
+    const finalData = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));
     return prisma.monitorDetail.upsert({
       where: { assetId },
-      create: { assetId, ...cleanDetail },
-      update: cleanDetail,
+      create: { assetId, ...finalData },
+      update: finalData,
     });
   }
-  if (['projector', 'device', 'accessory'].includes(typeLower)) {
+  if (['projector', 'conference speaker', 'webcam', 'docking station', 'presentation clicker', 'device', 'accessory', 'speaker', 'dock', 'peripheral', 'keyboard', 'mouse', 'headset'].some(t => typeLower.includes(t))) {
+    const data = {
+      deviceType: cleanDetail.deviceType,
+      connectionType: cleanDetail.connectionType,
+      powerSource: cleanDetail.powerSource,
+      rgbSupport: parseBoolean(cleanDetail.rgbSupport),
+    };
+    const finalData = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));
     return prisma.deviceDetail.upsert({
       where: { assetId },
-      create: { assetId, ...cleanDetail },
-      update: cleanDetail,
+      create: { assetId, ...finalData },
+      update: finalData,
     });
   }
-  if (['network', 'switch', 'router'].includes(typeLower)) {
+  if (['switch', 'router', 'access point', 'firewall', 'modem', 'network'].some(t => typeLower.includes(t))) {
+    const data = {
+      networkType: cleanDetail.networkType,
+      ipAddress: cleanDetail.ipAddress,
+      macAddress: cleanDetail.macAddress,
+      firmwareVersion: cleanDetail.firmwareVersion,
+      portCount: parseIntOrUndefined(cleanDetail.portCount),
+      locationRack: cleanDetail.locationRack,
+      poeSupport: parseBoolean(cleanDetail.poeSupport),
+    };
+    const finalData = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));
     return prisma.networkDeviceDetail.upsert({
       where: { assetId },
-      create: { assetId, ...cleanDetail },
-      update: cleanDetail,
+      create: { assetId, ...finalData },
+      update: finalData,
     });
   }
-  if (['rack', 'enclosure', 'pdu'].includes(typeLower)) {
+  if (['server rack', 'pdu', 'ups', 'enclosure', 'rack'].some(t => typeLower.includes(t))) {
+    const data = {
+      subType: cleanDetail.subType,
+      rackUnits: cleanDetail.rackUnits,
+      powerCapacity: cleanDetail.powerCapacity,
+      rackLocation: cleanDetail.rackLocation,
+    };
+    const finalData = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));
     return prisma.rackDetail.upsert({
       where: { assetId },
-      create: { assetId, ...cleanDetail },
-      update: cleanDetail,
+      create: { assetId, ...finalData },
+      update: finalData,
     });
   }
-  if (['printer'].includes(typeLower)) {
+  if (typeLower.includes('printer')) {
+    const data = {
+      printerType: cleanDetail.printerType,
+      isColor: parseBoolean(cleanDetail.isColor),
+      networkReady: parseBoolean(cleanDetail.networkReady),
+      ipAddress: cleanDetail.ipAddress,
+      macAddress: cleanDetail.macAddress,
+      pageCount: parseIntOrUndefined(cleanDetail.pageCount),
+      duplexSupport: parseBoolean(cleanDetail.duplexSupport),
+    };
+    const finalData = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));
     return prisma.printerDetail.upsert({
       where: { assetId },
-      create: { assetId, ...cleanDetail },
-      update: cleanDetail,
+      create: { assetId, ...finalData },
+      update: finalData,
+    });
+  }
+  if (['hdmi', 'displayport', 'usb-c', 'lan', 'power', 'audio', 'cable', 'vga', 'adapter', 'converter'].some(t => typeLower.includes(t))) {
+    const data = {
+      cableType: cleanDetail.cableType,
+      length: cleanDetail.length,
+      stockQuantity: parseIntOrUndefined(cleanDetail.stockQuantity),
+      minimumStock: parseIntOrUndefined(cleanDetail.minimumStock),
+    };
+    const finalData = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));
+    return prisma.cableDetail.upsert({
+      where: { assetId },
+      create: { assetId, ...finalData },
+      update: finalData,
+    });
+  }
+  if (['toner', 'ink', 'cartridge', 'battery', 'adapter', 'charger', 'consumable', 'paper', 'drum', 'ribbon'].some(t => typeLower.includes(t))) {
+    const data = {
+      consumableType: cleanDetail.consumableType,
+      compatibleWith: cleanDetail.compatibleWith,
+      stockQuantity: parseIntOrUndefined(cleanDetail.stockQuantity),
+      minimumStock: parseIntOrUndefined(cleanDetail.minimumStock),
+      expiryDate: parseDateOrUndefined(cleanDetail.expiryDate),
+    };
+    const finalData = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));
+    return prisma.consumableDetail.upsert({
+      where: { assetId },
+      create: { assetId, ...finalData },
+      update: finalData,
     });
   }
   return null;
@@ -165,9 +298,18 @@ async function upsertAssetDetail(prisma: any, assetId: number, type: string, det
 
 const ASSET_STATUS_OPTIONS = new Set(['Available', 'Borrowed', 'InUse', 'Maintenance', 'Retired', 'Lost']);
 
+const ASSET_TYPE_GROUPS: Record<string, string[]> = {
+  computers: ['Computer', 'Notebook', 'PC Desktop', 'Desktop PC', 'Laptop', 'Workstation', 'Macbook', 'Mini PC', 'All-in-One', 'Thin Client'],
+  monitors: ['Monitor', 'Monitor มาตรฐาน', 'Monitor Ultrawide', 'Monitor Curved', 'Monitor 4K'],
+  devices: ['Device', 'Projector', 'Conference Speaker', 'Webcam', 'Docking Station', 'Presentation Clicker', 'Accessory', 'Peripheral', 'Speaker', 'Dock'],
+  printers: ['Printer', 'Laser Printer', 'Inkjet Printer', 'Thermal Printer', 'Dot Matrix Printer'],
+  phonesTablets: ['Phone', 'Tablet', 'Smartphone', 'Mobile Phone', 'Mobile Hotspot'],
+  network: ['Network', 'Network Device', 'Switch', 'Router', 'Firewall', 'Access Point', 'AP', 'Modem'],
+};
+
 router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { search, status, department, location, type, page = '1', limit = '50' } = req.query;
+    const { search, status, department, location, type, typeGroup, page = '1', limit = '50' } = req.query;
     const pageNum = parseInt(page as string);
     const limitNum = Math.min(parseInt(limit as string), 100);
     const skip = (pageNum - 1) * limitNum;
@@ -176,7 +318,11 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
     if (status) where.status = status as string;
     if (department) where.departmentId = department as string;
     if (location) where.location = location as string;
-    if (type) where.type = type as string;
+    if (type) {
+      where.type = type as string;
+    } else if (typeGroup && ASSET_TYPE_GROUPS[String(typeGroup)]) {
+      where.type = { in: ASSET_TYPE_GROUPS[String(typeGroup)] };
+    }
     if (search) {
       where.OR = [
         { assetCode: { contains: search as string, mode: 'insensitive' } },
@@ -197,6 +343,22 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
     ]);
 
     res.json({ data: assets.map(withCalculatedAge), total, page: pageNum, totalPages: Math.ceil(total / limitNum) });
+  } catch (err) { next(err); }
+});
+
+router.get('/stats', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { typeGroup } = req.query;
+    const where: any = {};
+    if (typeGroup && ASSET_TYPE_GROUPS[String(typeGroup)]) {
+      where.type = { in: ASSET_TYPE_GROUPS[String(typeGroup)] };
+    }
+    if (req.user!.role === 'USER') where.status = 'Available';
+    const [byStatus, total] = await Promise.all([
+      prisma.asset.groupBy({ by: ['status'], where, _count: true }),
+      prisma.asset.count({ where }),
+    ]);
+    res.json({ total, byStatus });
   } catch (err) { next(err); }
 });
 
@@ -680,29 +842,205 @@ function getDetailInclude(type?: string | null): any {
 function getAssetDetail(prisma: any, assetId: number, type?: string | null) {
   if (!type) return null;
   const typeLower = type.toLowerCase();
-  if (['computer', 'notebook'].includes(typeLower)) {
+
+  if (['notebook', 'pc desktop', 'macbook', 'mini pc', 'all-in-one', 'thin client', 'computer'].some(t => typeLower.includes(t))) {
     return prisma.computerDetail.findUnique({ where: { assetId } });
   }
-  if (['phone', 'tablet'].includes(typeLower)) {
+  if (['smartphone', 'tablet', 'mobile hotspot'].some(t => typeLower.includes(t))) {
     return prisma.phoneDetail.findUnique({ where: { assetId } });
   }
-  if (['monitor'].includes(typeLower)) {
+  if (typeLower.includes('monitor')) {
     return prisma.monitorDetail.findUnique({ where: { assetId } });
   }
-  if (['projector', 'device', 'accessory'].includes(typeLower)) {
+  if (['projector', 'conference speaker', 'webcam', 'docking station', 'presentation clicker', 'device', 'accessory', 'speaker', 'dock', 'peripheral'].some(t => typeLower.includes(t))) {
     return prisma.deviceDetail.findUnique({ where: { assetId } });
   }
-  if (['network', 'switch', 'router'].includes(typeLower)) {
+  if (['switch', 'router', 'access point', 'firewall', 'modem', 'network'].some(t => typeLower.includes(t))) {
     return prisma.networkDeviceDetail.findUnique({ where: { assetId } });
   }
-  if (['rack', 'enclosure', 'pdu'].includes(typeLower)) {
+  if (['server rack', 'pdu', 'ups', 'enclosure', 'rack'].some(t => typeLower.includes(t))) {
     return prisma.rackDetail.findUnique({ where: { assetId } });
   }
-  if (['printer'].includes(typeLower)) {
+  if (typeLower.includes('printer')) {
     return prisma.printerDetail.findUnique({ where: { assetId } });
+  }
+  if (['hdmi', 'displayport', 'usb-c', 'lan', 'power', 'audio', 'cable'].some(t => typeLower.includes(t))) {
+    return prisma.cableDetail.findUnique({ where: { assetId } });
+  }
+  if (['toner', 'ink', 'cartridge', 'battery', 'adapter', 'charger', 'consumable'].some(t => typeLower.includes(t))) {
+    return prisma.consumableDetail.findUnique({ where: { assetId } });
   }
   return null;
 }
+
+  router.get('/export/excel', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const typeParam = req.query.type as string;
+      const whereClause = typeParam ? { type: typeParam } : {};
+
+      const assets = await prisma.asset.findMany({
+        where: whereClause,
+        include: {
+          category: true,
+          computerDetail: true,
+          phoneDetail: true,
+          monitorDetail: true,
+          deviceDetail: true,
+          networkDeviceDetail: true,
+          rackDetail: true,
+          printerDetail: true,
+          cableDetail: true,
+          consumableDetail: true,
+        },
+        orderBy: { updatedAt: 'desc' }
+      });
+  
+      const rows = assets.map(asset => {
+        let details: any = {};
+        if (asset.computerDetail) details = { ...asset.computerDetail };
+        if (asset.phoneDetail) details = { ...asset.phoneDetail };
+        if (asset.monitorDetail) details = { ...asset.monitorDetail };
+        if (asset.deviceDetail) details = { ...asset.deviceDetail };
+        if (asset.networkDeviceDetail) details = { ...asset.networkDeviceDetail };
+        if (asset.rackDetail) details = { ...asset.rackDetail };
+        if (asset.printerDetail) details = { ...asset.printerDetail };
+        if (asset.cableDetail) details = { ...asset.cableDetail };
+        if (asset.consumableDetail) details = { ...asset.consumableDetail };
+        
+        delete details.id;
+        delete details.assetId;
+        
+        return {
+          'Asset ID': asset.id,
+          'Asset Code': asset.assetCode,
+          'Asset Name': asset.assetName,
+          'Serial No': asset.serialNo,
+          'Type': asset.type,
+          'Category': asset.category?.name || '',
+          'Status': asset.status,
+          'Brand': asset.brand,
+          'Model': asset.model,
+          'Company': asset.company,
+          'Owner': asset.ownerName,
+          'Department': asset.departmentId,
+          'Location': asset.location,
+          'Floor': asset.floor,
+          'Old Asset Code': asset.oldAssetCode,
+          'Domain Name': asset.domainName,
+          'PO Number': asset.poNumber,
+          'PO Date': asset.poDate ? asset.poDate.toISOString().split('T')[0] : '',
+          'PR Number': asset.prNumber,
+          'Purchase Date': asset.purchaseDate ? asset.purchaseDate.toISOString().split('T')[0] : '',
+          'Vendor': asset.vendor,
+          'Budget': asset.budget,
+          'Remark': asset.remark,
+          'Created At': asset.createdAt.toISOString(),
+          'Updated At': asset.updatedAt.toISOString(),
+          ...details
+        };
+      });
+  
+      const worksheet = xlsx.utils.json_to_sheet(rows);
+      const workbook = xlsx.utils.book_new();
+      xlsx.utils.book_append_sheet(workbook, worksheet, 'Assets');
+      const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+  
+      res.setHeader('Content-Disposition', 'attachment; filename="assets_export.xlsx"');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.send(buffer);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post('/import/excel', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), uploadExcel.single('file'), async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.file) throw new AppError('ไม่พบไฟล์ที่อัปโหลด', 400);
+  
+      const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      const rows: any[] = xlsx.utils.sheet_to_json(sheet);
+  
+      let success = 0, errors = 0;
+      
+      for (const row of rows) {
+        try {
+          const assetCode = row['Asset Code'] || row['รหัสทรัพย์สิน'];
+          const serialNo = row['Serial No'] || row['Serial Number'] || row['SerialNumber'];
+          
+          if (!assetCode && !serialNo) {
+            errors++;
+            continue;
+          }
+  
+          const categoryName = row['Category'] || row['หมวดหมู่'];
+          let categoryId = null;
+          if (categoryName) {
+            const cat = await prisma.category.upsert({
+              where: { name: categoryName },
+              create: { name: categoryName, icon: '📦' },
+              update: {}
+            });
+            categoryId = cat.id;
+          }
+  
+          const poDate = row['PO Date'] ? new Date(row['PO Date']) : null;
+          const purchaseDate = row['Purchase Date'] ? new Date(row['Purchase Date']) : null;
+          const budgetVal = row['Budget'] || row['งบประมาณ'];
+  
+          const assetData = {
+            assetCode: assetCode ? String(assetCode) : String(serialNo),
+            assetName: row['Asset Name'] || row['ชื่อทรัพย์สิน'] || '',
+            serialNo: serialNo ? String(serialNo) : String(assetCode),
+            type: row['Type'] || row['ประเภทอุปกรณ์'] || '',
+            categoryId,
+            status: row['Status'] || row['สถานะ'] || 'Available',
+            brand: row['Brand'] || row['ยี่ห้อ'] || '',
+            model: row['Model'] || row['รุ่น'] || '',
+            company: row['Company'] || row['บริษัท'] || '',
+            ownerName: row['Owner'] || row['ผู้ถือครอง'] || '',
+            departmentId: row['Department'] || row['แผนก'] || '',
+            location: row['Location'] || row['สถานที่'] || '',
+            floor: row['Floor'] || row['ชั้น'] || '',
+            oldAssetCode: row['Old Asset Code'] || row['รหัสทรัพย์สินเดิม'] || null,
+            domainName: row['Domain Name'] || '',
+            poNumber: row['PO Number'] || row['เลขที่ PO'] || '',
+            poDate: poDate && !isNaN(poDate.getTime()) ? poDate : null,
+            prNumber: row['PR Number'] || row['เลขที่ PR'] || '',
+            purchaseDate: purchaseDate && !isNaN(purchaseDate.getTime()) ? purchaseDate : null,
+            vendor: row['Vendor'] || '',
+            budget: budgetVal ? String(budgetVal) : null,
+            remark: row['Remark'] || row['หมายเหตุ'] || ''
+          };
+  
+          const existing = await prisma.asset.findFirst({
+            where: assetCode ? { assetCode: String(assetCode) } : { serialNo: String(serialNo) }
+          });
+  
+          let savedAsset;
+          if (existing) {
+            savedAsset = await prisma.asset.update({ where: { id: existing.id }, data: assetData });
+          } else {
+            savedAsset = await prisma.asset.create({ data: assetData });
+          }
+  
+          if (savedAsset.type) {
+            await upsertAssetDetail(prisma, savedAsset.id, savedAsset.type, row);
+          }
+          
+          success++;
+        } catch (err) {
+          console.error('Error importing row:', err);
+          errors++;
+        }
+      }
+  
+      res.json({ success, errors, total: rows.length });
+    } catch (err) {
+      next(err);
+    }
+  });
 
 router.get('/:id', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {

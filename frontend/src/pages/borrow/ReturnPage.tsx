@@ -81,7 +81,7 @@ function RequestRow({ group, onReturn, defaultOpen = false }: { group: RequestGr
   const isOverdue = group.items.some(i => i.dueDate && new Date(i.dueDate) < new Date() && i.itemStatus === 'CheckedOut');
   const earliestDueDate = group.items
     .filter(i => i.itemStatus === 'CheckedOut' && i.dueDate)
-    .map(i => new Date(i.dueDate).getTime())
+    .map(i => new Date(i.dueDate as string).getTime())
     .sort((a, b) => a - b)[0];
 
   const toggleSelect = (itemId: number) => {
@@ -345,8 +345,8 @@ export default function ReturnPage() {
         })
         .filter((g: RequestGroup) => g.pendingCount > 0 || g.returnedCount > 0)
         .sort((a: RequestGroup, b: RequestGroup) => {
-          const aOverdue = a.items.some((i: BorrowItem) => new Date(i.dueDate) < new Date() && i.itemStatus === 'CheckedOut');
-          const bOverdue = b.items.some((i: BorrowItem) => new Date(i.dueDate) < new Date() && i.itemStatus === 'CheckedOut');
+          const aOverdue = a.items.some((i: BorrowItem) => i.dueDate && new Date(i.dueDate) < new Date() && i.itemStatus === 'CheckedOut');
+          const bOverdue = b.items.some((i: BorrowItem) => i.dueDate && new Date(i.dueDate) < new Date() && i.itemStatus === 'CheckedOut');
           if (aOverdue && !bOverdue) return -1;
           if (!aOverdue && bOverdue) return 1;
           return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();

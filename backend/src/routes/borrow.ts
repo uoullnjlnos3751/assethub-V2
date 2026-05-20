@@ -3,7 +3,7 @@ import { prisma } from '../index';
 import { authenticate, authorize } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { createNotification } from '../services/notification';
-import { validate, borrowRequestSchema, approveSchema, checkoutSchema, returnSchema, extensionSchema } from '../middleware/validation';
+import { validate, borrowRequestSchema, approveSchema, checkoutSchema, returnSchema, extensionSchema, reminderSchema } from '../middleware/validation';
 
 const router = Router();
 
@@ -22,10 +22,49 @@ async function getAllowExtension(): Promise<boolean> {
   return settings?.allowExtension ?? true;
 }
 
+function parseRequestedDueDate(value?: string): Date | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (date < today) return null;
+  return date;
+}
+
+function formatDateTh(value?: Date | string | null): string {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+function buildBorrowItemPayload(item: any, status: string) {
+  if (item.inventoryItem) {
+    return {
+      assetCode: item.inventoryItem.name,
+      serialNo: '',
+      brand: `จำนวน ${item.quantity}`,
+      model: item.inventoryItem.unit,
+      name: item.inventoryItem.name,
+      quantity: item.quantity,
+      unit: item.inventoryItem.unit,
+      status,
+    };
+  }
+  return {
+    assetCode: item.asset?.assetCode || '-',
+    serialNo: item.asset?.serialNo || '',
+    brand: item.asset?.brand || '',
+    model: item.asset?.model || '',
+    status,
+  };
+}
+
 // ── User: Create borrow request (multi-item) ──
 router.post('/requests', authenticate, validate(borrowRequestSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { assetIds, inventoryItems, purpose, notes, location } = req.body;
+    const { assetIds, inventoryItems, purpose, notes, location, dueDate: requestedDueDate } = req.body;
 
     const maxItems = await getMaxItems();
     const totalItems = (assetIds?.length || 0) + (inventoryItems?.length || 0);
@@ -70,8 +109,11 @@ router.post('/requests', authenticate, validate(borrowRequestSchema), async (req
 
     const borrowDays = await getBorrowDays();
     const borrowDate = new Date();
-    const dueDate = new Date();
-    dueDate.setDate(dueDate.getDate() + borrowDays);
+    const parsedDueDate = parseRequestedDueDate(requestedDueDate);
+    const dueDate = parsedDueDate || new Date();
+    if (!parsedDueDate) {
+      dueDate.setDate(dueDate.getDate() + borrowDays);
+    }
 
     const user = await prisma.appUser.findUnique({ where: { id: req.user!.userId } });
 
@@ -289,13 +331,10 @@ router.post('/requests/:id/approve', authenticate, authorize('IT_ADMIN', 'SUPERA
     });
 
     if (request.requester.email) {
-      const itemsPayload = request.items.map(item => ({
-        assetCode: item.asset!.assetCode,
-        serialNo: item.asset!.serialNo,
-        brand: item.asset!.brand,
-        model: item.asset!.model,
-        status: action === 'Approved' ? 'อนุมัติ' : 'ไม่อนุมัติ',
-      }));
+      const itemsPayload = request.items.map(item => buildBorrowItemPayload(
+        item,
+        action === 'Approved' ? 'อนุมัติ' : 'ไม่อนุมัติ'
+      ));
 
       const borrowDateStr = request.items[0]?.borrowDate
         ? new Date(request.items[0].borrowDate).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })
@@ -349,6 +388,26 @@ router.post('/requests/:id/checkout', authenticate, authorize('IT_ADMIN', 'SUPER
     if (request.status !== 'Approved') throw new AppError('คำขอยังไม่ได้รับการอนุมัติ');
 
     await prisma.$transaction(async (tx) => {
+      for (const item of request.items) {
+        if (item.isQuantityBased && item.inventoryItem) {
+          const latest = await tx.inventoryItem.findUnique({
+            where: { id: item.inventoryItemId! },
+            select: { name: true, availableQuantity: true, unit: true },
+          });
+          if (!latest || latest.availableQuantity < item.quantity) {
+            throw new AppError(`วัสดุ "${latest?.name || item.inventoryItem.name}" คงเหลือไม่พอ (มี ${latest?.availableQuantity ?? 0} ${latest?.unit || item.inventoryItem.unit})`);
+          }
+        } else if (item.asset) {
+          const latest = await tx.asset.findUnique({
+            where: { id: item.assetId! },
+            select: { status: true, assetCode: true },
+          });
+          if (!latest || latest.status !== 'Available') {
+            throw new AppError(`ทรัพย์สิน ${latest?.assetCode || item.asset.assetCode} ไม่พร้อมให้ยืมแล้ว`);
+          }
+        }
+      }
+
       await tx.checkout.create({
         data: { requestId: id, checkoutBy: req.user!.userId, receivedBy, handoverNote },
       });
@@ -392,18 +451,7 @@ router.post('/requests/:id/checkout', authenticate, authorize('IT_ADMIN', 'SUPER
     });
 
     if (request.requester?.email) {
-      const itemsPayload = request.items.map(item => {
-        if (item.inventoryItem) {
-          return { name: item.inventoryItem.name, quantity: item.quantity, unit: item.inventoryItem.unit, status: 'ส่งมอบแล้ว' };
-        }
-        return {
-          assetCode: item.asset!.assetCode,
-          serialNo: item.asset!.serialNo,
-          brand: item.asset!.brand,
-          model: item.asset!.model,
-          status: 'ส่งมอบแล้ว',
-        };
-      });
+      const itemsPayload = request.items.map(item => buildBorrowItemPayload(item, 'ส่งมอบแล้ว'));
       const borrowDateStr = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
       const dueDateStr = request.items[0]?.dueDate ? new Date(request.items[0].dueDate).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }) : '-';
       await createNotification('checkout_completed', 'EMAIL', request.requester.email, {
@@ -658,6 +706,83 @@ router.get('/extensions', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), asy
       orderBy: { createdAt: 'desc' },
     });
     res.json(extensions);
+  } catch (err) { next(err); }
+});
+
+router.get('/overdue', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const now = new Date();
+    const items = await prisma.borrowRequestItem.findMany({
+      where: {
+        itemStatus: { in: ['CheckedOut', 'PartiallyReturned'] },
+        dueDate: { lt: now },
+      },
+      include: {
+        asset: true,
+        inventoryItem: true,
+        request: { include: { requester: true } },
+      },
+      orderBy: { dueDate: 'asc' },
+    });
+
+    res.json(items.map((item) => ({
+      id: item.id,
+      requestId: item.requestId,
+      requestNo: item.request.requestNo,
+      borrowerName: item.request.requester.displayName || item.request.requester.adUsername,
+      borrowerEmail: item.request.requester.email || '',
+      department: item.request.requester.department || '',
+      purpose: item.request.purpose || '',
+      borrowDate: item.borrowDate,
+      dueDate: item.dueDate,
+      itemStatus: item.itemStatus,
+      isQuantityBased: item.isQuantityBased,
+      quantity: item.quantity,
+      daysOverdue: item.dueDate ? Math.floor((now.getTime() - item.dueDate.getTime()) / 86400000) : 0,
+      asset: item.asset ? {
+        id: item.asset.id,
+        assetCode: item.asset.assetCode,
+        serialNo: item.asset.serialNo,
+        brand: item.asset.brand,
+        model: item.asset.model,
+      } : null,
+      inventoryItem: item.inventoryItem ? {
+        id: item.inventoryItem.id,
+        name: item.inventoryItem.name,
+        unit: item.inventoryItem.unit,
+      } : null,
+    })));
+  } catch (err) { next(err); }
+});
+
+router.post('/items/:itemId/reminder', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), validate(reminderSchema), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const itemId = parseInt(req.params.itemId);
+    const item = await prisma.borrowRequestItem.findUnique({
+      where: { id: itemId },
+      include: { request: { include: { requester: true } }, asset: true, inventoryItem: true },
+    });
+    if (!item) throw new AppError('ไม่พบรายการยืม', 404);
+    if (!item.dueDate || new Date(item.dueDate) >= new Date()) throw new AppError('รายการนี้ยังไม่เกินกำหนด');
+    if (!item.request.requester.email) throw new AppError('ผู้ยืมไม่มีอีเมลสำหรับส่งแจ้งเตือน');
+
+    const daysOverdue = Math.floor((Date.now() - item.dueDate.getTime()) / 86400000);
+    await createNotification('overdue_borrow', 'EMAIL', item.request.requester.email, {
+      requestNo: item.request.requestNo,
+      requester: item.request.requester.displayName || item.request.requester.adUsername,
+      department: item.request.requester.department || '-',
+      purpose: item.request.purpose || '-',
+      assetCode: item.asset?.assetCode || item.inventoryItem?.name || '-',
+      serialNo: item.asset?.serialNo || '',
+      brand: item.asset?.brand || '',
+      model: item.asset?.model || (item.inventoryItem ? `จำนวน ${item.quantity} ${item.inventoryItem.unit}` : ''),
+      dueDate: formatDateTh(item.dueDate),
+      daysOverdue: String(daysOverdue),
+      note: req.body.note || '-',
+      items: [buildBorrowItemPayload(item, `เกินกำหนด ${daysOverdue} วัน`)],
+    });
+
+    res.json({ message: 'ส่งแจ้งเตือนรายการเกินกำหนดเรียบร้อย' });
   } catch (err) { next(err); }
 });
 

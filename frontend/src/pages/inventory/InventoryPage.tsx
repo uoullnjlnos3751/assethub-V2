@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Box, Button, Card, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
   FormControl, Grid, IconButton, InputLabel, MenuItem, Select, Table,
@@ -19,12 +20,13 @@ import EmptyState from '../../components/EmptyState';
 export default function InventoryPage() {
   const theme = useTheme();
   const toast = useToast();
+  const [searchParams] = useSearchParams();
   const [items, setItems] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
-  const [category, setCategory] = useState('');
+  const [category, setCategory] = useState(searchParams.get('category') || '');
   const [search, setSearch] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
 
@@ -45,6 +47,11 @@ export default function InventoryPage() {
   };
 
   useEffect(() => { fetchItems(); }, [page, pageSize, category]);
+
+  useEffect(() => {
+    setCategory(searchParams.get('category') || '');
+    setPage(0);
+  }, [searchParams]);
 
   useEffect(() => {
     inventoryAPI.categories().then((res) => setCategories(res.data || [])).catch(() => {});

@@ -19,6 +19,10 @@ export const borrowRequestSchema = z.object({
   dueDate: z.string().optional(),
 });
 
+export const reminderSchema = z.object({
+  note: z.string().optional(),
+});
+
 export const approveSchema = z.object({
   action: z.enum(['Approved', 'Rejected'], { errorMap: () => ({ message: 'การกระทำไม่ถูกต้อง' }) }),
   note: z.string().optional(),

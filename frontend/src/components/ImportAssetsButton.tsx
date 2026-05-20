@@ -50,12 +50,14 @@ export default function ImportAssetsButton() {
   const [previewData, setPreviewData] = useState<ImportedAsset[]>([]);
   const [fileName, setFileName] = useState('');
   const [encoding, setEncoding] = useState('UTF-8');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     setFileName(file.name);
+    setSelectedFile(file);
     setError('');
     setPreviewData([]);
     setLoading(true);
@@ -205,51 +207,29 @@ export default function ImportAssetsButton() {
   };
 
   const handleImport = async () => {
-    if (previewData.length === 0) return;
+    if (!selectedFile) return;
     
     setLoading(true);
     setError('');
     try {
       console.log('--- STARTING IMPORT ---');
-      let createdCount = 0;
-      let updatedCount = 0;
-      let failCount = 0;
-      let lastError = '';
+      const res = await assetAPI.importAssets(selectedFile);
+      const { success, errors, total } = res.data;
+      
+      console.log('--- IMPORT FINISHED ---', { success, errors, total });
 
-      for (let i = 0; i < previewData.length; i++) {
-        const asset = previewData[i];
-        try {
-          if (!asset.assetCode && !asset.serialNo) {
-            failCount++;
-            continue;
-          }
-
-          const res = await assetAPI.upsert(asset);
-          if (res.data.action === 'created') createdCount++;
-          else updatedCount++;
-          
-          if ((i + 1) % 10 === 0) console.log(`Progress: ${i + 1}/${previewData.length}`);
-        } catch (err: any) {
-          failCount++;
-          lastError = err.response?.data?.error || err.message;
-          console.error(`Row ${i} failed:`, lastError);
-        }
-      }
-
-      console.log('--- IMPORT FINISHED ---', { createdCount, updatedCount, failCount });
-
-      if (createdCount > 0 || updatedCount > 0) {
-        setError(`✓ นำเข้าสำเร็จ: สร้างใหม่ ${createdCount} รายการ, อัปเดต ${updatedCount} รายการ${failCount > 0 ? `, ล้มเหลว ${failCount} รายการ (${lastError})` : ''}`);
+      if (success > 0) {
+        setError(`✓ นำเข้าสำเร็จ: ${success} รายการ, ล้มเหลว ${errors} รายการ จากทั้งหมด ${total} รายการ`);
         setTimeout(() => {
           setOpen(false);
           window.location.reload();
-        }, 5000);
+        }, 3000);
       } else {
-        setError(`นำเข้าไม่สำเร็จ: ${lastError || 'ไม่พบข้อมูลที่ถูกต้อง'}`);
+        setError(`นำเข้าไม่สำเร็จ: ข้อมูลอาจซ้ำหรือไม่ถูกต้อง`);
       }
     } catch (err: any) {
       console.error('Overall import error:', err);
-      setError(err.message || 'เกิดข้อผิดพลาด');
+      setError(err.response?.data?.error || err.message || 'เกิดข้อผิดพลาด');
     } finally {
       setLoading(false);
     }

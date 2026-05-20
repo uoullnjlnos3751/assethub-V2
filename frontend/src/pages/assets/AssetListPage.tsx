@@ -45,6 +45,14 @@ import FilterListIcon from '@mui/icons-material/FilterList';
 import ImageIcon from '@mui/icons-material/Image';
 import ImageOffIcon from '@mui/icons-material/ImageNotSupported';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import ComputerIcon from '@mui/icons-material/Computer';
+import DesktopWindowsIcon from '@mui/icons-material/DesktopWindows';
+import DevicesIcon from '@mui/icons-material/Devices';
+import PrintIcon from '@mui/icons-material/Print';
+import PhoneAndroidIcon from '@mui/icons-material/PhoneAndroid';
+import RouterIcon from '@mui/icons-material/Router';
+import CableIcon from '@mui/icons-material/Cable';
+import ScienceIcon from '@mui/icons-material/Science';
 import { assetAPI, borrowAPI } from '../../services/api';
 import ExportAssetsButton from '../../components/ExportAssetsButton';
 import ImportAssetsButton from '../../components/ImportAssetsButton';
@@ -116,6 +124,33 @@ const statusLabels: Record<string, string> = {
 
 const columnDefaultsByField = new Map(defaultColumnConfig.map((config) => [config.field, config]));
 
+const typeGroupLabels: Record<string, string> = {
+  computers: 'Computers / Desktop PC',
+  monitors: 'Monitors',
+  devices: 'Devices',
+  printers: 'Printers',
+  phonesTablets: 'Phones / Tablets',
+  network: 'Network devices',
+};
+
+const typeGroupIcons: Record<string, React.ReactNode> = {
+  computers: <ComputerIcon />,
+  monitors: <DesktopWindowsIcon />,
+  devices: <DevicesIcon />,
+  printers: <PrintIcon />,
+  phonesTablets: <PhoneAndroidIcon />,
+  network: <RouterIcon />,
+};
+
+const typeGroupDescriptions: Record<string, string> = {
+  computers: 'คอมพิวเตอร์ตั้งโต๊ะ โน๊ตบุ๊ค และอุปกรณ์ประมวลผล',
+  monitors: 'จอภาพทุกประเภทสำหรับการทำงาน',
+  devices: 'อุปกรณ์นำเสนอ/AV และอุปกรณ์ต่อพ่วง',
+  printers: 'เครื่องพิมพ์ทุกประเภท',
+  phonesTablets: 'สมาร์ทโฟน แท็บเล็ต และอุปกรณ์สื่อสาร',
+  network: 'อุปกรณ์เครือข่าย สวิตช์ เราเตอร์ ไฟร์วอลล์',
+};
+
 const formatDate = (value: unknown) => {
   if (!value) return '';
   const date = new Date(String(value));
@@ -157,7 +192,8 @@ export default function AssetListPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState(searchParams.get('status') || '');
-  const [type, setType] = useState('');
+  const [type, setType] = useState(searchParams.get('type') || '');
+  const typeGroup = searchParams.get('typeGroup') || '';
   const [typeOptions, setTypeOptions] = useState<string[]>([]);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(50);
@@ -168,6 +204,7 @@ export default function AssetListPage() {
   const [extendDialog, setExtendDialog] = useState<{ open: boolean; item: any }>({ open: false, item: null });
   const [extendDays, setExtendDays] = useState(3);
   const [extendReason, setExtendReason] = useState('');
+  const [categoryStats, setCategoryStats] = useState<{ total: number; byStatus: { status: string; _count: number }[] } | null>(null);
   const navigate = useNavigate();
 
   const isAdmin = user?.role === 'IT_ADMIN' || user?.role === 'SUPERADMIN';
@@ -177,6 +214,8 @@ export default function AssetListPage() {
     const s = searchParams.get('status');
     if (s !== null) setStatus(s);
     else setStatus('');
+    setType(searchParams.get('type') || '');
+    setPage(0);
   }, [searchParams]);
 
   const fetchAssets = async () => {
@@ -186,6 +225,7 @@ export default function AssetListPage() {
         search,
         status: status || undefined,
         type: type || undefined,
+        typeGroup: !type && typeGroup ? typeGroup : undefined,
         page: page + 1,
         limit: pageSize,
       });
@@ -196,7 +236,15 @@ export default function AssetListPage() {
     }
   };
 
-  useEffect(() => { fetchAssets(); }, [page, pageSize, status, type]);
+  useEffect(() => { fetchAssets(); }, [page, pageSize, status, type, typeGroup]);
+
+  useEffect(() => {
+    if (typeGroup && isAdmin) {
+      assetAPI.stats(typeGroup).then((res) => setCategoryStats(res.data)).catch(() => setCategoryStats(null));
+    } else {
+      setCategoryStats(null);
+    }
+  }, [typeGroup, isAdmin]);
 
   useEffect(() => {
     assetAPI.typeOptions()
@@ -446,7 +494,7 @@ export default function AssetListPage() {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, gap: 2, flexWrap: 'wrap' }}>
         <Box>
           <Typography variant="h4" fontWeight={700}>
-            {isAvailableOnlyView ? 'รายการอุปกรณ์พร้อมยืม' : 'ทะเบียนทรัพย์สิน'}
+            {isAvailableOnlyView ? 'รายการอุปกรณ์พร้อมยืม' : typeGroupLabels[typeGroup] || 'ทะเบียนทรัพย์สิน'}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
             {isAvailableOnlyView ? 'เลือกอุปกรณ์ที่ต้องการยืม' : `ทั้งหมด ${total} รายการ`}
@@ -456,7 +504,7 @@ export default function AssetListPage() {
           {isAdmin && <ImportAssetsButton />}
           {isAdmin && <ExportAssetsButton />}
           {isAdmin && <Button variant="outlined" startIcon={<TableViewIcon />} onClick={() => setColumnDialogOpen(true)}>จัดคอลัมน์</Button>}
-          {isAdmin && <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('/assets/new')}>เพิ่มทรัพย์สิน</Button>}
+          {isAdmin && <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('/assets/new' + (typeGroup ? `?typeGroup=${typeGroup}` : ''))}>เพิ่มทรัพย์สิน</Button>}
         </Box>
       </Box>
 
@@ -497,6 +545,88 @@ export default function AssetListPage() {
           <Button variant="contained" startIcon={<SearchIcon />} onClick={handleSearch}>ค้นหา</Button>
         </Box>
       </Card>
+
+      {/* Category Header — shown when typeGroup is active */}
+      {typeGroup && typeGroupLabels[typeGroup] && (
+        <Card sx={{ mb: 3, overflow: 'visible' }}>
+          <Box sx={{ height: 4, borderRadius: '16px 16px 0 0', background: 'linear-gradient(90deg, #FF6B00, #FF8C00)' }} />
+          <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5 }}>
+                <Box sx={{
+                  width: 56, height: 56, borderRadius: 3,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  bgcolor: alpha(theme.palette.primary.main, 0.08), color: 'primary.main',
+                  fontSize: 28,
+                }}>
+                  {typeGroupIcons[typeGroup]}
+                </Box>
+                <Box>
+                  <Typography variant="h5" fontWeight={700}>{typeGroupLabels[typeGroup]}</Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.3 }}>{typeGroupDescriptions[typeGroup]}</Typography>
+                </Box>
+              </Box>
+              {isAdmin && (
+                <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate(`/assets/new?typeGroup=${typeGroup}`)} sx={{ borderRadius: 2, flexShrink: 0 }}>
+                  เพิ่ม{typeGroupLabels[typeGroup]}
+                </Button>
+              )}
+            </Box>
+
+            {/* Stats row */}
+            {categoryStats && (
+              <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: 2.5, pt: 2.5, borderTop: `1px solid ${theme.palette.divider}` }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 1, bgcolor: alpha(theme.palette.success.main, 0.08), borderRadius: 2 }}>
+                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'success.main' }} />
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" fontWeight={600}>พร้อมใช้</Typography>
+                    <Typography variant="body2" fontWeight={700}>{categoryStats.byStatus.find(s => s.status === 'Available')?._count || 0}</Typography>
+                  </Box>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 1, bgcolor: alpha(theme.palette.warning.main, 0.08), borderRadius: 2 }}>
+                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'warning.main' }} />
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" fontWeight={600}>กำลังยืม</Typography>
+                    <Typography variant="body2" fontWeight={700}>{categoryStats.byStatus.find(s => s.status === 'Borrowed')?._count || 0}</Typography>
+                  </Box>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 1, bgcolor: alpha(theme.palette.info.main, 0.08), borderRadius: 2 }}>
+                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'info.main' }} />
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" fontWeight={600}>ใช้งานประจำ</Typography>
+                    <Typography variant="body2" fontWeight={700}>{categoryStats.byStatus.find(s => s.status === 'InUse')?._count || 0}</Typography>
+                  </Box>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 1, bgcolor: alpha(theme.palette.warning.dark, 0.08), borderRadius: 2 }}>
+                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#f59e0b' }} />
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" fontWeight={600}>ซ่อมบำรุง</Typography>
+                    <Typography variant="body2" fontWeight={700}>{categoryStats.byStatus.find(s => s.status === 'Maintenance')?._count || 0}</Typography>
+                  </Box>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 1, bgcolor: alpha(theme.palette.grey[500], 0.08), borderRadius: 2 }}>
+                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'grey.400' }} />
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" fontWeight={600}>ปลดระวาง</Typography>
+                    <Typography variant="body2" fontWeight={700}>{categoryStats.byStatus.find(s => s.status === 'Retired')?._count || 0}</Typography>
+                  </Box>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 1, bgcolor: alpha(theme.palette.error.main, 0.08), borderRadius: 2 }}>
+                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'error.main' }} />
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" fontWeight={600}>สูญหาย</Typography>
+                    <Typography variant="body2" fontWeight={700}>{categoryStats.byStatus.find(s => s.status === 'Lost')?._count || 0}</Typography>
+                  </Box>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 1, bgcolor: alpha(theme.palette.primary.main, 0.08), borderRadius: 2 }}>
+                  <Typography variant="caption" color="text.secondary" fontWeight={600}>รวม</Typography>
+                  <Typography variant="body2" fontWeight={700} color="primary.main">{categoryStats.total}</Typography>
+                </Box>
+              </Box>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Borrowed Items Section — for user available-view */}
       {isAvailableOnlyView && myBorrowedItems.length > 0 && (

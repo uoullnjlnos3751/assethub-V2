@@ -53,7 +53,7 @@ export default function BorrowRequestPage() {
   useEffect(() => {
     const foundAssets = selected.map((id) => assets.find((a: any) => a.id === id)).filter(Boolean);
     setSelectedAssets(foundAssets);
-  }, [selected]);
+  }, [selected, assets]);
 
   useEffect(() => {
     if (activeTab === 1) {
@@ -76,7 +76,7 @@ export default function BorrowRequestPage() {
 
   const updateInvQty = (itemId: number, qty: number) => {
     setSelectedInventory((prev) =>
-      prev.map((s) => (s.item.id === itemId ? { ...s, qty: Math.max(1, qty) } : s))
+      prev.map((s) => (s.item.id === itemId ? { ...s, qty: Math.min(s.item.availableQuantity, Math.max(1, qty)) } : s))
     );
   };
 
@@ -434,7 +434,7 @@ export default function BorrowRequestPage() {
                 fullWidth
                 size="large"
                 onClick={handleSubmit}
-                disabled={submitting || selected.length === 0 || !purpose.trim()}
+                disabled={submitting || (selected.length === 0 && selectedInventory.length === 0) || !purpose.trim()}
                 sx={{ mb: 1 }}
               >
                 {submitting ? (

@@ -8,6 +8,13 @@ import {
 import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import DevicesIcon from '@mui/icons-material/Devices';
+import ComputerIcon from '@mui/icons-material/Computer';
+import DesktopWindowsIcon from '@mui/icons-material/DesktopWindows';
+import PrintIcon from '@mui/icons-material/Print';
+import PhoneAndroidIcon from '@mui/icons-material/PhoneAndroid';
+import RouterIcon from '@mui/icons-material/Router';
+import CableIcon from '@mui/icons-material/Cable';
+import ScienceIcon from '@mui/icons-material/Science';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import BuildCircleIcon from '@mui/icons-material/BuildCircle';
 import PeopleIcon from '@mui/icons-material/People';
@@ -74,12 +81,20 @@ const adminNav: NavEntry[] = [
     icon: <DevicesIcon />,
     children: [
       { label: 'ทะเบียน IT Asset', path: '/assets', icon: <DevicesIcon /> },
+      { label: 'Computers / Desktop PC', path: '/assets?typeGroup=computers', icon: <ComputerIcon /> },
+      { label: 'Monitors', path: '/assets?typeGroup=monitors', icon: <DesktopWindowsIcon /> },
+      { label: 'Devices', path: '/assets?typeGroup=devices', icon: <DevicesIcon /> },
+      { label: 'Printers', path: '/assets?typeGroup=printers', icon: <PrintIcon /> },
+      { label: 'Phones / Tablets', path: '/assets?typeGroup=phonesTablets', icon: <PhoneAndroidIcon /> },
+      { label: 'Cables', path: '/inventory?category=Cable', icon: <CableIcon /> },
+      { label: 'Network devices', path: '/assets?typeGroup=network', icon: <RouterIcon /> },
+      { label: 'Consumables', path: '/inventory?category=Consumable', icon: <ScienceIcon /> },
       { label: 'ประเภทอุปกรณ์ (Device Types)', path: '/assets/device-types', icon: <CategoryIcon /> },
       { label: 'สถานที่ตั้ง/ไซต์ (Location & Company)', path: '/assets/locations', icon: <LocationOnIcon /> },
       { label: 'ผู้จำหน่าย (Vendor)', path: '/assets/vendors', icon: <StoreIcon /> },
       { label: 'สถานะอุปกรณ์ (Asset Status)', path: '/assets/statuses', icon: <CheckCircleOutlineIcon /> },
       { label: 'นำเข้า/ส่งออก (Import/Export)', path: '/assets/import-export', icon: <ImportExportIcon /> },
-      { label: 'Inventory (Cables/Consumables)', path: '/inventory', icon: <InventoryIcon /> },
+      { label: 'Inventory', path: '/inventory', icon: <InventoryIcon /> },
       { label: 'จัดการหมวดหมู่ (Categories)', path: '/categories', icon: <CategoryManagementIcon /> },
     ],
   },

@@ -40,6 +40,14 @@ export const assetAPI = {
   upsert: (data: any) => api.post('/assets/upsert', data),
   update: (id: number, data: any) => api.put(`/assets/${id}`, data),
   delete: (id: number) => api.delete(`/assets/${id}`),
+  exportAssets: (type?: string) => api.get('/assets/export/excel', { params: type ? { type } : undefined, responseType: 'blob' }),
+  importAssets: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/assets/import/excel', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
   uploadImage: (id: number, formData: FormData) => {
     const token = localStorage.getItem('token');
     return axios.post(`/api/assets/${id}/image`, formData, {
@@ -83,6 +91,7 @@ export const assetAPI = {
   createAssetStatus: (data: any) => api.post('/assets/asset-statuses', data),
   updateAssetStatus: (id: number, data: any) => api.put(`/assets/asset-statuses/${id}`, data),
   deleteAssetStatus: (id: number) => api.delete(`/assets/asset-statuses/${id}`),
+  stats: (typeGroup: string) => api.get('/assets/stats', { params: { typeGroup } }),
 };
 
 // Borrow
@@ -93,9 +102,11 @@ export const borrowAPI = {
   myHistory: () => api.get('/borrow/my-history'),
   myExtensions: () => api.get('/borrow/my-extensions'),
   allRequests: (params?: any) => api.get('/borrow/all-requests', { params }),
+  overdue: () => api.get('/borrow/overdue'),
   approve: (id: number, data: any) => api.post(`/borrow/requests/${id}/approve`, data),
   checkout: (id: number, data: any) => api.post(`/borrow/requests/${id}/checkout`, data),
   returnItem: (itemId: number, data: any) => api.post(`/borrow/items/${itemId}/return`, data),
+  sendReminder: (itemId: number, data: any) => api.post(`/borrow/items/${itemId}/reminder`, data),
   history: (params?: any) => api.get('/borrow/history', { params }),
   createExtension: (data: any) => api.post('/borrow/extensions', data),
   approveExtension: (id: number, data: any) => api.put(`/borrow/extensions/${id}`, data),

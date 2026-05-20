@@ -35,6 +35,7 @@ model AppUser {
 model Asset {
   id                 Int                     @id @default(autoincrement())
   assetCode          String                  @unique
+  assetName          String?
   serialNo           String                  @unique
   type               String?
   categoryId         Int?
@@ -50,6 +51,8 @@ model Asset {
   poNumber           String?
   prNumber           String?
   purchaseDate       DateTime?
+  purchasePrice      Float?
+  warrantyEndDate    DateTime?
   age                Int?
   ownerName          String?
   departmentId       String?
@@ -84,6 +87,8 @@ model Asset {
   networkDeviceDetail NetworkDeviceDetail?
   rackDetail         RackDetail?
   printerDetail      PrinterDetail?
+  cableDetail        CableDetail?
+  consumableDetail   ConsumableDetail?
   category           Category?               @relation(fields: [categoryId], references: [id])
 
   @@index([status, departmentId, location])
@@ -120,24 +125,29 @@ model PhoneDetail {
   id              Int     @id @default(autoincrement())
   assetId         Int     @unique
   asset           Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  imei            String?
-  carrier         String?
-  phoneNumber     String?
+  imei1           String?
+  imei2           String?
+  osVersion       String?
   storageCapacity String?
-  color           String?
-  osType          String?
+  ram             String?
+  phoneNumber     String?
+  mdmEnrolled     Boolean?
+  simProvider     String?  // AIS, TrueMove, DTAC
 
   @@map("phone_details")
 }
 
 model MonitorDetail {
-  id             Int     @id @default(autoincrement())
-  assetId        Int     @unique
-  asset          Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  screenSize     String?
-  resolution     String?
-  connectionType String?
-  refreshRate    String?
+  id          Int     @id @default(autoincrement())
+  assetId     Int     @unique
+  asset       Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  screenSize  String?  // 24", 27", 34" Ultrawide
+  resolution  String?  // 1920x1080, 4K
+  panelType   String?  // IPS, VA, TN, OLED
+  refreshRate String?  // 60Hz, 144Hz, 240Hz
+  ports       String?  // HDMI, DisplayPort, USB-C
+  hasSpeaker  Boolean?
+  curved      Boolean?
 
   @@map("monitor_details")
 }
@@ -146,10 +156,10 @@ model DeviceDetail {
   id             Int     @id @default(autoincrement())
   assetId        Int     @unique
   asset          Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  subType        String?  // Projector, Speaker, Dock, Webcam, etc.
-  powerRating    String?
-  lampHours      Int?
-  connectionType String?
+  deviceType     String?  // Keyboard, Mouse, Headset, Webcam
+  connectionType String?  // USB, Wireless 2.4G, Bluetooth
+  powerSource    String?  // Battery AA, Rechargeable, USB Powered
+  rgbSupport     Boolean?
 
   @@map("device_details")
 }
@@ -158,13 +168,13 @@ model NetworkDeviceDetail {
   id              Int     @id @default(autoincrement())
   assetId         Int     @unique
   asset           Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  portCount       Int?
-  portSpeed       String?
-  isManaged       Boolean?
+  networkType     String?  // Switch, Router, Firewall, Access Point
   ipAddress       String?
   macAddress      String?
   firmwareVersion String?
-  hasPoE          Boolean?
+  portCount       Int?
+  locationRack    String?
+  poeSupport      Boolean?
 
   @@map("network_device_details")
 }
@@ -182,16 +192,43 @@ model RackDetail {
 }
 
 model PrinterDetail {
-  id               Int     @id @default(autoincrement())
-  assetId          Int     @unique
-  asset            Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  printerType      String?  // Laser, Inkjet, Thermal
-  isColor          Boolean?
-  paperSizes       String?
-  cartridgeModel   String?
-  isNetworkEnabled Boolean?
+  id            Int     @id @default(autoincrement())
+  assetId       Int     @unique
+  asset         Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  printerType   String?  // Laser, Inkjet, Dot Matrix, Thermal
+  isColor       Boolean?
+  networkReady  Boolean?
+  ipAddress     String?
+  macAddress    String?
+  pageCount     Int?
+  duplexSupport Boolean?
 
   @@map("printer_details")
+}
+
+model CableDetail {
+  id             Int     @id @default(autoincrement())
+  assetId        Int     @unique
+  asset          Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  cableType      String?  // HDMI, LAN CAT6, USB-C to Lightning
+  length         String?  // 1.5m, 3m, 5m
+  stockQuantity  Int?
+  minimumStock   Int?
+
+  @@map("cable_details")
+}
+
+model ConsumableDetail {
+  id              Int      @id @default(autoincrement())
+  assetId         Int      @unique
+  asset           Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  consumableType  String?   // Toner, Ink Cartridge, ถ่าน AA
+  compatibleWith  String?   // Printer Brother HL-L2320D etc.
+  stockQuantity   Int?
+  minimumStock    Int?
+  expiryDate      DateTime?
+
+  @@map("consumable_details")
 }
 
 model InventoryItem {

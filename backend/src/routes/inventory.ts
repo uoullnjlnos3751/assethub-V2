@@ -31,6 +31,20 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
   } catch (err) { next(err); }
 });
 
+router.get('/categories/list', authenticate, async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const rows = await prisma.inventoryItem.findMany({
+      where: { isActive: true },
+      distinct: ['category'],
+      select: { category: true },
+      orderBy: { category: 'asc' },
+    });
+    const categorySet = new Set(rows.map((r) => r.category).filter((v): v is string => v !== null));
+    ['Cable', 'Cartridge', 'Consumable', 'Other'].forEach((d) => categorySet.add(d));
+    res.json(Array.from(categorySet).sort((a, b) => a.localeCompare(b)));
+  } catch (err) { next(err); }
+});
+
 router.get('/:id', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const item = await prisma.inventoryItem.findUnique({
@@ -152,20 +166,6 @@ router.post('/:id/checkout', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), 
     ]);
 
     res.json(updated);
-  } catch (err) { next(err); }
-});
-
-router.get('/categories/list', authenticate, async (_req: Request, res: Response, next: NextFunction) => {
-  try {
-    const rows = await prisma.inventoryItem.findMany({
-      where: { isActive: true },
-      distinct: ['category'],
-      select: { category: true },
-      orderBy: { category: 'asc' },
-    });
-    const categorySet = new Set(rows.map((r) => r.category).filter((v): v is string => v !== null));
-    ['Cable', 'Cartridge', 'Consumable', 'Other'].forEach((d) => categorySet.add(d));
-    res.json(Array.from(categorySet).sort((a, b) => a.localeCompare(b)));
   } catch (err) { next(err); }
 });
 

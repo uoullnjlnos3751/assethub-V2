@@ -67,58 +67,19 @@ export default function ExportAssetsButton() {
     }
   };
 
-  const exportToExcel = async () => {
+  const exportToExcel = async (type?: string, typeName?: string) => {
     setLoading(true);
     setError('');
     try {
-      const assets = await fetchAllAssets();
-      
-      const data = assets.map((asset: Asset) => ({
-        'รหัสทรัพย์สิน': asset.assetCode,
-        'Serial No.': asset.serialNo,
-        'ประเภท': asset.type,
-        'ยี่ห้อ': asset.brand,
-        'รุ่น': asset.model,
-        'CPU': asset.cpu,
-        'Gen': asset.cpuGeneration,
-        'RAM': asset.ram,
-        'RAM Detail': asset.ramDetail,
-        'Storage 1': asset.storage1,
-        'Storage 2': asset.storage2,
-        'RAM Slot 1': asset.ramSlot1,
-        'RAM Slot 2': asset.ramSlot2,
-        'GPU': asset.gpu,
-         'OS Type': asset.osType,
-         'S/N Computer': asset.snComputer,
-
-        'OS Version': asset.osVersion,
-        'Windows License': asset.windowsLicense,
-        'Office License': asset.officeLicense,
-        'Antivirus Status': asset.antivirusStatus,
-        'Domain Name': asset.domainName,
-        'Vendor': asset.vendor,
-        'PO Number': asset.poNumber,
-        'PO Date': asset.poDate ? new Date(asset.poDate).toLocaleDateString('th-TH') : '',
-        'PR Number': asset.prNumber,
-        'วันซื้อ': asset.purchaseDate ? new Date(asset.purchaseDate).toLocaleDateString('th-TH') : '',
-        'อายุการใช้งาน': asset.age,
-        'เจ้าของ': asset.ownerName,
-        'แผนก': asset.departmentId,
-        'สถานที่': asset.location,
-        'ชั้น': asset.floor,
-        'บริษัท': asset.company,
-        'สถานะ': asset.status,
-        'หมายเหตุ': asset.remark,
-      }));
-
-      const ws = XLSX.utils.json_to_sheet(data);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Assets');
-      
-      // Set column widths
-      ws['!cols'] = Array(40).fill({ wch: 15 });
-
-      XLSX.writeFile(wb, `assets-${new Date().toISOString().split('T')[0]}.xlsx`);
+      const response = await assetAPI.exportAssets(type);
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      const fileName = type ? `assets-${type}-${new Date().toISOString().split('T')[0]}.xlsx` : `assets-all-${new Date().toISOString().split('T')[0]}.xlsx`;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
       handleClose();
     } catch (err: any) {
       setError(err.message || 'เกิดข้อผิดพลาด');
@@ -203,11 +164,29 @@ export default function ExportAssetsButton() {
         ส่งออก
       </Button>
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleClose}>
-        <MenuItem onClick={exportToExcel} disabled={loading}>
-          📊 ส่งออกเป็น Excel
+        <MenuItem onClick={() => exportToExcel()} disabled={loading}>
+          📊 ส่งออกทั้งหมด
+        </MenuItem>
+        <MenuItem onClick={() => exportToExcel('computers', 'Computers')} disabled={loading}>
+          💻 ส่งออกเฉพาะ Computers
+        </MenuItem>
+        <MenuItem onClick={() => exportToExcel('monitors', 'Monitors')} disabled={loading}>
+          🖥️ ส่งออกเฉพาะ Monitors
+        </MenuItem>
+        <MenuItem onClick={() => exportToExcel('devices', 'Devices')} disabled={loading}>
+          ⌨️ ส่งออกเฉพาะ Devices
+        </MenuItem>
+        <MenuItem onClick={() => exportToExcel('printers', 'Printers')} disabled={loading}>
+          🖨️ ส่งออกเฉพาะ Printers
+        </MenuItem>
+        <MenuItem onClick={() => exportToExcel('phonesTablets', 'Phones/Tablets')} disabled={loading}>
+          📱 ส่งออกเฉพาะ Phones / Tablets
+        </MenuItem>
+        <MenuItem onClick={() => exportToExcel('network', 'Network Devices')} disabled={loading}>
+          🛜 ส่งออกเฉพาะ Network Devices
         </MenuItem>
         <MenuItem onClick={exportToCSV} disabled={loading}>
-          📄 ส่งออกเป็น CSV
+          📄 ส่งออกทั้งหมด (CSV)
         </MenuItem>
       </Menu>
     </>

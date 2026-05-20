@@ -16,7 +16,9 @@ interface OverdueItem {
   requestNo: string;
   borrowerName: string;
   borrowerEmail: string;
-  asset: { assetCode: string; brand: string; model: string; serialNo: string };
+  asset?: { assetCode: string; brand: string; model: string; serialNo: string } | null;
+  inventoryItem?: { name: string; unit: string } | null;
+  quantity?: number;
   borrowDate: string;
   dueDate: string;
   daysOverdue: number;
@@ -42,15 +44,11 @@ export default function BorrowOverduePage() {
   const fetchOverdueItems = async () => {
     setLoading(true);
     try {
-      // Fetch all items and filter overdue ones
-      const res = await borrowAPI.myItems(); // This should return items, adjust based on actual API
-      const overdue = (res.data.data || [])
-        .filter((item: any) => new Date(item.dueDate) < new Date())
+      const res = await borrowAPI.overdue();
+      const overdue = (res.data || [])
         .map((item: any) => ({
           ...item,
-          daysOverdue: Math.floor(
-            (new Date().getTime() - new Date(item.dueDate).getTime()) / (1000 * 60 * 60 * 24)
-          ),
+          daysOverdue: item.daysOverdue ?? Math.floor((new Date().getTime() - new Date(item.dueDate).getTime()) / 86400000),
         }))
         .sort((a: any, b: any) => b.daysOverdue - a.daysOverdue);
       setItems(overdue);
@@ -68,7 +66,7 @@ export default function BorrowOverduePage() {
       return (
         item.requestNo.includes(searchLower) ||
         item.borrowerName?.toLowerCase().includes(searchLower) ||
-        (item.asset?.assetCode || '').toLowerCase().includes(searchLower) ||
+        (item.asset?.assetCode || item.inventoryItem?.name || '').toLowerCase().includes(searchLower) ||
         (item.asset?.serialNo || '').toLowerCase().includes(searchLower)
       );
     });
@@ -79,8 +77,7 @@ export default function BorrowOverduePage() {
     if (!selectedItem) return;
     setSending(true);
     try {
-      // Send reminder - adjust endpoint based on actual API
-      await borrowAPI.allRequests({ id: selectedItem.id }); // Placeholder
+      await borrowAPI.sendReminder(selectedItem.id, { note: reminderNote });
       setSuccess('ส่งการแจ้งเตือนสำเร็จ');
       setReminderDialog(false);
       setReminderNote('');
@@ -212,8 +209,8 @@ export default function BorrowOverduePage() {
                   >
                     <TableCell sx={{ fontWeight: 600 }}>{item.requestNo}</TableCell>
                     <TableCell>{item.borrowerName}</TableCell>
-                    <TableCell>{item.asset?.assetCode}</TableCell>
-                    <TableCell>{item.asset?.serialNo}</TableCell>
+                    <TableCell>{item.asset?.assetCode || item.inventoryItem?.name || '-'}</TableCell>
+                    <TableCell>{item.asset?.serialNo || (item.inventoryItem ? `${item.quantity} ${item.inventoryItem.unit}` : '-')}</TableCell>
                     <TableCell>{new Date(item.dueDate).toLocaleDateString('th-TH')}</TableCell>
                     <TableCell align="center">
                       <Chip
@@ -284,9 +281,11 @@ export default function BorrowOverduePage() {
                 <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                   ทรัพย์สิน
                 </Typography>
-                <Typography fontWeight={600}>{selectedItem.asset?.assetCode}</Typography>
+                <Typography fontWeight={600}>{selectedItem.asset?.assetCode || selectedItem.inventoryItem?.name || '-'}</Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {selectedItem.asset?.brand} {selectedItem.asset?.model} | {selectedItem.asset?.serialNo}
+                  {selectedItem.asset
+                    ? `${selectedItem.asset.brand || ''} ${selectedItem.asset.model || ''} | ${selectedItem.asset.serialNo || '-'}`
+                    : `จำนวน ${selectedItem.quantity || 0} ${selectedItem.inventoryItem?.unit || ''}`}
                 </Typography>
               </Box>
 
