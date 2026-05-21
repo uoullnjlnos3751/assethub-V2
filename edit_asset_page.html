@@ -1,0 +1,571 @@
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Sarabun',sans-serif;background:linear-gradient(135deg,#e8f0fe 0%,#f0ebff 40%,#eff6ff 70%,#f5f0ff 100%);min-height:100vh;position:relative;overflow-x:hidden}
+.orb{position:fixed;border-radius:50%;filter:blur(80px);pointer-events:none;z-index:0}
+.o1{width:420px;height:420px;background:rgba(99,102,241,.1);top:-140px;left:-100px}
+.o2{width:300px;height:300px;background:rgba(139,92,246,.09);bottom:-80px;right:-60px}
+.o3{width:180px;height:180px;background:rgba(59,130,246,.07);top:40%;left:42%}
+.grid-bg{position:fixed;inset:0;background-image:radial-gradient(circle,rgba(99,102,241,.1) 1px,transparent 1px);background-size:28px 28px;pointer-events:none;z-index:0}
+
+/* layout */
+.page{position:relative;z-index:1;max-width:860px;margin:0 auto;padding:20px}
+.glass{background:rgba(255,255,255,.68);border:1px solid rgba(255,255,255,.88);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);border-radius:14px;box-shadow:0 4px 24px rgba(99,102,241,.07),0 1px 3px rgba(0,0,0,.04)}
+.glass-lo{background:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.78);backdrop-filter:blur(12px);border-radius:10px}
+
+/* breadcrumb */
+.bc{display:flex;align-items:center;gap:6px;font-size:12px;color:#9ca3af;margin-bottom:14px}
+.bc span{color:#6366f1;font-weight:600;cursor:pointer}
+.bc-sep{color:#d1d5db}
+
+/* page header */
+.page-hdr{padding:18px 22px;margin-bottom:16px;display:flex;align-items:center;gap:14px}
+.asset-icon{width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,#4f46e5,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;box-shadow:0 4px 14px rgba(99,102,241,.3)}
+.page-title{font-size:17px;font-weight:700;color:#1e1b4b}
+.page-sub{font-size:11.5px;color:#9ca3af;margin-top:2px;display:flex;align-items:center;gap:6px}
+.asset-code-badge{font-family:monospace;font-size:11px;font-weight:700;color:#4338ca;background:rgba(99,102,241,.09);padding:2px 9px;border-radius:6px}
+
+/* unsaved banner */
+.unsaved-bar{display:none;align-items:center;gap:8px;padding:10px 16px;background:rgba(245,158,11,.09);border:1px solid rgba(245,158,11,.28);border-radius:10px;margin-bottom:14px;font-size:12px;color:#b45309}
+.unsaved-bar.show{display:flex}
+
+/* section card */
+.sec-card{padding:16px 20px;margin-bottom:14px}
+.sec-hd{display:flex;align-items:center;gap:8px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid rgba(99,102,241,.07)}
+.sec-bar{width:3px;height:15px;border-radius:2px;flex-shrink:0}
+.sec-title{font-size:13px;font-weight:700;color:#1e1b4b}
+.sec-sub{font-size:11px;color:#9ca3af;margin-left:auto}
+
+/* form fields */
+.row{display:grid;gap:12px;margin-bottom:12px}
+.r2{grid-template-columns:1fr 1fr}
+.r3{grid-template-columns:1fr 1fr 1fr}
+.r4{grid-template-columns:1fr 1fr 1fr 1fr}
+@media(max-width:600px){.r2,.r3,.r4{grid-template-columns:1fr 1fr}}
+.fg{display:flex;flex-direction:column;gap:5px}
+.lbl{font-size:11.5px;color:#6b7280;font-weight:500;display:flex;align-items:center;gap:4px}
+.lbl.req::after{content:'*';color:#ef4444;margin-left:1px}
+.lbl-tip{font-size:10px;color:#c4b5fd;background:rgba(99,102,241,.08);padding:1px 6px;border-radius:20px}
+input[type=text],input[type=number],input[type=date],select,textarea{
+  width:100%;padding:8px 11px;border:1px solid rgba(99,102,241,.18);border-radius:9px;
+  background:rgba(255,255,255,.7);font-family:'Sarabun',sans-serif;font-size:12.5px;color:#374151;
+  outline:none;transition:border-color .15s,box-shadow .15s
+}
+input:focus,select:focus,textarea:focus{border-color:rgba(99,102,241,.45);box-shadow:0 0 0 3px rgba(99,102,241,.09)}
+input:disabled,select:disabled{background:rgba(248,247,255,.6);color:#9ca3af;cursor:not-allowed}
+textarea{resize:vertical;min-height:68px}
+.hint{font-size:10.5px;color:#c4b5fd;margin-top:3px}
+.changed{border-color:rgba(245,158,11,.5)!important;background:rgba(254,252,232,.6)!important}
+.changed:focus{box-shadow:0 0 0 3px rgba(245,158,11,.12)!important}
+
+/* toggle switch */
+.toggle-wrap{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:rgba(248,247,255,.65);border:1px solid rgba(99,102,241,.09);border-radius:9px;transition:background .15s}
+.toggle-wrap:hover{background:rgba(99,102,241,.04)}
+.toggle-info .tl{font-size:12.5px;color:#374151;font-weight:500}
+.toggle-info .ts{font-size:10.5px;color:#9ca3af;margin-top:1px}
+.sw{position:relative;width:38px;height:21px;flex-shrink:0}
+.sw input{opacity:0;width:0;height:0}
+.knob{position:absolute;inset:0;border-radius:21px;background:#e5e7eb;cursor:pointer;transition:background .2s}
+.knob::before{content:'';position:absolute;width:17px;height:17px;border-radius:50%;background:#fff;top:2px;left:2px;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.sw input:checked+.knob{background:linear-gradient(135deg,#4f46e5,#7c3aed)}
+.sw input:checked+.knob::before{transform:translateX(17px)}
+
+/* status select custom */
+.status-row{display:flex;gap:6px;flex-wrap:wrap}
+.status-opt{padding:7px 14px;border-radius:20px;border:1.5px solid;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;font-family:'Sarabun',sans-serif;background:rgba(255,255,255,.5)}
+.s-available{border-color:rgba(16,185,129,.3);color:#059669}
+.s-available.sel{background:rgba(16,185,129,.12);border-color:rgba(16,185,129,.5)}
+.s-reserved{border-color:rgba(99,102,241,.25);color:#4338ca}
+.s-reserved.sel{background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.45)}
+.s-maintenance{border-color:rgba(239,68,68,.25);color:#dc2626}
+.s-maintenance.sel{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.45)}
+.s-transferred{border-color:rgba(107,114,128,.2);color:#6b7280}
+.s-transferred.sel{background:rgba(107,114,128,.08);border-color:rgba(107,114,128,.4)}
+.s-retired{border-color:rgba(55,65,81,.2);color:#374151}
+.s-retired.sel{background:rgba(55,65,81,.07);border-color:rgba(55,65,81,.35)}
+
+/* change log */
+.changelog{background:rgba(254,252,232,.5);border:1px solid rgba(245,158,11,.2);border-radius:10px;padding:12px 14px;margin-bottom:14px}
+.changelog-hd{font-size:11px;font-weight:700;color:#b45309;margin-bottom:8px;display:flex;align-items:center;gap:5px}
+.cl-item{display:flex;align-items:baseline;gap:8px;font-size:11.5px;padding:3px 0;border-bottom:1px solid rgba(245,158,11,.1)}
+.cl-item:last-child{border:none}
+.cl-field{color:#6b7280;min-width:120px;flex-shrink:0;font-weight:500}
+.cl-from{color:#dc2626;text-decoration:line-through;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cl-to{color:#059669;font-weight:600;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cl-arr{color:#9ca3af}
+
+/* note required */
+.note-reason{padding:12px 14px;background:rgba(248,247,255,.6);border:1px solid rgba(99,102,241,.14);border-radius:10px;margin-bottom:14px}
+.note-hd{font-size:11.5px;font-weight:700;color:#4338ca;margin-bottom:6px;display:flex;align-items:center;gap:5px}
+
+/* footer */
+.footer{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;position:sticky;bottom:0;z-index:10;margin-top:4px}
+.footer-left{display:flex;align-items:center;gap:8px}
+.footer-right{display:flex;align-items:center;gap:8px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;font-size:12.5px;font-family:'Sarabun',sans-serif;cursor:pointer;font-weight:600;border:1px solid;transition:all .15s}
+.btn-primary{background:linear-gradient(135deg,#4f46e5,#7c3aed);border-color:rgba(124,58,237,.35);color:#fff;box-shadow:0 3px 12px rgba(99,102,241,.28)}
+.btn-ghost{background:rgba(255,255,255,.7);border-color:rgba(99,102,241,.2);color:#4338ca}
+.btn-danger{background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.22);color:#dc2626}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* success toast */
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);opacity:0;transition:all .3s;z-index:100;pointer-events:none}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+.toast-inner{background:#1e1b4b;color:#fff;padding:10px 20px;border-radius:12px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;box-shadow:0 8px 24px rgba(30,27,75,.25)}
+</style>
+
+<div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div>
+<div class="grid-bg"></div>
+
+<div class="page">
+
+  <!-- Breadcrumb -->
+  <div class="bc">
+    <span>ทรัพย์สิน IT</span>
+    <span class="bc-sep">›</span>
+    <span>HQ-PS-N039</span>
+    <span class="bc-sep">›</span>
+    <span style="color:#9ca3af">แก้ไขข้อมูล</span>
+  </div>
+
+  <!-- Page header -->
+  <div class="glass page-hdr">
+    <div class="asset-icon">💻</div>
+    <div style="flex:1">
+      <div class="page-title">แก้ไขข้อมูลทรัพย์สิน</div>
+      <div class="page-sub">
+        <span class="asset-code-badge">HQ-PS-N039</span>
+        <span>Dell Latitude 5530 · Notebook</span>
+      </div>
+    </div>
+    <div style="text-align:right;flex-shrink:0">
+      <div style="font-size:10px;color:#9ca3af">แก้ไขล่าสุด</div>
+      <div style="font-size:12px;color:#6b7280;font-weight:600">28 มี.ค. 2568</div>
+      <div style="font-size:10.5px;color:#9ca3af">วัชระ คิดโสดา</div>
+    </div>
+  </div>
+
+  <!-- Unsaved banner -->
+  <div class="unsaved-bar" id="unsavedBar">
+    ⚠️ มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก — กรุณาบันทึกก่อนออกจากหน้านี้
+  </div>
+
+  <!-- Change log (แสดงเมื่อมีการเปลี่ยน) -->
+  <div class="changelog" id="changelogBox" style="display:none">
+    <div class="changelog-hd">✏️ รายการที่เปลี่ยนแปลง (<span id="changeCount">0</span> รายการ)</div>
+    <div id="changelogList"></div>
+  </div>
+
+  <!-- ① ข้อมูลพื้นฐาน -->
+  <div class="glass sec-card">
+    <div class="sec-hd">
+      <div class="sec-bar" style="background:linear-gradient(180deg,#4f46e5,#7c3aed)"></div>
+      <div class="sec-title">ข้อมูลพื้นฐาน</div>
+      <span class="sec-sub">ทุกประเภทอุปกรณ์</span>
+    </div>
+
+    <div class="row r3">
+      <div class="fg">
+        <label class="lbl req">Asset code</label>
+        <input type="text" id="f_asset_code" value="HQ-PS-N039" disabled>
+        <div class="hint">ไม่สามารถเปลี่ยน asset code ได้</div>
+      </div>
+      <div class="fg">
+        <label class="lbl req">ยี่ห้อ (Brand)</label>
+        <select id="f_brand" onchange="markChanged(this,'brand','ยี่ห้อ')">
+          <option>Dell</option><option>HP</option><option>Lenovo</option>
+          <option>Apple</option><option>ASUS</option><option>Acer</option><option>อื่นๆ</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label class="lbl req">รุ่น (Model)</label>
+        <input type="text" id="f_model" value="Latitude 5530" onchange="markChanged(this,'model','รุ่น')">
+      </div>
+    </div>
+
+    <div class="row r3">
+      <div class="fg">
+        <label class="lbl">Serial number</label>
+        <input type="text" id="f_serial" value="SN-DELL5530-XK9" onchange="markChanged(this,'serial_no','Serial No.')">
+      </div>
+      <div class="fg">
+        <label class="lbl req">Site</label>
+        <select id="f_site" onchange="markChanged(this,'site','Site')">
+          <option selected>PS</option><option>TRR Corp</option><option>TRRL</option>
+          <option>TRRP</option><option>TRRT</option><option>TMI</option><option>SSEC</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label class="lbl">ชั้น / ห้อง</label>
+        <input type="text" id="f_floor" value="23" onchange="markChanged(this,'floor','ชั้น')">
+      </div>
+    </div>
+
+    <div class="row r3">
+      <div class="fg">
+        <label class="lbl">แผนก</label>
+        <input type="text" id="f_dept" value="ACC" onchange="markChanged(this,'department_code','แผนก')">
+      </div>
+      <div class="fg">
+        <label class="lbl">ชื่อผู้ถือครอง</label>
+        <input type="text" id="f_owner" value="อาคเนย์ วันนาคอน" onchange="markChanged(this,'owner_name','ผู้ถือครอง')">
+      </div>
+      <div class="fg">
+        <label class="lbl">AD Username</label>
+        <input type="text" id="f_username" value="aekachai.wan" onchange="markChanged(this,'owner_username','AD Username')">
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div class="fg" style="margin-bottom:12px">
+      <label class="lbl req">สถานะ <span class="lbl-tip">คลิกเพื่อเปลี่ยน</span></label>
+      <div class="status-row" id="statusRow">
+        <button class="status-opt s-available sel" onclick="selectStatus('Available',this)">✅ พร้อมใช้งาน</button>
+        <button class="status-opt s-reserved" onclick="selectStatus('Reserved',this)">🔒 สำรอง</button>
+        <button class="status-opt s-maintenance" onclick="selectStatus('Maintenance',this)">🔧 ส่งซ่อม</button>
+        <button class="status-opt s-transferred" onclick="selectStatus('Transferred',this)">📦 โอนย้าย</button>
+        <button class="status-opt s-retired" onclick="selectStatus('Retired',this)">🗑 เลิกใช้งาน</button>
+      </div>
+    </div>
+
+    <div class="row r2">
+      <div class="fg">
+        <label class="lbl">Asset Owner (บริษัท)</label>
+        <select id="f_asset_owner" onchange="markChanged(this,'asset_owner','Asset Owner')">
+          <option>TRR Corp</option><option>PS</option><option>TRRL</option><option>TMI</option><option>SSEC</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label class="lbl">หมายเหตุ</label>
+        <input type="text" id="f_remark" placeholder="หมายเหตุเพิ่มเติม..." onchange="markChanged(this,'remark','หมายเหตุ')">
+      </div>
+    </div>
+
+    <div class="fg">
+      <div class="toggle-wrap">
+        <div class="toggle-info">
+          <div class="tl">อนุญาตให้ยืม</div>
+          <div class="ts">เปิด = สามารถสร้างคำขอยืมได้</div>
+        </div>
+        <label class="sw"><input type="checkbox" checked onchange="markToggle(this,'is_borrowable','อนุญาตให้ยืม')"><span class="knob"></span></label>
+      </div>
+    </div>
+  </div>
+
+  <!-- ② Hardware spec -->
+  <div class="glass sec-card">
+    <div class="sec-hd">
+      <div class="sec-bar" style="background:linear-gradient(180deg,#2563eb,#60a5fa)"></div>
+      <div class="sec-title">สเปก Hardware</div>
+      <span class="sec-sub">เก็บใน asset_details JSONB</span>
+    </div>
+
+    <div class="row r3">
+      <div class="fg">
+        <label class="lbl">CPU</label>
+        <input type="text" id="f_cpu" value="Intel Core i7-1260P" onchange="markChanged(this,'cpu','CPU')">
+      </div>
+      <div class="fg">
+        <label class="lbl">CPU Generation</label>
+        <input type="text" id="f_gen" value="Gen 12" onchange="markChanged(this,'cpu_gen','CPU Generation')">
+      </div>
+      <div class="fg">
+        <label class="lbl">RAM</label>
+        <select id="f_ram" onchange="markChanged(this,'ram_gb','RAM')">
+          <option>4 GB</option><option>8 GB</option><option selected>16 GB</option><option>32 GB</option><option>64 GB</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row r3">
+      <div class="fg">
+        <label class="lbl">SSD</label>
+        <select id="f_ssd" onchange="markChanged(this,'ssd_gb','SSD')">
+          <option>128 GB</option><option>256 GB</option><option selected>512 GB</option><option>1 TB</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label class="lbl">HDD</label>
+        <input type="text" id="f_hdd" placeholder="ถ้ามี เช่น 1 TB" onchange="markChanged(this,'hdd','HDD')">
+      </div>
+      <div class="fg">
+        <label class="lbl">อายุอุปกรณ์ (ปี)</label>
+        <input type="number" id="f_age" value="1" min="0" onchange="markChanged(this,'asset_age','อายุ (ปี)')">
+      </div>
+    </div>
+  </div>
+
+  <!-- ③ ระบบปฏิบัติการ -->
+  <div class="glass sec-card">
+    <div class="sec-hd">
+      <div class="sec-bar" style="background:linear-gradient(180deg,#0284c7,#38bdf8)"></div>
+      <div class="sec-title">ระบบปฏิบัติการ &amp; Software</div>
+    </div>
+
+    <div class="row r3">
+      <div class="fg">
+        <label class="lbl">Windows</label>
+        <select id="f_os" onchange="markChanged(this,'os','Windows')">
+          <option selected>Windows 11</option><option>Windows 10</option><option>Windows 7</option><option>macOS</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label class="lbl">Windows Version</label>
+        <input type="text" id="f_winver" value="24H2 (26100.4652)" onchange="markChanged(this,'win_version','Windows Version')">
+      </div>
+      <div class="fg">
+        <label class="lbl">Join Domain</label>
+        <input type="text" id="f_domain" value="TRRGROUP" onchange="markChanged(this,'join_domain','Join Domain')">
+      </div>
+    </div>
+
+    <div class="row r2" style="margin-bottom:12px">
+      <div class="fg">
+        <label class="lbl">MS Office</label>
+        <select id="f_office" onchange="markChanged(this,'ms_office','MS Office')">
+          <option selected>MS 365</option><option>2021</option><option>2019</option><option>2016</option><option>2013</option><option>ไม่มี</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label class="lbl">Antivirus</label>
+        <input type="text" id="f_av" value="Trend Micro Apex One" onchange="markChanged(this,'antivirus','Antivirus')">
+      </div>
+    </div>
+
+    <div class="row r2" style="margin-bottom:12px">
+      <div class="fg">
+        <label class="lbl">Computer Name</label>
+        <input type="text" id="f_compname" value="HQ-PS-N039" onchange="markChanged(this,'computer_name','Computer Name')">
+      </div>
+      <div class="fg">
+        <label class="lbl">IP Phone</label>
+        <input type="text" id="f_phone" value="1840" onchange="markChanged(this,'ip_phone','IP Phone')">
+      </div>
+    </div>
+
+    <!-- Toggle group -->
+    <div class="row r2">
+      <div class="toggle-wrap">
+        <div class="toggle-info"><div class="tl">Windows Activate</div></div>
+        <label class="sw"><input type="checkbox" id="t_win" checked onchange="markToggle(this,'windows_activate','Windows Activate')"><span class="knob"></span></label>
+      </div>
+      <div class="toggle-wrap">
+        <div class="toggle-info"><div class="tl">Office Activate</div></div>
+        <label class="sw"><input type="checkbox" id="t_office" checked onchange="markToggle(this,'office_activate','Office Activate')"><span class="knob"></span></label>
+      </div>
+      <div class="toggle-wrap">
+        <div class="toggle-info"><div class="tl">GLPI Agent</div></div>
+        <label class="sw"><input type="checkbox" id="t_glpi" checked onchange="markToggle(this,'glpi','GLPI Agent')"><span class="knob"></span></label>
+      </div>
+      <div class="toggle-wrap">
+        <div class="toggle-info"><div class="tl">Spicework Agent</div></div>
+        <label class="sw"><input type="checkbox" id="t_spice" onchange="markToggle(this,'spicework','Spicework Agent')"><span class="knob"></span></label>
+      </div>
+      <div class="toggle-wrap">
+        <div class="toggle-info"><div class="tl">USB Policy</div></div>
+        <label class="sw"><input type="checkbox" id="t_usb" checked onchange="markToggle(this,'usb_policy','USB Policy')"><span class="knob"></span></label>
+      </div>
+      <div class="toggle-wrap">
+        <div class="toggle-info"><div class="tl">Printer Local</div></div>
+        <label class="sw"><input type="checkbox" id="t_printer" onchange="markToggle(this,'has_printer','Printer Local')"><span class="knob"></span></label>
+      </div>
+    </div>
+  </div>
+
+  <!-- ④ จัดซื้อ / ประกัน -->
+  <div class="glass sec-card">
+    <div class="sec-hd">
+      <div class="sec-bar" style="background:linear-gradient(180deg,#059669,#34d399)"></div>
+      <div class="sec-title">จัดซื้อ &amp; ประกัน</div>
+    </div>
+    <div class="row r4">
+      <div class="fg">
+        <label class="lbl">วันที่ซื้อ</label>
+        <input type="date" id="f_podate" value="2024-01-15" onchange="markChanged(this,'po_date','วันที่ซื้อ')">
+      </div>
+      <div class="fg">
+        <label class="lbl">วันหมดประกัน</label>
+        <input type="date" id="f_warranty" value="2027-01-14" onchange="markChanged(this,'warranty_end','วันหมดประกัน')">
+      </div>
+      <div class="fg">
+        <label class="lbl">ราคาซื้อ (บาท)</label>
+        <input type="number" id="f_price" value="45900" onchange="markChanged(this,'purchase_price','ราคาซื้อ')">
+      </div>
+      <div class="fg">
+        <label class="lbl">เลข PO</label>
+        <input type="text" id="f_po" value="PO-2568-0042" onchange="markChanged(this,'po_no','เลข PO')">
+      </div>
+    </div>
+    <div class="row r2">
+      <div class="fg">
+        <label class="lbl">เลข PR</label>
+        <input type="text" id="f_pr" value="PR-2568-0031" onchange="markChanged(this,'pr_no','เลข PR')">
+      </div>
+      <div class="fg">
+        <label class="lbl">Vendor / ผู้ขาย</label>
+        <input type="text" id="f_vendor" value="บริษัท เดลล์ ไทยแลนด์" onchange="markChanged(this,'vendor','Vendor')">
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑤ เหตุผลในการแก้ไข -->
+  <div class="note-reason" id="reasonBox" style="display:none">
+    <div class="note-hd">📝 เหตุผลในการแก้ไข <span style="color:#ef4444;font-size:10px">*จำเป็น</span></div>
+    <textarea id="f_reason" placeholder="ระบุเหตุผล เช่น อัปเดตสเปกหลัง RAM upgrade, แก้ชื่อเครื่องให้ตรงตาม naming convention..." style="min-height:60px"></textarea>
+  </div>
+
+  <!-- Sticky footer -->
+  <div class="glass footer">
+    <div class="footer-left">
+      <button class="btn btn-danger" onclick="confirmDiscard()">↩ ยกเลิกการแก้ไข</button>
+    </div>
+    <div class="footer-right">
+      <span id="changeCounter" style="font-size:12px;color:#9ca3af;display:none">เปลี่ยนแปลง <strong id="footerCount" style="color:#b45309">0</strong> รายการ</span>
+      <button class="btn btn-ghost" onclick="previewChanges()">👁 Preview</button>
+      <button class="btn btn-primary" id="saveBtn" onclick="saveChanges()" disabled>
+        <span id="saveLabel">💾 บันทึก</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast">
+  <div class="toast-inner" id="toastInner"></div>
+</div>
+
+<script>
+// ── original values (snapshot on load) ──────────────────────
+const ORIGINAL = {
+  brand:'Dell', model:'Latitude 5530', serial_no:'SN-DELL5530-XK9',
+  site:'PS', floor:'23', department_code:'ACC',
+  owner_name:'อาคเนย์ วันนาคอน', owner_username:'aekachai.wan',
+  asset_owner:'TRR Corp', status:'Available', is_borrowable:true,
+  cpu:'Intel Core i7-1260P', cpu_gen:'Gen 12', ram_gb:'16 GB',
+  ssd_gb:'512 GB', hdd:'', asset_age:1,
+  os:'Windows 11', win_version:'24H2 (26100.4652)', join_domain:'TRRGROUP',
+  ms_office:'MS 365', antivirus:'Trend Micro Apex One',
+  computer_name:'HQ-PS-N039', ip_phone:'1840',
+  windows_activate:true, office_activate:true, glpi:true,
+  spicework:false, usb_policy:true, has_printer:false,
+  po_date:'2024-01-15', warranty_end:'2027-01-14',
+  purchase_price:45900, po_no:'PO-2568-0042',
+  pr_no:'PR-2568-0031', vendor:'บริษัท เดลล์ ไทยแลนด์',
+};
+
+let changes = {}; // { fieldKey: { label, from, to } }
+let currentStatus = 'Available';
+
+function getOrig(key){ return ORIGINAL[key] ?? ''; }
+
+function markChanged(el, key, label){
+  const orig = String(getOrig(key));
+  const now  = String(el.value ?? '').trim();
+  if(now !== orig && now !== ''){
+    el.classList.add('changed');
+    changes[key] = { label, from: orig, to: now };
+  } else {
+    el.classList.remove('changed');
+    delete changes[key];
+  }
+  refreshUI();
+}
+
+function markToggle(el, key, label){
+  const orig = Boolean(getOrig(key));
+  const now  = el.checked;
+  if(now !== orig){
+    changes[key] = { label, from: orig?'เปิด':'ปิด', to: now?'เปิด':'ปิด' };
+  } else {
+    delete changes[key];
+  }
+  refreshUI();
+}
+
+function selectStatus(val, btn){
+  if(val === currentStatus) return;
+  changes['status'] = { label:'สถานะ', from: currentStatus, to: val };
+  currentStatus = val;
+  document.querySelectorAll('.status-opt').forEach(b=>b.classList.remove('sel'));
+  btn.classList.add('sel');
+  refreshUI();
+}
+
+function refreshUI(){
+  const count = Object.keys(changes).length;
+  const hasChanges = count > 0;
+
+  document.getElementById('unsavedBar').classList.toggle('show', hasChanges);
+  document.getElementById('changelogBox').style.display = hasChanges ? '' : 'none';
+  document.getElementById('reasonBox').style.display = hasChanges ? '' : 'none';
+  document.getElementById('changeCounter').style.display = hasChanges ? '' : 'none';
+  document.getElementById('changeCount').textContent = count;
+  document.getElementById('footerCount').textContent = count;
+  document.getElementById('saveBtn').disabled = !hasChanges;
+
+  // build changelog list
+  const list = document.getElementById('changelogList');
+  list.innerHTML = Object.values(changes).map(c=>`
+    <div class="cl-item">
+      <span class="cl-field">${c.label}</span>
+      <span class="cl-from">${c.from || '(ว่าง)'}</span>
+      <span class="cl-arr">→</span>
+      <span class="cl-to">${c.to}</span>
+    </div>`).join('');
+}
+
+function previewChanges(){
+  const count = Object.keys(changes).length;
+  if(count === 0){ showToast('ℹ️ ยังไม่มีการเปลี่ยนแปลง','#6366f1'); return; }
+  showToast(`👁 Preview: ${count} รายการที่จะบันทึก`,'#4f46e5');
+}
+
+function saveChanges(){
+  const reason = document.getElementById('f_reason').value.trim();
+  if(!reason){ 
+    document.getElementById('f_reason').focus();
+    document.getElementById('f_reason').style.borderColor='rgba(239,68,68,.5)';
+    showToast('⚠️ กรุณาระบุเหตุผลในการแก้ไข','#b45309');
+    return;
+  }
+  const btn = document.getElementById('saveBtn');
+  const label = document.getElementById('saveLabel');
+  btn.disabled = true;
+  label.innerHTML = '<div class="spinner"></div>กำลังบันทึก...';
+
+  setTimeout(()=>{
+    // simulate API call success
+    Object.keys(changes).forEach(k => {
+      if(ORIGINAL[k] !== undefined) ORIGINAL[k] = changes[k].to;
+    });
+    changes = {};
+    refreshUI();
+    label.innerHTML = '💾 บันทึก';
+    document.getElementById('f_reason').value = '';
+    document.getElementById('f_reason').style.borderColor='';
+    showToast('✅ บันทึกข้อมูลสำเร็จ! ระบบบันทึกประวัติแล้ว','#059669');
+    // reset all changed highlights
+    document.querySelectorAll('.changed').forEach(el=>el.classList.remove('changed'));
+  }, 1200);
+}
+
+function confirmDiscard(){
+  if(Object.keys(changes).length === 0){ showToast('ℹ️ ไม่มีการเปลี่ยนแปลง','#6366f1'); return; }
+  if(confirm('ยืนยันยกเลิกการแก้ไข? การเปลี่ยนแปลงทั้งหมดจะหายไป')){
+    location.reload();
+  }
+}
+
+function showToast(msg, color='#1e1b4b'){
+  const t = document.getElementById('toast');
+  const ti = document.getElementById('toastInner');
+  ti.style.background = color;
+  ti.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._to);
+  t._to = setTimeout(()=>t.classList.remove('show'), 3000);
+}
+</script>

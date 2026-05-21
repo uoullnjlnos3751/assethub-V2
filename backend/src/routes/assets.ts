@@ -876,7 +876,14 @@ function getAssetDetail(prisma: any, assetId: number, type?: string | null) {
   router.get('/export/excel', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const typeParam = req.query.type as string;
-      const whereClause = typeParam ? { type: typeParam } : {};
+      let whereClause: any = {};
+      if (typeParam) {
+        if (ASSET_TYPE_GROUPS[typeParam]) {
+          whereClause = { type: { in: ASSET_TYPE_GROUPS[typeParam] } };
+        } else {
+          whereClause = { type: typeParam };
+        }
+      }
 
       const assets = await prisma.asset.findMany({
         where: whereClause,
@@ -940,9 +947,64 @@ function getAssetDetail(prisma: any, assetId: number, type?: string | null) {
         };
       });
   
-      const worksheet = xlsx.utils.json_to_sheet(rows);
+      const emptyRow = {
+        'Asset ID': '',
+        'Asset Code': '',
+        'Asset Name': '',
+        'Serial No': '',
+        'Type': '',
+        'Category': '',
+        'Status': '',
+        'Brand': '',
+        'Model': '',
+        'Company': '',
+        'Owner': '',
+        'Department': '',
+        'Location': '',
+        'Floor': '',
+        'Old Asset Code': '',
+        'Domain Name': '',
+        'PO Number': '',
+        'PO Date': '',
+        'PR Number': '',
+        'Purchase Date': '',
+        'Vendor': '',
+        'Budget': '',
+        'Remark': '',
+        'Created At': '',
+        'Updated At': ''
+      };
+
+      const sheetsData: Record<string, any[]> = {};
+      if (rows.length === 0) {
+        sheetsData['Assets'] = [emptyRow];
+      } else {
+        rows.forEach((row, index) => {
+          const type = assets[index].type || 'Other';
+          if (!sheetsData[type]) sheetsData[type] = [];
+          sheetsData[type].push(row);
+        });
+      }
+
       const workbook = xlsx.utils.book_new();
-      xlsx.utils.book_append_sheet(workbook, worksheet, 'Assets');
+      for (const [sheetName, sheetRows] of Object.entries(sheetsData)) {
+        const ws = xlsx.utils.json_to_sheet(sheetRows.length > 0 ? sheetRows : [emptyRow]);
+        
+        // Excel sheet names cannot exceed 31 chars and cannot contain certain chars
+        let safeName = sheetName.replace(/[\\/*?:\[\]]/g, '').substring(0, 31);
+        if (!safeName) safeName = 'Sheet';
+        
+        // Ensure unique name
+        let finalName = safeName;
+        let counter = 1;
+        while (workbook.SheetNames.includes(finalName)) {
+          finalName = `${safeName.substring(0, 28)}_${counter}`;
+          counter++;
+        }
+        
+        xlsx.utils.book_append_sheet(workbook, ws, finalName);
+      }
+
       const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
   
       res.setHeader('Content-Disposition', 'attachment; filename="assets_export.xlsx"');
@@ -958,13 +1020,17 @@ function getAssetDetail(prisma: any, assetId: number, type?: string | null) {
       if (!req.file) throw new AppError('ไม่พบไฟล์ที่อัปโหลด', 400);
   
       const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
-      const sheetName = workbook.SheetNames[0];
-      const sheet = workbook.Sheets[sheetName];
-      const rows: any[] = xlsx.utils.sheet_to_json(sheet);
+      
+      const allRows: any[] = [];
+      for (const sheetName of workbook.SheetNames) {
+        const sheet = workbook.Sheets[sheetName];
+        const rows: any[] = xlsx.utils.sheet_to_json(sheet);
+        allRows.push(...rows);
+      }
   
       let success = 0, errors = 0;
       
-      for (const row of rows) {
+      for (const row of allRows) {
         try {
           const assetCode = row['Asset Code'] || row['รหัสทรัพย์สิน'];
           const serialNo = row['Serial No'] || row['Serial Number'] || row['SerialNumber'];
@@ -1036,7 +1102,7 @@ function getAssetDetail(prisma: any, assetId: number, type?: string | null) {
         }
       }
   
-      res.json({ success, errors, total: rows.length });
+      res.json({ success, errors, total: allRows.length });
     } catch (err) {
       next(err);
     }

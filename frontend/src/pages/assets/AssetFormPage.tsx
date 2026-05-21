@@ -1,33 +1,9 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import {
-  Alert,
-  Autocomplete,
-  Box,
-  Button,
-  Card,
-  CardContent,
-  CircularProgress,
-  Divider,
-  Grid,
-  MenuItem,
-  Stack,
-  TextField,
-  Typography,
-  useTheme,
-  alpha,
-  IconButton,
-} from '@mui/material';
-import {
-  Save as SaveIcon,
-  ArrowBack as ArrowBackIcon,
-  CloudUpload as CloudUploadIcon,
-  Delete as DeleteIcon,
-  Image as ImageIcon,
-  CameraAlt as CameraAltIcon,
-} from '@mui/icons-material';
+import { CircularProgress } from '@mui/material';
 import { assetAPI } from '../../services/api';
 
+/* ─── Types / Defaults ─────────────────────────────────────────── */
 const initialData = {
   assetCode: '', assetName: '', serialNo: '', type: '', brand: '', model: '',
   cpu: '', cpuGeneration: '', ram: '', ramSlot1: '', ramSlot2: '', gpu: '',
@@ -37,15 +13,16 @@ const initialData = {
   purchasePrice: '', warrantyEndDate: '',
   ownerName: '', departmentId: '', location: '', floor: '',
   company: '', oldAssetCode: '', budget: '', status: 'Available', remark: '',
+  snComputer: '', windowsLicense: '',
 };
 
 const fallbackStatusOptions = [
-  { value: 'Available', label: 'พร้อมใช้งาน' },
-  { value: 'Borrowed', label: 'กำลังยืม' },
-  { value: 'InUse', label: 'ใช้งานประจำ' },
-  { value: 'Maintenance', label: 'ซ่อมบำรุง' },
-  { value: 'Retired', label: 'ปลดระวาง' },
-  { value: 'Lost', label: 'สูญหาย' },
+  { value: 'Available', label: '✅ พร้อมใช้งาน', cls: 's-available' },
+  { value: 'Borrowed',  label: '🔒 กำลังยืม',    cls: 's-reserved' },
+  { value: 'InUse',     label: '💼 ใช้งานประจำ',  cls: 's-reserved' },
+  { value: 'Maintenance', label: '🔧 ซ่อมบำรุง',  cls: 's-maintenance' },
+  { value: 'Retired',   label: '🗑 ปลดระวาง',    cls: 's-retired' },
+  { value: 'Lost',      label: '❌ สูญหาย',       cls: 's-maintenance' },
 ];
 
 const calculateAge = (purchaseDate: string) => {
@@ -59,73 +36,107 @@ const calculateAge = (purchaseDate: string) => {
   return Math.max(years, 0).toString();
 };
 
-const fieldSx = {
-  '& .MuiInputBase-root': {
-    borderRadius: 1,
-    fontSize: '0.875rem',
-    backgroundColor: 'transparent',
-    transition: 'all 0.15s ease',
-  },
-  '& .MuiInputLabel-root': {
-    fontWeight: 400,
-    fontSize: '0.8rem',
-    color: 'text.secondary',
-    '&.Mui-focused': {
-      color: 'primary.main',
-    },
-  },
-  '& .MuiOutlinedInput-notchedOutline': {
-    borderColor: (theme: any) => alpha(theme.palette.divider, 0.6),
-  },
-  '&:hover .MuiOutlinedInput-notchedOutline': {
-    borderColor: (theme: any) => alpha(theme.palette.text.primary, 0.3),
-  },
-  '& .Mui-focused .MuiOutlinedInput-notchedOutline': {
-    borderWidth: 1,
-  },
+const typeGroupCategoryMap: Record<string, string> = {
+  computers: 'คอมพิวเตอร์', monitors: 'จอภาพ', devices: 'อุปกรณ์นำเสนอ/AV',
+  printers: 'เครื่องพิมพ์', phonesTablets: 'อุปกรณ์สื่อสาร', network: 'อุปกรณ์เครือข่าย',
 };
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
+function getTypeIcon(type: string): string {
+  const t = type?.toLowerCase() || '';
+  if (['notebook', 'laptop', 'macbook'].some(k => t.includes(k))) return '💻';
+  if (['desktop', 'pc', 'workstation', 'all-in-one'].some(k => t.includes(k))) return '🖥';
+  if (t.includes('monitor')) return '🖥';
+  if (t.includes('printer')) return '🖨';
+  if (['phone', 'tablet', 'smartphone'].some(k => t.includes(k))) return '📱';
+  if (['switch', 'router', 'firewall', 'access point', 'network'].some(k => t.includes(k))) return '🌐';
+  if (t.includes('projector')) return '📽';
+  return '🔧';
+}
+
+/* ─── Small UI helpers ─────────────────────────────────────────── */
+function FG({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
   return (
-    <Typography
-      variant="subtitle2"
-      sx={{
-        fontWeight: 600,
-        textTransform: 'uppercase',
-        letterSpacing: 1.2,
-        color: 'text.secondary',
-        mb: 2,
-        pb: 1,
-        borderBottom: 1,
-        borderColor: 'divider',
-      }}
-    >
+    <div className="fg">
+      <label className={`lbl${required ? ' req' : ''}`}>{label}</label>
       {children}
-    </Typography>
+    </div>
   );
 }
 
-const typeGroupCategoryMap: Record<string, string> = {
-  computers:    'คอมพิวเตอร์',
-  monitors:     'จอภาพ',
-  devices:      'อุปกรณ์นำเสนอ/AV',
-  printers:     'เครื่องพิมพ์',
-  phonesTablets: 'อุปกรณ์สื่อสาร',
-  network:      'อุปกรณ์เครือข่าย',
-};
+function FInput({ value, onChange, disabled, placeholder, type = 'text', readOnly }: {
+  value: string; onChange?: (v: string) => void; disabled?: boolean;
+  placeholder?: string; type?: string; readOnly?: boolean;
+}) {
+  return (
+    <input type={type} value={value}
+      onChange={e => onChange?.(e.target.value)}
+      disabled={disabled} placeholder={placeholder}
+      readOnly={readOnly}
+    />
+  );
+}
 
+function FSelect({ value, onChange, children, disabled }: {
+  value: string; onChange?: (v: string) => void; children: React.ReactNode; disabled?: boolean;
+}) {
+  return (
+    <select value={value} onChange={e => onChange?.(e.target.value)} disabled={disabled}>
+      {children}
+    </select>
+  );
+}
+
+function FTextarea({ value, onChange, placeholder }: {
+  value: string; onChange?: (v: string) => void; placeholder?: string;
+}) {
+  return <textarea value={value} onChange={e => onChange?.(e.target.value)} placeholder={placeholder} />;
+}
+
+function ToggleWrap({ label, desc, checked, onChange }: {
+  label: string; desc?: string; checked: boolean; onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="toggle-wrap">
+      <div className="toggle-info">
+        <div className="tl">{label}</div>
+        {desc && <div className="ts">{desc}</div>}
+      </div>
+      <label className="sw">
+        <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} />
+        <span className="knob"></span>
+      </label>
+    </div>
+  );
+}
+
+function SecCard({ title, sub, barColor, children }: {
+  title: string; sub?: string; barColor?: string; children: React.ReactNode;
+}) {
+  return (
+    <div className="glass sec-card">
+      <div className="sec-hd">
+        <div className="sec-bar" style={{ background: barColor || 'linear-gradient(180deg,#4f46e5,#7c3aed)' }}></div>
+        <div className="sec-title">{title}</div>
+        {sub && <span className="sec-sub">{sub}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/* ─── Main Component ───────────────────────────────────────────── */
 export default function AssetFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const typeGroupFromUrl = searchParams.get('typeGroup') || '';
-  const theme = useTheme();
-  const [form, setForm] = useState(initialData);
+  const [form, setForm] = useState<any>(initialData);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(!!id);
   const [error, setError] = useState('');
-  const [ownerOptions, setOwnerOptions] = useState<any[]>([]);
-  const [ownerLoading, setOwnerLoading] = useState(false);
+  const [detail, setDetail] = useState<Record<string, any>>({});
+
+  // Dropdown options
   const [typeOptions, setTypeOptions] = useState<string[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
@@ -138,191 +149,88 @@ export default function AssetFormPage() {
   const [companyOptions, setCompanyOptions] = useState<string[]>([]);
   const [antivirusOptions, setAntivirusOptions] = useState<string[]>([]);
   const [statusOptions, setStatusOptions] = useState(fallbackStatusOptions);
+  const [initialCategoryId, setInitialCategoryId] = useState<number | null>(null);
+
+  // Image
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
   const [imageError, setImageError] = useState('');
-  const [detail, setDetail] = useState<Record<string, any>>({});
-  const [initialCategoryId, setInitialCategoryId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Change tracking (for unsaved banner / changelog)
+  const [originalSnapshot, setOriginalSnapshot] = useState<Record<string, string>>({});
+  const [changes, setChanges] = useState<Record<string, { label: string; from: string; to: string }>>({});
+
+  // Toast
+  const [toastMsg, setToastMsg] = useState('');
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastColor, setToastColor] = useState('#1e1b4b');
+  const toastTimer = useRef<any>(null);
 
   const assetAge = useMemo(() => calculateAge(form.purchaseDate), [form.purchaseDate]);
 
+  const typeLower = form.type?.toLowerCase() || '';
+  const catName = categories.find(c => c.id === selectedCategory)?.name || '';
+
   const isComputer = useMemo(() => {
-    if (!selectedCategory || categories.length === 0) {
-      const t = form.type?.toLowerCase().trim() || '';
-      if (t === 'pc') return true;
-      return ['notebook', 'pc desktop', 'macbook', 'mini pc', 'all-in-one', 'thin client', 'computer'].some(k => t.includes(k));
-    }
-    const cat = categories.find((c) => c.id === selectedCategory);
-    if (!cat) return false;
-    return cat.name === 'คอมพิวเตอร์';
-  }, [selectedCategory, categories, form.type]);
+    if (catName) return catName === 'คอมพิวเตอร์';
+    const t = typeLower.trim();
+    if (t === 'pc') return true;
+    return ['notebook', 'pc desktop', 'macbook', 'mini pc', 'all-in-one', 'thin client', 'computer'].some(k => t.includes(k));
+  }, [catName, typeLower]);
 
-  const isMonitor = useMemo(() => {
-    if (!selectedCategory || categories.length === 0) {
-      const t = form.type?.toLowerCase().trim() || '';
-      return t.includes('monitor');
-    }
-    const cat = categories.find((c) => c.id === selectedCategory);
-    if (!cat) return false;
-    return cat.name === 'จอภาพ';
-  }, [selectedCategory, categories, form.type]);
+  const isMonitor = useMemo(() => catName === 'จอภาพ' || typeLower.includes('monitor'), [catName, typeLower]);
+  const isPhone = useMemo(() => catName === 'อุปกรณ์สื่อสาร' || ['smartphone', 'tablet', 'mobile hotspot', 'ipad'].some(k => typeLower.includes(k)), [catName, typeLower]);
+  const isDevice = useMemo(() => catName === 'อุปกรณ์นำเสนอ/AV' || ['projector', 'conference speaker', 'webcam', 'docking station', 'presentation clicker'].some(k => typeLower.includes(k)), [catName, typeLower]);
+  const isNetwork = useMemo(() => catName === 'อุปกรณ์เครือข่าย' || ['switch', 'router', 'access point', 'firewall', 'modem'].some(k => typeLower.includes(k)), [catName, typeLower]);
+  const isRack = useMemo(() => catName === 'Rack & Infrastructure' || ['server rack', 'pdu', 'ups', 'enclosure'].some(k => typeLower.includes(k)), [catName, typeLower]);
+  const isPrinter = useMemo(() => catName === 'เครื่องพิมพ์' || typeLower.includes('printer'), [catName, typeLower]);
+  const isCable = useMemo(() => catName === 'สายสัญญาณ' || ['hdmi cable', 'lan cable', 'power cable'].some(k => typeLower.includes(k)), [catName, typeLower]);
+  const isConsumable = useMemo(() => catName === 'วัสดุสิ้นเปลือง' || ['cartridge', 'toner', 'adapter/charger'].some(k => typeLower.includes(k)), [catName, typeLower]);
 
-  const isPhone = useMemo(() => {
-    if (!selectedCategory || categories.length === 0) {
-      const t = form.type?.toLowerCase().trim() || '';
-      return ['smartphone', 'tablet', 'mobile hotspot', 'ipad'].some(k => t.includes(k));
-    }
-    const cat = categories.find((c) => c.id === selectedCategory);
-    return cat?.name === 'อุปกรณ์สื่อสาร';
-  }, [selectedCategory, categories, form.type]);
-
-  const isDevice = useMemo(() => {
-    if (!selectedCategory || categories.length === 0) {
-      const t = form.type?.toLowerCase().trim() || '';
-      return ['projector', 'conference speaker', 'webcam', 'docking station', 'presentation clicker'].some(k => t.includes(k));
-    }
-    const cat = categories.find((c) => c.id === selectedCategory);
-    return cat?.name === 'อุปกรณ์นำเสนอ/AV';
-  }, [selectedCategory, categories, form.type]);
-
-  const isNetwork = useMemo(() => {
-    if (!selectedCategory || categories.length === 0) {
-      const t = form.type?.toLowerCase().trim() || '';
-      return ['switch', 'router', 'access point', 'firewall', 'modem'].some(k => t.includes(k));
-    }
-    const cat = categories.find((c) => c.id === selectedCategory);
-    return cat?.name === 'อุปกรณ์เครือข่าย';
-  }, [selectedCategory, categories, form.type]);
-
-  const isRack = useMemo(() => {
-    if (!selectedCategory || categories.length === 0) {
-      const t = form.type?.toLowerCase().trim() || '';
-      return ['server rack', 'pdu', 'ups', 'enclosure'].some(k => t.includes(k));
-    }
-    const cat = categories.find((c) => c.id === selectedCategory);
-    return cat?.name === 'Rack & Infrastructure';
-  }, [selectedCategory, categories, form.type]);
-
-  const isPrinter = useMemo(() => {
-    if (!selectedCategory || categories.length === 0) {
-      const t = form.type?.toLowerCase().trim() || '';
-      return t.includes('printer');
-    }
-    const cat = categories.find((c) => c.id === selectedCategory);
-    return cat?.name === 'เครื่องพิมพ์';
-  }, [selectedCategory, categories, form.type]);
-
-  const isCable = useMemo(() => {
-    if (!selectedCategory || categories.length === 0) {
-      const t = form.type?.toLowerCase().trim() || '';
-      return ['hdmi cable', 'displayport cable', 'usb-c cable', 'lan cable', 'power cable', 'audio cable'].some(k => t.includes(k));
-    }
-    const cat = categories.find((c) => c.id === selectedCategory);
-    return cat?.name === 'สายสัญญาณ';
-  }, [selectedCategory, categories, form.type]);
-
-  const isConsumable = useMemo(() => {
-    if (!selectedCategory || categories.length === 0) {
-      const t = form.type?.toLowerCase().trim() || '';
-      return ['cartridge', 'toner', 'ถ่าน', 'adapter/charger'].some(k => t.includes(k));
-    }
-    const cat = categories.find((c) => c.id === selectedCategory);
-    return cat?.name === 'วัสดุสิ้นเปลือง';
-  }, [selectedCategory, categories, form.type]);
-
+  /* ─── Load asset ─── */
   useEffect(() => {
     if (!id) return;
     assetAPI.get(parseInt(id)).then((res) => {
       const a = res.data;
-      setForm({
-        assetCode: a.assetCode || '',
-        assetName: a.assetName || '',
-        serialNo: a.serialNo || '',
-        type: a.type || '',
-        brand: a.brand || '',
-        model: a.model || '',
-        cpu: a.cpu || '',
-        cpuGeneration: a.cpuGeneration || '',
-        ram: a.ram || '',
-        ramSlot1: a.ramSlot1 || '',
-        ramSlot2: a.ramSlot2 || '',
-        gpu: a.gpu || '',
-        storage1: a.storage1 || '',
-        storage2: a.storage2 || '',
-        osType: a.osType || 'Windows',
-        osVersion: a.osVersion || '',
-        officeLicense: a.officeLicense || '',
-        antivirusStatus: a.antivirusStatus || '',
-        domainName: a.domainName || '',
-        vendor: a.vendor || '',
-        poNumber: a.poNumber || '',
+      const loaded: any = {
+        assetCode: a.assetCode || '', assetName: a.assetName || '',
+        serialNo: a.serialNo || '', type: a.type || '',
+        brand: a.brand || '', model: a.model || '',
+        cpu: a.cpu || '', cpuGeneration: a.cpuGeneration || '',
+        ram: a.ram || '', ramSlot1: a.ramSlot1 || '', ramSlot2: a.ramSlot2 || '',
+        gpu: a.gpu || '', storage1: a.storage1 || '', storage2: a.storage2 || '',
+        osType: a.osType || 'Windows', osVersion: a.osVersion || '',
+        officeLicense: a.officeLicense || '', antivirusStatus: a.antivirusStatus || '',
+        domainName: a.domainName || '', snComputer: a.snComputer || '',
+        windowsLicense: a.windowsLicense || '',
+        vendor: a.vendor || '', poNumber: a.poNumber || '',
         poDate: a.poDate ? a.poDate.split('T')[0] : '',
         prNumber: a.prNumber || '',
         purchaseDate: a.purchaseDate ? a.purchaseDate.split('T')[0] : '',
-        purchasePrice: a.purchasePrice !== undefined && a.purchasePrice !== null ? String(a.purchasePrice) : '',
+        purchasePrice: a.purchasePrice != null ? String(a.purchasePrice) : '',
         warrantyEndDate: a.warrantyEndDate ? a.warrantyEndDate.split('T')[0] : '',
-        ownerName: a.ownerName || '',
-        departmentId: a.departmentId || '',
-        location: a.location || '',
-        floor: a.floor || '',
-        company: a.company || '',
-        oldAssetCode: a.oldAssetCode || '',
-        budget: a.budget || '',
-        status: a.status || 'Available',
-        remark: a.remark || '',
-      });
-      if (a.image) {
-        setImagePreview(a.image);
-      }
-      if (a.detail) {
-        setDetail(a.detail);
-      }
-      if (a.categoryId) {
-        setInitialCategoryId(a.categoryId);
-      }
+        ownerName: a.ownerName || '', departmentId: a.departmentId || '',
+        location: a.location || '', floor: a.floor || '',
+        company: a.company || '', oldAssetCode: a.oldAssetCode || '',
+        budget: a.budget || '', status: a.status || 'Available', remark: a.remark || '',
+      };
+      setForm(loaded);
+      setOriginalSnapshot({ ...loaded });
+      if (a.image) setImagePreview(a.image);
+      if (a.detail) setDetail(a.detail);
+      if (a.categoryId) setInitialCategoryId(a.categoryId);
     }).finally(() => setFetching(false));
   }, [id]);
 
+  /* ─── Load options ─── */
   useEffect(() => {
-    assetAPI.typeOptions().then((res) => setTypeOptions(res.data || [])).catch(() => setTypeOptions([]));
-    assetAPI.list({ limit: 1 }).then(() => {}).catch(() => {});
+    assetAPI.typeOptions().then((res) => setTypeOptions(res.data || [])).catch(() => {});
     import('../../services/api').then(({ categoryAPI }) => {
-      categoryAPI.list().then((res) => {
-        setCategories(res.data || []);
-      }).catch(() => setCategories([]));
+      categoryAPI.list().then((res) => setCategories(res.data || [])).catch(() => {});
     });
-    assetAPI.locationOptions().then((res) => setLocationOptions(res.data || [])).catch(() => setLocationOptions([]));
-  }, []);
-
-
-
-  // Auto-select category from ?typeGroup=... URL param (for new assets)
-  useEffect(() => {
-    if (!id && typeGroupFromUrl && categories.length > 0) {
-      const targetName = typeGroupCategoryMap[typeGroupFromUrl];
-      if (targetName) {
-        const cat = categories.find(c => c.name === targetName);
-        if (cat) {
-          setSelectedCategory(cat.id);
-          setAvailableTypes(cat.types || []);
-        }
-      }
-    }
-  }, [categories, typeGroupFromUrl, id]);
-
-  useEffect(() => {
-    if (initialCategoryId && categories.length > 0) {
-      const cat = categories.find(c => c.id === initialCategoryId);
-      if (cat) {
-        setSelectedCategory(cat.id);
-        setAvailableTypes(cat.types || []);
-      }
-    }
-  }, [categories, initialCategoryId]);
-
-  useEffect(() => {
-    assetAPI.vendorOptions().then((res) => setVendorOptions(res.data || [])).catch(() => setVendorOptions([]));
+    assetAPI.locationOptions().then((res) => setLocationOptions(res.data || [])).catch(() => {});
+    assetAPI.vendorOptions().then((res) => setVendorOptions(res.data || [])).catch(() => {});
     assetAPI.osTypeOptions().then((res) => setOsTypeOptions(res.data || [])).catch(() => {});
     assetAPI.departmentOptions().then((res) => setDepartmentOptions(res.data || [])).catch(() => {});
     assetAPI.domainOptions().then((res) => setDomainOptions(res.data || [])).catch(() => {});
@@ -330,1213 +238,743 @@ export default function AssetFormPage() {
     assetAPI.antivirusOptions().then((res) => setAntivirusOptions(res.data || [])).catch(() => {});
     assetAPI.statusOptions()
       .then((res) => {
-        const options = (res.data || []).map((item: any) => ({ value: item.code, label: item.name }));
-        setStatusOptions(options.length ? options : fallbackStatusOptions);
+        const opts = (res.data || []).map((item: any) => ({
+          value: item.code, label: item.name,
+          cls: item.code === 'Available' ? 's-available' : item.code === 'Maintenance' ? 's-maintenance' : item.code === 'Retired' ? 's-retired' : 's-reserved',
+        }));
+        setStatusOptions(opts.length ? opts : fallbackStatusOptions);
       })
       .catch(() => setStatusOptions(fallbackStatusOptions));
   }, []);
 
   useEffect(() => {
-    const query = form.ownerName.trim();
-    if (query.length < 2) {
-      setOwnerOptions([]);
-      return;
+    if (!id && typeGroupFromUrl && categories.length > 0) {
+      const targetName = typeGroupCategoryMap[typeGroupFromUrl];
+      if (targetName) {
+        const cat = categories.find(c => c.name === targetName);
+        if (cat) { setSelectedCategory(cat.id); setAvailableTypes(cat.types || []); }
+      }
     }
-    const timer = window.setTimeout(() => {
-      setOwnerLoading(true);
-      assetAPI.searchOwners(query)
-        .then((res) => setOwnerOptions(res.data || []))
-        .catch(() => setOwnerOptions([]))
-        .finally(() => setOwnerLoading(false));
-    }, 350);
-    return () => clearTimeout(timer);
-  }, [form.ownerName]);
+  }, [categories, typeGroupFromUrl, id]);
 
-  // Reset detail when asset type changes (only in create mode or when not initial load)
   useEffect(() => {
-    if (!form.type) { setDetail({}); return; }
-    const templates: Record<string, Record<string, any>> = {
-      Smartphone: { osType: 'iOS' },
-      Tablet: { osType: 'Android' },
-      'Monitor มาตรฐาน': { resolution: '1920x1080' },
-      'Monitor Ultrawide': { resolution: '2560x1440' },
-      'Monitor Curved': { resolution: '1920x1080' },
-      'Monitor 4K': { resolution: '3840x2160' },
-      Projector: { subType: 'Projector' },
-      Switch: { isManaged: true, portCount: 24 },
-      Router: { isManaged: true },
-      'Server Rack': { subType: 'Rack' },
-      Enclosure: { subType: 'Enclosure' },
-      PDU: { subType: 'PDU' },
-      'Laser Printer': { printerType: 'Laser' },
-      'Inkjet Printer': { printerType: 'Inkjet' },
-      Notebook: {},
-      'PC Desktop': {},
-      Macbook: {},
-      'Mini PC': {},
-      'All-in-One': {},
-      'Thin Client': {},
-      'Mobile Hotspot': {},
-      'Conference Speaker': {},
-      Webcam: {},
-      'Docking Station': {},
-      'Presentation Clicker': {},
-      'Thermal Printer': { printerType: 'Thermal' },
-      'Dot Matrix Printer': { printerType: 'Dot Matrix' },
-      'Access Point': {},
-      Firewall: {},
-      Modem: {},
-      UPS: {},
-    };
-    const match = Object.keys(templates).find(k => k.toLowerCase() === form.type.toLowerCase());
-    if (match) {
-      setDetail((prev) => ({ ...templates[match], ...prev }));
+    if (initialCategoryId && categories.length > 0) {
+      const cat = categories.find(c => c.id === initialCategoryId);
+      if (cat) { setSelectedCategory(cat.id); setAvailableTypes(cat.types || []); }
     }
-  }, [form.type]);
+  }, [categories, initialCategoryId]);
 
-  const handleDetailChange = (field: string) => (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | any
-  ) => {
-    const value = e?.target?.type === 'checkbox' ? e.target.checked : (e?.target?.value ?? e ?? '');
-    setDetail((prev) => ({ ...prev, [field]: value }));
-  };
+  /* ─── Field change tracking ─── */
+  function trackChange(field: string, label: string, newVal: string) {
+    const orig = originalSnapshot[field] ?? '';
+    setChanges(prev => {
+      const next = { ...prev };
+      if (newVal !== orig) {
+        next[field] = { label, from: orig, to: newVal };
+      } else {
+        delete next[field];
+      }
+      return next;
+    });
+  }
 
-  const handleChange = (field: keyof typeof initialData) => (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    setForm((prev) => ({ ...prev, [field]: e.target.value }));
-  };
+  function setFormField(field: string, label: string, value: string) {
+    setForm((prev: any) => ({ ...prev, [field]: value }));
+    if (id) trackChange(field, label, value);
+  }
 
+  function setDetailField(field: string, value: any) {
+    setDetail(prev => ({ ...prev, [field]: value }));
+  }
+
+  /* ─── Toast ─── */
+  function showToast(msg: string, color = '#1e1b4b') {
+    setToastMsg(msg);
+    setToastColor(color);
+    setToastVisible(true);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToastVisible(false), 3000);
+  }
+
+  /* ─── Submit ─── */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.assetCode.trim() || !form.serialNo.trim() || !form.ownerName.trim()) {
-      setError('กรุณากรอกข้อมูลที่จำเป็น (*) ให้ครบถ้วน');
+    if (!form.assetCode.trim()) {
+      setError('กรุณากรอกรหัสทรัพย์สิน (Asset Code)');
+      showToast('⚠️ กรุณากรอกรหัสทรัพย์สิน', '#b45309');
       return;
     }
-    setLoading(true);
-    setError('');
+    setLoading(true); setError('');
     const payload = { ...form, detail, categoryId: selectedCategory || undefined };
     try {
-      if (id) {
-        await assetAPI.update(parseInt(id), payload);
-      } else {
-        await assetAPI.create(payload);
-      }
-      navigate('/assets');
+      if (id) { await assetAPI.update(parseInt(id), payload); }
+      else { await assetAPI.create(payload); }
+      showToast('✅ บันทึกข้อมูลสำเร็จ!', '#059669');
+      setTimeout(() => navigate(id ? `/assets/${id}` : '/assets'), 800);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'ไม่สามารถบันทึกข้อมูลได้');
-    } finally {
-      setLoading(false);
-    }
+      const msg = err.response?.data?.error || 'ไม่สามารถบันทึกข้อมูลได้';
+      setError(msg);
+      showToast('❌ ' + msg, '#dc2626');
+    } finally { setLoading(false); }
   };
 
+  /* ─── Image handlers ─── */
   const handleImageUpload = async (file: File) => {
-    if (!id) {
-      setImageError('กรุณาบันทึกทรัพย์สินก่อนอัพโหลดรูปภาพ');
-      return;
-    }
-    if (!file.type.startsWith('image/')) {
-      setImageError('กรุณาเลือกไฟล์รูปภาพเท่านั้น');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setImageError('ขนาดไฟล์ต้องไม่เกิน 5MB');
-      return;
-    }
-
-    setImageUploading(true);
-    setImageError('');
-
+    if (!id) { setImageError('กรุณาบันทึกทรัพย์สินก่อนอัพโหลดรูปภาพ'); return; }
+    if (!file.type.startsWith('image/')) { setImageError('กรุณาเลือกไฟล์รูปภาพเท่านั้น'); return; }
+    if (file.size > 5 * 1024 * 1024) { setImageError('ขนาดไฟล์ต้องไม่เกิน 5MB'); return; }
+    setImageUploading(true); setImageError('');
     try {
       const formData = new FormData();
       formData.append('image', file);
-
-      console.log('Uploading image for asset ID:', id);
       const res = await assetAPI.uploadImage(parseInt(id), formData);
-      console.log('Upload response:', res.data);
       setImagePreview(res.data.image);
     } catch (err: any) {
-      console.error('Upload error:', err);
-      console.error('Error response:', err.response);
-      setImageError(err.response?.data?.error || err.message || 'ไม่สามารถอัพโหลดรูปภาพได้');
-    } finally {
-      setImageUploading(false);
-    }
+      setImageError(err.response?.data?.error || 'ไม่สามารถอัพโหลดรูปภาพได้');
+    } finally { setImageUploading(false); }
   };
 
   const handleImageDelete = async () => {
     if (!id) return;
-    try {
-      await assetAPI.deleteImage(parseInt(id));
-      setImagePreview(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    } catch (err: any) {
-      setImageError(err.response?.data?.error || 'ไม่สามารถลบรูปภาพได้');
-    }
+    try { await assetAPI.deleteImage(parseInt(id)); setImagePreview(null); if (fileInputRef.current) fileInputRef.current.value = ''; }
+    catch (err: any) { setImageError(err.response?.data?.error || 'ไม่สามารถลบรูปภาพได้'); }
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      handleImageUpload(file);
-    }
-  };
+  const changeCount = Object.keys(changes).length;
+  const hasChanges = changeCount > 0;
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    const file = e.dataTransfer.files?.[0];
-    if (file) {
-      handleImageUpload(file);
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  const typeLower = form.type?.toLowerCase() || '';
-
-  function renderDetailFields() {
-    if (!form.type && !selectedCategory) return null;
-
-    // อุปกรณ์สื่อสาร (Phone / Tablet / IPAD)
-    if (isPhone) {
-      return (
-        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-          <CardContent sx={{ p: 3 }}>
-            <SectionTitle>ข้อมูลอุปกรณ์สื่อสาร</SectionTitle>
-            <Grid container spacing={2.5}>
-              <Grid item xs={12} sm={4}>
-                <TextField size="small" label="IMEI 1" fullWidth value={detail.imei1 || ''} onChange={handleDetailChange('imei1')} sx={fieldSx} placeholder="ตัวเลข 15 หลัก" />
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <TextField size="small" label="IMEI 2" fullWidth value={detail.imei2 || ''} onChange={handleDetailChange('imei2')} sx={fieldSx} placeholder="ตัวเลข 15 หลัก (ถ้ามี)" />
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <TextField size="small" label="เบอร์โทรศัพท์" fullWidth value={detail.phoneNumber || ''} onChange={handleDetailChange('phoneNumber')} sx={fieldSx} />
-              </Grid>
-              <Grid item xs={12} sm={3}>
-                <TextField size="small" label="OS" select fullWidth value={detail.osType || ''} onChange={handleDetailChange('osType')} sx={fieldSx}>
-                  <MenuItem value="">ไม่ระบุ</MenuItem>
-                  <MenuItem value="iOS">iOS</MenuItem>
-                  <MenuItem value="iPadOS">iPadOS</MenuItem>
-                  <MenuItem value="Android">Android</MenuItem>
-                  <MenuItem value="Others">อื่นๆ</MenuItem>
-                </TextField>
-              </Grid>
-              <Grid item xs={12} sm={3}>
-                <TextField size="small" label="OS Version" fullWidth value={detail.osVersion || ''} onChange={handleDetailChange('osVersion')} sx={fieldSx} placeholder="เช่น iOS 17.4, Android 14" />
-              </Grid>
-              <Grid item xs={12} sm={3}>
-                <TextField size="small" label="ความจุ (Storage)" fullWidth value={detail.storageCapacity || ''} onChange={handleDetailChange('storageCapacity')} sx={fieldSx} placeholder="เช่น 128GB, 256GB" />
-              </Grid>
-              <Grid item xs={12} sm={3}>
-                <TextField size="small" label="RAM" fullWidth value={detail.ram || ''} onChange={handleDetailChange('ram')} sx={fieldSx} placeholder="เช่น 6GB, 8GB" />
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <TextField size="small" label="สี (Color)" fullWidth value={detail.color || ''} onChange={handleDetailChange('color')} sx={fieldSx} placeholder="เช่น Space Gray, Silver, Blue" />
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <TextField size="small" label="ผู้ให้บริการ (SIM/Carrier)" fullWidth value={detail.simProvider || ''} onChange={handleDetailChange('simProvider')} sx={fieldSx} placeholder="เช่น AIS, TrueMove, DTAC" />
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <TextField size="small" label="MDM Enrolled" select fullWidth value={detail.mdmEnrolled === null || detail.mdmEnrolled === undefined ? '' : String(detail.mdmEnrolled)} onChange={(e) => setDetail((prev) => ({ ...prev, mdmEnrolled: e.target.value === '' ? null : e.target.value === 'true' }))} sx={fieldSx}>
-                  <MenuItem value="">ไม่ระบุ</MenuItem>
-                  <MenuItem value="true">ลงทะเบียนแล้ว</MenuItem>
-                  <MenuItem value="false">ยังไม่ได้ลงทะเบียน</MenuItem>
-                </TextField>
-              </Grid>
-            </Grid>
-          </CardContent>
-        </Card>
-      );
-    }
-
-    // จอภาพ (Monitor)
-    if (isMonitor) {
-      return (
-        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-          <CardContent sx={{ p: 3 }}>
-            <SectionTitle>ข้อมูลจอภาพ</SectionTitle>
-            <Grid container spacing={2.5}>
-              <Grid item xs={12} sm={3}>
-                <TextField size="small" label="ขนาดจอ (นิ้ว)" fullWidth value={detail.screenSize || ''} onChange={handleDetailChange('screenSize')} sx={fieldSx} placeholder="เช่น 24, 27, 34" />
-              </Grid>
-              <Grid item xs={12} sm={3}>
-                <TextField size="small" label="ความละเอียด" select fullWidth value={detail.resolution || ''} onChange={handleDetailChange('resolution')} sx={fieldSx}>
-                  <MenuItem value="">ไม่ระบุ</MenuItem>
-                  <MenuItem value="1920x1080">1920x1080 (Full HD)</MenuItem>
-                  <MenuItem value="2560x1080">2560x1080 (UW FHD)</MenuItem>
-                  <MenuItem value="2560x1440">2560x1440 (QHD)</MenuItem>
-                  <MenuItem value="3440x1440">3440x1440 (UW QHD)</MenuItem>
-                  <MenuItem value="3840x2160">3840x2160 (4K)</MenuItem>
-                  <MenuItem value="Others">อื่นๆ</MenuItem>
-                </TextField>
-              </Grid>
-              <Grid item xs={12} sm={3}>
-                <TextField size="small" label="ประเภทแผง (Panel Type)" select fullWidth value={detail.panelType || ''} onChange={handleDetailChange('panelType')} sx={fieldSx}>
-                  <MenuItem value="">ไม่ระบุ</MenuItem>
-                  <MenuItem value="IPS">IPS</MenuItem>
-                  <MenuItem value="VA">VA</MenuItem>
-                  <MenuItem value="TN">TN</MenuItem>
-                  <MenuItem value="OLED">OLED</MenuItem>
-                  <MenuItem value="QLED">QLED</MenuItem>
-                  <MenuItem value="Others">อื่นๆ</MenuItem>
-                </TextField>
-              </Grid>
-              <Grid item xs={12} sm={3}>
-                <TextField size="small" label="อัตรารีเฟรช (Hz)" fullWidth value={detail.refreshRate || ''} onChange={handleDetailChange('refreshRate')} sx={fieldSx} placeholder="เช่น 60Hz, 144Hz, 240Hz" />
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <TextField size="small" label="พอร์ตเชื่อมต่อ" fullWidth value={detail.ports || ''} onChange={handleDetailChange('ports')} sx={fieldSx} placeholder="เช่น HDMI x2, DisplayPort, USB-C" />
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <TextField size="small" label="มีลำโพงในตัว" select fullWidth value={detail.hasSpeaker === null || detail.hasSpeaker === undefined ? '' : String(detail.hasSpeaker)} onChange={(e) => setDetail((prev) => ({ ...prev, hasSpeaker: e.target.value === '' ? null : e.target.value === 'true' }))} sx={fieldSx}>
-                  <MenuItem value="">ไม่ระบุ</MenuItem>
-                  <MenuItem value="true">มี</MenuItem>
-                  <MenuItem value="false">ไม่มี</MenuItem>
-                </TextField>
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <TextField size="small" label="จอโค้ง (Curved)" select fullWidth value={detail.curved === null || detail.curved === undefined ? '' : String(detail.curved)} onChange={(e) => setDetail((prev) => ({ ...prev, curved: e.target.value === '' ? null : e.target.value === 'true' }))} sx={fieldSx}>
-                  <MenuItem value="">ไม่ระบุ</MenuItem>
-                  <MenuItem value="true">จอโค้ง</MenuItem>
-                  <MenuItem value="false">จอแบน</MenuItem>
-                </TextField>
-              </Grid>
-            </Grid>
-          </CardContent>
-        </Card>
-      );
-    }
-
-    // อุปกรณ์นำเสนอ/AV
-    if (isDevice) {
-      if (typeLower.includes('projector')) {
-        return (
-          <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-            <CardContent sx={{ p: 3 }}>
-              <SectionTitle>ข้อมูล Projector</SectionTitle>
-              <Grid container spacing={2.5}>
-                <Grid item xs={12} sm={4}>
-                  <TextField size="small" label="ความสว่าง (Lumens)" type="number" fullWidth value={detail.lumens ?? ''} onChange={handleDetailChange('lumens')} sx={fieldSx} placeholder="เช่น 3000, 4000" />
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <TextField size="small" label="ความละเอียด" select fullWidth value={detail.resolution || ''} onChange={handleDetailChange('resolution')} sx={fieldSx}>
-                    <MenuItem value="">ไม่ระบุ</MenuItem>
-                    <MenuItem value="SVGA 800x600">SVGA 800x600</MenuItem>
-                    <MenuItem value="XGA 1024x768">XGA 1024x768</MenuItem>
-                    <MenuItem value="WXGA 1280x800">WXGA 1280x800</MenuItem>
-                    <MenuItem value="Full HD 1920x1080">Full HD 1920x1080</MenuItem>
-                    <MenuItem value="4K 3840x2160">4K 3840x2160</MenuItem>
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <TextField size="small" label="Throw Ratio" fullWidth value={detail.throwRatio || ''} onChange={handleDetailChange('throwRatio')} sx={fieldSx} placeholder="เช่น 1.5:1" />
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <TextField size="small" label="ชั่วโมงหลอดที่ใช้แล้ว (Lamp Hours)" type="number" fullWidth value={detail.lampHours ?? ''} onChange={handleDetailChange('lampHours')} sx={fieldSx} />
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <TextField size="small" label="ช่องสัญญาณเข้า (Input)" fullWidth value={detail.connectionType || ''} onChange={handleDetailChange('connectionType')} sx={fieldSx} placeholder="เช่น HDMI, VGA, USB-C" />
-                </Grid>
-              </Grid>
-            </CardContent>
-          </Card>
-        );
-      }
-      if (typeLower.includes('webcam')) {
-        return (
-          <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-            <CardContent sx={{ p: 3 }}>
-              <SectionTitle>ข้อมูล Webcam</SectionTitle>
-              <Grid container spacing={2.5}>
-                <Grid item xs={12} sm={4}>
-                  <TextField size="small" label="ความละเอียด" select fullWidth value={detail.resolution || ''} onChange={handleDetailChange('resolution')} sx={fieldSx}>
-                    <MenuItem value="">ไม่ระบุ</MenuItem>
-                    <MenuItem value="720p HD">720p (HD)</MenuItem>
-                    <MenuItem value="1080p Full HD">1080p (Full HD)</MenuItem>
-                    <MenuItem value="1440p QHD">1440p (QHD)</MenuItem>
-                    <MenuItem value="4K UHD">4K (UHD)</MenuItem>
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <TextField size="small" label="FPS" select fullWidth value={detail.fps || ''} onChange={handleDetailChange('fps')} sx={fieldSx}>
-                    <MenuItem value="">ไม่ระบุ</MenuItem>
-                    <MenuItem value="30fps">30fps</MenuItem>
-                    <MenuItem value="60fps">60fps</MenuItem>
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <TextField size="small" label="การเชื่อมต่อ" select fullWidth value={detail.connectionType || ''} onChange={handleDetailChange('connectionType')} sx={fieldSx}>
-                    <MenuItem value="">ไม่ระบุ</MenuItem>
-                    <MenuItem value="USB-A">USB-A</MenuItem>
-                    <MenuItem value="USB-C">USB-C</MenuItem>
-                    <MenuItem value="Wireless">Wireless</MenuItem>
-                  </TextField>
-                </Grid>
-              </Grid>
-            </CardContent>
-          </Card>
-        );
-      }
-      if (typeLower.includes('docking')) {
-        return (
-          <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-            <CardContent sx={{ p: 3 }}>
-              <SectionTitle>ข้อมูล Docking Station</SectionTitle>
-              <Grid container spacing={2.5}>
-                <Grid item xs={12} sm={4}>
-                  <TextField size="small" label="มาตรฐานเชื่อมต่อ" select fullWidth value={detail.usbStandard || ''} onChange={handleDetailChange('usbStandard')} sx={fieldSx}>
-                    <MenuItem value="">ไม่ระบุ</MenuItem>
-                    <MenuItem value="USB-C 3.1">USB-C 3.1</MenuItem>
-                    <MenuItem value="USB-C 3.2">USB-C 3.2</MenuItem>
-                    <MenuItem value="Thunderbolt 3">Thunderbolt 3</MenuItem>
-                    <MenuItem value="Thunderbolt 4">Thunderbolt 4</MenuItem>
-                    <MenuItem value="USB-A 3.0">USB-A 3.0</MenuItem>
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <TextField size="small" label="จำนวนพอร์ต" type="number" fullWidth value={detail.portCount ?? ''} onChange={handleDetailChange('portCount')} sx={fieldSx} />
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <TextField size="small" label="Power Delivery (W)" type="number" fullWidth value={detail.powerDelivery ?? ''} onChange={handleDetailChange('powerDelivery')} sx={fieldSx} placeholder="เช่น 65, 90, 100" />
-                </Grid>
-              </Grid>
-            </CardContent>
-          </Card>
-        );
-      }
-      if (typeLower.includes('conference speaker') || typeLower.includes('speaker')) {
-        return (
-          <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-            <CardContent sx={{ p: 3 }}>
-              <SectionTitle>ข้อมูล Conference Speaker</SectionTitle>
-              <Grid container spacing={2.5}>
-                <Grid item xs={12} sm={6}>
-                  <TextField size="small" label="การเชื่อมต่อ" select fullWidth value={detail.connectionType || ''} onChange={handleDetailChange('connectionType')} sx={fieldSx}>
-                    <MenuItem value="">ไม่ระบุ</MenuItem>
-                    <MenuItem value="USB">USB</MenuItem>
-                    <MenuItem value="Bluetooth">Bluetooth</MenuItem>
-                    <MenuItem value="3.5mm Audio">3.5mm Audio</MenuItem>
-                    <MenuItem value="USB + Bluetooth">USB + Bluetooth</MenuItem>
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField size="small" label="กำลังไฟ (W)" fullWidth value={detail.powerRating || ''} onChange={handleDetailChange('powerRating')} sx={fieldSx} />
-                </Grid>
-              </Grid>
-            </CardContent>
-          </Card>
-        );
-      }
-      if (typeLower.includes('clicker') || typeLower.includes('presentation clicker')) {
-        return (
-          <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-            <CardContent sx={{ p: 3 }}>
-              <SectionTitle>ข้อมูล Presentation Clicker</SectionTitle>
-              <Grid container spacing={2.5}>
-                <Grid item xs={12} sm={4}>
-                  <TextField size="small" label="ช่วงระยะ (Range)" fullWidth value={detail.range || ''} onChange={handleDetailChange('range')} sx={fieldSx} placeholder="เช่น 30m, 50m" />
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <TextField size="small" label="ประเภท Receiver" select fullWidth value={detail.receiverType || ''} onChange={handleDetailChange('receiverType')} sx={fieldSx}>
-                    <MenuItem value="">ไม่ระบุ</MenuItem>
-                    <MenuItem value="USB-A dongle">USB-A dongle</MenuItem>
-                    <MenuItem value="USB-C dongle">USB-C dongle</MenuItem>
-                    <MenuItem value="Bluetooth">Bluetooth</MenuItem>
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <TextField size="small" label="แบตเตอรี่" fullWidth value={detail.batteryType || ''} onChange={handleDetailChange('batteryType')} sx={fieldSx} placeholder="เช่น AAA x1, Built-in" />
-                </Grid>
-              </Grid>
-            </CardContent>
-          </Card>
-        );
-      }
-      // Generic AV
-      return (
-        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-          <CardContent sx={{ p: 3 }}>
-            <SectionTitle>ข้อมูลอุปกรณ์ AV</SectionTitle>
-            <Grid container spacing={2.5}>
-              <Grid item xs={12} sm={6}>
-                <TextField size="small" label="ประเภทการเชื่อมต่อ" fullWidth value={detail.connectionType || ''} onChange={handleDetailChange('connectionType')} sx={fieldSx} />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField size="small" label="กำลังไฟ (W)" fullWidth value={detail.powerRating || ''} onChange={handleDetailChange('powerRating')} sx={fieldSx} />
-              </Grid>
-            </Grid>
-          </CardContent>
-        </Card>
-      );
-    }
-
-    // อุปกรณ์เครือข่าย (Network)
-    if (isNetwork) {
-      const isAccessPoint = typeLower.includes('access point');
-      const isSwitch = typeLower.includes('switch');
-      return (
-        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-          <CardContent sx={{ p: 3 }}>
-            <SectionTitle>ข้อมูลอุปกรณ์เครือข่าย</SectionTitle>
-            <Grid container spacing={2.5}>
-              {isAccessPoint ? (
-                <>
-                  <Grid item xs={12} sm={4}>
-                    <TextField size="small" label="WiFi Standard" select fullWidth value={detail.wifiStandard || ''} onChange={handleDetailChange('wifiStandard')} sx={fieldSx}>
-                      <MenuItem value="">ไม่ระบุ</MenuItem>
-                      <MenuItem value="WiFi 4 (802.11n)">WiFi 4 (802.11n)</MenuItem>
-                      <MenuItem value="WiFi 5 (802.11ac)">WiFi 5 (802.11ac)</MenuItem>
-                      <MenuItem value="WiFi 6 (802.11ax)">WiFi 6 (802.11ax)</MenuItem>
-                      <MenuItem value="WiFi 6E">WiFi 6E</MenuItem>
-                      <MenuItem value="WiFi 7 (802.11be)">WiFi 7 (802.11be)</MenuItem>
-                    </TextField>
-                  </Grid>
-                  <Grid item xs={12} sm={4}>
-                    <TextField size="small" label="ย่านความถี่ (Band)" select fullWidth value={detail.band || ''} onChange={handleDetailChange('band')} sx={fieldSx}>
-                      <MenuItem value="">ไม่ระบุ</MenuItem>
-                      <MenuItem value="2.4GHz only">2.4GHz เท่านั้น</MenuItem>
-                      <MenuItem value="5GHz only">5GHz เท่านั้น</MenuItem>
-                      <MenuItem value="Dual Band (2.4+5GHz)">Dual Band (2.4+5GHz)</MenuItem>
-                      <MenuItem value="Tri Band">Tri Band</MenuItem>
-                    </TextField>
-                  </Grid>
-                  <Grid item xs={12} sm={4}>
-                    <TextField size="small" label="จำนวนพอร์ต LAN" type="number" fullWidth value={detail.portCount ?? ''} onChange={handleDetailChange('portCount')} sx={fieldSx} />
-                  </Grid>
-                </>
-              ) : (
-                <>
-                  <Grid item xs={12} sm={3}>
-                    <TextField size="small" label="จำนวน Port" type="number" fullWidth value={detail.portCount ?? ''} onChange={handleDetailChange('portCount')} sx={fieldSx} />
-                  </Grid>
-                  <Grid item xs={12} sm={3}>
-                    <TextField size="small" label="ความเร็ว Port" select fullWidth value={detail.portSpeed || ''} onChange={handleDetailChange('portSpeed')} sx={fieldSx}>
-                      <MenuItem value="">ไม่ระบุ</MenuItem>
-                      <MenuItem value="100Mbps">100Mbps</MenuItem>
-                      <MenuItem value="1Gbps">1Gbps</MenuItem>
-                      <MenuItem value="10Gbps">10Gbps</MenuItem>
-                      <MenuItem value="25Gbps">25Gbps</MenuItem>
-                      <MenuItem value="40Gbps">40Gbps</MenuItem>
-                    </TextField>
-                  </Grid>
-                  {isSwitch && (
-                    <>
-                      <Grid item xs={12} sm={3}>
-                        <TextField size="small" label="PoE" select fullWidth value={detail.hasPoE === null || detail.hasPoE === undefined ? '' : String(detail.hasPoE)} onChange={(e) => setDetail((prev) => ({ ...prev, hasPoE: e.target.value === '' ? null : e.target.value === 'true' }))} sx={fieldSx}>
-                          <MenuItem value="">ไม่ระบุ</MenuItem>
-                          <MenuItem value="true">มี PoE</MenuItem>
-                          <MenuItem value="false">ไม่มี PoE</MenuItem>
-                        </TextField>
-                      </Grid>
-                      <Grid item xs={12} sm={3}>
-                        <TextField size="small" label="VLAN Support" select fullWidth value={detail.vlanSupport === null || detail.vlanSupport === undefined ? '' : String(detail.vlanSupport)} onChange={(e) => setDetail((prev) => ({ ...prev, vlanSupport: e.target.value === '' ? null : e.target.value === 'true' }))} sx={fieldSx}>
-                          <MenuItem value="">ไม่ระบุ</MenuItem>
-                          <MenuItem value="true">รองรับ VLAN</MenuItem>
-                          <MenuItem value="false">ไม่รองรับ</MenuItem>
-                        </TextField>
-                      </Grid>
-                    </>
-                  )}
-                </>
-              )}
-              <Grid item xs={12} sm={3}>
-                <TextField size="small" label="IP Address" fullWidth value={detail.ipAddress || ''} onChange={handleDetailChange('ipAddress')} sx={fieldSx} />
-              </Grid>
-              <Grid item xs={12} sm={3}>
-                <TextField size="small" label="MAC Address" fullWidth value={detail.macAddress || ''} onChange={handleDetailChange('macAddress')} sx={fieldSx} />
-              </Grid>
-              <Grid item xs={12} sm={3}>
-                <TextField size="small" label="Firmware Version" fullWidth value={detail.firmwareVersion || ''} onChange={handleDetailChange('firmwareVersion')} sx={fieldSx} />
-              </Grid>
-              <Grid item xs={12} sm={3}>
-                <TextField size="small" label="จัดการได้ (Managed)" select fullWidth value={detail.isManaged === null || detail.isManaged === undefined ? '' : String(detail.isManaged)} onChange={(e) => setDetail((prev) => ({ ...prev, isManaged: e.target.value === '' ? null : e.target.value === 'true' }))} sx={fieldSx}>
-                  <MenuItem value="">ไม่ระบุ</MenuItem>
-                  <MenuItem value="true">Managed</MenuItem>
-                  <MenuItem value="false">Unmanaged</MenuItem>
-                </TextField>
-              </Grid>
-            </Grid>
-          </CardContent>
-        </Card>
-      );
-    }
-
-    // Rack & Infrastructure
-    if (isRack) {
-      const isUPS = typeLower.includes('ups');
-      return (
-        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-          <CardContent sx={{ p: 3 }}>
-            <SectionTitle>ข้อมูล {isUPS ? 'UPS' : 'Rack / Infrastructure'}</SectionTitle>
-            <Grid container spacing={2.5}>
-              <Grid item xs={12} sm={3}>
-                <TextField size="small" label="ประเภท" select fullWidth value={detail.subType || ''} onChange={handleDetailChange('subType')} sx={fieldSx}>
-                  <MenuItem value="">ไม่ระบุ</MenuItem>
-                  <MenuItem value="Rack">Rack</MenuItem>
-                  <MenuItem value="Enclosure">Enclosure</MenuItem>
-                  <MenuItem value="PDU">PDU</MenuItem>
-                  <MenuItem value="UPS">UPS</MenuItem>
-                </TextField>
-              </Grid>
-              {isUPS ? (
-                <>
-                  <Grid item xs={12} sm={3}>
-                    <TextField size="small" label="ความจุ (VA)" type="number" fullWidth value={detail.vaCapacity ?? ''} onChange={handleDetailChange('vaCapacity')} sx={fieldSx} placeholder="เช่น 1000, 2000" />
-                  </Grid>
-                  <Grid item xs={12} sm={3}>
-                    <TextField size="small" label="Watt ที่รองรับ" type="number" fullWidth value={detail.wattCapacity ?? ''} onChange={handleDetailChange('wattCapacity')} sx={fieldSx} />
-                  </Grid>
-                  <Grid item xs={12} sm={3}>
-                    <TextField size="small" label="Runtime (นาที)" type="number" fullWidth value={detail.batteryRuntime ?? ''} onChange={handleDetailChange('batteryRuntime')} sx={fieldSx} />
-                  </Grid>
-                  <Grid item xs={12} sm={4}>
-                    <TextField size="small" label="ประเภทแบตเตอรี่" fullWidth value={detail.batteryType || ''} onChange={handleDetailChange('batteryType')} sx={fieldSx} placeholder="เช่น Lead Acid, Lithium" />
-                  </Grid>
-                  <Grid item xs={12} sm={4}>
-                    <TextField size="small" label="จำนวน Outlet" type="number" fullWidth value={detail.outletCount ?? ''} onChange={handleDetailChange('outletCount')} sx={fieldSx} />
-                  </Grid>
-                  <Grid item xs={12} sm={4}>
-                    <TextField size="small" label="ตำแหน่งติดตั้ง" fullWidth value={detail.rackLocation || ''} onChange={handleDetailChange('rackLocation')} sx={fieldSx} />
-                  </Grid>
-                </>
-              ) : (
-                <>
-                  <Grid item xs={12} sm={3}>
-                    <TextField size="small" label="ขนาด (Rack Units)" fullWidth value={detail.rackUnits || ''} onChange={handleDetailChange('rackUnits')} sx={fieldSx} placeholder="เช่น 42U" />
-                  </Grid>
-                  <Grid item xs={12} sm={3}>
-                    <TextField size="small" label="กำลังไฟ (Power Capacity)" fullWidth value={detail.powerCapacity || ''} onChange={handleDetailChange('powerCapacity')} sx={fieldSx} />
-                  </Grid>
-                  <Grid item xs={12} sm={3}>
-                    <TextField size="small" label="ตำแหน่งในห้อง Server" fullWidth value={detail.rackLocation || ''} onChange={handleDetailChange('rackLocation')} sx={fieldSx} />
-                  </Grid>
-                </>
-              )}
-            </Grid>
-          </CardContent>
-        </Card>
-      );
-    }
-
-    // เครื่องพิมพ์ (Printer)
-    if (isPrinter) {
-      return (
-        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-          <CardContent sx={{ p: 3 }}>
-            <SectionTitle>ข้อมูลเครื่องพิมพ์</SectionTitle>
-            <Grid container spacing={2.5}>
-              <Grid item xs={12} sm={4}>
-                <TextField size="small" label="ประเภทเครื่องพิมพ์" select fullWidth value={detail.printerType || ''} onChange={handleDetailChange('printerType')} sx={fieldSx}>
-                  <MenuItem value="">ไม่ระบุ</MenuItem>
-                  <MenuItem value="Laser">Laser</MenuItem>
-                  <MenuItem value="Inkjet">Inkjet</MenuItem>
-                  <MenuItem value="Thermal">Thermal</MenuItem>
-                  <MenuItem value="Dot Matrix">Dot Matrix</MenuItem>
-                  <MenuItem value="Others">อื่นๆ</MenuItem>
-                </TextField>
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <TextField size="small" label="พิมพ์สี" select fullWidth value={detail.isColor === null || detail.isColor === undefined ? '' : String(detail.isColor)} onChange={(e) => setDetail((prev) => ({ ...prev, isColor: e.target.value === '' ? null : e.target.value === 'true' }))} sx={fieldSx}>
-                  <MenuItem value="">ไม่ระบุ</MenuItem>
-                  <MenuItem value="true">สี (Color)</MenuItem>
-                  <MenuItem value="false">ขาวดำ (Mono)</MenuItem>
-                </TextField>
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <TextField size="small" label="ขนาดกระดาษ" fullWidth value={detail.paperSizes || ''} onChange={handleDetailChange('paperSizes')} sx={fieldSx} placeholder="เช่น A4, A3, Letter" />
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <TextField size="small" label="พิมพ์สองหน้า (Duplex)" select fullWidth value={detail.duplexSupport === null || detail.duplexSupport === undefined ? '' : String(detail.duplexSupport)} onChange={(e) => setDetail((prev) => ({ ...prev, duplexSupport: e.target.value === '' ? null : e.target.value === 'true' }))} sx={fieldSx}>
-                  <MenuItem value="">ไม่ระบุ</MenuItem>
-                  <MenuItem value="true">รองรับ Duplex</MenuItem>
-                  <MenuItem value="false">ไม่รองรับ</MenuItem>
-                </TextField>
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <TextField size="small" label="เชื่อมต่อเครือข่าย" select fullWidth value={detail.isNetworkEnabled === null || detail.isNetworkEnabled === undefined ? '' : String(detail.isNetworkEnabled)} onChange={(e) => setDetail((prev) => ({ ...prev, isNetworkEnabled: e.target.value === '' ? null : e.target.value === 'true' }))} sx={fieldSx}>
-                  <MenuItem value="">ไม่ระบุ</MenuItem>
-                  <MenuItem value="true">มี Network</MenuItem>
-                  <MenuItem value="false">ไม่มี Network</MenuItem>
-                </TextField>
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <TextField size="small" label="รุ่นหมึก/Cartridge" fullWidth value={detail.cartridgeModel || ''} onChange={handleDetailChange('cartridgeModel')} sx={fieldSx} placeholder="เช่น TN-2380, CE285A" />
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <TextField size="small" label="IP Address" fullWidth value={detail.ipAddress || ''} onChange={handleDetailChange('ipAddress')} sx={fieldSx} />
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <TextField size="small" label="MAC Address" fullWidth value={detail.macAddress || ''} onChange={handleDetailChange('macAddress')} sx={fieldSx} />
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <TextField size="small" label="จำนวนหน้าพิมพ์แล้ว" type="number" fullWidth value={detail.pageCount ?? ''} onChange={handleDetailChange('pageCount')} sx={fieldSx} />
-              </Grid>
-            </Grid>
-          </CardContent>
-        </Card>
-      );
-    }
-
-    // สายสัญญาณ (Cable)
-    if (isCable) {
-      return (
-        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-          <CardContent sx={{ p: 3 }}>
-            <SectionTitle>ข้อมูลสายสัญญาณ</SectionTitle>
-            <Grid container spacing={2.5}>
-              <Grid item xs={12} sm={3}>
-                <TextField size="small" label="ประเภทสาย" select fullWidth value={detail.cableType || ''} onChange={handleDetailChange('cableType')} sx={fieldSx}>
-                  <MenuItem value="">ไม่ระบุ</MenuItem>
-                  <MenuItem value="HDMI">HDMI</MenuItem>
-                  <MenuItem value="DisplayPort">DisplayPort</MenuItem>
-                  <MenuItem value="USB-C">USB-C</MenuItem>
-                  <MenuItem value="LAN CAT5e">LAN CAT5e</MenuItem>
-                  <MenuItem value="LAN CAT6">LAN CAT6</MenuItem>
-                  <MenuItem value="LAN CAT6a">LAN CAT6a</MenuItem>
-                  <MenuItem value="Power Cable">Power Cable</MenuItem>
-                  <MenuItem value="Audio 3.5mm">Audio 3.5mm</MenuItem>
-                  <MenuItem value="Others">อื่นๆ</MenuItem>
-                </TextField>
-              </Grid>
-              <Grid item xs={12} sm={3}>
-                <TextField size="small" label="ความยาว" fullWidth value={detail.length || ''} onChange={handleDetailChange('length')} sx={fieldSx} placeholder="เช่น 1.5m, 3m, 5m" />
-              </Grid>
-              <Grid item xs={12} sm={3}>
-                <TextField size="small" label="จำนวนคงเหลือ (ชิ้น)" type="number" fullWidth value={detail.stockQuantity ?? ''} onChange={handleDetailChange('stockQuantity')} sx={fieldSx} />
-              </Grid>
-              <Grid item xs={12} sm={3}>
-                <TextField size="small" label="จำนวนขั้นต่ำ (Min Stock)" type="number" fullWidth value={detail.minimumStock ?? ''} onChange={handleDetailChange('minimumStock')} sx={fieldSx} />
-              </Grid>
-            </Grid>
-          </CardContent>
-        </Card>
-      );
-    }
-
-    // วัสดุสิ้นเปลือง (Consumable)
-    if (isConsumable) {
-      return (
-        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-          <CardContent sx={{ p: 3 }}>
-            <SectionTitle>ข้อมูลวัสดุสิ้นเปลือง</SectionTitle>
-            <Grid container spacing={2.5}>
-              <Grid item xs={12} sm={4}>
-                <TextField size="small" label="ประเภทวัสดุ" select fullWidth value={detail.consumableType || ''} onChange={handleDetailChange('consumableType')} sx={fieldSx}>
-                  <MenuItem value="">ไม่ระบุ</MenuItem>
-                  <MenuItem value="Toner Cartridge">Toner Cartridge</MenuItem>
-                  <MenuItem value="Ink Cartridge">Ink Cartridge</MenuItem>
-                  <MenuItem value="Drum Unit">Drum Unit</MenuItem>
-                  <MenuItem value="Ribbon">Ribbon</MenuItem>
-                  <MenuItem value="Battery AA">Battery AA</MenuItem>
-                  <MenuItem value="Battery AAA">Battery AAA</MenuItem>
-                  <MenuItem value="Adapter/Charger">Adapter/Charger</MenuItem>
-                  <MenuItem value="Others">อื่นๆ</MenuItem>
-                </TextField>
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <TextField size="small" label="ใช้งานกับ (Compatible With)" fullWidth value={detail.compatibleWith || ''} onChange={handleDetailChange('compatibleWith')} sx={fieldSx} placeholder="เช่น Brother HL-L2320D" />
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <TextField size="small" label="วันหมดอายุ" type="date" fullWidth InputLabelProps={{ shrink: true }} value={detail.expiryDate ? String(detail.expiryDate).split('T')[0] : ''} onChange={handleDetailChange('expiryDate')} sx={fieldSx} />
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <TextField size="small" label="จำนวนคงเหลือ" type="number" fullWidth value={detail.stockQuantity ?? ''} onChange={handleDetailChange('stockQuantity')} sx={fieldSx} />
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <TextField size="small" label="จำนวนขั้นต่ำ (Min Stock)" type="number" fullWidth value={detail.minimumStock ?? ''} onChange={handleDetailChange('minimumStock')} sx={fieldSx} />
-              </Grid>
-            </Grid>
-          </CardContent>
-        </Card>
-      );
-    }
-
-    return null;
-  }
-
+  /* ─── Loading state ─── */
   if (fetching) return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
       <CircularProgress size={32} />
-    </Box>
+    </div>
   );
 
+  const icon = getTypeIcon(form.type);
+
   return (
-    <Box sx={{ maxWidth: 1200, mx: 'auto', px: { xs: 2, md: 4 }, py: 3 }}>
-      {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Button
-            size="small"
-            startIcon={<ArrowBackIcon sx={{ fontSize: 18 }} />}
-            onClick={() => navigate('/assets')}
-            sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary' } }}
-          >
-            กลับ
-          </Button>
-          <Typography variant="h5" fontWeight={500} sx={{ letterSpacing: -0.3 }}>
-            {id ? 'แก้ไขข้อมูลทรัพย์สิน' : 'เพิ่มทรัพย์สินใหม่'}
-          </Typography>
-        </Box>
-        <Button
-          variant="contained"
-          size="small"
-          type="submit"
-          form="asset-form"
-          disabled={loading}
-          startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <SaveIcon sx={{ fontSize: 18 }} />}
-          sx={{
-            borderRadius: 1,
-            fontWeight: 500,
-            textTransform: 'none',
-            px: 2.5,
-            boxShadow: 'none',
-            '&:hover': { boxShadow: 'none' },
-          }}
-        >
-          {loading ? 'กำลังบันทึก...' : 'บันทึก'}
-        </Button>
-      </Box>
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
+        .ef-root{font-family:'Sarabun',sans-serif;position:relative}
+        .ef-orb{position:fixed;border-radius:50%;filter:blur(80px);pointer-events:none;z-index:0}
+        .ef-o1{width:420px;height:420px;background:rgba(99,102,241,.08);top:-140px;left:-100px}
+        .ef-o2{width:300px;height:300px;background:rgba(139,92,246,.07);bottom:-80px;right:-60px}
+        .ef-grid-bg{position:fixed;inset:0;background-image:radial-gradient(circle,rgba(99,102,241,.08) 1px,transparent 1px);background-size:28px 28px;pointer-events:none;z-index:0}
+        .ef-page{position:relative;z-index:1;max-width:860px;margin:0 auto;padding:16px 20px 120px}
 
-      {error && <Alert severity="error" sx={{ mb: 3, borderRadius: 1 }}>{error}</Alert>}
+        .glass{background:rgba(255,255,255,.68);border:1px solid rgba(255,255,255,.88);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);border-radius:14px;box-shadow:0 4px 24px rgba(99,102,241,.07),0 1px 3px rgba(0,0,0,.04)}
 
-      <Box id="asset-form" component="form" onSubmit={handleSubmit}>
-        <Stack spacing={4}>
-          {/* ผู้ถือครองและสถานที่ */}
-          <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-            <CardContent sx={{ p: 3 }}>
-              <SectionTitle>ผู้ถือครองและสถานที่</SectionTitle>
-              <Grid container spacing={2.5}>
-                <Grid item xs={12} md={6}>
-                  <Autocomplete
-                    freeSolo
-                    options={ownerOptions}
-                    loading={ownerLoading}
-                    inputValue={form.ownerName}
-                    getOptionLabel={(option) => typeof option === 'string' ? option : option.displayName || option.adUsername || ''}
-                    onInputChange={(_, value) => setForm((prev) => ({ ...prev, ownerName: value }))}
-                    onChange={(_, value) => {
-                      if (value && typeof value !== 'string') {
-                        setForm((prev) => ({
-                          ...prev,
-                          ownerName: value.displayName || value.adUsername || prev.ownerName,
-                          departmentId: value.department || prev.departmentId,
-                        }));
-                      }
-                    }}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        size="small"
-                        label="ผู้ถือครอง *"
-                        required
-                        helperText="ค้นหาจาก AD/LDAP หรือกรอกเองได้"
-                        sx={fieldSx}
-                        InputProps={{
-                          ...params.InputProps,
-                          endAdornment: (
-                            <>
-                              {ownerLoading ? <CircularProgress color="inherit" size={16} /> : null}
-                              {params.InputProps.endAdornment}
-                            </>
-                          ),
-                        }}
-                      />
-                    )}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6} md={2}>
-                  <TextField size="small" label="แผนก" select fullWidth value={form.departmentId} onChange={handleChange('departmentId')} sx={fieldSx}>
-                    <MenuItem value="">ไม่ระบุ</MenuItem>
-                    {departmentOptions.map((opt) => <MenuItem key={opt} value={opt}>{opt}</MenuItem>)}
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} sm={6} md={2}>
-                  <TextField size="small" label="Location" select fullWidth value={form.location} onChange={handleChange('location')} sx={fieldSx}>
-                    <MenuItem value="">ไม่ระบุ</MenuItem>
-                    {locationOptions.map((option) => <MenuItem key={option} value={option}>{option}</MenuItem>)}
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} sm={6} md={2}>
-                  <TextField size="small" label="Floor" fullWidth value={form.floor} onChange={handleChange('floor')} sx={fieldSx} />
-                </Grid>
-              </Grid>
-            </CardContent>
-          </Card>
+        /* breadcrumb */
+        .bc{display:flex;align-items:center;gap:6px;font-size:12px;color:#9ca3af;margin-bottom:14px}
+        .bc a{color:#6366f1;font-weight:600;cursor:pointer;text-decoration:none}
+        .bc a:hover{text-decoration:underline}
+        .bc-sep{color:#d1d5db}
 
-          {/* ข้อมูลทรัพย์สิน */}
-          <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-            <CardContent sx={{ p: 3 }}>
-              <SectionTitle>ข้อมูลทรัพย์สิน</SectionTitle>
-              <Grid container spacing={2.5}>
-                <Grid item xs={12} sm={6} md={3}>
-                  <TextField size="small" label="รหัสทรัพย์สิน *" fullWidth required value={form.assetCode} onChange={handleChange('assetCode')} sx={fieldSx} />
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <TextField size="small" label="ชื่อทรัพย์สิน" fullWidth value={form.assetName} onChange={handleChange('assetName')} sx={fieldSx} />
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <TextField size="small" label="Serial Number *" fullWidth required value={form.serialNo} onChange={handleChange('serialNo')} sx={fieldSx} />
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <TextField size="small" label="หมวดหมู่" select fullWidth value={selectedCategory || ''} onChange={(e) => {
-                    const catId = e.target.value ? parseInt(e.target.value) : null;
-                    setSelectedCategory(catId);
-                    setForm((prev) => ({ ...prev, type: '' }));
-                    if (catId) {
-                      const cat = categories.find(c => c.id === catId);
-                      setAvailableTypes(cat?.types || []);
-                    } else {
-                      setAvailableTypes([]);
-                    }
-                  }} sx={fieldSx}>
-                    <MenuItem value="">ไม่ระบุ</MenuItem>
-                    {categories.map((cat) => <MenuItem key={cat.id} value={cat.id}>{cat.icon} {cat.name}</MenuItem>)}
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <TextField size="small" label="ประเภทอุปกรณ์" select fullWidth value={form.type} onChange={handleChange('type')} sx={fieldSx} disabled={!selectedCategory && availableTypes.length === 0}>
-                    <MenuItem value="">ไม่ระบุ</MenuItem>
-                    {(selectedCategory ? availableTypes : typeOptions.map(t => ({ name: t }))).map((option: any) => <MenuItem key={option.name || option} value={option.name || option}>{option.name || option}</MenuItem>)}
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <TextField size="small" label="สถานะ" select fullWidth value={form.status} onChange={handleChange('status')} sx={fieldSx}>
-                    {statusOptions.map((option) => <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>)}
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <TextField size="small" label="ยี่ห้อ (Brand)" fullWidth value={form.brand} onChange={handleChange('brand')} sx={fieldSx} />
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <TextField size="small" label="รุ่น (Model)" fullWidth value={form.model} onChange={handleChange('model')} sx={fieldSx} />
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Autocomplete
-                    freeSolo
-                    options={companyOptions}
-                    inputValue={form.company}
-                    onInputChange={(_, v) => setForm((prev) => ({ ...prev, company: v }))}
-                    onChange={(_, v) => setForm((prev) => ({ ...prev, company: v || '' }))}
-                    renderInput={(params) => (
-                      <TextField {...params} size="small" label="Company" fullWidth sx={fieldSx} />
-                    )}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <TextField size="small" label="Computer Name เดิม" fullWidth value={form.oldAssetCode} onChange={handleChange('oldAssetCode')} sx={fieldSx} />
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <TextField size="small" label="Domain Name" select fullWidth value={form.domainName} onChange={handleChange('domainName')} sx={fieldSx}>
-                    <MenuItem value="">ไม่ระบุ</MenuItem>
-                    {domainOptions.map((opt) => <MenuItem key={opt} value={opt}>{opt}</MenuItem>)}
-                  </TextField>
-                </Grid>
-              </Grid>
-            </CardContent>
-          </Card>
+        /* page header */
+        .page-hdr{padding:18px 22px;margin-bottom:16px;display:flex;align-items:center;gap:14px}
+        .asset-icon{width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,#4f46e5,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;box-shadow:0 4px 14px rgba(99,102,241,.3)}
+        .page-title{font-size:17px;font-weight:700;color:#1e1b4b}
+        .page-sub{font-size:11.5px;color:#9ca3af;margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+        .asset-code-badge{font-family:monospace;font-size:11px;font-weight:700;color:#4338ca;background:rgba(99,102,241,.09);padding:2px 9px;border-radius:6px}
 
-          {/* OS/Software และ Hardware */}
-          {isComputer && !isMonitor && (
-            <Grid container spacing={3}>
-              <Grid item xs={12} lg={5}>
-                <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider', height: '100%' }}>
-                  <CardContent sx={{ p: 3 }}>
-                    <SectionTitle>OS และ Software</SectionTitle>
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} sm={6}>
-                        <Autocomplete
-                          freeSolo
-                          options={osTypeOptions}
-                          inputValue={form.osType}
-                          onInputChange={(_, v) => setForm((prev) => ({ ...prev, osType: v }))}
-                          onChange={(_, v) => setForm((prev) => ({ ...prev, osType: v || '' }))}
-                          renderInput={(params) => (
-                            <TextField {...params} size="small" label="OS" fullWidth sx={fieldSx} />
-                          )}
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <TextField size="small" label="Windows" fullWidth value={form.osVersion} onChange={handleChange('osVersion')} sx={fieldSx} />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <TextField size="small" label="MS Office" fullWidth value={form.officeLicense} onChange={handleChange('officeLicense')} sx={fieldSx} />
-                      </Grid>
-                      <Grid item xs={12}>
-                        <Autocomplete
-                          freeSolo
-                          options={antivirusOptions}
-                          inputValue={form.antivirusStatus}
-                          onInputChange={(_, v) => setForm((prev) => ({ ...prev, antivirusStatus: v }))}
-                          onChange={(_, v) => setForm((prev) => ({ ...prev, antivirusStatus: v || '' }))}
-                          renderInput={(params) => (
-                            <TextField {...params} size="small" label="Antivirus" fullWidth sx={fieldSx} />
-                          )}
-                        />
-                      </Grid>
-                    </Grid>
-                  </CardContent>
-                </Card>
-              </Grid>
+        /* unsaved banner */
+        .unsaved-bar{display:flex;align-items:center;gap:8px;padding:10px 16px;background:rgba(245,158,11,.09);border:1px solid rgba(245,158,11,.28);border-radius:10px;margin-bottom:14px;font-size:12px;color:#b45309}
 
-              <Grid item xs={12} lg={7}>
-                <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider', height: '100%' }}>
-                  <CardContent sx={{ p: 3 }}>
-                    <SectionTitle>Hardware</SectionTitle>
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} md={4}>
-                        <TextField size="small" label="CPU" fullWidth value={form.cpu} onChange={handleChange('cpu')} sx={fieldSx} />
-                      </Grid>
-                      <Grid item xs={12} md={4}>
-                        <TextField size="small" label="Generation" fullWidth value={form.cpuGeneration} onChange={handleChange('cpuGeneration')} sx={fieldSx} />
-                      </Grid>
-                      <Grid item xs={12} md={4}>
-                        <TextField size="small" label="GPU" fullWidth value={form.gpu} onChange={handleChange('gpu')} sx={fieldSx} />
-                      </Grid>
-                      <Grid item xs={12} sm={6} md={4}>
-                        <TextField size="small" label="RAM" fullWidth value={form.ram} onChange={handleChange('ram')} sx={fieldSx} />
-                      </Grid>
-                      <Grid item xs={12} sm={6} md={4}>
-                        <TextField size="small" label="RAM Slot1" fullWidth value={form.ramSlot1} onChange={handleChange('ramSlot1')} sx={fieldSx} />
-                      </Grid>
-                      <Grid item xs={12} sm={6} md={4}>
-                        <TextField size="small" label="RAM Slot2" fullWidth value={form.ramSlot2} onChange={handleChange('ramSlot2')} sx={fieldSx} />
-                      </Grid>
-                      <Grid item xs={12} sm={6} md={4}>
-                        <TextField size="small" label="Storage 1" fullWidth value={form.storage1} onChange={handleChange('storage1')} sx={fieldSx} />
-                      </Grid>
-                      <Grid item xs={12} sm={6} md={4}>
-                        <TextField size="small" label="Storage 2" fullWidth value={form.storage2} onChange={handleChange('storage2')} sx={fieldSx} />
-                      </Grid>
-                    </Grid>
-                  </CardContent>
-                </Card>
-              </Grid>
-            </Grid>
+        /* changelog */
+        .changelog{background:rgba(254,252,232,.5);border:1px solid rgba(245,158,11,.2);border-radius:10px;padding:12px 14px;margin-bottom:14px}
+        .changelog-hd{font-size:11px;font-weight:700;color:#b45309;margin-bottom:8px}
+        .cl-item{display:flex;align-items:baseline;gap:8px;font-size:11.5px;padding:3px 0;border-bottom:1px solid rgba(245,158,11,.1)}
+        .cl-item:last-child{border:none}
+        .cl-field{color:#6b7280;min-width:120px;flex-shrink:0;font-weight:500}
+        .cl-from{color:#dc2626;text-decoration:line-through;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .cl-to{color:#059669;font-weight:600;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .cl-arr{color:#9ca3af}
+
+        /* error banner */
+        .err-bar{padding:10px 16px;background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.2);border-radius:10px;margin-bottom:14px;font-size:12px;color:#dc2626;display:flex;align-items:center;gap:8px}
+
+        /* section card */
+        .sec-card{padding:16px 20px;margin-bottom:14px}
+        .sec-hd{display:flex;align-items:center;gap:8px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid rgba(99,102,241,.07)}
+        .sec-bar{width:3px;height:15px;border-radius:2px;flex-shrink:0}
+        .sec-title{font-size:13px;font-weight:700;color:#1e1b4b}
+        .sec-sub{font-size:11px;color:#9ca3af;margin-left:auto}
+
+        /* form grid */
+        .row{display:grid;gap:12px;margin-bottom:12px}
+        .r2{grid-template-columns:1fr 1fr}
+        .r3{grid-template-columns:1fr 1fr 1fr}
+        .r4{grid-template-columns:1fr 1fr 1fr 1fr}
+        @media(max-width:600px){.r2,.r3,.r4{grid-template-columns:1fr 1fr}}
+        .fg{display:flex;flex-direction:column;gap:5px}
+        .lbl{font-size:11.5px;color:#6b7280;font-weight:500}
+        .lbl.req::after{content:'*';color:#ef4444;margin-left:2px}
+        input[type=text],input[type=number],input[type=date],select,textarea{
+          width:100%;padding:8px 11px;border:1px solid rgba(99,102,241,.18);border-radius:9px;
+          background:rgba(255,255,255,.7);font-family:'Sarabun',sans-serif;font-size:12.5px;color:#374151;
+          outline:none;transition:border-color .15s,box-shadow .15s;box-sizing:border-box
+        }
+        input:focus,select:focus,textarea:focus{border-color:rgba(99,102,241,.45);box-shadow:0 0 0 3px rgba(99,102,241,.09)}
+        input:disabled,select:disabled{background:rgba(248,247,255,.6);color:#9ca3af;cursor:not-allowed}
+        input[readonly]{background:rgba(248,247,255,.7);color:#6b7280}
+        textarea{resize:vertical;min-height:68px}
+        .hint{font-size:10.5px;color:#c4b5fd;margin-top:3px}
+
+        /* status pills */
+        .status-row{display:flex;gap:6px;flex-wrap:wrap}
+        .status-opt{padding:7px 14px;border-radius:20px;border:1.5px solid;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;font-family:'Sarabun',sans-serif;background:rgba(255,255,255,.5)}
+        .s-available{border-color:rgba(16,185,129,.3);color:#059669}
+        .s-available.sel{background:rgba(16,185,129,.12);border-color:rgba(16,185,129,.5)}
+        .s-reserved{border-color:rgba(99,102,241,.25);color:#4338ca}
+        .s-reserved.sel{background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.45)}
+        .s-maintenance{border-color:rgba(239,68,68,.25);color:#dc2626}
+        .s-maintenance.sel{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.45)}
+        .s-retired{border-color:rgba(107,114,128,.2);color:#6b7280}
+        .s-retired.sel{background:rgba(107,114,128,.08);border-color:rgba(107,114,128,.4)}
+
+        /* toggle */
+        .toggle-wrap{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:rgba(248,247,255,.65);border:1px solid rgba(99,102,241,.09);border-radius:9px;transition:background .15s}
+        .toggle-wrap:hover{background:rgba(99,102,241,.04)}
+        .toggle-info .tl{font-size:12.5px;color:#374151;font-weight:500}
+        .toggle-info .ts{font-size:10.5px;color:#9ca3af;margin-top:1px}
+        .sw{position:relative;width:38px;height:21px;flex-shrink:0;cursor:pointer}
+        .sw input{opacity:0;width:0;height:0;position:absolute}
+        .knob{position:absolute;inset:0;border-radius:21px;background:#e5e7eb;cursor:pointer;transition:background .2s}
+        .knob::before{content:'';position:absolute;width:17px;height:17px;border-radius:50%;background:#fff;top:2px;left:2px;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+        .sw input:checked+.knob{background:linear-gradient(135deg,#4f46e5,#7c3aed)}
+        .sw input:checked+.knob::before{transform:translateX(17px)}
+
+        /* sticky footer */
+        .sticky-footer{position:fixed;bottom:0;left:0;right:0;z-index:100;background:rgba(255,255,255,.9);backdrop-filter:blur(20px);border-top:1px solid rgba(99,102,241,.1);padding:12px 24px;display:flex;align-items:center;justify-content:space-between}
+        .footer-right{display:flex;align-items:center;gap:10px}
+        .footer-count{font-size:12px;color:#9ca3af}
+        .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;font-size:12.5px;font-family:'Sarabun',sans-serif;cursor:pointer;font-weight:600;border:1px solid;transition:all .15s}
+        .btn-primary{background:linear-gradient(135deg,#4f46e5,#7c3aed);border-color:rgba(124,58,237,.35);color:#fff;box-shadow:0 3px 12px rgba(99,102,241,.28)}
+        .btn-primary:disabled{opacity:.5;cursor:not-allowed}
+        .btn-ghost{background:rgba(255,255,255,.7);border-color:rgba(99,102,241,.2);color:#4338ca}
+        .btn-ghost:hover{background:rgba(99,102,241,.05)}
+        .btn-danger{background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.22);color:#dc2626}
+        .spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:ef-spin .6s linear infinite}
+        @keyframes ef-spin{to{transform:rotate(360deg)}}
+
+        /* toast */
+        .ef-toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);opacity:0;transition:all .3s;z-index:200;pointer-events:none}
+        .ef-toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+        .ef-toast-inner{color:#fff;padding:10px 20px;border-radius:12px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,.2)}
+
+        /* image upload */
+        .img-drop{width:100%;aspect-ratio:4/3;border-radius:12px;border:2px dashed rgba(99,102,241,.2);background:rgba(248,247,255,.5);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:border-color .15s;position:relative;overflow:hidden}
+        .img-drop:hover{border-color:rgba(99,102,241,.4);background:rgba(99,102,241,.03)}
+        .img-drop img{width:100%;height:100%;object-fit:contain}
+        .img-actions{position:absolute;top:8px;right:8px;display:flex;gap:4px}
+        .img-btn{width:28px;height:28px;border-radius:8px;border:1px solid rgba(99,102,241,.2);background:rgba(255,255,255,.9);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;transition:all .15s}
+        .img-btn:hover{background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+        .img-btn.del{border-color:rgba(239,68,68,.2);color:#dc2626}
+        .img-hint{text-align:center;padding:24px;color:#9ca3af;font-size:12px;line-height:1.8}
+      `}</style>
+
+      <div className="ef-root">
+        <div className="ef-orb ef-o1"></div>
+        <div className="ef-orb ef-o2"></div>
+        <div className="ef-grid-bg"></div>
+
+        <div className="ef-page">
+          {/* Breadcrumb */}
+          <div className="bc">
+            <a onClick={() => navigate('/assets')}>ทรัพย์สิน IT</a>
+            {id && form.assetCode && <><span className="bc-sep">›</span><a onClick={() => navigate(`/assets/${id}`)}>{form.assetCode}</a></>}
+            <span className="bc-sep">›</span>
+            <span style={{ color: '#9ca3af' }}>{id ? 'แก้ไขข้อมูล' : 'เพิ่มทรัพย์สินใหม่'}</span>
+          </div>
+
+          {/* Page header */}
+          <div className="glass page-hdr">
+            <div className="asset-icon">{icon}</div>
+            <div style={{ flex: 1 }}>
+              <div className="page-title">{id ? 'แก้ไขข้อมูลทรัพย์สิน' : 'เพิ่มทรัพย์สินใหม่'}</div>
+              <div className="page-sub">
+                {form.assetCode && <span className="asset-code-badge">{form.assetCode}</span>}
+                {(form.brand || form.model) && <span>{form.brand} {form.model}{form.type ? ` · ${form.type}` : ''}</span>}
+              </div>
+            </div>
+            {id && (
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <div style={{ fontSize: '10px', color: '#9ca3af' }}>กำลังแก้ไข</div>
+                <div style={{ fontSize: '12px', color: '#6b7280', fontWeight: 600 }}>{form.assetCode}</div>
+              </div>
+            )}
+          </div>
+
+          {/* Unsaved banner */}
+          {hasChanges && (
+            <div className="unsaved-bar">
+              ⚠️ มีการเปลี่ยนแปลง {changeCount} รายการที่ยังไม่ได้บันทึก
+            </div>
           )}
 
-          {/* Type-specific detail fields */}
-          {renderDetailFields()}
+          {/* Changelog */}
+          {hasChanges && (
+            <div className="changelog">
+              <div className="changelog-hd">✏️ รายการที่เปลี่ยนแปลง ({changeCount} รายการ)</div>
+              {Object.values(changes).map((c, i) => (
+                <div className="cl-item" key={i}>
+                  <span className="cl-field">{c.label}</span>
+                  <span className="cl-from">{c.from || '(ว่าง)'}</span>
+                  <span className="cl-arr">→</span>
+                  <span className="cl-to">{c.to}</span>
+                </div>
+              ))}
+            </div>
+          )}
 
-          {/* ข้อมูลจัดซื้อ */}
-          <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-            <CardContent sx={{ p: 3 }}>
-              <SectionTitle>ข้อมูลจัดซื้อ</SectionTitle>
-              <Grid container spacing={2.5}>
-                <Grid item xs={12} sm={6} md={2.4}>
-                  <TextField size="small" label="PR No." fullWidth value={form.prNumber} onChange={handleChange('prNumber')} sx={fieldSx} />
-                </Grid>
-                <Grid item xs={12} sm={6} md={2.4}>
-                  <TextField size="small" label="งบประมาณ" fullWidth value={form.budget} onChange={handleChange('budget')} sx={fieldSx} />
-                </Grid>
-                <Grid item xs={12} sm={6} md={2.4}>
-                  <TextField size="small" label="PO Date" type="date" fullWidth InputLabelProps={{ shrink: true }} value={form.poDate} onChange={handleChange('poDate')} sx={fieldSx} />
-                </Grid>
-                <Grid item xs={12} sm={6} md={2.4}>
-                  <TextField size="small" label="PO No." fullWidth value={form.poNumber} onChange={handleChange('poNumber')} sx={fieldSx} />
-                </Grid>
-                <Grid item xs={12} sm={6} md={2.4}>
-                  <TextField size="small" label="Vendor" select fullWidth value={form.vendor} onChange={handleChange('vendor')} sx={fieldSx}>
-                    <MenuItem value="">ไม่ระบุ</MenuItem>
-                    {vendorOptions.map((option) => <MenuItem key={option} value={option}>{option}</MenuItem>)}
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} sm={6} md={2.4}>
-                  <TextField size="small" label="วันที่ซื้อ" type="date" fullWidth InputLabelProps={{ shrink: true }} value={form.purchaseDate} onChange={handleChange('purchaseDate')} sx={fieldSx} />
-                </Grid>
-                <Grid item xs={12} sm={6} md={2.4}>
-                  <TextField size="small" label="อายุ (ปี)" fullWidth value={assetAge} InputProps={{ readOnly: true }} helperText="คำนวณอัตโนมัติ" sx={fieldSx} />
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField size="small" label="หมายเหตุ" fullWidth multiline minRows={2} value={form.remark} onChange={handleChange('remark')} sx={fieldSx} />
-                </Grid>
-              </Grid>
-            </CardContent>
-          </Card>
+          {/* Error */}
+          {error && <div className="err-bar">❌ {error}</div>}
 
-          {/* รูปภาพทะเบียนทรัพย์สิน */}
-          <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-            <CardContent sx={{ p: 3 }}>
-              <SectionTitle>รูปภาพทะเบียนทรัพย์สิน</SectionTitle>
-              
-              {imageError && (
-                <Alert severity="error" sx={{ mb: 2, borderRadius: 1 }}>{imageError}</Alert>
-              )}
+          <form id="asset-form" onSubmit={handleSubmit}>
 
-              <Grid container spacing={3}>
-                <Grid item xs={12} md={5}>
-                  {/* Image Preview */}
-                  <Box
-                    sx={{
-                      width: '100%',
-                      aspectRatio: '4/3',
-                      borderRadius: 2,
-                      border: '1px dashed',
-                      borderColor: imagePreview ? 'transparent' : 'divider',
-                      bgcolor: imagePreview ? 'transparent' : alpha(theme.palette.primary.main, 0.02),
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      overflow: 'hidden',
-                      position: 'relative',
-                    }}
-                  >
-                    {imagePreview ? (
-                      <>
-                        <img
-                          src={imagePreview}
-                          alt="Asset registration"
-                          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                        />
-                        <Box
-                          sx={{
-                            position: 'absolute',
-                            top: 8,
-                            right: 8,
-                            display: 'flex',
-                            gap: 0.5,
-                          }}
-                        >
-                          <IconButton
-                            size="small"
-                            onClick={() => fileInputRef.current?.click()}
-                            sx={{
-                              bgcolor: 'background.paper',
-                              boxShadow: 1,
-                              '&:hover': { bgcolor: 'background.paper' },
-                            }}
-                          >
-                            <CameraAltIcon fontSize="small" />
-                          </IconButton>
-                          <IconButton
-                            size="small"
-                            onClick={handleImageDelete}
-                            sx={{
-                              bgcolor: 'background.paper',
-                              boxShadow: 1,
-                              color: 'error.main',
-                              '&:hover': { bgcolor: 'background.paper' },
-                            }}
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
-                      </>
-                    ) : (
-                      <Box
-                        sx={{
-                          textAlign: 'center',
-                          p: 3,
-                          cursor: 'pointer',
-                        }}
-                        onClick={() => fileInputRef.current?.click()}
-                        onDrop={handleDrop}
-                        onDragOver={handleDragOver}
-                      >
-                        <ImageIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                          ลากรูปภาพมาวางที่นี่
-                        </Typography>
-                        <Typography variant="caption" color="text.disabled">
-                          หรือคลิกเพื่อเลือกไฟล์ (JPG, PNG, GIF สูงสุด 5MB)
-                        </Typography>
-                      </Box>
-                    )}
-                  </Box>
-                </Grid>
+            {/* ① ข้อมูลพื้นฐาน */}
+            <SecCard title="ข้อมูลพื้นฐาน" sub="ทุกประเภทอุปกรณ์">
+              <div className="row r3">
+                <FG label="Asset Code" required>
+                  <FInput value={form.assetCode} onChange={v => setFormField('assetCode', 'Asset Code', v)} disabled={!!id} placeholder="เช่น HQ-PS-N001" />
+                  {id && <div className="hint">ไม่สามารถเปลี่ยน Asset Code ได้</div>}
+                </FG>
+                <FG label="ยี่ห้อ (Brand)" required>
+                  <FInput value={form.brand} onChange={v => setFormField('brand', 'ยี่ห้อ', v)} placeholder="เช่น Dell, HP, Lenovo" />
+                </FG>
+                <FG label="รุ่น (Model)">
+                  <FInput value={form.model} onChange={v => setFormField('model', 'รุ่น', v)} placeholder="เช่น Latitude 5530" />
+                </FG>
+              </div>
+              <div className="row r3">
+                <FG label="Serial Number">
+                  <FInput value={form.serialNo} onChange={v => setFormField('serialNo', 'Serial No.', v)} placeholder="Serial No." />
+                </FG>
+                <FG label="หมวดหมู่">
+                  <FSelect value={selectedCategory ? String(selectedCategory) : ''} onChange={v => {
+                    const catId = v ? parseInt(v) : null;
+                    setSelectedCategory(catId);
+                    setForm((prev: any) => ({ ...prev, type: '' }));
+                    if (catId) { const cat = categories.find(c => c.id === catId); setAvailableTypes(cat?.types || []); }
+                    else setAvailableTypes([]);
+                  }}>
+                    <option value="">ไม่ระบุ</option>
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+                  </FSelect>
+                </FG>
+                <FG label="ประเภทอุปกรณ์">
+                  <FSelect value={form.type} onChange={v => setFormField('type', 'ประเภท', v)}>
+                    <option value="">ไม่ระบุ</option>
+                    {(selectedCategory ? availableTypes : typeOptions.map(t => ({ name: t }))).map((opt: any) => <option key={opt.name || opt} value={opt.name || opt}>{opt.name || opt}</option>)}
+                  </FSelect>
+                </FG>
+              </div>
+              <div className="row r3">
+                <FG label="ชื่อผู้ถือครอง">
+                  <FInput value={form.ownerName} onChange={v => setFormField('ownerName', 'ผู้ถือครอง', v)} placeholder="ชื่อ-นามสกุล" />
+                </FG>
+                <FG label="แผนก">
+                  <FSelect value={form.departmentId} onChange={v => setFormField('departmentId', 'แผนก', v)}>
+                    <option value="">ไม่ระบุ</option>
+                    {departmentOptions.map(d => <option key={d} value={d}>{d}</option>)}
+                  </FSelect>
+                </FG>
+                <FG label="Company">
+                  <FSelect value={form.company} onChange={v => setFormField('company', 'Company', v)}>
+                    <option value="">ไม่ระบุ</option>
+                    {companyOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                  </FSelect>
+                </FG>
+              </div>
+              <div className="row r3">
+                <FG label="Location">
+                  <FSelect value={form.location} onChange={v => setFormField('location', 'Location', v)}>
+                    <option value="">ไม่ระบุ</option>
+                    {locationOptions.map(l => <option key={l} value={l}>{l}</option>)}
+                  </FSelect>
+                </FG>
+                <FG label="ชั้น / ห้อง">
+                  <FInput value={form.floor} onChange={v => setFormField('floor', 'ชั้น', v)} placeholder="เช่น 23, B1" />
+                </FG>
+                <FG label="Asset Name">
+                  <FInput value={form.assetName} onChange={v => setFormField('assetName', 'Asset Name', v)} placeholder="ชื่อทรัพย์สิน (ถ้ามี)" />
+                </FG>
+              </div>
 
-                <Grid item xs={12} md={7}>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      accept="image/*"
-                      onChange={handleFileSelect}
-                      style={{ display: 'none' }}
-                    />
+              {/* Status pills */}
+              <div className="fg" style={{ marginBottom: 12 }}>
+                <label className="lbl">สถานะ <span style={{ fontSize: '10px', color: '#c4b5fd', background: 'rgba(99,102,241,.08)', padding: '1px 6px', borderRadius: '20px' }}>คลิกเพื่อเปลี่ยน</span></label>
+                <div className="status-row">
+                  {statusOptions.map(opt => (
+                    <button type="button" key={opt.value}
+                      className={`status-opt ${opt.cls}${form.status === opt.value ? ' sel' : ''}`}
+                      onClick={() => setFormField('status', 'สถานะ', opt.value)}>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-                    <Button
-                      variant="outlined"
-                      startIcon={imageUploading ? <CircularProgress size={16} /> : <CloudUploadIcon />}
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={imageUploading || !id}
-                      fullWidth
-                      sx={{
-                        borderRadius: 1,
-                        py: 1.5,
-                        textTransform: 'none',
-                        fontWeight: 500,
-                      }}
-                    >
-                      {imageUploading ? 'กำลังอัพโหลด...' : id ? 'อัพโหลดรูปภาพ' : 'บันทึกทรัพย์สินก่อนอัพโหลด'}
-                    </Button>
+              <div className="row r2">
+                <FG label="Domain Name">
+                  <FSelect value={form.domainName} onChange={v => setFormField('domainName', 'Domain Name', v)}>
+                    <option value="">ไม่ระบุ</option>
+                    {domainOptions.map(d => <option key={d} value={d}>{d}</option>)}
+                  </FSelect>
+                </FG>
+                <FG label="Old Asset Code / Computer Name เดิม">
+                  <FInput value={form.oldAssetCode} onChange={v => setFormField('oldAssetCode', 'Old Code', v)} placeholder="ชื่อเครื่องเดิม" />
+                </FG>
+              </div>
 
-                    <Box sx={{ p: 2, borderRadius: 1, bgcolor: alpha(theme.palette.primary.main, 0.04) }}>
-                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                        💡 คำแนะนำ
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                        • ถ่ายรูปทะเบียนทรัพย์สินให้ชัดเจน อ่านข้อความได้
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                        • รองรับไฟล์ JPG, PNG, GIF
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                        • ขนาดไฟล์สูงสุด 5MB
-                      </Typography>
-                    </Box>
-                  </Box>
-                </Grid>
-              </Grid>
-            </CardContent>
-          </Card>
+              <FG label="หมายเหตุ">
+                <FTextarea value={form.remark} onChange={v => setFormField('remark', 'หมายเหตุ', v)} placeholder="หมายเหตุเพิ่มเติม..." />
+              </FG>
+            </SecCard>
 
-          {/* Sticky Footer */}
-          <Box
-            sx={{
-              position: 'sticky',
-              bottom: 0,
-              zIndex: 10,
-              bgcolor: 'background.default',
-              py: 2,
-              borderTop: 1,
-              borderColor: 'divider',
-            }}
-          >
-            <Stack direction="row" justifyContent="flex-end" spacing={1.5}>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => navigate('/assets')}
-                sx={{ borderRadius: 1, textTransform: 'none', px: 2.5 }}
-              >
-                ยกเลิก
-              </Button>
-              <Button
-                variant="contained"
-                size="small"
-                type="submit"
-                disabled={loading}
-                startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <SaveIcon sx={{ fontSize: 18 }} />}
-                sx={{
-                  borderRadius: 1,
-                  textTransform: 'none',
-                  fontWeight: 500,
-                  px: 3,
-                  boxShadow: 'none',
-                  '&:hover': { boxShadow: 'none' },
-                }}
-              >
-                {loading ? 'กำลังบันทึก...' : id ? 'บันทึกการแก้ไข' : 'สร้างทรัพย์สิน'}
-              </Button>
-            </Stack>
-          </Box>
-        </Stack>
-      </Box>
-    </Box>
+            {/* ② Hardware (Computer only) */}
+            {isComputer && !isMonitor && (
+              <SecCard title="สเปก Hardware" barColor="linear-gradient(180deg,#2563eb,#60a5fa)">
+                <div className="row r3">
+                  <FG label="CPU">
+                    <FInput value={form.cpu} onChange={v => setFormField('cpu', 'CPU', v)} placeholder="เช่น Intel Core i7-1260P" />
+                  </FG>
+                  <FG label="CPU Generation">
+                    <FInput value={form.cpuGeneration} onChange={v => setFormField('cpuGeneration', 'CPU Gen', v)} placeholder="เช่น Gen 12" />
+                  </FG>
+                  <FG label="RAM">
+                    <FInput value={form.ram} onChange={v => setFormField('ram', 'RAM', v)} placeholder="เช่น 16 GB DDR5" />
+                  </FG>
+                </div>
+                <div className="row r3">
+                  <FG label="RAM Slot 1">
+                    <FInput value={form.ramSlot1} onChange={v => setFormField('ramSlot1', 'RAM Slot 1', v)} placeholder="เช่น 8 GB" />
+                  </FG>
+                  <FG label="RAM Slot 2">
+                    <FInput value={form.ramSlot2} onChange={v => setFormField('ramSlot2', 'RAM Slot 2', v)} placeholder="เช่น 8 GB" />
+                  </FG>
+                  <FG label="GPU">
+                    <FInput value={form.gpu} onChange={v => setFormField('gpu', 'GPU', v)} placeholder="เช่น NVIDIA RTX 3060" />
+                  </FG>
+                </div>
+                <div className="row r3">
+                  <FG label="Storage 1">
+                    <FInput value={form.storage1} onChange={v => setFormField('storage1', 'Storage 1', v)} placeholder="เช่น 512 GB NVMe SSD" />
+                  </FG>
+                  <FG label="Storage 2">
+                    <FInput value={form.storage2} onChange={v => setFormField('storage2', 'Storage 2', v)} placeholder="เช่น 1 TB HDD" />
+                  </FG>
+                  <FG label="อายุอุปกรณ์ (ปี)">
+                    <FInput value={assetAge} readOnly placeholder="คำนวณอัตโนมัติ" />
+                    <div className="hint">คำนวณจากวันที่ซื้อ</div>
+                  </FG>
+                </div>
+              </SecCard>
+            )}
+
+            {/* ③ OS & Software (Computer only) */}
+            {isComputer && !isMonitor && (
+              <SecCard title="ระบบปฏิบัติการ & Software" barColor="linear-gradient(180deg,#0284c7,#38bdf8)">
+                <div className="row r3">
+                  <FG label="OS Type">
+                    <FSelect value={form.osType} onChange={v => setFormField('osType', 'OS Type', v)}>
+                      <option value="">ไม่ระบุ</option>
+                      {(osTypeOptions.length ? osTypeOptions : ['Windows', 'macOS', 'Linux']).map(o => <option key={o} value={o}>{o}</option>)}
+                    </FSelect>
+                  </FG>
+                  <FG label="OS Version">
+                    <FInput value={form.osVersion} onChange={v => setFormField('osVersion', 'OS Version', v)} placeholder="เช่น Windows 11, 24H2" />
+                  </FG>
+                  <FG label="Windows License">
+                    <FInput value={form.windowsLicense} onChange={v => setFormField('windowsLicense', 'Windows License', v)} placeholder="Product Key / License" />
+                  </FG>
+                </div>
+                <div className="row r3">
+                  <FG label="MS Office / Office License">
+                    <FInput value={form.officeLicense} onChange={v => setFormField('officeLicense', 'MS Office', v)} placeholder="เช่น MS 365, Office 2021" />
+                  </FG>
+                  <FG label="Antivirus">
+                    <FSelect value={form.antivirusStatus} onChange={v => setFormField('antivirusStatus', 'Antivirus', v)}>
+                      <option value="">ไม่ระบุ</option>
+                      {(antivirusOptions.length ? antivirusOptions : ['Trend Micro Apex One', 'Kaspersky', 'ESET', 'Windows Defender', 'ไม่มี']).map(a => <option key={a} value={a}>{a}</option>)}
+                    </FSelect>
+                  </FG>
+                  <FG label="S/N Computer (Computer Name)">
+                    <FInput value={form.snComputer} onChange={v => setFormField('snComputer', 'S/N Computer', v)} placeholder="เช่น HQ-PS-N039" />
+                  </FG>
+                </div>
+              </SecCard>
+            )}
+
+            {/* Monitor detail */}
+            {isMonitor && (
+              <SecCard title="ข้อมูลจอภาพ" barColor="linear-gradient(180deg,#7c3aed,#a855f7)">
+                <div className="row r3">
+                  <FG label="ขนาดจอ (นิ้ว)">
+                    <FInput value={detail.screenSize || ''} onChange={v => setDetailField('screenSize', v)} placeholder="เช่น 24, 27, 34" />
+                  </FG>
+                  <FG label="ความละเอียด">
+                    <FSelect value={detail.resolution || ''} onChange={v => setDetailField('resolution', v)}>
+                      <option value="">ไม่ระบุ</option>
+                      {['1920x1080','2560x1080','2560x1440','3440x1440','3840x2160','Others'].map(r => <option key={r} value={r}>{r}</option>)}
+                    </FSelect>
+                  </FG>
+                  <FG label="Panel Type">
+                    <FSelect value={detail.panelType || ''} onChange={v => setDetailField('panelType', v)}>
+                      <option value="">ไม่ระบุ</option>
+                      {['IPS','VA','TN','OLED','QLED','Others'].map(p => <option key={p} value={p}>{p}</option>)}
+                    </FSelect>
+                  </FG>
+                </div>
+                <div className="row r3">
+                  <FG label="Refresh Rate">
+                    <FInput value={detail.refreshRate || ''} onChange={v => setDetailField('refreshRate', v)} placeholder="เช่น 60Hz, 144Hz" />
+                  </FG>
+                  <FG label="พอร์ตเชื่อมต่อ">
+                    <FInput value={detail.ports || ''} onChange={v => setDetailField('ports', v)} placeholder="เช่น HDMI x2, DP" />
+                  </FG>
+                </div>
+              </SecCard>
+            )}
+
+            {/* Phone detail */}
+            {isPhone && (
+              <SecCard title="ข้อมูลอุปกรณ์สื่อสาร" barColor="linear-gradient(180deg,#7c3aed,#a855f7)">
+                <div className="row r3">
+                  <FG label="IMEI 1"><FInput value={detail.imei1 || ''} onChange={v => setDetailField('imei1', v)} placeholder="15 หลัก" /></FG>
+                  <FG label="IMEI 2"><FInput value={detail.imei2 || ''} onChange={v => setDetailField('imei2', v)} placeholder="15 หลัก (ถ้ามี)" /></FG>
+                  <FG label="เบอร์โทรศัพท์"><FInput value={detail.phoneNumber || ''} onChange={v => setDetailField('phoneNumber', v)} /></FG>
+                </div>
+                <div className="row r3">
+                  <FG label="OS"><FSelect value={detail.osType || ''} onChange={v => setDetailField('osType', v)}>
+                    <option value="">ไม่ระบุ</option>
+                    {['iOS','iPadOS','Android','Others'].map(o => <option key={o} value={o}>{o}</option>)}
+                  </FSelect></FG>
+                  <FG label="OS Version"><FInput value={detail.osVersion || ''} onChange={v => setDetailField('osVersion', v)} /></FG>
+                  <FG label="Storage"><FInput value={detail.storageCapacity || ''} onChange={v => setDetailField('storageCapacity', v)} placeholder="เช่น 128GB" /></FG>
+                </div>
+                <div className="row r3">
+                  <FG label="RAM"><FInput value={detail.ram || ''} onChange={v => setDetailField('ram', v)} /></FG>
+                  <FG label="สี"><FInput value={detail.color || ''} onChange={v => setDetailField('color', v)} /></FG>
+                  <FG label="SIM Provider"><FInput value={detail.simProvider || ''} onChange={v => setDetailField('simProvider', v)} /></FG>
+                </div>
+              </SecCard>
+            )}
+
+            {/* Network detail */}
+            {isNetwork && (
+              <SecCard title="ข้อมูลอุปกรณ์เครือข่าย" barColor="linear-gradient(180deg,#0891b2,#38bdf8)">
+                <div className="row r3">
+                  <FG label="IP Address"><FInput value={detail.ipAddress || ''} onChange={v => setDetailField('ipAddress', v)} /></FG>
+                  <FG label="MAC Address"><FInput value={detail.macAddress || ''} onChange={v => setDetailField('macAddress', v)} /></FG>
+                  <FG label="จำนวน Port"><FInput type="number" value={detail.portCount ?? ''} onChange={v => setDetailField('portCount', v)} /></FG>
+                </div>
+                <div className="row r3">
+                  <FG label="Port Speed">
+                    <FSelect value={detail.portSpeed || ''} onChange={v => setDetailField('portSpeed', v)}>
+                      <option value="">ไม่ระบุ</option>
+                      {['100Mbps','1Gbps','10Gbps','25Gbps','40Gbps'].map(s => <option key={s} value={s}>{s}</option>)}
+                    </FSelect>
+                  </FG>
+                  <FG label="Firmware Version"><FInput value={detail.firmwareVersion || ''} onChange={v => setDetailField('firmwareVersion', v)} /></FG>
+                  <FG label="Managed">
+                    <FSelect value={detail.isManaged == null ? '' : String(detail.isManaged)} onChange={v => setDetailField('isManaged', v === '' ? null : v === 'true')}>
+                      <option value="">ไม่ระบุ</option>
+                      <option value="true">Managed</option>
+                      <option value="false">Unmanaged</option>
+                    </FSelect>
+                  </FG>
+                </div>
+              </SecCard>
+            )}
+
+            {/* Printer detail */}
+            {isPrinter && (
+              <SecCard title="ข้อมูลเครื่องพิมพ์" barColor="linear-gradient(180deg,#dc2626,#f87171)">
+                <div className="row r3">
+                  <FG label="ประเภทเครื่องพิมพ์">
+                    <FSelect value={detail.printerType || ''} onChange={v => setDetailField('printerType', v)}>
+                      <option value="">ไม่ระบุ</option>
+                      {['Laser','Inkjet','Thermal','Dot Matrix','Others'].map(p => <option key={p} value={p}>{p}</option>)}
+                    </FSelect>
+                  </FG>
+                  <FG label="ขนาดกระดาษ"><FInput value={detail.paperSizes || ''} onChange={v => setDetailField('paperSizes', v)} placeholder="เช่น A4, A3" /></FG>
+                  <FG label="รุ่นหมึก / Cartridge"><FInput value={detail.cartridgeModel || ''} onChange={v => setDetailField('cartridgeModel', v)} /></FG>
+                </div>
+                <div className="row r3">
+                  <FG label="IP Address"><FInput value={detail.ipAddress || ''} onChange={v => setDetailField('ipAddress', v)} /></FG>
+                  <FG label="MAC Address"><FInput value={detail.macAddress || ''} onChange={v => setDetailField('macAddress', v)} /></FG>
+                  <FG label="จำนวนหน้าที่พิมพ์"><FInput type="number" value={detail.pageCount ?? ''} onChange={v => setDetailField('pageCount', v)} /></FG>
+                </div>
+              </SecCard>
+            )}
+
+            {/* AV Device */}
+            {isDevice && (
+              <SecCard title="ข้อมูลอุปกรณ์ AV/นำเสนอ" barColor="linear-gradient(180deg,#059669,#34d399)">
+                <div className="row r3">
+                  {typeLower.includes('projector') && <>
+                    <FG label="ความสว่าง (Lumens)"><FInput type="number" value={detail.lumens ?? ''} onChange={v => setDetailField('lumens', v)} /></FG>
+                    <FG label="ความละเอียด"><FInput value={detail.resolution || ''} onChange={v => setDetailField('resolution', v)} /></FG>
+                    <FG label="Lamp Hours"><FInput type="number" value={detail.lampHours ?? ''} onChange={v => setDetailField('lampHours', v)} /></FG>
+                  </>}
+                  {typeLower.includes('webcam') && <>
+                    <FG label="ความละเอียด"><FInput value={detail.resolution || ''} onChange={v => setDetailField('resolution', v)} /></FG>
+                    <FG label="FPS"><FInput value={detail.fps || ''} onChange={v => setDetailField('fps', v)} /></FG>
+                  </>}
+                  <FG label="การเชื่อมต่อ"><FInput value={detail.connectionType || ''} onChange={v => setDetailField('connectionType', v)} /></FG>
+                </div>
+              </SecCard>
+            )}
+
+            {/* Rack/UPS */}
+            {isRack && (
+              <SecCard title="ข้อมูล Rack / UPS" barColor="linear-gradient(180deg,#374151,#6b7280)">
+                <div className="row r3">
+                  <FG label="ประเภท">
+                    <FSelect value={detail.subType || ''} onChange={v => setDetailField('subType', v)}>
+                      <option value="">ไม่ระบุ</option>
+                      {['Rack','Enclosure','PDU','UPS'].map(s => <option key={s} value={s}>{s}</option>)}
+                    </FSelect>
+                  </FG>
+                  {typeLower.includes('ups') ? <>
+                    <FG label="ความจุ (VA)"><FInput type="number" value={detail.vaCapacity ?? ''} onChange={v => setDetailField('vaCapacity', v)} /></FG>
+                    <FG label="Watt"><FInput type="number" value={detail.wattCapacity ?? ''} onChange={v => setDetailField('wattCapacity', v)} /></FG>
+                  </> : <>
+                    <FG label="Rack Units"><FInput value={detail.rackUnits || ''} onChange={v => setDetailField('rackUnits', v)} placeholder="เช่น 42U" /></FG>
+                    <FG label="ตำแหน่ง"><FInput value={detail.rackLocation || ''} onChange={v => setDetailField('rackLocation', v)} /></FG>
+                  </>}
+                </div>
+              </SecCard>
+            )}
+
+            {/* Cable */}
+            {isCable && (
+              <SecCard title="ข้อมูลสายสัญญาณ" barColor="linear-gradient(180deg,#6b7280,#9ca3af)">
+                <div className="row r4">
+                  <FG label="ประเภทสาย">
+                    <FSelect value={detail.cableType || ''} onChange={v => setDetailField('cableType', v)}>
+                      <option value="">ไม่ระบุ</option>
+                      {['HDMI','DisplayPort','USB-C','LAN CAT5e','LAN CAT6','Power Cable','Audio 3.5mm','Others'].map(c => <option key={c} value={c}>{c}</option>)}
+                    </FSelect>
+                  </FG>
+                  <FG label="ความยาว"><FInput value={detail.length || ''} onChange={v => setDetailField('length', v)} placeholder="เช่น 1.5m" /></FG>
+                  <FG label="จำนวนคงเหลือ"><FInput type="number" value={detail.stockQuantity ?? ''} onChange={v => setDetailField('stockQuantity', v)} /></FG>
+                  <FG label="Min Stock"><FInput type="number" value={detail.minimumStock ?? ''} onChange={v => setDetailField('minimumStock', v)} /></FG>
+                </div>
+              </SecCard>
+            )}
+
+            {/* Consumable */}
+            {isConsumable && (
+              <SecCard title="ข้อมูลวัสดุสิ้นเปลือง" barColor="linear-gradient(180deg,#d97706,#fbbf24)">
+                <div className="row r3">
+                  <FG label="ประเภทวัสดุ">
+                    <FSelect value={detail.consumableType || ''} onChange={v => setDetailField('consumableType', v)}>
+                      <option value="">ไม่ระบุ</option>
+                      {['Toner Cartridge','Ink Cartridge','Drum Unit','Ribbon','Battery AA','Battery AAA','Adapter/Charger','Others'].map(c => <option key={c} value={c}>{c}</option>)}
+                    </FSelect>
+                  </FG>
+                  <FG label="ใช้กับ (Compatible)"><FInput value={detail.compatibleWith || ''} onChange={v => setDetailField('compatibleWith', v)} /></FG>
+                  <FG label="วันหมดอายุ"><FInput type="date" value={detail.expiryDate ? String(detail.expiryDate).split('T')[0] : ''} onChange={v => setDetailField('expiryDate', v)} /></FG>
+                </div>
+                <div className="row r2">
+                  <FG label="จำนวนคงเหลือ"><FInput type="number" value={detail.stockQuantity ?? ''} onChange={v => setDetailField('stockQuantity', v)} /></FG>
+                  <FG label="Min Stock"><FInput type="number" value={detail.minimumStock ?? ''} onChange={v => setDetailField('minimumStock', v)} /></FG>
+                </div>
+              </SecCard>
+            )}
+
+            {/* ④ จัดซื้อ / ประกัน */}
+            <SecCard title="จัดซื้อ & ประกัน" barColor="linear-gradient(180deg,#059669,#34d399)">
+              <div className="row r4">
+                <FG label="วันที่ซื้อ"><FInput type="date" value={form.purchaseDate} onChange={v => setFormField('purchaseDate', 'วันที่ซื้อ', v)} /></FG>
+                <FG label="วันหมดประกัน"><FInput type="date" value={form.warrantyEndDate} onChange={v => setFormField('warrantyEndDate', 'วันหมดประกัน', v)} /></FG>
+                <FG label="ราคาซื้อ (บาท)"><FInput type="number" value={form.purchasePrice} onChange={v => setFormField('purchasePrice', 'ราคาซื้อ', v)} /></FG>
+                <FG label="อายุ (ปี)"><FInput value={assetAge} readOnly /><div className="hint">คำนวณอัตโนมัติ</div></FG>
+              </div>
+              <div className="row r4">
+                <FG label="PO Date"><FInput type="date" value={form.poDate} onChange={v => setFormField('poDate', 'PO Date', v)} /></FG>
+                <FG label="PO Number"><FInput value={form.poNumber} onChange={v => setFormField('poNumber', 'PO Number', v)} placeholder="เช่น PO-2568-0042" /></FG>
+                <FG label="PR Number"><FInput value={form.prNumber} onChange={v => setFormField('prNumber', 'PR Number', v)} placeholder="เช่น PR-2568-0031" /></FG>
+                <FG label="งบประมาณ"><FInput value={form.budget} onChange={v => setFormField('budget', 'งบประมาณ', v)} /></FG>
+              </div>
+              <div className="row r2">
+                <FG label="Vendor / ผู้ขาย">
+                  <FSelect value={form.vendor} onChange={v => setFormField('vendor', 'Vendor', v)}>
+                    <option value="">ไม่ระบุ</option>
+                    {vendorOptions.map(v => <option key={v} value={v}>{v}</option>)}
+                  </FSelect>
+                </FG>
+              </div>
+            </SecCard>
+
+            {/* ⑤ รูปภาพ */}
+            <SecCard title="รูปภาพทะเบียนทรัพย์สิน" barColor="linear-gradient(180deg,#6366f1,#8b5cf6)">
+              {imageError && <div className="err-bar" style={{ marginBottom: 12 }}>❌ {imageError}</div>}
+              <div className="row r2">
+                <div className="img-drop"
+                  onClick={() => fileInputRef.current?.click()}
+                  onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) handleImageUpload(f); }}
+                  onDragOver={e => e.preventDefault()}
+                >
+                  {imagePreview ? (
+                    <>
+                      <img src={imagePreview} alt="Asset" />
+                      <div className="img-actions" onClick={e => e.stopPropagation()}>
+                        <div className="img-btn" onClick={() => fileInputRef.current?.click()}>📷</div>
+                        <div className="img-btn del" onClick={handleImageDelete}>🗑</div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="img-hint">
+                      <div style={{ fontSize: '32px', marginBottom: '8px' }}>🖼</div>
+                      <div>ลากรูปภาพมาวางที่นี่</div>
+                      <div style={{ fontSize: '10.5px', color: '#c4b5fd', marginTop: '4px' }}>หรือคลิกเพื่อเลือกไฟล์ · JPG, PNG สูงสุด 5MB</div>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <input type="file" ref={fileInputRef} accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleImageUpload(f); }} />
+                  <button type="button" className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center', marginBottom: '10px' }}
+                    onClick={() => fileInputRef.current?.click()} disabled={imageUploading || !id}>
+                    {imageUploading ? '⏳ กำลังอัพโหลด...' : id ? '📤 อัพโหลดรูปภาพ' : '💾 บันทึกก่อนอัพโหลด'}
+                  </button>
+                  <div style={{ padding: '12px 14px', borderRadius: '10px', background: 'rgba(248,247,255,.6)', border: '1px solid rgba(99,102,241,.09)', fontSize: '11px', color: '#9ca3af', lineHeight: 1.8 }}>
+                    💡 <strong style={{ color: '#6b7280' }}>คำแนะนำ</strong><br />
+                    • ถ่ายรูปทะเบียนทรัพย์สินให้ชัดเจน อ่านข้อความได้<br />
+                    • รองรับไฟล์ JPG, PNG, GIF<br />
+                    • ขนาดไฟล์สูงสุด 5MB
+                  </div>
+                </div>
+              </div>
+            </SecCard>
+
+          </form>
+        </div>
+
+        {/* Sticky Footer */}
+        <div className="sticky-footer">
+          <div>
+            <button type="button" className="btn btn-danger" onClick={() => {
+              if (hasChanges) { if (window.confirm('ยืนยันยกเลิกการแก้ไข? การเปลี่ยนแปลงทั้งหมดจะหายไป')) navigate(-1); }
+              else navigate(-1);
+            }}>↩ ยกเลิก</button>
+          </div>
+          <div className="footer-right">
+            {hasChanges && <span className="footer-count">เปลี่ยนแปลง <strong style={{ color: '#b45309' }}>{changeCount}</strong> รายการ</span>}
+            <button type="submit" form="asset-form" className="btn btn-primary" disabled={loading}>
+              {loading ? <><span className="spinner"></span>กำลังบันทึก...</> : `💾 ${id ? 'บันทึกการแก้ไข' : 'สร้างทรัพย์สิน'}`}
+            </button>
+          </div>
+        </div>
+
+        {/* Toast */}
+        <div className={`ef-toast${toastVisible ? ' show' : ''}`}>
+          <div className="ef-toast-inner" style={{ background: toastColor }}>{toastMsg}</div>
+        </div>
+      </div>
+    </>
   );
 }

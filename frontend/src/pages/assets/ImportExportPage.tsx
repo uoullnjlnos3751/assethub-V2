@@ -70,11 +70,29 @@ const buildRows = (assets: any[]) => assets.map((asset) => {
   return row;
 });
 
-const writeWorkbook = (rows: Record<string, any>[], fileName: string) => {
-  const ws = XLSX.utils.json_to_sheet(rows);
-  ws['!cols'] = exportColumns.map(([, label]) => ({ wch: Math.max(label.length + 4, 14) }));
+const writeWorkbook = (sheetsData: Record<string, Record<string, any>[]>, fileName: string) => {
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Assets');
+  const emptyRow = Object.fromEntries(exportColumns.map(([, label]) => [label, '']));
+  
+  for (const [sheetName, rows] of Object.entries(sheetsData)) {
+    // If empty, put one empty object with all headers so headers still show up
+    const ws = XLSX.utils.json_to_sheet(rows.length > 0 ? rows : [emptyRow]);
+    ws['!cols'] = exportColumns.map(([, label]) => ({ wch: Math.max(label.length + 4, 14) }));
+    
+    // Excel sheet names cannot exceed 31 chars and cannot contain certain chars
+    let safeName = sheetName.replace(/[\\/*?:\[\]]/g, '').substring(0, 31);
+    if (!safeName) safeName = 'Sheet';
+    
+    // Ensure unique name if trimmed
+    let finalName = safeName;
+    let counter = 1;
+    while (wb.SheetNames.includes(finalName)) {
+      finalName = `${safeName.substring(0, 28)}_${counter}`;
+      counter++;
+    }
+    
+    XLSX.utils.book_append_sheet(wb, ws, finalName);
+  }
   XLSX.writeFile(wb, fileName);
 };
 
@@ -92,7 +110,18 @@ export default function ImportExportPage() {
     setError('');
     try {
       const assets = await fetchAllAssets();
-      writeWorkbook(buildRows(assets), `assets-${new Date().toISOString().split('T')[0]}.xlsx`);
+      const rows = buildRows(assets);
+      
+      const sheetsData: Record<string, Record<string, any>[]> = {};
+      rows.forEach((row, index) => {
+        const type = assets[index].type || 'Other';
+        if (!sheetsData[type]) sheetsData[type] = [];
+        sheetsData[type].push(row);
+      });
+      
+      if (Object.keys(sheetsData).length === 0) sheetsData['Assets'] = [];
+      
+      writeWorkbook(sheetsData, `assets-${new Date().toISOString().split('T')[0]}.xlsx`);
     } catch (err: any) {
       setError(err.message || 'ไม่สามารถส่งออกข้อมูลได้');
     } finally {
@@ -105,7 +134,10 @@ export default function ImportExportPage() {
     setError('');
     try {
       const assets = await fetchAllAssets();
-      const ws = XLSX.utils.json_to_sheet(buildRows(assets));
+      const rows = buildRows(assets);
+      const emptyRow = Object.fromEntries(exportColumns.map(([, label]) => [label, '']));
+      
+      const ws = XLSX.utils.json_to_sheet(rows.length > 0 ? rows : [emptyRow]);
       const csv = XLSX.utils.sheet_to_csv(ws, { FS: ',', blankrows: false });
       const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
@@ -123,9 +155,28 @@ export default function ImportExportPage() {
     }
   };
 
-  const downloadTemplate = () => {
-    const emptyRow = Object.fromEntries(exportColumns.map(([, label]) => [label, '']));
-    writeWorkbook([emptyRow], 'asset-import-template.xlsx');
+  const downloadTemplate = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await assetAPI.deviceTypes();
+      const types = res.data.map((t: any) => t.name);
+      if (types.length === 0) types.push('Computer', 'Monitor');
+      
+      const emptyRow = Object.fromEntries(exportColumns.map(([, label]) => [label, '']));
+      const sheetsData: Record<string, Record<string, any>[]> = {};
+      types.forEach((type: string) => {
+        // Pre-fill type in the template to make it easier for users
+        const rowWithType = { ...emptyRow, 'ประเภทอุปกรณ์': type };
+        sheetsData[type] = [rowWithType];
+      });
+      
+      writeWorkbook(sheetsData, 'asset-import-template.xlsx');
+    } catch (err: any) {
+      setError('ไม่สามารถดาวน์โหลด Template ได้');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

@@ -70,8 +70,13 @@ export default function ImportAssetsButton() {
           try {
             const data = e.target?.result as ArrayBuffer;
             const workbook = XLSX.read(data, { type: 'array' });
-            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+            
+            const jsonData: any[] = [];
+            for (const sheetName of workbook.SheetNames) {
+              const worksheet = workbook.Sheets[sheetName];
+              const sheetData = XLSX.utils.sheet_to_json(worksheet) as any[];
+              jsonData.push(...sheetData);
+            }
             
             console.log('Raw Excel Data (first row):', jsonData[0]);
 

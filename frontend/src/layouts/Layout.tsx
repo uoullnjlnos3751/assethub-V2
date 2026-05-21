@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   AppBar, Box, CssBaseline, Drawer, IconButton, List, ListItem, ListItemButton,
   ListItemIcon, ListItemText, Toolbar, Typography, Button, Avatar, Menu, MenuItem,
-  Divider, Collapse, alpha, useTheme
+  Divider, Collapse, alpha, useTheme, Badge
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -43,11 +43,14 @@ import CategoryManagementIcon from '@mui/icons-material/Category';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
+import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import { useAuth } from '../contexts/AuthContext';
 import Breadcrumbs from '../components/Breadcrumbs';
 import PageTransition from '../components/PageTransition';
 
-const drawerWidth = 280;
+// ── Sidebar width matching ITSM HTML (210px) ───────────────────────────────
+const drawerWidth = 220;
+const appBarHeight = 50;
 
 interface NavItem {
   label: string;
@@ -65,82 +68,107 @@ interface NavGroup {
 
 type NavEntry = NavItem | NavGroup;
 
+// ── Nav data (unchanged) ─────────────────────────────────────────────────
 const userNavItems: NavItem[] = [
-  { label: 'รายการของพร้อมยืม', path: '/assets?status=Available', icon: <CheckCircleOutlineIcon /> },
-  { label: 'ยืมทรัพย์สิน', path: '/borrow/new', icon: <AddBoxIcon /> },
-  { label: 'คำขอของฉัน', path: '/borrow/my-requests', icon: <ListAltIcon /> },
-  { label: 'รายการที่ยืม', path: '/borrow/my-items', icon: <ShoppingCartIcon /> },
-  { label: 'คำขอขยายวัน', path: '/borrow/my-extensions', icon: <ExtensionIcon /> },
-  { label: 'ประวัติการยืม', path: '/borrow/my-history', icon: <HistoryIcon /> },
+  { label: 'รายการของพร้อมยืม', path: '/assets?status=Available', icon: <CheckCircleOutlineIcon fontSize="small" /> },
+  { label: 'ยืมทรัพย์สิน', path: '/borrow/new', icon: <AddBoxIcon fontSize="small" /> },
+  { label: 'คำขอของฉัน', path: '/borrow/my-requests', icon: <ListAltIcon fontSize="small" /> },
+  { label: 'รายการที่ยืม', path: '/borrow/my-items', icon: <ShoppingCartIcon fontSize="small" /> },
+  { label: 'คำขอขยายวัน', path: '/borrow/my-extensions', icon: <ExtensionIcon fontSize="small" /> },
+  { label: 'ประวัติการยืม', path: '/borrow/my-history', icon: <HistoryIcon fontSize="small" /> },
 ];
 
 const adminNav: NavEntry[] = [
-  { label: 'แดชบอร์ด', path: '/dashboard', icon: <DashboardIcon /> },
+  { label: 'แดชบอร์ด', path: '/dashboard', icon: <DashboardIcon fontSize="small" /> },
   {
     label: 'ทรัพย์สิน',
-    icon: <DevicesIcon />,
+    icon: <DevicesIcon fontSize="small" />,
     children: [
-      { label: 'ทะเบียน IT Asset', path: '/assets', icon: <DevicesIcon /> },
-      { label: 'Computers / Desktop PC', path: '/assets?typeGroup=computers', icon: <ComputerIcon /> },
-      { label: 'Monitors', path: '/assets?typeGroup=monitors', icon: <DesktopWindowsIcon /> },
-      { label: 'Devices', path: '/assets?typeGroup=devices', icon: <DevicesIcon /> },
-      { label: 'Printers', path: '/assets?typeGroup=printers', icon: <PrintIcon /> },
-      { label: 'Phones / Tablets', path: '/assets?typeGroup=phonesTablets', icon: <PhoneAndroidIcon /> },
-      { label: 'Cables', path: '/inventory?category=Cable', icon: <CableIcon /> },
-      { label: 'Network devices', path: '/assets?typeGroup=network', icon: <RouterIcon /> },
-      { label: 'Consumables', path: '/inventory?category=Consumable', icon: <ScienceIcon /> },
-      { label: 'ประเภทอุปกรณ์ (Device Types)', path: '/assets/device-types', icon: <CategoryIcon /> },
-      { label: 'สถานที่ตั้ง/ไซต์ (Location & Company)', path: '/assets/locations', icon: <LocationOnIcon /> },
-      { label: 'ผู้จำหน่าย (Vendor)', path: '/assets/vendors', icon: <StoreIcon /> },
-      { label: 'สถานะอุปกรณ์ (Asset Status)', path: '/assets/statuses', icon: <CheckCircleOutlineIcon /> },
-      { label: 'นำเข้า/ส่งออก (Import/Export)', path: '/assets/import-export', icon: <ImportExportIcon /> },
-      { label: 'Inventory', path: '/inventory', icon: <InventoryIcon /> },
-      { label: 'จัดการหมวดหมู่ (Categories)', path: '/categories', icon: <CategoryManagementIcon /> },
+      { label: 'ทะเบียน IT Asset', path: '/assets', icon: <DevicesIcon fontSize="small" /> },
+      { label: 'Computers / Desktop PC', path: '/assets?typeGroup=computers', icon: <ComputerIcon fontSize="small" /> },
+      { label: 'Monitors', path: '/assets?typeGroup=monitors', icon: <DesktopWindowsIcon fontSize="small" /> },
+      { label: 'Devices', path: '/assets?typeGroup=devices', icon: <DevicesIcon fontSize="small" /> },
+      { label: 'Printers', path: '/assets?typeGroup=printers', icon: <PrintIcon fontSize="small" /> },
+      { label: 'Phones / Tablets', path: '/assets?typeGroup=phonesTablets', icon: <PhoneAndroidIcon fontSize="small" /> },
+      { label: 'Cables', path: '/inventory?category=Cable', icon: <CableIcon fontSize="small" /> },
+      { label: 'Network devices', path: '/assets?typeGroup=network', icon: <RouterIcon fontSize="small" /> },
+      { label: 'Consumables', path: '/inventory?category=Consumable', icon: <ScienceIcon fontSize="small" /> },
+      { label: 'ประเภทอุปกรณ์ (Device Types)', path: '/assets/device-types', icon: <CategoryIcon fontSize="small" /> },
+      { label: 'สถานที่ตั้ง/ไซต์ (Location & Company)', path: '/assets/locations', icon: <LocationOnIcon fontSize="small" /> },
+      { label: 'ผู้จำหน่าย (Vendor)', path: '/assets/vendors', icon: <StoreIcon fontSize="small" /> },
+      { label: 'สถานะอุปกรณ์ (Asset Status)', path: '/assets/statuses', icon: <CheckCircleOutlineIcon fontSize="small" /> },
+      { label: 'นำเข้า/ส่งออก (Import/Export)', path: '/assets/import-export', icon: <ImportExportIcon fontSize="small" /> },
+      { label: 'พิมพ์ QR สติ๊กเกอร์', path: '/assets/print-qr', icon: <PrintIcon fontSize="small" /> },
+      { label: 'Inventory', path: '/inventory', icon: <InventoryIcon fontSize="small" /> },
+      { label: 'จัดการหมวดหมู่ (Categories)', path: '/categories', icon: <CategoryManagementIcon fontSize="small" /> },
     ],
   },
   {
     label: 'ยืม-คืน',
-    icon: <ShoppingCartIcon />,
+    icon: <ShoppingCartIcon fontSize="small" />,
     children: [
-      { label: 'รายการของพร้อมยืม', path: '/assets?status=Available', icon: <CheckCircleOutlineIcon /> },
-      { label: 'รออนุมัติ', path: '/borrow/approval-queue', icon: <CheckCircleIcon /> },
-      { label: 'ส่งมอบ (Check-out)', path: '/borrow/checkout', icon: <HandymanIcon /> },
-      { label: 'รับคืน (Return)', path: '/borrow/return', icon: <AssignmentReturnIcon /> },
-      { label: 'ยืมเกินกำหนด (Overdue)', path: '/borrow/overdue', icon: <ErrorIcon /> },
-      { label: 'ประวัติยืมทั้งหมด', path: '/borrow/history', icon: <HistoryIcon /> },
-      { label: 'ขยายวัน (Extension)', path: '/borrow/extensions', icon: <ExtensionIcon /> },
+      { label: 'รายการของพร้อมยืม', path: '/assets?status=Available', icon: <CheckCircleOutlineIcon fontSize="small" /> },
+      { label: 'รออนุมัติ', path: '/borrow/approval-queue', icon: <CheckCircleIcon fontSize="small" /> },
+      { label: 'ส่งมอบ (Check-out)', path: '/borrow/checkout', icon: <HandymanIcon fontSize="small" /> },
+      { label: 'รับคืน (Return)', path: '/borrow/return', icon: <AssignmentReturnIcon fontSize="small" /> },
+      { label: 'ยืมเกินกำหนด (Overdue)', path: '/borrow/overdue', icon: <ErrorIcon fontSize="small" /> },
+      { label: 'ประวัติยืมทั้งหมด', path: '/borrow/history', icon: <HistoryIcon fontSize="small" /> },
+      { label: 'ขยายวัน (Extension)', path: '/borrow/extensions', icon: <ExtensionIcon fontSize="small" /> },
     ],
   },
   {
     label: 'PM ตรวจนับ',
-    icon: <BuildCircleIcon />,
+    icon: <BuildCircleIcon fontSize="small" />,
     children: [
-      { label: 'PM Dashboard', path: '/pm', icon: <DashboardIcon /> },
-      { label: 'PM Plans', path: '/pm/plans', icon: <AssignmentIcon /> },
-      { label: 'PM Runs', path: '/pm/runs', icon: <PlayArrowIcon /> },
-      { label: 'PM Template', path: '/pm/templates', icon: <DescriptionIcon /> },
+      { label: 'PM Dashboard', path: '/pm', icon: <DashboardIcon fontSize="small" /> },
+      { label: 'PM Plans', path: '/pm/plans', icon: <AssignmentIcon fontSize="small" /> },
+      { label: 'PM Runs', path: '/pm/runs', icon: <PlayArrowIcon fontSize="small" /> },
+      { label: 'PM Template', path: '/pm/templates', icon: <DescriptionIcon fontSize="small" /> },
     ],
   },
   {
     label: 'รายงาน',
-    icon: <AssessmentIcon />,
+    icon: <AssessmentIcon fontSize="small" />,
     children: [
-      { label: 'รายงานทรัพย์สิน', path: '/reports/assets', icon: <InventoryIcon /> },
-      { label: 'รายงานยืม-คืน', path: '/reports/borrow', icon: <ReceiptLongIcon /> },
-      { label: 'รายงาน PM', path: '/reports/pm', icon: <AssessmentIcon /> },
+      { label: 'รายงานทรัพย์สิน', path: '/reports/assets', icon: <InventoryIcon fontSize="small" /> },
+      { label: 'รายงานยืม-คืน', path: '/reports/borrow', icon: <ReceiptLongIcon fontSize="small" /> },
+      { label: 'รายงาน PM', path: '/reports/pm', icon: <AssessmentIcon fontSize="small" /> },
     ],
   },
-  { label: 'จัดการผู้ใช้', path: '/admin/users', icon: <PeopleIcon />, roles: ['SUPERADMIN'] },
-  { label: 'ตั้งค่า', path: '/admin/settings', icon: <SettingsIcon />, roles: ['SUPERADMIN'] },
+  { label: 'จัดการผู้ใช้', path: '/admin/users', icon: <PeopleIcon fontSize="small" />, roles: ['SUPERADMIN'] },
+  { label: 'ตั้งค่า', path: '/admin/settings', icon: <SettingsIcon fontSize="small" />, roles: ['SUPERADMIN'] },
   {
     label: 'ประวัติ',
-    icon: <HistoryIcon />,
+    icon: <HistoryIcon fontSize="small" />,
     children: [
-      { label: 'ประวัติแจ้งเตือน (Notification Log)', path: '/admin/notification-logs', icon: <NotificationsIcon /> },
-      { label: 'Audit Log', path: '/admin/audit-log', icon: <ReceiptLongIcon /> },
+      { label: 'ประวัติแจ้งเตือน (Notification Log)', path: '/admin/notification-logs', icon: <NotificationsIcon fontSize="small" /> },
+      { label: 'Audit Log', path: '/admin/audit-log', icon: <ReceiptLongIcon fontSize="small" /> },
     ],
   },
 ];
+
+// ── Section label component ──────────────────────────────────────────────
+function SidebarSection({ children }: { children: React.ReactNode }) {
+  return (
+    <Typography
+      variant="caption"
+      sx={{
+        display: 'block',
+        px: '20px',
+        pt: '14px',
+        pb: '4px',
+        fontSize: '10px',
+        fontWeight: 500,
+        color: '#9ca3af',
+        textTransform: 'uppercase',
+        letterSpacing: '0.07em',
+        lineHeight: 1,
+      }}
+    >
+      {children}
+    </Typography>
+  );
+}
 
 export default function Layout() {
   const theme = useTheme();
@@ -161,7 +189,9 @@ export default function Layout() {
     : userNavItems;
 
   const isActive = (path: string) =>
-    location.pathname === path || (path !== '/' && location.pathname.startsWith(path + '?')) || (path !== '/' && location.pathname.startsWith(path + '/'));
+    location.pathname === path ||
+    (path !== '/' && location.pathname.startsWith(path + '?')) ||
+    (path !== '/' && location.pathname.startsWith(path + '/'));
 
   const toggleGroup = (label: string) => {
     setOpenGroups(prev => ({ ...prev, [label]: !prev[label] }));
@@ -182,205 +212,424 @@ export default function Layout() {
     }
   }, [location.pathname, location.search]);
 
-  const renderNav = () => (
-    <List sx={{ px: 1.5 }}>
-      {filteredNav.map((entry) => {
-        if ('children' in entry) {
-          const group = entry as NavGroup;
-          const isOpen = openGroups[group.label] ?? false;
-          return (
-            <React.Fragment key={group.label}>
-              <ListItem disablePadding sx={{ mb: 0.5 }}>
-                <ListItemButton 
-                  onClick={() => toggleGroup(group.label)}
-                  sx={{ 
-                    borderRadius: 3,
-                    py: 1.2,
-                    '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.05) }
+  // ── Section grouping for sidebar visual clarity ─────────────────────
+  const getSectionLabel = (label: string): string | null => {
+    if (label === 'แดชบอร์ด') return 'ภาพรวม';
+    if (label === 'ทรัพย์สิน') return 'จัดการทรัพย์สิน';
+    if (label === 'ยืม-คืน') return 'Service Desk';
+    if (label === 'PM ตรวจนับ') return null;
+    if (label === 'รายงาน') return 'รายงาน';
+    if (label === 'จัดการผู้ใช้') return 'ผู้ดูแลระบบ';
+    if (label === 'ตั้งค่า') return null;
+    if (label === 'ประวัติ') return null;
+    return null;
+  };
+
+  const renderNav = () => {
+    const items: React.ReactNode[] = [];
+    let prevSection = '';
+
+    filteredNav.forEach((entry) => {
+      const sectionLabel = 'children' in entry
+        ? getSectionLabel((entry as NavGroup).label)
+        : getSectionLabel((entry as NavItem).label);
+
+      if (sectionLabel && sectionLabel !== prevSection) {
+        items.push(<SidebarSection key={`sec-${sectionLabel}`}>{sectionLabel}</SidebarSection>);
+        prevSection = sectionLabel;
+      }
+
+      if ('children' in entry) {
+        const group = entry as NavGroup;
+        const isOpen = openGroups[group.label] ?? false;
+        items.push(
+          <React.Fragment key={group.label}>
+            <ListItem disablePadding>
+              <ListItemButton
+                onClick={() => toggleGroup(group.label)}
+                sx={{
+                  borderRadius: '7px',
+                  mx: '8px',
+                  py: '7px',
+                  px: '12px',
+                  my: '1px',
+                  '&:hover': { bgcolor: '#f9fafb' },
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: 30, color: isOpen ? '#f59e0b' : '#6b7280' }}>
+                  {group.icon}
+                </ListItemIcon>
+                <ListItemText
+                  primary={group.label}
+                  primaryTypographyProps={{
+                    fontSize: '0.8125rem',
+                    fontWeight: 500,
+                    color: isOpen ? '#111827' : '#374151',
                   }}
-                >
-                  <ListItemIcon sx={{ minWidth: 40, color: isOpen ? theme.palette.primary.main : 'inherit' }}>{group.icon}</ListItemIcon>
-                  <ListItemText primary={group.label} primaryTypographyProps={{ fontWeight: 600, fontSize: '0.9rem' }} />
-                  {isOpen ? <ExpandLess sx={{ fontSize: 20 }} /> : <ExpandMore sx={{ fontSize: 20 }} />}
-                </ListItemButton>
-              </ListItem>
-              <Collapse in={isOpen} timeout="auto" unmountOnExit>
-                <List component="div" disablePadding sx={{ mb: 1 }}>
-                  {group.children.map((child) => {
-                    const active = location.pathname + location.search === child.path;
-                    return (
-                      <ListItem key={child.path} disablePadding sx={{ mb: 0.2 }}>
-                        <ListItemButton
-                          selected={active}
-                          onClick={() => { navigate(child.path); setMobileOpen(false); }}
-                          sx={{ 
-                            pl: 5, 
-                            borderRadius: 2.5,
-                            py: 1,
-                            '&.Mui-selected': {
-                              bgcolor: alpha(theme.palette.primary.main, 0.08),
-                              color: theme.palette.primary.main,
-                              '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.12) }
-                            }
+                />
+                {isOpen
+                  ? <ExpandLess sx={{ fontSize: 16, color: '#9ca3af' }} />
+                  : <ExpandMore sx={{ fontSize: 16, color: '#9ca3af' }} />}
+              </ListItemButton>
+            </ListItem>
+
+            <Collapse in={isOpen} timeout="auto" unmountOnExit>
+              <List component="div" disablePadding sx={{ mb: 0.5 }}>
+                {group.children.map((child) => {
+                  const active = location.pathname + location.search === child.path;
+                  return (
+                    <ListItem key={child.path} disablePadding>
+                      <ListItemButton
+                        selected={active}
+                        onClick={() => { navigate(child.path); setMobileOpen(false); }}
+                        sx={{
+                          pl: '44px',
+                          pr: '12px',
+                          py: '6px',
+                          mx: '8px',
+                          my: '1px',
+                          borderRadius: '7px',
+                          '&.Mui-selected': {
+                            bgcolor: '#fef3c7',
+                            color: '#b45309',
+                            '&:hover': { bgcolor: '#fde68a' },
+                          },
+                          '&:hover': { bgcolor: '#f9fafb' },
+                        }}
+                      >
+                        <ListItemIcon sx={{ minWidth: 26, color: active ? '#b45309' : '#9ca3af' }}>
+                          {React.cloneElement(child.icon as React.ReactElement, { sx: { fontSize: 14 } })}
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={child.label}
+                          primaryTypographyProps={{
+                            fontSize: '0.78rem',
+                            fontWeight: active ? 600 : 400,
+                            color: active ? '#b45309' : '#4b5563',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
                           }}
-                        >
-                          <ListItemIcon sx={{ minWidth: 36, color: active ? 'inherit' : alpha(theme.palette.text.primary, 0.5) }}>
-                             {React.cloneElement(child.icon as React.ReactElement, { size: 18 })}
-                          </ListItemIcon>
-                          <ListItemText primary={child.label} primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: active ? 700 : 500 }} />
-                        </ListItemButton>
-                      </ListItem>
-                    );
-                  })}
-                </List>
-              </Collapse>
-            </React.Fragment>
-          );
-        }
+                        />
+                      </ListItemButton>
+                    </ListItem>
+                  );
+                })}
+              </List>
+            </Collapse>
+          </React.Fragment>
+        );
+      } else {
         const item = entry as NavItem;
-        const active = location.pathname + location.search === item.path;
-        return (
-          <ListItem key={item.path} disablePadding sx={{ mb: 0.5 }}>
+        const active = isActive(item.path);
+        items.push(
+          <ListItem key={item.path} disablePadding>
             <ListItemButton
               selected={active}
               onClick={() => { navigate(item.path); setMobileOpen(false); }}
-              sx={{ 
-                borderRadius: 3,
-                py: 1.2,
+              sx={{
+                borderRadius: '7px',
+                mx: '8px',
+                py: '7px',
+                px: '12px',
+                my: '1px',
                 '&.Mui-selected': {
-                  bgcolor: alpha(theme.palette.primary.main, 0.1),
-                  color: theme.palette.primary.main,
-                  '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.15) }
-                }
+                  bgcolor: '#fef3c7',
+                  color: '#b45309',
+                  '&:hover': { bgcolor: '#fde68a' },
+                },
+                '&:hover': { bgcolor: '#f9fafb' },
               }}
             >
-              <ListItemIcon sx={{ minWidth: 40, color: active ? 'inherit' : 'inherit' }}>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.label} primaryTypographyProps={{ fontWeight: active ? 700 : 600, fontSize: '0.9rem' }} />
+              <ListItemIcon sx={{ minWidth: 30, color: active ? '#b45309' : '#6b7280' }}>
+                {item.icon}
+              </ListItemIcon>
+              <ListItemText
+                primary={item.label}
+                primaryTypographyProps={{
+                  fontSize: '0.8125rem',
+                  fontWeight: active ? 600 : 500,
+                  color: active ? '#b45309' : '#374151',
+                }}
+              />
             </ListItemButton>
           </ListItem>
         );
-      })}
-    </List>
-  );
+      }
+    });
 
+    return <List disablePadding sx={{ pt: 0.5, pb: 2 }}>{items}</List>;
+  };
+
+  // ── Sidebar content ────────────────────────────────────────────────────
   const drawer = (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Toolbar sx={{ 
-        mb: 2,
-        minHeight: '72px !important',
-        borderBottom: '1px solid #E2E8F0',
-        gap: 1.5,
-        px: 2.5
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: '#ffffff' }}>
+      {/* Logo / Brand */}
+      <Box sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        px: '14px',
+        height: `${appBarHeight}px`,
+        borderBottom: '0.5px solid #e5e7eb',
+        flexShrink: 0,
       }}>
+        {/* Logo box — amber square like HTML .sb-logo-icon */}
         <Box sx={{
-          width: 40, height: 40, borderRadius: 2,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'linear-gradient(135deg, #FF6B00 0%, #FF8C00 100%)',
-          boxShadow: '0 4px 12px rgba(255,107,0,0.3)',
+          width: 34,
+          height: 34,
+          borderRadius: '8px',
+          background: '#f59e0b',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontWeight: 600,
+          fontSize: '13px',
           color: '#fff',
-          fontSize: 18,
           flexShrink: 0,
+          letterSpacing: '-0.02em',
         }}>
-          <img src="/vite.svg" alt="logo" style={{ width: 22, height: 22, filter: 'brightness(0) invert(1)' }} />
+          IT
         </Box>
         <Box>
-          <Typography variant="body1" noWrap sx={{ fontWeight: 800, lineHeight: 1.2, color: '#0F172A', fontSize: '0.95rem' }}>
-            IT Asset
+          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: '#111827', lineHeight: 1.2 }}>
+            IT Asset Pro
           </Typography>
-          <Typography variant="caption" noWrap sx={{ color: '#64748B', fontSize: '0.7rem', lineHeight: 1, fontWeight: 500 }}>
-            TRR Group
+          <Typography sx={{ fontSize: '10px', color: '#6b7280', lineHeight: 1 }}>
+            ระบบจัดการ IT ครบวงจร
           </Typography>
         </Box>
-      </Toolbar>
-      <Box sx={{ overflowY: 'auto', flexGrow: 1, pb: 2 }}>
+      </Box>
+
+      {/* Nav */}
+      <Box sx={{ overflowY: 'auto', flexGrow: 1 }}>
         {renderNav()}
+      </Box>
+
+      {/* User block at bottom — like HTML .sb-user */}
+      <Box sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        px: '14px',
+        py: '10px',
+        borderTop: '0.5px solid #e5e7eb',
+        mt: 'auto',
+      }}>
+        <Avatar sx={{
+          width: 32,
+          height: 32,
+          background: 'linear-gradient(135deg, #f59e0b, #8b5cf6)',
+          fontSize: '11px',
+          fontWeight: 500,
+          flexShrink: 0,
+          border: 'none',
+          boxShadow: 'none',
+        }}>
+          {user?.displayName?.charAt(0) || 'U'}
+        </Avatar>
+        <Box sx={{ overflow: 'hidden', flex: 1 }}>
+          <Typography sx={{ fontSize: '12px', fontWeight: 500, color: '#111827', lineHeight: 1.3, noWrap: true }}>
+            {user?.displayName || user?.adUsername}
+          </Typography>
+          <Typography sx={{ fontSize: '10px', color: '#f59e0b', lineHeight: 1 }}>
+            {user?.role === 'SUPERADMIN' ? 'Super Admin' : user?.role === 'IT_ADMIN' ? 'IT Admin' : 'User'}
+          </Typography>
+        </Box>
+        <IconButton
+          size="small"
+          onClick={() => { logout(); navigate('/login'); }}
+          sx={{ color: '#9ca3af', p: '4px', '&:hover': { color: '#ef4444', bgcolor: '#fef2f2' } }}
+          title="ออกจากระบบ"
+        >
+          <LogoutIcon sx={{ fontSize: 16 }} />
+        </IconButton>
       </Box>
     </Box>
   );
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', position: 'relative' }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh', position: 'relative', bgcolor: '#f5f6fa' }}>
       <CssBaseline />
 
-      <AppBar position="fixed" sx={{ 
-        width: { md: `calc(100% - ${drawerWidth}px)` }, 
-        ml: { md: `${drawerWidth}px` },
-        zIndex: (theme) => theme.zIndex.drawer + 1,
-      }}>
-        <Toolbar sx={{ minHeight: '72px !important', px: 3 }}>
-          <IconButton color="inherit" edge="start" onClick={() => setMobileOpen(!mobileOpen)} sx={{ mr: 2, display: { md: 'none' } }}>
-            <MenuIcon />
+      {/* ── AppBar / Topbar ──────────────────────────────────────────── */}
+      <AppBar
+        position="fixed"
+        elevation={0}
+        sx={{
+          width: { md: `calc(100% - ${drawerWidth}px)` },
+          ml: { md: `${drawerWidth}px` },
+          zIndex: (t) => t.zIndex.drawer + 1,
+          height: `${appBarHeight}px`,
+        }}
+      >
+        <Toolbar
+          sx={{
+            minHeight: `${appBarHeight}px !important`,
+            height: `${appBarHeight}px`,
+            px: { xs: 2, md: '20px' },
+            gap: '12px',
+          }}
+        >
+          {/* Mobile hamburger */}
+          <IconButton
+            color="inherit"
+            edge="start"
+            onClick={() => setMobileOpen(!mobileOpen)}
+            sx={{ mr: 1, display: { md: 'none' }, color: '#374151' }}
+          >
+            <MenuIcon sx={{ fontSize: 20 }} />
           </IconButton>
-          <Typography variant="h6" noWrap sx={{ flexGrow: 1, fontWeight: 700, color: theme.palette.text.primary, letterSpacing: '-0.01em', fontSize: '1.1rem' }}>
-            ระบบบริหารทรัพย์สิน IT
-          </Typography>
-          <Button 
-            variant="text"
-            onClick={(e) => setAnchorEl(e.currentTarget)} 
-            startIcon={<Avatar sx={{ width: 36, height: 36, bgcolor: 'linear-gradient(135deg, #FF6B00, #FF8C00)', fontWeight: 800, fontSize: '0.95rem', border: `2px solid ${alpha('#fff', 0.9)}`, background: 'linear-gradient(135deg, #FF6B00, #FF8C00)' }}>{user?.displayName?.charAt(0) || 'U'}</Avatar>}
-            sx={{ 
-              borderRadius: 4,
-              px: 2,
-              py: 0.8,
-              color: theme.palette.text.primary,
-              '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) }
-            }}
-          >
-            {user?.displayName || user?.adUsername}
-          </Button>
-          <Menu 
-            anchorEl={anchorEl} 
-            open={Boolean(anchorEl)} 
-            onClose={() => setAnchorEl(null)}
-            PaperProps={{
-              sx: { 
-                mt: 1.5,
-                minWidth: 220,
-                borderRadius: 5,
-                boxShadow: '0 20px 50px rgba(0,0,0,0.12)',
-                border: '1px solid #E5E7EB',
-                p: 1
+
+          {/* Page title area */}
+          <Box>
+            <Typography
+              sx={{
+                fontWeight: 500,
+                color: '#111827',
+                fontSize: '15px',
+                lineHeight: 1.2,
+              }}
+            >
+              ระบบบริหารทรัพย์สิน IT
+            </Typography>
+          </Box>
+
+          {/* Spacer */}
+          <Box sx={{ flex: 1 }} />
+
+          {/* Right side: notification + user */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* Notification bell */}
+            <IconButton
+              size="small"
+              sx={{
+                width: 32,
+                height: 32,
+                borderRadius: '7px',
+                border: '0.5px solid #e5e7eb',
+                color: '#6b7280',
+                '&:hover': { bgcolor: '#f9fafb' },
+              }}
+            >
+              <NotificationsIcon sx={{ fontSize: 16 }} />
+            </IconButton>
+
+            {/* User button */}
+            <Button
+              variant="text"
+              onClick={(e) => setAnchorEl(e.currentTarget)}
+              startIcon={
+                <Avatar
+                  sx={{
+                    width: 28,
+                    height: 28,
+                    background: 'linear-gradient(135deg, #f59e0b, #8b5cf6)',
+                    fontSize: '11px',
+                    fontWeight: 500,
+                    border: 'none',
+                    boxShadow: 'none',
+                  }}
+                >
+                  {user?.displayName?.charAt(0) || 'U'}
+                </Avatar>
               }
-            }}
-          >
-            <Box sx={{ px: 2, py: 2 }}>
-               <Typography variant="subtitle1" fontWeight={900} sx={{ lineHeight: 1.2 }}>{user?.displayName}</Typography>
-               <Typography variant="caption" color="text.secondary" fontWeight={600}>{user?.role === 'SUPERADMIN' ? 'ผู้ดูแลระบบสูงสุด' : user?.role === 'IT_ADMIN' ? 'IT Admin' : 'ผู้ใช้'}</Typography>
-            </Box>
-            <Divider sx={{ my: 1, opacity: 0.4 }} />
-            <MenuItem onClick={() => { setAnchorEl(null); logout(); navigate('/login'); }} sx={{ borderRadius: 3, py: 1.5, color: theme.palette.error.main, fontWeight: 700 }}>
-              <LogoutIcon sx={{ mr: 1.5, fontSize: 20 }} /> ออกจากระบบ
-            </MenuItem>
-          </Menu>
+              sx={{
+                borderRadius: '7px',
+                px: '10px',
+                py: '5px',
+                height: 32,
+                color: '#111827',
+                fontSize: '12px',
+                fontWeight: 500,
+                border: '0.5px solid #e5e7eb',
+                bgcolor: '#ffffff',
+                '&:hover': { bgcolor: '#f9fafb' },
+                '& .MuiButton-startIcon': { mr: '6px' },
+              }}
+            >
+              {user?.displayName || user?.adUsername}
+            </Button>
+
+            {/* User dropdown */}
+            <Menu
+              anchorEl={anchorEl}
+              open={Boolean(anchorEl)}
+              onClose={() => setAnchorEl(null)}
+              transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+              anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+              PaperProps={{
+                sx: {
+                  mt: '4px',
+                  minWidth: 200,
+                  borderRadius: '8px',
+                  boxShadow: '0 8px 20px rgba(0,0,0,0.1)',
+                  border: '0.5px solid #e5e7eb',
+                  p: '4px',
+                },
+              }}
+            >
+              <Box sx={{ px: '12px', py: '10px', borderBottom: '0.5px solid #f3f4f6', mb: '4px' }}>
+                <Typography sx={{ fontWeight: 600, fontSize: '13px', color: '#111827', lineHeight: 1.3 }}>
+                  {user?.displayName}
+                </Typography>
+                <Typography sx={{ fontSize: '11px', color: '#6b7280', mt: '2px' }}>
+                  {user?.role === 'SUPERADMIN' ? 'ผู้ดูแลระบบสูงสุด' : user?.role === 'IT_ADMIN' ? 'IT Admin' : 'ผู้ใช้'}
+                </Typography>
+              </Box>
+              <MenuItem
+                onClick={() => { setAnchorEl(null); logout(); navigate('/login'); }}
+                sx={{ color: '#ef4444', borderRadius: '6px', fontSize: '13px', fontWeight: 500 }}
+              >
+                <LogoutIcon sx={{ mr: 1.5, fontSize: 16 }} />
+                ออกจากระบบ
+              </MenuItem>
+            </Menu>
+          </Box>
         </Toolbar>
       </AppBar>
 
+      {/* ── Sidebar nav box ──────────────────────────────────────────── */}
       <Box component="nav" sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}>
+        {/* Mobile drawer */}
         <Drawer
           variant="temporary"
           open={mobileOpen}
           onClose={() => setMobileOpen(false)}
-          sx={{ display: { xs: 'block', md: 'none' }, '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth } }}
+          sx={{
+            display: { xs: 'block', md: 'none' },
+            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+          }}
         >
           {drawer}
         </Drawer>
+
+        {/* Desktop drawer */}
         <Drawer
           variant="permanent"
-          sx={{ display: { xs: 'none', md: 'block' }, '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth } }}
+          sx={{
+            display: { xs: 'none', md: 'block' },
+            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+          }}
           open
         >
           {drawer}
         </Drawer>
       </Box>
 
-      <Box component="main" sx={{
-        flexGrow: 1, 
-        p: { xs: 2, md: 5 }, 
-        width: { md: `calc(100% - ${drawerWidth}px)` }, 
-        mt: '70px',
-        position: 'relative',
-        minHeight: 'calc(100vh - 70px)'
-      }}>
+      {/* ── Main content ─────────────────────────────────────────────── */}
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          p: { xs: 2, md: '20px' },
+          width: { md: `calc(100% - ${drawerWidth}px)` },
+          mt: `${appBarHeight}px`,
+          position: 'relative',
+          minHeight: `calc(100vh - ${appBarHeight}px)`,
+          bgcolor: '#f5f6fa',
+        }}
+      >
         <Breadcrumbs />
         <PageTransition>
           <Outlet />

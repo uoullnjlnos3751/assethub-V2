@@ -1,0 +1,587 @@
+
+<h2 class="sr-only">Asset Detail Page — สเปก ประวัติ PM Glassmorphism Light</h2>
+<style>
+.root{font-family:'Sarabun',sans-serif;background:linear-gradient(135deg,#e8f0fe 0%,#f0ebff 40%,#eff6ff 70%,#f5f0ff 100%);min-height:100vh;padding:0;position:relative;overflow:hidden}
+.orb{position:fixed;border-radius:50%;filter:blur(80px);pointer-events:none;z-index:0}
+.o1{width:420px;height:420px;background:rgba(99,102,241,.1);top:-140px;left:-100px}
+.o2{width:300px;height:300px;background:rgba(139,92,246,.09);bottom:-80px;right:-60px}
+.o3{width:180px;height:180px;background:rgba(59,130,246,.07);top:50%;left:45%}
+.grid-bg{position:fixed;inset:0;background-image:radial-gradient(circle,rgba(99,102,241,.1) 1px,transparent 1px);background-size:28px 28px;pointer-events:none;z-index:0}
+.page{position:relative;z-index:1;max-width:900px;margin:0 auto;padding:20px}
+
+/* glass */
+.glass{background:rgba(255,255,255,.65);border:1px solid rgba(255,255,255,.85);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-radius:14px;box-shadow:0 4px 24px rgba(99,102,241,.07),0 1px 3px rgba(0,0,0,.04)}
+.glass-sm{background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.8);backdrop-filter:blur(12px);border-radius:10px;box-shadow:0 2px 10px rgba(99,102,241,.05)}
+
+/* breadcrumb */
+.bc{display:flex;align-items:center;gap:6px;font-size:12px;color:#9ca3af;margin-bottom:14px}
+.bc a{color:#6366f1;text-decoration:none;font-weight:500}
+.bc-sep{color:#d1d5db}
+
+/* hero card */
+.hero{padding:20px 24px;margin-bottom:16px}
+.hero-top{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap}
+.hero-icon{width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#4f46e5,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;box-shadow:0 4px 16px rgba(99,102,241,.3)}
+.hero-info{flex:1;min-width:0}
+.hero-name{font-size:18px;font-weight:700;color:#1e1b4b;line-height:1.2}
+.hero-sub{font-size:12px;color:#6b7280;margin-top:3px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.hero-code{font-family:monospace;font-size:12px;font-weight:700;color:#4338ca;background:rgba(99,102,241,.08);padding:2px 8px;border-radius:6px}
+.hero-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:10px;font-size:12px;font-family:'Sarabun',sans-serif;cursor:pointer;font-weight:600;border:1px solid;transition:all .15s}
+.btn-primary{background:linear-gradient(135deg,#4f46e5,#7c3aed);border-color:rgba(124,58,237,.3);color:#fff;box-shadow:0 3px 10px rgba(99,102,241,.25)}
+.btn-ghost{background:rgba(255,255,255,.7);border-color:rgba(99,102,241,.2);color:#4338ca}
+.btn-danger{background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.2);color:#dc2626}
+.btn-warn{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.25);color:#b45309}
+
+/* status + badges */
+.pill{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
+.p-ok{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.22);color:#059669}
+.p-warn{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.22);color:#d97706}
+.p-err{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:#dc2626}
+.p-purple{background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.22);color:#4338ca}
+.p-gray{background:rgba(107,114,128,.07);border:1px solid rgba(107,114,128,.18);color:#6b7280}
+.sdot{width:5px;height:5px;border-radius:50%;background:currentColor}
+
+/* quick stats strip */
+.qstrip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.qs{padding:12px 14px;text-align:center}
+.qs-val{font-size:18px;font-weight:800;color:#1e1b4b;line-height:1}
+.qs-lbl{font-size:10px;color:#9ca3af;margin-top:3px}
+
+/* tabs */
+.tabs{display:flex;gap:4px;background:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.8);border-radius:12px;padding:4px;margin-bottom:16px;backdrop-filter:blur(12px);flex-wrap:wrap}
+.tab-btn{flex:1;min-width:80px;padding:8px 10px;border-radius:9px;border:none;background:none;font-size:12px;font-weight:600;color:#9ca3af;cursor:pointer;font-family:'Sarabun',sans-serif;display:flex;align-items:center;justify-content:center;gap:5px;transition:all .15s;white-space:nowrap}
+.tab-btn i{font-size:14px}
+.tab-btn.active{background:#fff;color:#4338ca;box-shadow:0 2px 8px rgba(99,102,241,.12)}
+.tab-panel{display:none}
+.tab-panel.show{display:block}
+
+/* spec grid */
+.spec-section{margin-bottom:16px}
+.sec-hd{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.06em}
+.sec-bar{width:3px;height:14px;border-radius:2px;flex-shrink:0;background:var(--sb,linear-gradient(180deg,#4f46e5,#7c3aed))}
+.spec-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+@media(max-width:600px){.spec-grid{grid-template-columns:1fr 1fr}}
+.spec-item{padding:10px 12px;border-radius:10px;background:rgba(248,247,255,.7);border:1px solid rgba(99,102,241,.07)}
+.spec-lbl{font-size:10px;color:#9ca3af;margin-bottom:3px;font-weight:500}
+.spec-val{font-size:13px;color:#1e1b4b;font-weight:600}
+.spec-val.mono{font-family:monospace;font-size:12px;color:#4338ca}
+.spec-val.ok{color:#059669}
+.spec-val.err{color:#dc2626}
+.spec-val.warn{color:#d97706}
+.toggle-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700}
+.tc-yes{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.22);color:#059669}
+.tc-no{background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.18);color:#dc2626}
+
+/* software list */
+.sw-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.sw-tag{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.18);color:#4338ca}
+
+/* history timeline */
+.timeline{display:flex;flex-direction:column;gap:0}
+.tl-item{display:flex;gap:12px;position:relative}
+.tl-item:not(:last-child) .tl-line{position:absolute;left:15px;top:32px;bottom:0;width:1px;background:rgba(99,102,241,.12)}
+.tl-dot{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;margin-top:2px;border:2px solid;position:relative;z-index:1}
+.tl-dot-create{background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3)}
+.tl-dot-edit{background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.25)}
+.tl-dot-borrow{background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.28)}
+.tl-dot-return{background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.25)}
+.tl-dot-pm{background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.25)}
+.tl-body{flex:1;padding-bottom:16px}
+.tl-action{font-size:12px;font-weight:700;color:#1e1b4b}
+.tl-detail{font-size:11.5px;color:#6b7280;margin-top:2px;line-height:1.5}
+.tl-meta{font-size:10.5px;color:#d1d5db;margin-top:3px;display:flex;gap:10px;flex-wrap:wrap}
+.tl-actor{display:inline-flex;align-items:center;gap:4px}
+.ava-xs{width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff}
+.av-b{background:linear-gradient(135deg,#3b82f6,#6366f1)}
+.av-p{background:linear-gradient(135deg,#7c3aed,#a855f7)}
+.av-g{background:linear-gradient(135deg,#059669,#34d399)}
+
+/* PM section */
+.pm-list{display:flex;flex-direction:column;gap:8px}
+.pm-item{padding:14px 16px;border-radius:12px;border:1px solid rgba(99,102,241,.1);background:rgba(248,247,255,.6)}
+.pm-item-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.pm-year{font-size:13px;font-weight:700;color:#1e1b4b}
+.pm-checks{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:8px}
+@media(max-width:500px){.pm-checks{grid-template-columns:1fr 1fr}}
+.pm-check{display:flex;align-items:center;gap:5px;font-size:11px;color:#374151}
+.chk-ic{width:16px;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0}
+.chk-y{background:rgba(16,185,129,.15);color:#059669;border:1px solid rgba(16,185,129,.25)}
+.chk-n{background:rgba(239,68,68,.1);color:#dc2626;border:1px solid rgba(239,68,68,.2)}
+.pm-score{display:flex;align-items:center;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(99,102,241,.07);font-size:11px;color:#9ca3af}
+.stars{color:#f59e0b;font-size:13px}
+.pm-staff{font-size:11px;color:#6b7280;display:flex;align-items:center;gap:4px}
+
+/* borrow current */
+.borrow-now{padding:14px 16px;border-radius:12px;border:1px solid rgba(245,158,11,.25);background:rgba(254,252,232,.6);margin-bottom:12px}
+.borrow-hd{font-size:12px;font-weight:700;color:#b45309;display:flex;align-items:center;gap:6px;margin-bottom:8px}
+.borrow-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:11.5px}
+.borrow-f{color:#9ca3af;margin-bottom:2px;font-size:10px}
+.borrow-v{color:#1e1b4b;font-weight:600}
+
+/* warranty bar */
+.warranty-bar{background:rgba(255,255,255,.5);border:1px solid rgba(99,102,241,.12);border-radius:10px;padding:12px 14px;margin-bottom:8px}
+.wb-hd{display:flex;justify-content:space-between;font-size:11px;margin-bottom:6px}
+.wb-label{color:#9ca3af}
+.wb-val{color:#4338ca;font-weight:700}
+.wb-track{background:rgba(99,102,241,.1);border-radius:4px;height:6px}
+.wb-fill{height:6px;border-radius:4px;background:linear-gradient(90deg,#4f46e5,#7c3aed)}
+.wb-fill.warn{background:linear-gradient(90deg,#d97706,#fbbf24)}
+.wb-fill.err{background:linear-gradient(90deg,#ef4444,#f87171)}
+
+/* related assets */
+.related-list{display:flex;flex-direction:column;gap:6px}
+.rel-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:rgba(248,247,255,.6);border:1px solid rgba(99,102,241,.07)}
+.rel-ico{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.12);flex-shrink:0}
+.rel-name{font-size:12px;font-weight:600;color:#4338ca;font-family:monospace}
+.rel-type{font-size:10.5px;color:#9ca3af}
+</style>
+
+<div class="root">
+<div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div>
+<div class="grid-bg"></div>
+<div class="page">
+
+  <!-- Breadcrumb -->
+  <div class="bc">
+    <a href="#">ทรัพย์สิน IT</a>
+    <span class="bc-sep">›</span>
+    <span>HQ-PS-N039</span>
+  </div>
+
+  <!-- Hero -->
+  <div class="glass hero">
+    <div class="hero-top">
+      <div class="hero-icon">💻</div>
+      <div class="hero-info" style="flex:1">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <div class="hero-name">Dell Latitude 5530</div>
+          <span class="pill p-ok"><span class="sdot"></span>พร้อมใช้งาน</span>
+        </div>
+        <div class="hero-sub">
+          <span class="hero-code">HQ-PS-N039</span>
+          <span>Notebook · PS · ชั้น 23</span>
+          <span>·</span>
+          <span>แผนก ACC</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap">
+          <div class="hero-code" style="background:rgba(245,158,11,.1);color:#b45309;border-radius:6px;padding:2px 8px;font-size:11px">อายุ 1 ปี</div>
+          <div style="font-size:11px;color:#9ca3af">S/N: SN-DELL5530-XK9</div>
+        </div>
+      </div>
+      <div style="flex-shrink:0;text-align:right">
+        <div style="font-size:22px;font-weight:800;color:#4f46e5">฿45,900</div>
+        <div style="font-size:10px;color:#9ca3af;margin-top:1px">ราคาซื้อ</div>
+      </div>
+    </div>
+
+    <div class="hero-actions">
+      <button class="btn btn-ghost"><i class="ti ti-edit" aria-hidden="true"></i>แก้ไข</button>
+      <button class="btn btn-ghost"><i class="ti ti-arrows-transfer-down" aria-hidden="true"></i>โอนย้าย</button>
+      <button class="btn btn-warn"><i class="ti ti-tool" aria-hidden="true"></i>ส่งซ่อม</button>
+      <button class="btn btn-primary"><i class="ti ti-package" aria-hidden="true"></i>สร้างคำขอยืม</button>
+      <button class="btn btn-danger" style="margin-left:auto"><i class="ti ti-trash" aria-hidden="true"></i>เลิกใช้งาน</button>
+    </div>
+  </div>
+
+  <!-- Quick stats -->
+  <div class="qstrip">
+    <div class="glass qs">
+      <div class="qs-val">0</div>
+      <div class="qs-lbl">ยืมอยู่ (ครั้ง)</div>
+    </div>
+    <div class="glass qs">
+      <div class="qs-val" style="color:#7c3aed">3</div>
+      <div class="qs-lbl">ยืมทั้งหมด</div>
+    </div>
+    <div class="glass qs">
+      <div class="qs-val" style="color:#059669">1</div>
+      <div class="qs-lbl">PM เสร็จแล้ว</div>
+    </div>
+    <div class="glass qs">
+      <div class="qs-val" style="color:#d97706">428</div>
+      <div class="qs-lbl">วันหมดประกัน</div>
+    </div>
+  </div>
+
+  <!-- Warranty bar -->
+  <div class="warranty-bar">
+    <div class="wb-hd">
+      <span class="wb-label">🛡 ประกัน: 15 ม.ค. 2567 → 14 ม.ค. 2570</span>
+      <span class="wb-val">เหลือ 428 วัน (59%)</span>
+    </div>
+    <div class="wb-track"><div class="wb-fill warn" style="width:59%"></div></div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('spec',this)"><i class="ti ti-cpu" aria-hidden="true"></i>สเปก</button>
+    <button class="tab-btn" onclick="showTab('software',this)"><i class="ti ti-apps" aria-hidden="true"></i>Software</button>
+    <button class="tab-btn" onclick="showTab('history',this)"><i class="ti ti-history" aria-hidden="true"></i>ประวัติ</button>
+    <button class="tab-btn" onclick="showTab('borrow',this)"><i class="ti ti-package" aria-hidden="true"></i>ยืม-คืน</button>
+    <button class="tab-btn" onclick="showTab('pm',this)"><i class="ti ti-tool" aria-hidden="true"></i>PM</button>
+    <button class="tab-btn" onclick="showTab('related',this)"><i class="ti ti-link" aria-hidden="true"></i>อุปกรณ์เสริม</button>
+  </div>
+
+  <!-- TAB: SPEC -->
+  <div class="tab-panel show" id="tab-spec">
+    <div class="glass" style="padding:18px">
+
+      <div class="spec-section">
+        <div class="sec-hd"><div class="sec-bar"></div>Hardware</div>
+        <div class="spec-grid">
+          <div class="spec-item"><div class="spec-lbl">CPU</div><div class="spec-val">Intel Core i7-1260P</div></div>
+          <div class="spec-item"><div class="spec-lbl">Generation</div><div class="spec-val">Gen 12 (Alder Lake)</div></div>
+          <div class="spec-item"><div class="spec-lbl">RAM</div><div class="spec-val">16 GB DDR5</div></div>
+          <div class="spec-item"><div class="spec-lbl">SSD</div><div class="spec-val">512 GB NVMe</div></div>
+          <div class="spec-item"><div class="spec-lbl">HDD</div><div class="spec-val" style="color:#9ca3af">—</div></div>
+          <div class="spec-item"><div class="spec-lbl">Serial No.</div><div class="spec-val mono">SN-DELL5530-XK9</div></div>
+        </div>
+      </div>
+
+      <div class="spec-section">
+        <div class="sec-hd"><div class="sec-bar" style="--sb:linear-gradient(180deg,#2563eb,#60a5fa)"></div>ระบบปฏิบัติการ</div>
+        <div class="spec-grid">
+          <div class="spec-item"><div class="spec-lbl">Windows</div><div class="spec-val">Windows 11</div></div>
+          <div class="spec-item"><div class="spec-lbl">Version</div><div class="spec-val mono">24H2 (26100.4652)</div></div>
+          <div class="spec-item">
+            <div class="spec-lbl">Activate</div>
+            <span class="toggle-chip tc-yes">✓ Activated</span>
+          </div>
+          <div class="spec-item"><div class="spec-lbl">Join Domain</div><div class="spec-val">TRRGROUP</div></div>
+          <div class="spec-item"><div class="spec-lbl">Computer Name</div><div class="spec-val mono">HQ-PS-N039</div></div>
+          <div class="spec-item"><div class="spec-lbl">IP Phone</div><div class="spec-val">1840</div></div>
+        </div>
+      </div>
+
+      <div class="spec-section">
+        <div class="sec-hd"><div class="sec-bar" style="--sb:linear-gradient(180deg,#059669,#34d399)"></div>จัดซื้อ / ประกัน</div>
+        <div class="spec-grid">
+          <div class="spec-item"><div class="spec-lbl">วันที่ซื้อ</div><div class="spec-val">15 ม.ค. 2567</div></div>
+          <div class="spec-item"><div class="spec-lbl">วันหมดประกัน</div><div class="spec-val warn">14 ม.ค. 2570</div></div>
+          <div class="spec-item"><div class="spec-lbl">ราคาซื้อ</div><div class="spec-val">฿45,900</div></div>
+          <div class="spec-item"><div class="spec-lbl">เลข PO</div><div class="spec-val mono">PO-2568-0042</div></div>
+          <div class="spec-item"><div class="spec-lbl">Vendor</div><div class="spec-val">บริษัท เดลล์ ไทยแลนด์</div></div>
+          <div class="spec-item"><div class="spec-lbl">อายุอุปกรณ์</div><div class="spec-val">1 ปี 4 เดือน</div></div>
+        </div>
+      </div>
+
+      <div class="spec-section">
+        <div class="sec-hd"><div class="sec-bar" style="--sb:linear-gradient(180deg,#dc2626,#f87171)"></div>ผู้ถือครอง</div>
+        <div class="spec-grid">
+          <div class="spec-item"><div class="spec-lbl">ชื่อผู้ใช้</div><div class="spec-val">อาคเนย์ วันนาคอน</div></div>
+          <div class="spec-item"><div class="spec-lbl">AD Username</div><div class="spec-val mono">aekachai.wan</div></div>
+          <div class="spec-item"><div class="spec-lbl">แผนก</div><div class="spec-val">ACC</div></div>
+          <div class="spec-item"><div class="spec-lbl">Site</div><div class="spec-val">PS · ชั้น 23</div></div>
+          <div class="spec-item"><div class="spec-lbl">Asset Owner</div><div class="spec-val">TRR Corp</div></div>
+          <div class="spec-item"><div class="spec-lbl">ยืมได้</div><span class="toggle-chip tc-yes">✓ ใช่</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- TAB: SOFTWARE -->
+  <div class="tab-panel" id="tab-software">
+    <div class="glass" style="padding:18px">
+      <div class="spec-section">
+        <div class="sec-hd"><div class="sec-bar"></div>Microsoft</div>
+        <div class="spec-grid">
+          <div class="spec-item">
+            <div class="spec-lbl">MS Office</div>
+            <div class="spec-val">MS 365</div>
+            <div style="margin-top:5px"><span class="toggle-chip tc-yes">✓ Activated</span></div>
+          </div>
+          <div class="spec-item">
+            <div class="spec-lbl">License No.</div>
+            <div class="spec-val mono" style="font-size:10px;word-break:break-all">XXXXX-XXXXX-XXXXX-XXXXX</div>
+          </div>
+          <div class="spec-item">
+            <div class="spec-lbl">Office version</div>
+            <div class="spec-val">16.0.18429</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="spec-section">
+        <div class="sec-hd"><div class="sec-bar" style="--sb:linear-gradient(180deg,#dc2626,#f87171)"></div>Security</div>
+        <div class="spec-grid">
+          <div class="spec-item">
+            <div class="spec-lbl">Antivirus</div>
+            <div class="spec-val">Trend Micro Apex One</div>
+            <div style="margin-top:5px"><span class="toggle-chip tc-yes">✓ Updated</span></div>
+          </div>
+          <div class="spec-item">
+            <div class="spec-lbl">USB Policy</div>
+            <span class="toggle-chip tc-yes">✓ บังคับใช้แล้ว</span>
+          </div>
+          <div class="spec-item">
+            <div class="spec-lbl">Admin Password</div>
+            <span class="toggle-chip tc-no">✗ ยังไม่เปลี่ยน</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="spec-section">
+        <div class="sec-hd"><div class="sec-bar" style="--sb:linear-gradient(180deg,#2563eb,#60a5fa)"></div>Monitoring agents</div>
+        <div class="spec-grid">
+          <div class="spec-item">
+            <div class="spec-lbl">GLPI Agent</div>
+            <span class="toggle-chip tc-yes">✓ ติดตั้งแล้ว</span>
+          </div>
+          <div class="spec-item">
+            <div class="spec-lbl">Spicework Agent</div>
+            <span class="toggle-chip tc-yes">✓ ติดตั้งแล้ว</span>
+          </div>
+          <div class="spec-item">
+            <div class="spec-lbl">PC Audit</div>
+            <span class="toggle-chip tc-yes">✓ ผ่าน</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="spec-section">
+        <div class="sec-hd"><div class="sec-bar" style="--sb:linear-gradient(180deg,#7c3aed,#a855f7)"></div>Additional software</div>
+        <div class="sw-list">
+          <span class="sw-tag">Visio 2021</span>
+          <span class="sw-tag">Adobe Acrobat Reader</span>
+          <span class="sw-tag">Nitro PDF</span>
+          <span class="sw-tag">7-Zip</span>
+          <span class="sw-tag">VPN Client</span>
+          <span class="sw-tag">Teams Desktop</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: HISTORY -->
+  <div class="tab-panel" id="tab-history">
+    <div class="glass" style="padding:18px">
+      <div class="timeline">
+
+        <div class="tl-item">
+          <div class="tl-line"></div>
+          <div class="tl-dot tl-dot-borrow">🔄</div>
+          <div class="tl-body">
+            <div class="tl-action">คืนอุปกรณ์ <span class="pill p-ok" style="font-size:10px">Completed</span></div>
+            <div class="tl-detail">คืนจากคำขอ BR-2568-0039 · สภาพ: ปกติ</div>
+            <div class="tl-meta">
+              <span>12 พ.ค. 2568 14:22 น.</span>
+              <span class="tl-actor"><div class="ava-xs av-p">CJ</div> ชัยวัฒน์ จ. (IT Admin)</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-line"></div>
+          <div class="tl-dot tl-dot-borrow">📦</div>
+          <div class="tl-body">
+            <div class="tl-action">ส่งมอบอุปกรณ์ Check-out <span class="pill p-purple" style="font-size:10px">BR-2568-0039</span></div>
+            <div class="tl-detail">ผู้รับ: อาคเนย์ วันนาคอน (ACC) · กำหนดคืน 15 พ.ค. 2568</div>
+            <div class="tl-meta">
+              <span>12 พ.ค. 2568 10:05 น.</span>
+              <span class="tl-actor"><div class="ava-xs av-b">WK</div> วัชระ คิดโสดา (IT Admin)</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-line"></div>
+          <div class="tl-dot tl-dot-pm">🔧</div>
+          <div class="tl-body">
+            <div class="tl-action">ทำ PM ประจำปี 2568 <span class="pill p-purple" style="font-size:10px">เสร็จสิ้น</span></div>
+            <div class="tl-detail">ช่าง: วัชระ คิดโสดา · คะแนน: ★★★★☆ 4/5</div>
+            <div class="tl-meta">
+              <span>28 มี.ค. 2568 11:30 น.</span>
+              <span class="tl-actor"><div class="ava-xs av-b">WK</div> วัชระ คิดโสดา (IT Admin)</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-line"></div>
+          <div class="tl-dot tl-dot-edit">✏️</div>
+          <div class="tl-body">
+            <div class="tl-action">แก้ไขข้อมูล</div>
+            <div class="tl-detail">อัปเดต Windows version: 23H2 → 24H2 (26100.4652)</div>
+            <div class="tl-meta">
+              <span>28 มี.ค. 2568 11:00 น.</span>
+              <span class="tl-actor"><div class="ava-xs av-b">WK</div> วัชระ คิดโสดา</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-line"></div>
+          <div class="tl-dot tl-dot-borrow">📦</div>
+          <div class="tl-body">
+            <div class="tl-action">ยืม-คืน ครั้งที่ 2 <span class="pill p-ok" style="font-size:10px">Completed</span></div>
+            <div class="tl-detail">BR-2568-0021 · ยืม 3 วัน · คืนตรงกำหนด</div>
+            <div class="tl-meta"><span>10 ก.พ. 2568</span></div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-line"></div>
+          <div class="tl-dot tl-dot-borrow">📦</div>
+          <div class="tl-body">
+            <div class="tl-action">ยืม-คืน ครั้งที่ 1 <span class="pill p-ok" style="font-size:10px">Completed</span></div>
+            <div class="tl-detail">BR-2568-0008 · ยืม 3 วัน · คืนตรงกำหนด</div>
+            <div class="tl-meta"><span>5 ม.ค. 2568</span></div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-dot tl-dot-create">✨</div>
+          <div class="tl-body">
+            <div class="tl-action">เพิ่มอุปกรณ์ใหม่เข้าระบบ</div>
+            <div class="tl-detail">นำเข้าจาก Excel · ทะเบียนคอม V41</div>
+            <div class="tl-meta">
+              <span>15 ม.ค. 2568</span>
+              <span class="tl-actor"><div class="ava-xs av-g">IT</div> IT Admin (Import)</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: BORROW -->
+  <div class="tab-panel" id="tab-borrow">
+    <div class="glass" style="padding:18px">
+      <div style="font-size:11px;font-weight:700;color:#6b7280;letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px">ประวัติการยืม-คืน</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+
+        <div style="display:grid;grid-template-columns:auto 1fr auto auto auto;gap:10px;align-items:center;padding:10px 14px;border-radius:10px;background:rgba(248,247,255,.7);border:1px solid rgba(99,102,241,.08);font-size:12px">
+          <div style="font-family:monospace;color:#4338ca;font-weight:700">BR-2568-0039</div>
+          <div><div style="color:#1e1b4b;font-weight:600">อาคเนย์ วันนาคอน</div><div style="font-size:10px;color:#9ca3af">ACC · 12–15 พ.ค. 2568</div></div>
+          <div style="text-align:right;font-size:10.5px;color:#9ca3af">3 วัน</div>
+          <div><span class="pill p-ok"><span class="sdot"></span>คืนแล้ว</span></div>
+          <div style="font-size:11px;color:#059669">ปกติ</div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:auto 1fr auto auto auto;gap:10px;align-items:center;padding:10px 14px;border-radius:10px;background:rgba(248,247,255,.7);border:1px solid rgba(99,102,241,.08);font-size:12px">
+          <div style="font-family:monospace;color:#4338ca;font-weight:700">BR-2568-0021</div>
+          <div><div style="color:#1e1b4b;font-weight:600">ประภา รื่นเริง</div><div style="font-size:10px;color:#9ca3af">FIN · 10–13 ก.พ. 2568</div></div>
+          <div style="text-align:right;font-size:10.5px;color:#9ca3af">3 วัน</div>
+          <div><span class="pill p-ok"><span class="sdot"></span>คืนแล้ว</span></div>
+          <div style="font-size:11px;color:#059669">ปกติ</div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:auto 1fr auto auto auto;gap:10px;align-items:center;padding:10px 14px;border-radius:10px;background:rgba(248,247,255,.7);border:1px solid rgba(99,102,241,.08);font-size:12px">
+          <div style="font-family:monospace;color:#4338ca;font-weight:700">BR-2568-0008</div>
+          <div><div style="color:#1e1b4b;font-weight:600">สมชาย กิตติกร</div><div style="font-size:10px;color:#9ca3af">ACC · 5–8 ม.ค. 2568</div></div>
+          <div style="text-align:right;font-size:10.5px;color:#9ca3af">3 วัน</div>
+          <div><span class="pill p-ok"><span class="sdot"></span>คืนแล้ว</span></div>
+          <div style="font-size:11px;color:#059669">ปกติ</div>
+        </div>
+
+      </div>
+      <div style="margin-top:14px;padding:10px 14px;border-radius:10px;background:rgba(248,247,255,.5);border:1px solid rgba(99,102,241,.07);display:flex;gap:20px;font-size:12px">
+        <div><span style="color:#9ca3af">ยืมทั้งหมด</span> <strong style="color:#4f46e5;margin-left:4px">3 ครั้ง</strong></div>
+        <div><span style="color:#9ca3af">คืนตรงกำหนด</span> <strong style="color:#059669;margin-left:4px">3/3</strong></div>
+        <div><span style="color:#9ca3af">เกินกำหนด</span> <strong style="color:#9ca3af;margin-left:4px">0 ครั้ง</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: PM -->
+  <div class="tab-panel" id="tab-pm">
+    <div class="glass" style="padding:18px">
+      <div class="pm-list">
+
+        <div class="pm-item">
+          <div class="pm-item-hd">
+            <div>
+              <div class="pm-year">PM ปี 2568 <span class="pill p-ok" style="font-size:10px;margin-left:4px">✓ เสร็จสิ้น</span></div>
+              <div class="pm-staff"><div class="ava-xs av-b" style="width:20px;height:20px;font-size:9px">WK</div>วัชระ คิดโสดา (แจ็ค) · 28 มี.ค. 2568</div>
+            </div>
+            <button class="btn btn-ghost" style="font-size:11px;padding:5px 10px">ดูรายละเอียด</button>
+          </div>
+          <div class="pm-checks">
+            <div class="pm-check"><div class="chk-ic chk-y">✓</div>Windows Activate</div>
+            <div class="pm-check"><div class="chk-ic chk-y">✓</div>Office Activate</div>
+            <div class="pm-check"><div class="chk-ic chk-y">✓</div>อัปเดต Antivirus</div>
+            <div class="pm-check"><div class="chk-ic chk-y">✓</div>USB Policy</div>
+            <div class="pm-check"><div class="chk-ic chk-n">✗</div>เปลี่ยน Admin PW</div>
+            <div class="pm-check"><div class="chk-ic chk-y">✓</div>GLPI Agent</div>
+            <div class="pm-check"><div class="chk-ic chk-y">✓</div>Spicework</div>
+            <div class="pm-check"><div class="chk-ic chk-y">✓</div>PC Audit</div>
+            <div class="pm-check"><div class="chk-ic chk-y">✓</div>ทำความสะอาด</div>
+          </div>
+          <div class="pm-score">
+            <span class="stars">★★★★☆</span>
+            <span style="color:#1e1b4b;font-weight:700">4/5</span>
+            <span>· ความพึงพอใจผู้ใช้</span>
+            <span style="margin-left:auto;color:#b45309;font-size:11px">⚠ Admin PW ยังไม่เปลี่ยน</span>
+          </div>
+        </div>
+
+        <div class="pm-item" style="border-color:rgba(156,163,175,.2);opacity:.7">
+          <div class="pm-item-hd">
+            <div>
+              <div class="pm-year" style="color:#6b7280">PM ปี 2567 <span class="pill p-gray" style="font-size:10px;margin-left:4px">✓ เสร็จสิ้น</span></div>
+              <div class="pm-staff" style="color:#9ca3af">ชัยวัฒน์ จารุกรุณา (วัฒน์) · 15 ก.พ. 2567</div>
+            </div>
+            <button class="btn btn-ghost" style="font-size:11px;padding:5px 10px">ดูรายละเอียด</button>
+          </div>
+          <div class="pm-score" style="border-top:1px solid rgba(99,102,241,.07);padding-top:8px;margin-top:4px">
+            <span class="stars" style="color:#d1d5db">★★★★★</span>
+            <span style="color:#9ca3af">5/5</span>
+            <span>· ไม่พบปัญหา</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: RELATED -->
+  <div class="tab-panel" id="tab-related">
+    <div class="glass" style="padding:18px">
+      <div style="font-size:11px;font-weight:700;color:#6b7280;letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px">อุปกรณ์ต่อพ่วงที่เชื่อมอยู่</div>
+      <div class="related-list">
+        <div class="rel-item">
+          <div class="rel-ico">🖥</div>
+          <div style="flex:1">
+            <div class="rel-name">HQ-PS-M003</div>
+            <div class="rel-type">Monitor · Dell E2425HS · 24" FHD IPS</div>
+          </div>
+          <span class="pill p-ok"><span class="sdot"></span>ใช้งาน</span>
+        </div>
+        <div class="rel-item">
+          <div class="rel-ico">🖱</div>
+          <div style="flex:1">
+            <div class="rel-name" style="color:#7c3aed">STOCK-MOUSE-001</div>
+            <div class="rel-type">Mouse · Logitech M171 · Wireless 2.4G</div>
+          </div>
+          <span class="pill p-ok"><span class="sdot"></span>ใช้งาน</span>
+        </div>
+        <div class="rel-item">
+          <div class="rel-ico">⌨️</div>
+          <div style="flex:1">
+            <div class="rel-name" style="color:#7c3aed">STOCK-KB-003</div>
+            <div class="rel-type">Keyboard · HP K1000 · USB</div>
+          </div>
+          <span class="pill p-ok"><span class="sdot"></span>ใช้งาน</span>
+        </div>
+      </div>
+      <button class="btn btn-ghost" style="margin-top:12px;width:100%;justify-content:center;font-size:12px">
+        <i class="ti ti-plus" aria-hidden="true"></i>เชื่อมอุปกรณ์เสริม
+      </button>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+function showTab(name, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('show'));
+  btn.classList.add('active');
+  const panel = document.getElementById('tab-' + name);
+  if (panel) panel.classList.add('show');
+}
+</script>

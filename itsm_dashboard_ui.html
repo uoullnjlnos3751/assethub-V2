@@ -1,0 +1,530 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:var(--font-sans,sans-serif)}
+body{background:var(--color-background-tertiary)}
+.app{display:flex;height:100vh;min-height:700px;background:var(--color-background-tertiary)}
+.sidebar{width:210px;min-width:210px;background:var(--color-background-primary);border-right:0.5px solid var(--color-border-tertiary);display:flex;flex-direction:column;overflow-y:auto}
+.sb-logo{display:flex;align-items:center;gap:8px;padding:14px 14px 10px;border-bottom:0.5px solid var(--color-border-tertiary)}
+.sb-logo-icon{width:34px;height:34px;border-radius:8px;background:#f59e0b;display:flex;align-items:center;justify-content:center;font-weight:500;font-size:13px;color:#fff}
+.sb-logo-text{font-size:13px;font-weight:500;color:var(--color-text-primary);line-height:1.2}
+.sb-logo-sub{font-size:10px;color:var(--color-text-secondary)}
+.sb-section{padding:10px 10px 4px;font-size:10px;font-weight:500;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:.05em}
+.sb-item{display:flex;align-items:center;gap:8px;padding:7px 12px;margin:1px 8px;border-radius:var(--border-radius-md);cursor:pointer;font-size:13px;color:var(--color-text-secondary);transition:background .15s}
+.sb-item:hover{background:var(--color-background-secondary)}
+.sb-item.active{background:#fef3c7;color:#b45309;font-weight:500}
+.sb-item .icon{width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.sb-badge{margin-left:auto;background:#ef4444;color:#fff;font-size:10px;border-radius:999px;padding:1px 6px;min-width:18px;text-align:center}
+.sb-user{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:0.5px solid var(--color-border-tertiary);margin-top:auto}
+.avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#f59e0b,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:#fff;flex-shrink:0}
+.sb-user-text{font-size:12px;color:var(--color-text-primary);font-weight:500}
+.sb-user-role{font-size:10px;color:#f59e0b}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{height:50px;background:var(--color-background-primary);border-bottom:0.5px solid var(--color-border-tertiary);display:flex;align-items:center;padding:0 20px;gap:12px}
+.topbar-title{font-size:15px;font-weight:500;color:var(--color-text-primary)}
+.topbar-sub{font-size:11px;color:var(--color-text-secondary)}
+.topbar-search{flex:1;max-width:280px;margin-left:16px;position:relative}
+.topbar-search input{width:100%;padding:6px 12px 6px 30px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);font-size:12px;background:var(--color-background-secondary);color:var(--color-text-primary)}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.topbar-loc{font-size:11px;background:var(--color-background-secondary);padding:5px 10px;border-radius:var(--border-radius-md);color:var(--color-text-secondary)}
+.topbar-icon{width:32px;height:32px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-tertiary);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;color:var(--color-text-secondary)}
+.content{flex:1;overflow-y:auto;padding:20px}
+.breadcrumb{font-size:12px;color:var(--color-text-secondary);margin-bottom:16px}
+.breadcrumb span{color:var(--color-text-tertiary)}
+.breadcrumb .cur{color:var(--color-text-primary)}
+.asset-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px}
+.asset-card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:14px 12px;cursor:pointer;transition:border-color .15s}
+.asset-card:hover{border-color:var(--color-border-secondary)}
+.asset-card.active{border-top:3px solid #f59e0b}
+.asset-icon{font-size:20px;margin-bottom:6px}
+.asset-num{font-size:22px;font-weight:500;color:var(--color-text-primary)}
+.asset-label{font-size:11px;color:var(--color-text-secondary);margin-top:2px}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.stat-card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:14px}
+.stat-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.stat-badge{font-size:10px;padding:2px 8px;border-radius:999px}
+.stat-badge.ontrack{background:#d1fae5;color:#065f46}
+.stat-badge.active{background:#dbeafe;color:#1e40af}
+.stat-badge.pct{background:#d1fae5;color:#065f46}
+.stat-badge.alert{background:#fee2e2;color:#991b1b}
+.stat-num{font-size:28px;font-weight:500}
+.stat-num.orange{color:#f59e0b}
+.stat-num.blue{color:#2563eb}
+.stat-num.green{color:#10b981}
+.stat-num.red{color:#ef4444}
+.stat-label{font-size:12px;color:var(--color-text-secondary)}
+.stat-sub{font-size:10px;color:var(--color-text-tertiary);margin-top:2px}
+.bar-row{display:flex;gap:2px;margin-top:10px}
+.bar-seg{height:5px;border-radius:2px;flex:1}
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+.chart-card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:16px}
+.chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.chart-title{font-size:13px;font-weight:500;color:var(--color-text-primary)}
+.chart-link{font-size:11px;color:#f59e0b;cursor:pointer}
+.mini-chart{height:100px;display:flex;align-items:flex-end;gap:3px;padding-top:8px}
+.mini-bar{flex:1;border-radius:3px 3px 0 0;min-height:4px}
+.donut-wrap{display:flex;align-items:center;gap:16px}
+.donut-svg{flex-shrink:0}
+.donut-legend{font-size:11px;color:var(--color-text-secondary)}
+.donut-legend li{list-style:none;display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.bottom-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.table-card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:16px}
+.table-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.tbl{width:100%;font-size:12px;border-collapse:collapse}
+.tbl th{font-size:10px;font-weight:500;color:var(--color-text-tertiary);text-align:left;padding:4px 6px;border-bottom:0.5px solid var(--color-border-tertiary)}
+.tbl td{padding:6px 6px;border-bottom:0.5px solid var(--color-border-tertiary);color:var(--color-text-secondary);vertical-align:middle}
+.tbl td:first-child{color:#f59e0b;font-weight:500}
+.pill{display:inline-block;font-size:10px;padding:2px 7px;border-radius:999px}
+.pill.orange{background:#fff7ed;color:#c2410c}
+.pill.green{background:#d1fae5;color:#065f46}
+.pill.red{background:#fee2e2;color:#991b1b}
+.pill.blue{background:#dbeafe;color:#1e40af}
+.pill.yellow{background:#fef9c3;color:#a16207}
+.alert-card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:16px}
+.alert-item{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:0.5px solid var(--color-border-tertiary)}
+.alert-item:last-child{border-bottom:none}
+.alert-icon{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+.page-tabs{display:flex;gap:0}
+.tab{padding:6px 14px;font-size:12px;cursor:pointer;border-bottom:2px solid transparent;color:var(--color-text-secondary)}
+.tab.active{border-bottom-color:#f59e0b;color:#b45309;font-weight:500}
+</style>
+
+<div class="app">
+<nav class="sidebar">
+  <div class="sb-logo">
+    <div class="sb-logo-icon">IT</div>
+    <div>
+      <div class="sb-logo-text">IT Asset Pro</div>
+      <div class="sb-logo-sub">ระบบจัดการ IT ครบวงจร</div>
+    </div>
+  </div>
+  <div class="sb-section">ภาพรวม</div>
+  <div class="sb-item active" onclick="showPage('dashboard')"><div class="icon">🏠</div>Dashboard</div>
+  <div class="sb-item" onclick="showPage('reports')"><div class="icon">📊</div>รายงานสรุป<span class="sb-badge">ใหม่</span></div>
+  <div class="sb-section">จัดการทรัพย์สิน</div>
+  <div class="sb-item" onclick="showPage('computers')"><div class="icon">💻</div>คอมพิวเตอร์</div>
+  <div class="sb-item" onclick="showPage('assets')"><div class="icon">🖥️</div>จอภาพ</div>
+  <div class="sb-item" onclick="showPage('assets')"><div class="icon">🖨️</div>เครื่องพิมพ์</div>
+  <div class="sb-item" onclick="showPage('assets')"><div class="icon">🌐</div>อุปกรณ์เครือข่าย</div>
+  <div class="sb-item" onclick="showPage('allassets')"><div class="icon">📦</div>อุปกรณ์ทั่วไป</div>
+  <div class="sb-section">Service Desk</div>
+  <div class="sb-item" onclick="showPage('servicedesk')"><div class="icon">✏️</div>แจ้งซ่อม<span class="sb-badge">1</span></div>
+  <div class="sb-item" onclick="showPage('pm')"><div class="icon">📅</div>บำรุงรักษา (PM)</div>
+  <div class="sb-item" onclick="showPage('assets')"><div class="icon">🔄</div>ยืม-คืนอุปกรณ์</div>
+  <div class="sb-item" onclick="showPage('sla')"><div class="icon">⚡</div>SLA Management</div>
+  <div class="sb-section">คลังอะไหล่</div>
+  <div class="sb-item" onclick="showPage('assets')"><div class="icon">🔧</div>ตลับหมึก</div>
+  <div class="sb-item" onclick="showPage('assets')"><div class="icon">🔩</div>อะไหล่</div>
+  <div class="sb-section">ซอฟต์แวร์และสัญญา</div>
+  <div class="sb-item" onclick="showPage('licenses')"><div class="icon">💿</div>Software Licenses<span class="sb-badge">1</span></div>
+  <div class="sb-item" onclick="showPage('assets')"><div class="icon">🌍</div>โดเมน & SSL</div>
+  <div class="sb-item" onclick="showPage('assets')"><div class="icon">📄</div>สัญญา</div>
+  <div class="sb-user">
+    <div class="avatar">AI</div>
+    <div>
+      <div class="sb-user-text">Al Pairoj</div>
+      <div class="sb-user-role">Super Admin</div>
+    </div>
+    <div style="margin-left:auto;font-size:14px;cursor:pointer;color:var(--color-text-tertiary)">⚙️</div>
+  </div>
+</nav>
+
+<div class="main">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title" id="topbar-title">📊 Dashboard ภาพรวมระบบ</div>
+      <div class="topbar-sub" id="topbar-sub">ข้อมูล ณ 28 มีนาคม 2569</div>
+    </div>
+    <div class="topbar-search">
+      <input placeholder="ค้นหา...">
+    </div>
+    <div class="topbar-right">
+      <div class="topbar-loc">📍 สำนักงานใหญ่ กรุงเทพ</div>
+      <div class="topbar-icon">☀️</div>
+      <div class="topbar-icon">⤢</div>
+      <div class="topbar-icon">🔔</div>
+      <div class="avatar" style="width:32px;height:32px;font-size:11px">AI</div>
+      <div style="font-size:12px;color:var(--color-text-primary)">Al Pairoj</div>
+      <div style="font-size:12px;color:var(--color-text-tertiary)">14:38:20</div>
+    </div>
+  </div>
+
+  <div class="content" id="page-content">
+  </div>
+</div>
+</div>
+
+<script>
+const pages = {
+dashboard: `
+<div class="breadcrumb"><span>หน้าหลัก</span> › <span class="cur">Dashboard</span></div>
+<div class="asset-grid">
+  <div class="asset-card active"><div class="asset-icon">💻</div><div class="asset-num">3</div><div class="asset-label">คอมพิวเตอร์</div></div>
+  <div class="asset-card"><div class="asset-icon">🖥️</div><div class="asset-num">2</div><div class="asset-label">จอภาพ</div></div>
+  <div class="asset-card"><div class="asset-icon">🖨️</div><div class="asset-num">2</div><div class="asset-label">เครื่องพิมพ์</div></div>
+  <div class="asset-card"><div class="asset-icon">🌐</div><div class="asset-num">2</div><div class="asset-label">อุปกรณ์เครือข่าย</div></div>
+  <div class="asset-card"><div class="asset-icon">📦</div><div class="asset-num">0</div><div class="asset-label">อุปกรณ์ทั่วไป</div></div>
+  <div class="asset-card"><div class="asset-icon">🖧</div><div class="asset-num">1</div><div class="asset-label">เซิร์ฟเวอร์</div></div>
+  <div class="asset-card"><div class="asset-icon">🔋</div><div class="asset-num">0</div><div class="asset-label">UPS/สำรองไฟ</div></div>
+  <div class="asset-card"><div class="asset-icon">✏️</div><div class="asset-num">1</div><div class="asset-label">งานซ่อมเปิดอยู่</div></div>
+  <div class="asset-card"><div class="asset-icon">❤️</div><div class="asset-num" style="color:#ef4444">0</div><div class="asset-label">Stock ต่ำ</div></div>
+  <div class="asset-card"><div class="asset-icon">⏱️</div><div class="asset-num">1</div><div class="asset-label">License ใกล้หมด</div></div>
+  <div class="asset-card"><div class="asset-icon">🌐</div><div class="asset-num" style="color:#ef4444">0</div><div class="asset-label">Domain/SSL</div></div>
+  <div class="asset-card"><div class="asset-icon">📅</div><div class="asset-num" style="color:#f59e0b">เดือนนี้</div><div class="asset-label">PM วางแผน</div></div>
+</div>
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-top"><div style="font-size:20px">✏️</div><div class="stat-badge ontrack">✓ On Track</div></div>
+    <div class="stat-num orange">1</div>
+    <div class="stat-label">งานซ่อมที่เปิดอยู่</div>
+    <div class="stat-sub">เดือนนี้ 1 งาน · MTTR 0 ชม.</div>
+    <div class="bar-row">${Array(10).fill(0).map((_,i)=>`<div class="bar-seg" style="background:${i<7?'#f59e0b':'#fed7aa'}"></div>`).join('')}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-top"><div style="font-size:20px">🖥️</div><div class="stat-badge active">▲ Active</div></div>
+    <div class="stat-num blue">10</div>
+    <div class="stat-label">ทรัพย์สิน IT ทั้งหมด</div>
+    <div class="stat-sub">ใช้งาน 9 · สำรอง 1 เสีย</div>
+    <div class="bar-row">${Array(10).fill(0).map((_,i)=>`<div class="bar-seg" style="background:${i<9?'#3b82f6':'#93c5fd'}"></div>`).join('')}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-top"><div style="font-size:20px">✅</div><div class="stat-badge pct">▲ 100%</div></div>
+    <div class="stat-num green">100%</div>
+    <div class="stat-label">SLA Achievement</div>
+    <div class="stat-sub">เดือน 1 มี.ค. 2569 · เป้า 95%</div>
+    <div class="bar-row">${Array(10).fill(0).map(()=>`<div class="bar-seg" style="background:#10b981"></div>`).join('')}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-top"><div style="font-size:20px">⚠️</div><div class="stat-badge alert">▼ 1 รายการ</div></div>
+    <div class="stat-num red">1</div>
+    <div class="stat-label">การแจ้งเตือนทั้งหมด</div>
+    <div class="stat-sub">SSL 0 · สัญญา 0 · Stock 0</div>
+    <div class="bar-row">${Array(10).fill(0).map((_,i)=>`<div class="bar-seg" style="background:${i<2?'#ef4444':'#fca5a5'}"></div>`).join('')}</div>
+  </div>
+</div>
+<div class="charts-row">
+  <div class="chart-card">
+    <div class="chart-header"><div class="chart-title">📈 แนวโน้มงานซ่อม — 6 เดือน</div><div class="chart-link">รายงาน →</div></div>
+    <div class="mini-chart">
+      ${[15,25,40,30,55,60,45,70,50,80,65,90].map((h,i)=>`<div class="mini-bar" style="height:${h}%;background:${i%2===0?'#fbbf24':'#86efac'}"></div>`).join('')}
+    </div>
+    <div style="font-size:10px;color:var(--color-text-tertiary);margin-top:6px;text-align:center">มี.ค. 2569</div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header"><div class="chart-title">🗂️ สัดส่วนทรัพย์สิน IT</div><div class="chart-link">10 รายการ</div></div>
+    <div class="donut-wrap">
+      <svg class="donut-svg" width="90" height="90" viewBox="0 0 90 90">
+        <circle cx="45" cy="45" r="30" fill="none" stroke="#3b82f6" stroke-width="16" stroke-dasharray="56.5 131.9" stroke-dashoffset="0"/>
+        <circle cx="45" cy="45" r="30" fill="none" stroke="#10b981" stroke-width="16" stroke-dasharray="37.7 131.9" stroke-dashoffset="-56.5"/>
+        <circle cx="45" cy="45" r="30" fill="none" stroke="#f59e0b" stroke-width="16" stroke-dasharray="37.7 131.9" stroke-dashoffset="-94.2"/>
+        <circle cx="45" cy="45" r="30" fill="none" stroke="#8b5cf6" stroke-width="16" stroke-dasharray="20 131.9" stroke-dashoffset="-131.9"/>
+        <text x="45" y="49" text-anchor="middle" font-size="14" font-weight="500" fill="var(--color-text-primary)">10</text>
+      </svg>
+      <ul class="donut-legend">
+        <li><div class="dot" style="background:#3b82f6"></div>คอมพิวเตอร์ 3</li>
+        <li><div class="dot" style="background:#10b981"></div>จอภาพ 2</li>
+        <li><div class="dot" style="background:#f59e0b"></div>เครื่องพิมพ์ 2</li>
+        <li><div class="dot" style="background:#8b5cf6"></div>อุปกรณ์เครือข่าย 2</li>
+        <li><div class="dot" style="background:#ef4444"></div>UPS/สำรองไฟ 0</li>
+      </ul>
+    </div>
+  </div>
+</div>
+<div class="bottom-row">
+  <div class="table-card">
+    <div class="table-header"><div class="chart-title">✏️ งานซ่อมล่าสุด</div><div class="chart-link">ดูทั้งหมด →</div></div>
+    <table class="tbl">
+      <tr><th>JOB ID</th><th>อุปกรณ์/ปัญหา</th><th>ช่าง</th><th>ลำดับ</th><th>สถานะ</th></tr>
+      <tr><td>#0001</td><td>Dell P2423D<br><span style="font-size:10px;color:var(--color-text-tertiary)">test</span></td><td>—</td><td><span class="pill yellow">ปานกลาง</span></td><td><span class="pill orange">มอบหมาย</span></td></tr>
+    </table>
+  </div>
+  <div class="alert-card">
+    <div class="table-header"><div class="chart-title">🔔 แจ้งเตือนด่วน</div><span style="font-size:11px;background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:999px">1</span></div>
+    <div class="alert-item">
+      <div class="alert-icon" style="background:#fff7ed">⚠️</div>
+      <div>
+        <div style="font-size:12px;font-weight:500;color:var(--color-text-primary)">License ใกล้หมด (2 วัน)</div>
+        <div style="font-size:11px;color:var(--color-text-secondary)">Windows 2025 · หมดอายุ 30 มี.ค. 2569</div>
+      </div>
+    </div>
+  </div>
+</div>`,
+
+computers: `
+<div class="breadcrumb"><span>หน้าหลัก</span> › <span class="cur">💻 คอมพิวเตอร์</span></div>
+<div class="stats-row" style="grid-template-columns:repeat(5,1fr)">
+  <div class="stat-card"><div style="font-size:18px">💻</div><div class="stat-num" style="font-size:22px">3</div><div class="stat-label" style="font-size:11px">ทั้งหมด</div></div>
+  <div class="stat-card" style="border-top:3px solid #10b981"><div style="font-size:18px">✅</div><div class="stat-num green" style="font-size:22px">2</div><div class="stat-label" style="font-size:11px">ใช้งาน</div></div>
+  <div class="stat-card" style="border-top:3px solid #f59e0b"><div style="font-size:18px">✏️</div><div class="stat-num orange" style="font-size:22px">1</div><div class="stat-label" style="font-size:11px">ส่งซ่อม</div></div>
+  <div class="stat-card" style="border-top:3px solid #8b5cf6"><div style="font-size:18px">📦</div><div class="stat-num" style="font-size:22px;color:#8b5cf6">0</div><div class="stat-label" style="font-size:11px">สำรอง</div></div>
+  <div class="stat-card" style="border-top:3px solid #ef4444"><div style="font-size:18px">🛡️</div><div class="stat-num red" style="font-size:22px">0</div><div class="stat-label" style="font-size:11px">ประกันใกล้หมด</div></div>
+</div>
+<div style="display:flex;gap:8px;margin-bottom:14px;align-items:center">
+  <div class="page-tabs">
+    <div class="tab active">ทั้งหมด</div>
+    <div class="tab">✅ ใช้งาน (2)</div>
+    <div class="tab">✏️ ซ่อม (1)</div>
+    <div class="tab">📦 สำรอง (0)</div>
+    <div class="tab">ประกันใกล้หมด</div>
+  </div>
+  <button style="margin-left:auto;background:#f59e0b;color:#fff;border:none;padding:7px 14px;border-radius:var(--border-radius-md);font-size:12px;cursor:pointer">+ เพิ่มคอมพิวเตอร์</button>
+</div>
+<div style="display:flex;gap:8px;margin-bottom:14px;align-items:center">
+  <input placeholder="ค้นหารหัส, ยี่ห้อ, S/N, IP, ชื่อผู้ใช้" style="flex:1;padding:7px 12px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);font-size:12px;background:var(--color-background-secondary);color:var(--color-text-primary)">
+  <select style="padding:7px 10px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);font-size:12px;background:var(--color-background-secondary);color:var(--color-text-primary)"><option>— ทุกสาขา —</option></select>
+  <select style="padding:7px 10px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);font-size:12px;background:var(--color-background-secondary);color:var(--color-text-primary)"><option>— ทุกสถานะ —</option></select>
+  <button style="background:#f59e0b;color:#fff;border:none;padding:7px 14px;border-radius:var(--border-radius-md);font-size:12px;cursor:pointer">🔍 ค้นหา</button>
+  <button style="background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);padding:7px 10px;border-radius:var(--border-radius-md);font-size:12px;cursor:pointer;color:var(--color-text-secondary)">↺ ล้าง</button>
+  <button style="background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);padding:7px 10px;border-radius:var(--border-radius-md);font-size:12px;cursor:pointer;color:var(--color-text-secondary)">📤 Export CSV</button>
+</div>
+<div class="table-card">
+  <div class="table-header"><div class="chart-title">💻 รายการคอมพิวเตอร์ (3 เครื่อง)</div><div style="font-size:11px;color:var(--color-text-tertiary)">หน้า 1/1</div></div>
+  <table class="tbl" style="width:100%">
+    <tr><th>รหัส</th><th>อุปกรณ์</th><th>CPU/RAM/STORAGE</th><th>OS</th><th>IP ADDRESS</th><th>สาขา/แผนก</th><th>ผู้ใช้งาน</th><th>IT ผู้ดูแล</th><th>ประกัน</th><th>สถานะ</th><th>จัดการ</th></tr>
+    <tr><td>HQ-PC-0001</td><td><b style="font-weight:500;font-size:12px">HP EliteBook 840 G9</b><br><span style="font-size:10px;color:var(--color-text-tertiary)">S/N: CND1234ABC</span></td><td>—</td><td>—</td><td style="color:#3b82f6">192.168.1.101</td><td><span class="pill blue">สำนักงานใหญ่ กรุงเทพ</span><span class="pill" style="background:#f0fdf4;color:#166534;margin-left:2px">ฝ่ายการเงิน</span></td><td>—</td><td>—</td><td><span class="pill red">หมดแล้ว</span></td><td><span class="pill green">ใช้งาน</span></td><td><span style="cursor:pointer">👁️</span> <span style="cursor:pointer">✏️</span></td></tr>
+    <tr><td>HQ-PC-0002</td><td><b style="font-weight:500;font-size:12px">Lenovo ThinkPad X1 Carbon</b><br><span style="font-size:10px;color:var(--color-text-tertiary)">S/N: LNV9876XYZ</span></td><td>—</td><td>—</td><td style="color:#3b82f6">192.168.1.102</td><td><span class="pill blue">สำนักงานใหญ่ กรุงเทพ</span><span class="pill" style="background:#f0fdf4;color:#166534;margin-left:2px">ฝ่ายการเงิน</span></td><td>—</td><td>—</td><td><span class="pill red">หมดแล้ว</span></td><td><span class="pill green">ใช้งาน</span></td><td><span style="cursor:pointer">👁️</span> <span style="cursor:pointer">✏️</span></td></tr>
+    <tr><td>HQ-PC-0003</td><td><b style="font-weight:500;font-size:12px">Dell Latitude 5530</b><br><span style="font-size:10px;color:var(--color-text-tertiary)">S/N: DLLABCD001</span></td><td>—</td><td>—</td><td style="color:#3b82f6">192.168.1.103</td><td><span class="pill blue">สำนักงานใหญ่ กรุงเทพ</span><span class="pill" style="background:#fdf4ff;color:#86198f;margin-left:2px">ฝ่ายทรัพยากรบุคคล</span></td><td>—</td><td>—</td><td><span class="pill red">หมดแล้ว</span></td><td><span class="pill orange">ซ่อม</span></td><td><span style="cursor:pointer">👁️</span> <span style="cursor:pointer">✏️</span></td></tr>
+  </table>
+</div>`,
+
+servicedesk: `
+<div class="breadcrumb"><span>หน้าหลัก</span> › <span class="cur">Service Desk</span></div>
+<div style="display:flex;gap:8px;margin-bottom:14px;align-items:center">
+  <div class="page-tabs">
+    <div class="tab active" style="background:#f59e0b;color:#fff;border-radius:var(--border-radius-md);border:none">ทั้งหมด (1)</div>
+    <div class="tab">รอมอบหมาย (0)</div>
+    <div class="tab">กำลังซ่อม (0)</div>
+    <div class="tab">รอชิ้นส่วน (0)</div>
+    <div class="tab">เสร็จ (0)</div>
+  </div>
+  <button style="margin-left:auto;background:#f59e0b;color:#fff;border:none;padding:7px 14px;border-radius:var(--border-radius-md);font-size:12px;cursor:pointer">+ แจ้งซ่อมใหม่</button>
+</div>
+<div style="display:flex;gap:8px;margin-bottom:14px">
+  <input placeholder="ค้นหา Job ID, หัวข้อ, ผู้แจ้ง..." style="flex:1;padding:7px 12px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);font-size:12px;background:var(--color-background-secondary);color:var(--color-text-primary)">
+  <select style="padding:7px 10px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);font-size:12px;background:var(--color-background-secondary);color:var(--color-text-primary)"><option>— ทุกลำดับ —</option></select>
+  <select style="padding:7px 10px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);font-size:12px;background:var(--color-background-secondary);color:var(--color-text-primary)"><option>— ทุกสาขา —</option></select>
+  <select style="padding:7px 10px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);font-size:12px;background:var(--color-background-secondary);color:var(--color-text-primary)"><option>— ทุกช่าง —</option></select>
+  <button style="background:#f59e0b;color:#fff;border:none;padding:7px 14px;border-radius:var(--border-radius-md);font-size:12px;cursor:pointer">🔍 ค้นหา</button>
+</div>
+<div class="table-card">
+  <div class="table-header"><div class="chart-title">✏️ รายการงานซ่อม (1 รายการ)</div><div class="chart-link">📤 Export →</div></div>
+  <table class="tbl">
+    <tr><th>JOB ID</th><th>อุปกรณ์/ปัญหา</th><th>สาขา</th><th>ผู้แจ้ง</th><th>ช่าง</th><th>ลำดับ</th><th>SLA</th><th>สถานะ</th><th>วันที่แจ้ง</th><th>จัดการ</th></tr>
+    <tr>
+      <td>#0001</td>
+      <td><span style="font-weight:500;font-size:12px">Dell P2423D</span><br><span style="font-size:10px;color:var(--color-text-tertiary)">test</span></td>
+      <td><span class="pill blue">สำนักงานใหญ่ กรุงเทพ</span><span class="pill green" style="margin-left:2px">ฝ่าย IT</span></td>
+      <td>Al Pairoj</td>
+      <td>ประภาส อันทรีดี</td>
+      <td><span class="pill yellow">ปานกลาง</span></td>
+      <td><span style="color:#ef4444;font-size:11px">⚡ เกิน</span></td>
+      <td><span class="pill orange">มอบหมาย</span></td>
+      <td style="font-size:11px">28 มี.ค. 2569</td>
+      <td><span style="cursor:pointer;font-size:14px">👁️</span></td>
+    </tr>
+  </table>
+</div>`,
+
+sla: `
+<div class="breadcrumb"><span>หน้าหลัก</span> › <span class="cur">SLA Management</span></div>
+<div class="table-card" style="margin-bottom:14px">
+  <div class="table-header"><div class="chart-title">⚡ SLA Performance เดือนนี้</div><div class="chart-link">รายงานเต็ม →</div></div>
+  <div style="display:flex;align-items:center;gap:12px;margin:8px 0">
+    <span style="font-size:12px;color:#f59e0b">● Medium</span>
+    <div style="flex:1;height:6px;background:var(--color-background-secondary);border-radius:999px;overflow:hidden"><div style="width:100%;height:100%;background:#10b981;border-radius:999px"></div></div>
+    <span style="font-size:12px;color:var(--color-text-secondary)">งาน 1 · Breach 0 · MTTR — ชม.</span>
+    <span style="font-size:14px;font-weight:500;color:#10b981">100.0%</span>
+  </div>
+</div>
+<div class="table-card" style="margin-bottom:14px">
+  <div class="table-header"><div class="chart-title">⚡ SLA Policies</div><button style="background:#f59e0b;color:#fff;border:none;padding:6px 12px;border-radius:var(--border-radius-md);font-size:12px;cursor:pointer">+ เพิ่ม Policy</button></div>
+  <table class="tbl">
+    <tr><th>ชื่อ POLICY</th><th>PRIORITY</th><th>เวลาตอบสนอง</th><th>เวลาที่ใช้</th><th>งานเดือนนี้</th><th>BREACH</th><th>สถานะ</th><th>จัดการ</th></tr>
+    <tr><td style="color:var(--color-text-primary);font-weight:500">Critical SLA</td><td><span class="pill red">Critical</span></td><td style="color:#f59e0b">1.0 ชม.</td><td style="color:#10b981">4.0 ชม.</td><td>0 งาน</td><td><span class="pill green">ไม่มี</span></td><td><span class="pill green">เปิดใช้</span></td><td>✏️ 🗑️</td></tr>
+    <tr><td style="color:var(--color-text-primary);font-weight:500">High Priority SLA</td><td><span class="pill orange">High</span></td><td style="color:#f59e0b">2.0 ชม.</td><td style="color:#10b981">8.0 ชม.</td><td>0 งาน</td><td><span class="pill green">ไม่มี</span></td><td><span class="pill green">เปิดใช้</span></td><td>✏️ 🗑️</td></tr>
+    <tr><td style="color:var(--color-text-primary);font-weight:500">Medium Priority SLA</td><td><span class="pill yellow">Medium</span></td><td style="color:#f59e0b">4.0 ชม.</td><td style="color:#10b981">24.0 ชม.</td><td>1 งาน</td><td><span class="pill green">ไม่มี</span></td><td><span class="pill green">เปิดใช้</span></td><td>✏️ 🗑️</td></tr>
+    <tr><td style="color:var(--color-text-primary);font-weight:500">Standard SLA</td><td><span class="pill green">Low</span></td><td style="color:#f59e0b">8.0 ชม.</td><td style="color:#10b981">72.0 ชม.</td><td>0 งาน</td><td><span class="pill green">ไม่มี</span></td><td><span class="pill green">เปิดใช้</span></td><td>✏️ 🗑️</td></tr>
+  </table>
+</div>
+<div class="table-card">
+  <div class="chart-title" style="margin-bottom:12px">📋 คู่มือ SLA ระบบ</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <div style="border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:12px"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span style="color:#ef4444">●</span><b style="font-weight:500">Critical</b></div><div style="font-size:12px;color:var(--color-text-secondary)">สำคัญมาก — ระบบหยุดทำงาน, กระทบธุรกิจทั้งหมด</div><div style="font-size:11px;color:#f59e0b;margin-top:4px">ตอบสนอง 1 ชม. แก้ไข 4 ชม.</div></div>
+    <div style="border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:12px"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span style="color:#f97316">●</span><b style="font-weight:500">High</b></div><div style="font-size:12px;color:var(--color-text-secondary)">ด่วน — กระทบผู้ใช้จำนวนมาก, ไม่มี workaround</div><div style="font-size:11px;color:#f59e0b;margin-top:4px">ตอบสนอง 2 ชม. แก้ไข 8 ชม.</div></div>
+    <div style="border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:12px"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span style="color:#eab308">●</span><b style="font-weight:500">Medium</b></div><div style="font-size:12px;color:var(--color-text-secondary)">ปานกลาง — กระทบผู้ใช้บางส่วน, มี workaround ได้</div><div style="font-size:11px;color:#f59e0b;margin-top:4px">ตอบสนอง 4 ชม. แก้ไข 24 ชม.</div></div>
+    <div style="border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:12px"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span style="color:#10b981">●</span><b style="font-weight:500">Low</b></div><div style="font-size:12px;color:var(--color-text-secondary)">ทั่วไป — ปัญหาเล็กน้อย, กระทบน้อย</div><div style="font-size:11px;color:#f59e0b;margin-top:4px">ตอบสนอง 8 ชม. แก้ไข 72 ชม.</div></div>
+  </div>
+</div>`,
+
+licenses: `
+<div class="breadcrumb"><span>หน้าหลัก</span> › <span class="cur">Software Licenses</span></div>
+<div class="stats-row">
+  <div class="stat-card"><div style="font-size:20px">💿</div><div class="stat-num" style="font-size:22px">2</div><div class="stat-label">License ทั้งหมด</div></div>
+  <div class="stat-card"><div style="font-size:20px">🚫</div><div class="stat-num green" style="font-size:22px">0</div><div class="stat-label">หมดอายุแล้ว</div></div>
+  <div class="stat-card"><div style="font-size:20px">⚠️</div><div class="stat-num orange" style="font-size:22px">1</div><div class="stat-label">ใกล้หมด (30 วัน)</div></div>
+  <div class="stat-card"><div style="font-size:20px">💺</div><div class="stat-num green" style="font-size:22px">0</div><div class="stat-label">Seats เต็ม</div></div>
+</div>
+<div style="display:flex;gap:8px;margin-bottom:14px;align-items:center">
+  <div class="page-tabs">
+    <div class="tab active">ทั้งหมด (2)</div>
+    <div class="tab">⚠️ ใกล้หมด (1)</div>
+    <div class="tab">หมดแล้ว (0)</div>
+    <div class="tab">Seats เต็ม (0)</div>
+  </div>
+  <button style="background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);padding:7px 10px;border-radius:var(--border-radius-md);font-size:12px;cursor:pointer;color:var(--color-text-secondary);margin-left:auto">📤 Export CSV</button>
+  <button style="background:#f59e0b;color:#fff;border:none;padding:7px 14px;border-radius:var(--border-radius-md);font-size:12px;cursor:pointer">+ เพิ่ม License</button>
+</div>
+<div class="table-card">
+  <div class="table-header"><div class="chart-title">💿 รายการ Software Licenses (2)</div></div>
+  <table class="tbl">
+    <tr><th>ซอฟต์แวร์</th><th>ประเภท</th><th>SEATS USED/TOTAL</th><th>VENDOR</th><th>วันหมดอายุ</th><th>ราคาต่ออายุ</th><th>สถานะ</th><th>จัดการ</th></tr>
+    <tr>
+      <td><span style="font-weight:500">Windows 2025</span> <span style="font-size:10px;color:var(--color-text-tertiary)">v2025</span></td>
+      <td>📅 รายปี</td><td>0 / 1</td><td>Windows 2025</td>
+      <td><span class="pill orange">⚠️ 2 วัน</span></td>
+      <td>฿16,200</td>
+      <td><span class="pill orange">ใกล้หมด</span></td>
+      <td>👁️ ✏️</td>
+    </tr>
+    <tr>
+      <td><span style="font-weight:500">O365</span> <span style="font-size:10px;color:var(--color-text-tertiary)">v365</span></td>
+      <td>⭐ ถาวร</td><td>0 / 1</td><td>O365</td>
+      <td><span class="pill green">● 30 ธ.ค. 2569</span></td>
+      <td>฿100</td>
+      <td><span class="pill green">ปกติ</span></td>
+      <td>👁️ ✏️</td>
+    </tr>
+  </table>
+</div>`,
+
+allassets: `
+<div class="breadcrumb"><span>หน้าหลัก</span> › <span class="cur">🗂️ ทรัพย์สิน IT ทั้งหมด</span></div>
+<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+  <div class="tab active" style="border-bottom:2px solid #f59e0b;color:#b45309;cursor:pointer">ทั้งหมด (9)</div>
+  <div class="tab" style="cursor:pointer">💻 คอมพิวเตอร์ 3</div>
+  <div class="tab" style="cursor:pointer">🖥️ จอภาพ 2</div>
+  <div class="tab" style="cursor:pointer">🖨️ เครื่องพิมพ์ 2</div>
+  <div class="tab" style="cursor:pointer">🌐 อุปกรณ์เครือข่าย 2</div>
+  <div class="tab" style="cursor:pointer">🛡️ เซิร์ฟเวอร์ 1</div>
+  <div class="tab" style="cursor:pointer">ประกันใกล้หมด</div>
+  <button style="margin-left:auto;background:#f59e0b;color:#fff;border:none;padding:7px 14px;border-radius:var(--border-radius-md);font-size:12px;cursor:pointer">+ เพิ่มทรัพย์สิน</button>
+</div>
+<div style="display:flex;gap:8px;margin-bottom:14px">
+  <input placeholder="ค้นหารหัส, ยี่ห้อ, S/N, IP, ชื่อผู้ใช้" style="flex:1;padding:7px 12px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);font-size:12px;background:var(--color-background-secondary);color:var(--color-text-primary)">
+  <select style="padding:7px 10px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);font-size:12px;background:var(--color-background-secondary);color:var(--color-text-primary)"><option>— ทุกสาขา —</option></select>
+  <select style="padding:7px 10px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);font-size:12px;background:var(--color-background-secondary);color:var(--color-text-primary)"><option>— ทุกสถานะ —</option></select>
+  <button style="background:#f59e0b;color:#fff;border:none;padding:7px 14px;border-radius:var(--border-radius-md);font-size:12px;cursor:pointer">🔍 ค้นหา</button>
+  <button style="background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);padding:7px 10px;border-radius:var(--border-radius-md);font-size:12px;cursor:pointer;color:var(--color-text-secondary)">📤 Export CSV</button>
+</div>
+<div class="table-card">
+  <div class="table-header"><div class="chart-title">🗂️ รายการทรัพย์สิน (2 รายการ)</div><div style="font-size:11px;color:var(--color-text-tertiary)">หน้า 1/1</div></div>
+  <table class="tbl">
+    <tr><th>รหัส</th><th>ประเภท</th><th>อุปกรณ์</th><th>SERIAL/IP</th><th>สาขา/แผนก</th><th>ผู้ใช้งาน</th><th>ราคา</th><th>ประกัน</th><th>สถานะ</th><th>จัดการ</th></tr>
+    <tr><td>HQ-MN-0001</td><td>🖥️ จอภาพ</td><td><span style="font-weight:500">Dell P2423D</span><br><span style="font-size:10px;color:var(--color-text-tertiary)">📍 ชั้น 3 ฝ่ายการเงิน</span></td><td>DLLMN001XY</td><td><span class="pill blue">สำนักงานใหญ่ กรุงเทพ</span><span class="pill green" style="margin-left:2px">ฝ่ายการเงิน</span></td><td>—</td><td>฿9,500</td><td><span class="pill red">หมดแล้ว</span></td><td><span class="pill green">ใช้งาน</span></td><td>👁️ ✏️</td></tr>
+    <tr><td>HQ-MN-0002</td><td>🖥️ จอภาพ</td><td><span style="font-weight:500">LG 27UK850-W</span><br><span style="font-size:10px;color:var(--color-text-tertiary)">📍 ชั้น 2 ฝ่ายขาย</span></td><td>LGMN9981AA</td><td><span class="pill blue">สำนักงานใหญ่ กรุงเทพ</span><span class="pill" style="background:#fdf4ff;color:#86198f;margin-left:2px">ฝ่ายขาย</span></td><td>—</td><td>฿12,000</td><td><span class="pill red">หมดแล้ว</span></td><td><span class="pill green">ใช้งาน</span></td><td>👁️ ✏️</td></tr>
+  </table>
+</div>`,
+
+pm: `
+<div class="breadcrumb"><span>หน้าหลัก</span> › <span class="cur">📅 PM Calendar</span></div>
+<div class="stats-row">
+  <div class="stat-card"><div style="font-size:20px">📅</div><div class="stat-num orange" style="font-size:22px">2</div><div class="stat-label">PM เดือนนี้</div></div>
+  <div class="stat-card"><div style="font-size:20px">✅</div><div class="stat-num green" style="font-size:22px">0</div><div class="stat-label">เสร็จแล้ว</div></div>
+  <div class="stat-card"><div style="font-size:20px">📋</div><div class="stat-num" style="font-size:22px">2</div><div class="stat-label">วางแผนทั้งหมด</div></div>
+  <div class="stat-card"><div style="font-size:20px">📈</div><div class="stat-num blue" style="font-size:22px">0%</div><div class="stat-label">Completion Rate</div></div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 360px;gap:14px">
+  <div class="chart-card">
+    <div class="chart-header">
+      <div style="display:flex;align-items:center;gap:8px"><button style="background:none;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:4px 8px;cursor:pointer;font-size:12px">‹</button><div class="chart-title">มีนาคม 2569</div><button style="background:none;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:4px 8px;cursor:pointer;font-size:12px">›</button></div>
+      <button style="background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);padding:4px 10px;border-radius:var(--border-radius-md);font-size:12px;cursor:pointer;color:var(--color-text-secondary)">วันนี้</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);text-align:center;gap:2px">
+      ${['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัส','ศุกร์','เสาร์'].map((d,i)=>`<div style="font-size:11px;color:${i===0?'#ef4444':i===6?'#3b82f6':'var(--color-text-tertiary)'};padding:4px">${d}</div>`).join('')}
+      ${[...Array(5)].map(()=>`<div></div>`).join('')}
+      ${[...Array(31)].map((_,i)=>{const d=i+1;let extra='';if(d===28)extra=`<div style="font-size:9px;background:#fef3c7;color:#b45309;border-radius:3px;padding:1px 2px;margin-top:2px">test</div>`;if(d===31)extra=`<div style="font-size:9px;background:#dbeafe;color:#1e40af;border-radius:3px;padding:1px 2px;margin-top:2px">ต่อ MA</div>`;return`<div style="padding:4px 2px;border-radius:4px;background:${d===28?'#fef9c3':d===31?'#dbeafe':'transparent'};font-size:12px;color:${d===28?'#b45309':d===31?'#1e40af':'var(--color-text-primary)'}">${d}${extra}</div>`}).join('')}
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div class="chart-card">
+      <div class="chart-title" style="margin-bottom:12px">+ สร้างแผน PM</div>
+      <div style="margin-bottom:8px"><label style="font-size:11px;color:var(--color-text-secondary)">อุปกรณ์ *</label><select style="width:100%;margin-top:4px;padding:7px 10px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);font-size:12px;background:var(--color-background-secondary);color:var(--color-text-primary)"><option>— เลือกอุปกรณ์ —</option></select></div>
+      <div style="margin-bottom:8px"><label style="font-size:11px;color:var(--color-text-secondary)">หัวข้อ PM *</label><input placeholder="PM คอมพิวเตอร์ประจำปี, เปลี่ยน Thermal Paste..." style="width:100%;margin-top:4px;padding:7px 10px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);font-size:12px;background:var(--color-background-secondary);color:var(--color-text-primary)"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div><label style="font-size:11px;color:var(--color-text-secondary)">วันที่กำหนด *</label><input type="date" value="2026-03-28" style="width:100%;margin-top:4px;padding:7px 8px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);font-size:11px;background:var(--color-background-secondary);color:var(--color-text-primary)"></div>
+        <div><label style="font-size:11px;color:var(--color-text-secondary)">ช่างรับผิดชอบ</label><select style="width:100%;margin-top:4px;padding:7px 8px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);font-size:11px;background:var(--color-background-secondary);color:var(--color-text-primary)"><option>— เลือกช่าง —</option></select></div>
+      </div>
+      <button style="width:100%;background:#f59e0b;color:#fff;border:none;padding:9px;border-radius:var(--border-radius-md);font-size:13px;cursor:pointer">📅 สร้างแผน PM</button>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header"><div class="chart-title">📋 PM เดือน มีนาคม</div><div class="chart-link">รอดำเนินการ</div></div>
+      <div style="border-left:3px solid #f59e0b;padding:8px 10px;margin-bottom:8px;background:var(--color-background-secondary);border-radius:0 var(--border-radius-md) var(--border-radius-md) 0">
+        <div style="font-size:11px;color:var(--color-text-tertiary)">28 มี.ค.</div>
+        <div style="font-size:13px;font-weight:500">test</div>
+        <div style="font-size:11px;color:var(--color-text-secondary)">HQ-MN-0002 LG 27UK850-W</div>
+        <div style="font-size:11px;color:var(--color-text-tertiary)">ช่าง: Al Pairoj</div>
+        <div style="display:flex;gap:6px;margin-top:6px"><span class="pill orange">วางแผน</span><button style="background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);padding:3px 8px;border-radius:var(--border-radius-md);font-size:11px;cursor:pointer;color:var(--color-text-secondary)">อัพเดท</button></div>
+      </div>
+      <div style="border-left:3px solid #3b82f6;padding:8px 10px;background:var(--color-background-secondary);border-radius:0 var(--border-radius-md) var(--border-radius-md) 0">
+        <div style="font-size:11px;color:var(--color-text-tertiary)">31 มี.ค.</div>
+        <div style="font-size:13px;font-weight:500">ต่อ MA</div>
+        <div style="font-size:11px;color:var(--color-text-secondary)">HQ-NW-0002 FortiGate FG-60F</div>
+        <div style="font-size:11px;color:var(--color-text-tertiary)">ช่าง: สมชาย กิตติวงศ์</div>
+        <div style="display:flex;gap:6px;margin-top:6px"><span class="pill orange">วางแผน</span><button style="background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);padding:3px 8px;border-radius:var(--border-radius-md);font-size:11px;cursor:pointer;color:var(--color-text-secondary)">อัพเดท</button></div>
+      </div>
+    </div>
+  </div>
+</div>`,
+
+reports: `
+<div class="breadcrumb"><span>หน้าหลัก</span> › <span class="cur">รายงานสรุป</span></div>
+<div class="chart-title" style="margin-bottom:12px">📋 รายงานหลัก</div>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
+  <div class="chart-card" style="cursor:pointer"><div style="display:flex;gap:12px;align-items:center"><div style="font-size:24px">✏️</div><div><div style="font-weight:500">รายงานงานซ่อม</div><div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">สรุปงาน Service Desk แยกตามสถานะ, ลำดับ, ช่าง, สาขา พร้อม MTTR และค่าใช้จ่าย</div><div style="margin-top:8px"><span class="pill orange">1 งานเดือนนี้</span></div></div></div></div>
+  <div class="chart-card" style="cursor:pointer"><div style="display:flex;gap:12px;align-items:center"><div style="font-size:24px">🗂️</div><div><div style="font-weight:500">รายงานทรัพย์สิน IT</div><div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">ทะเบียนทรัพย์สินทั้งหมด แยกตามประเภท สาขา สถานะ รวมมูลค่าและประกัน</div><div style="margin-top:8px"><span class="pill blue">10 รายการ</span></div></div></div></div>
+  <div class="chart-card" style="cursor:pointer"><div style="display:flex;gap:12px;align-items:center"><div style="font-size:24px">⚡</div><div><div style="font-weight:500">รายงาน SLA Performance</div><div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">ผลการทำงานตาม SLA แยกตามลำดับ ช่าง และสาขา พร้อม Trend 6 เดือน</div><div style="margin-top:8px"><span class="pill green">100% Achievement</span></div></div></div></div>
+  <div class="chart-card" style="cursor:pointer"><div style="display:flex;gap:12px;align-items:center"><div style="font-size:24px">📊</div><div><div style="font-weight:500">รายงานเปรียบเทียบสาขา</div><div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">เปรียบเทียบทรัพย์สิน งานซ่อม SLA และมูลค่าของแต่ละสาขา พร้อม Chart</div><div style="margin-top:8px"><span class="pill blue">5 สาขา</span><span class="pill green" style="margin-left:4px">฿0.7M</span></div></div></div></div>
+  <div class="chart-card" style="cursor:pointer"><div style="display:flex;gap:12px;align-items:center"><div style="font-size:24px">💿</div><div><div style="font-weight:500">รายงาน Software Licenses</div><div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">สรุปการใช้งาน Seats, License ใกล้หมด, ค่าใช้จ่าย และการต่ออายุ</div><div style="margin-top:8px"><span class="pill blue">2 License</span><span class="pill orange" style="margin-left:4px">1 ใกล้หมด</span></div></div></div></div>
+  <div class="chart-card" style="cursor:pointer"><div style="display:flex;gap:12px;align-items:center"><div style="font-size:24px">🔔</div><div><div style="font-weight:500">ศูนย์แจ้งเตือน</div><div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">รวม Alert ทั้งหมด — SLA, SSL, สัญญา, License, ประกัน, Stock, อะไหล่ใกล้กับที่กำหนด</div><div style="margin-top:8px"><span class="pill green">✓ ปกติทุกระบบ</span></div></div></div></div>
+</div>
+<div style="margin-bottom:20px">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><div style="font-size:14px">📤</div><div class="chart-title">EXPORT CSV ด่วน</div></div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px">
+    ${['งานซ่อมเดือนนี้','ทรัพย์สินทั้งหมด','ประกันใกล้หมด','SLA เดือนนี้','สรุปสาขา','Software License','License ทั้งหมด','โดเมน & SSL','สัญญาทั้งหมด','ตลับหมึก','อะไหล่'].map(t=>`<button style="background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);padding:7px 12px;border-radius:var(--border-radius-md);font-size:12px;cursor:pointer;color:var(--color-text-secondary)">📤 ${t}</button>`).join('')}
+  </div>
+</div>`,
+
+assets: `
+<div class="breadcrumb"><span>หน้าหลัก</span> › <span class="cur">หน้านี้</span></div>
+<div style="text-align:center;padding:60px 20px;color:var(--color-text-secondary)">
+  <div style="font-size:40px;margin-bottom:12px">🚧</div>
+  <div style="font-size:16px;font-weight:500;color:var(--color-text-primary);margin-bottom:8px">หน้านี้อยู่ในการพัฒนา</div>
+  <div style="font-size:13px">คลิกเมนูอื่นเพื่อดูตัวอย่างหน้าที่สร้างเสร็จแล้ว</div>
+</div>`
+};
+
+const titleMap = {
+  dashboard: ['📊 Dashboard ภาพรวมระบบ','ข้อมูล ณ 28 มีนาคม 2569'],
+  computers: ['💻 คอมพิวเตอร์ / แล็ปท็อป','ข้อมูล ณ 28 มีนาคม 2569'],
+  servicedesk: ['✏️ Service Desk — งานซ่อม','ข้อมูล ณ 28 มีนาคม 2569'],
+  sla: ['⚡ SLA Management','ข้อมูล ณ 28 มีนาคม 2569'],
+  licenses: ['💿 Software Licenses','ข้อมูล ณ 28 มีนาคม 2569'],
+  allassets: ['🗂️ ทรัพย์สิน IT','ข้อมูล ณ 28 มีนาคม 2569'],
+  pm: ['📅 บำรุงรักษา (PM)','ข้อมูล ณ 28 มีนาคม 2569'],
+  reports: ['📋 รายงานสรุป','ข้อมูล ณ 28 มีนาคม 2569'],
+  assets: ['📦 หน้าอื่นๆ','ข้อมูล ณ 28 มีนาคม 2569']
+};
+
+function showPage(name) {
+  document.getElementById('page-content').innerHTML = pages[name] || pages.assets;
+  const t = titleMap[name] || titleMap.assets;
+  document.getElementById('topbar-title').textContent = t[0];
+  document.getElementById('topbar-sub').textContent = t[1];
+  document.querySelectorAll('.sb-item').forEach(el => el.classList.remove('active'));
+  const map = {dashboard:0,reports:1,computers:2,assets:3,servicedesk:9,pm:10,sla:12,licenses:16,allassets:4};
+  const items = document.querySelectorAll('.sb-item');
+  if(map[name]!==undefined && items[map[name]]) items[map[name]].classList.add('active');
+}
+
+showPage('dashboard');
+</script>

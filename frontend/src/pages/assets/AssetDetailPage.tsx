@@ -1,628 +1,680 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-  Box, Typography, Card, CardContent, Grid, Chip, Button, Table, TableBody,
-  TableCell, TableContainer, TableHead, TableRow, Paper, CircularProgress,
-  Divider, Stack,
-} from '@mui/material';
-import {
-  Edit as EditIcon,
-  ArrowBack as ArrowBackIcon,
-} from '@mui/icons-material';
+import { CircularProgress } from '@mui/material';
+import QRCode from 'react-qr-code';
 import { assetAPI } from '../../services/api';
 
-const statusColors: Record<string, string> = {
-  Available: 'success', Borrowed: 'warning', InUse: 'info',
-  Maintenance: 'error', Retired: 'default', Lost: 'error',
-};
-
-const statusLabels: Record<string, string> = {
+/* ─── Status helpers ──────────────────────────────────────────── */
+const STATUS_LABEL: Record<string, string> = {
   Available: 'พร้อมใช้งาน', Borrowed: 'กำลังยืม', InUse: 'ใช้งานประจำ',
   Maintenance: 'ซ่อมบำรุง', Retired: 'ปลดระวาง', Lost: 'สูญหาย',
 };
-
-const historyActionLabels: Record<string, string> = {
-  CREATE: 'สร้าง', STATUS_CHANGE: 'เปลี่ยนสถานะ', OWNER_CHANGE: 'เปลี่ยนผู้ถือครอง',
-  LOCATION_CHANGE: 'เปลี่ยนสถานที่', CHECKOUT: 'ส่งมอบ', RETURN: 'คืน',
+const STATUS_CLASS: Record<string, string> = {
+  Available: 'p-ok', Borrowed: 'p-warn', InUse: 'p-purple',
+  Maintenance: 'p-warn', Retired: 'p-gray', Lost: 'p-err',
 };
 
-const pmStatusLabels: Record<string, string> = {
+const HISTORY_LABEL: Record<string, string> = {
+  CREATE: 'เพิ่มทรัพย์สินเข้าระบบ', STATUS_CHANGE: 'เปลี่ยนสถานะ',
+  OWNER_CHANGE: 'เปลี่ยนผู้ถือครอง', LOCATION_CHANGE: 'เปลี่ยนสถานที่',
+  CHECKOUT: 'ส่งมอบอุปกรณ์ Check-out', RETURN: 'คืนอุปกรณ์',
+};
+
+const HISTORY_ICON: Record<string, string> = {
+  CREATE: '✨', STATUS_CHANGE: '✏️', OWNER_CHANGE: '👤',
+  LOCATION_CHANGE: '📍', CHECKOUT: '📦', RETURN: '🔄',
+};
+
+const HISTORY_DOT: Record<string, string> = {
+  CREATE: 'tl-dot-create', STATUS_CHANGE: 'tl-dot-edit',
+  OWNER_CHANGE: 'tl-dot-edit', LOCATION_CHANGE: 'tl-dot-edit',
+  CHECKOUT: 'tl-dot-borrow', RETURN: 'tl-dot-return',
+};
+
+const PM_LABEL: Record<string, string> = {
   DRAFT: 'ร่าง', IN_PROGRESS: 'กำลังดำเนินการ', COMPLETED: 'เสร็จสิ้น',
 };
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <Typography
-      variant="subtitle2"
-      sx={{
-        fontWeight: 600,
-        textTransform: 'uppercase',
-        letterSpacing: 1.2,
-        color: 'text.secondary',
-        mb: 2,
-        pb: 1,
-        borderBottom: 1,
-        borderColor: 'divider',
-      }}
-    >
-      {children}
-    </Typography>
-  );
+/* ─── Emoji icons by type ─────────────────────────────────────── */
+function getTypeIcon(type: string): string {
+  const t = type?.toLowerCase() || '';
+  if (['notebook', 'laptop', 'macbook'].some(k => t.includes(k))) return '💻';
+  if (['desktop', 'pc', 'workstation', 'all-in-one'].some(k => t.includes(k))) return '🖥';
+  if (t.includes('server')) return '🗄';
+  if (t.includes('monitor')) return '🖥';
+  if (t.includes('printer')) return '🖨';
+  if (['phone', 'tablet', 'smartphone', 'ipad'].some(k => t.includes(k))) return '📱';
+  if (['switch', 'router', 'firewall', 'access point', 'ap', 'network'].some(k => t.includes(k))) return '🌐';
+  if (t.includes('projector')) return '📽';
+  if (t.includes('webcam')) return '📷';
+  if (t.includes('speaker')) return '🔊';
+  return '🔧';
 }
 
-function InfoItem({ label, value, fullWidth }: { label: string; value: string | number | null | undefined; fullWidth?: boolean }) {
+/* ─── Spec item ───────────────────────────────────────────────── */
+function SpecItem({ label, value, mono, colorClass }: {
+  label: string; value?: string | number | null; mono?: boolean; colorClass?: string;
+}) {
   if (value === null || value === undefined || value === '') return null;
   return (
-    <Grid item xs={12} sm={6} md={fullWidth ? 12 : 4}>
-      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 400, display: 'block', mb: 0.25, fontSize: '0.75rem' }}>
-        {label}
-      </Typography>
-      <Typography variant="body2" sx={{ fontWeight: 500, fontSize: '0.875rem' }}>
-        {value}
-      </Typography>
-    </Grid>
+    <div className="spec-item">
+      <div className="spec-lbl">{label}</div>
+      <div className={`spec-val${mono ? ' mono' : ''}${colorClass ? ' ' + colorClass : ''}`}>
+        {String(value)}
+      </div>
+    </div>
   );
 }
 
+function BoolBadge({ value, yes, no }: { value: boolean | null | undefined; yes?: string; no?: string }) {
+  if (value === null || value === undefined) return null;
+  return value
+    ? <span className="toggle-chip tc-yes">✓ {yes || 'ใช่'}</span>
+    : <span className="toggle-chip tc-no">✗ {no || 'ไม่ใช่'}</span>;
+}
+
+/* ─── Warranty progress bar ───────────────────────────────────── */
+function WarrantyBar({ purchaseDate, warrantyEndDate }: { purchaseDate?: string; warrantyEndDate?: string }) {
+  if (!purchaseDate || !warrantyEndDate) return null;
+  const start = new Date(purchaseDate).getTime();
+  const end = new Date(warrantyEndDate).getTime();
+  const now = Date.now();
+  const total = end - start;
+  const elapsed = now - start;
+  const pct = Math.max(0, Math.min(100, (elapsed / total) * 100));
+  const daysLeft = Math.max(0, Math.round((end - now) / 86400000));
+  const fillClass = pct >= 90 ? 'err' : pct >= 70 ? 'warn' : '';
+
+  return (
+    <div className="warranty-bar">
+      <div className="wb-hd">
+        <span className="wb-label">
+          🛡 ประกัน: {new Date(purchaseDate).toLocaleDateString('th-TH')} → {new Date(warrantyEndDate).toLocaleDateString('th-TH')}
+        </span>
+        <span className="wb-val">
+          {daysLeft > 0 ? `เหลือ ${daysLeft.toLocaleString('th-TH')} วัน (${Math.round(100 - pct)}%)` : 'หมดประกันแล้ว'}
+        </span>
+      </div>
+      <div className="wb-track">
+        <div className={`wb-fill ${fillClass}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+/* ─── Spec sections by type ───────────────────────────────────── */
+function SpecTab({ asset }: { asset: any }) {
+  const t = (asset.type || '').toLowerCase();
+  const cat = (asset.category?.name || '').toLowerCase();
+  const detail = asset.detail || {};
+
+  const isComputer = ['notebook', 'laptop', 'macbook', 'pc desktop', 'desktop', 'workstation', 'all-in-one', 'mini pc', 'thin client', 'computer'].some(k => t.includes(k)) || cat === 'คอมพิวเตอร์' || t === 'pc';
+  const isMonitor = t.includes('monitor') || cat === 'จอภาพ';
+  const isPhone = ['smartphone', 'tablet', 'ipad', 'mobile'].some(k => t.includes(k)) || cat === 'อุปกรณ์สื่อสาร';
+  const isNetwork = ['switch', 'router', 'access point', 'firewall', 'modem'].some(k => t.includes(k)) || cat === 'อุปกรณ์เครือข่าย';
+  const isPrinter = t.includes('printer') || cat === 'เครื่องพิมพ์';
+
+  return (
+    <div className="glass" style={{ padding: '18px' }}>
+      {/* ── General ── */}
+      <div className="spec-section">
+        <div className="sec-hd"><div className="sec-bar" style={{ '--sb': 'linear-gradient(180deg,#6366f1,#8b5cf6)' } as any}></div>ข้อมูลทั่วไป</div>
+        <div className="spec-grid">
+          <SpecItem label="ชื่อทรัพย์สิน" value={asset.assetName} />
+          <SpecItem label="ประเภท" value={asset.type} />
+          <SpecItem label="ยี่ห้อ" value={asset.brand} />
+          <SpecItem label="รุ่น" value={asset.model} />
+          <SpecItem label="Serial No." value={asset.serialNo} mono />
+          <SpecItem label="Company" value={asset.company} />
+          <SpecItem label="Old Asset Code" value={asset.oldAssetCode} mono />
+          <SpecItem label="Domain Name" value={asset.domainName} />
+        </div>
+      </div>
+
+      {/* ── Computer Hardware ── */}
+      {isComputer && !isMonitor && (
+        <>
+          <div className="spec-section">
+            <div className="sec-hd"><div className="sec-bar"></div>Hardware</div>
+            <div className="spec-grid">
+              <SpecItem label="CPU" value={asset.cpu} />
+              <SpecItem label="Generation" value={asset.cpuGeneration} />
+              <SpecItem label="RAM" value={asset.ram} />
+              <SpecItem label="RAM Slot 1" value={asset.ramSlot1} />
+              <SpecItem label="RAM Slot 2" value={asset.ramSlot2} />
+              <SpecItem label="Storage 1" value={asset.storage1} />
+              <SpecItem label="Storage 2" value={asset.storage2} />
+              <SpecItem label="GPU" value={asset.gpu} />
+            </div>
+          </div>
+          <div className="spec-section">
+            <div className="sec-hd"><div className="sec-bar" style={{ '--sb': 'linear-gradient(180deg,#2563eb,#60a5fa)' } as any}></div>ระบบปฏิบัติการ</div>
+            <div className="spec-grid">
+              <SpecItem label="OS Type" value={asset.osType} />
+              <SpecItem label="OS Version" value={asset.osVersion} mono />
+              <SpecItem label="S/N Computer" value={asset.snComputer} mono />
+              <SpecItem label="Join Domain" value={asset.domainName} />
+              <SpecItem label="Windows License" value={asset.windowsLicense} />
+              <SpecItem label="MS Office" value={asset.officeLicense} />
+              <SpecItem label="Antivirus" value={asset.antivirusStatus} />
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Monitor ── */}
+      {isMonitor && (
+        <div className="spec-section">
+          <div className="sec-hd"><div className="sec-bar"></div>ข้อมูลจอภาพ</div>
+          <div className="spec-grid">
+            <SpecItem label="ขนาดจอ (นิ้ว)" value={detail.screenSize} />
+            <SpecItem label="ความละเอียด" value={detail.resolution} />
+            <SpecItem label="Panel Type" value={detail.panelType} />
+            <SpecItem label="Refresh Rate" value={detail.refreshRate} />
+            <SpecItem label="พอร์ตเชื่อมต่อ" value={detail.ports} />
+            {detail.hasSpeaker !== undefined && detail.hasSpeaker !== null && (
+              <div className="spec-item">
+                <div className="spec-lbl">ลำโพงในตัว</div>
+                <BoolBadge value={detail.hasSpeaker} yes="มี" no="ไม่มี" />
+              </div>
+            )}
+            {detail.curved !== undefined && detail.curved !== null && (
+              <div className="spec-item">
+                <div className="spec-lbl">Curved</div>
+                <BoolBadge value={detail.curved} yes="จอโค้ง" no="จอแบน" />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Phone/Tablet ── */}
+      {isPhone && (
+        <div className="spec-section">
+          <div className="sec-hd"><div className="sec-bar" style={{ '--sb': 'linear-gradient(180deg,#7c3aed,#a855f7)' } as any}></div>ข้อมูลอุปกรณ์สื่อสาร</div>
+          <div className="spec-grid">
+            <SpecItem label="IMEI 1" value={detail.imei1} mono />
+            <SpecItem label="IMEI 2" value={detail.imei2} mono />
+            <SpecItem label="เบอร์โทรศัพท์" value={detail.phoneNumber} />
+            <SpecItem label="OS" value={detail.osType} />
+            <SpecItem label="OS Version" value={detail.osVersion} />
+            <SpecItem label="Storage" value={detail.storageCapacity} />
+            <SpecItem label="RAM" value={detail.ram} />
+            <SpecItem label="สี" value={detail.color} />
+            <SpecItem label="SIM Provider" value={detail.simProvider} />
+          </div>
+        </div>
+      )}
+
+      {/* ── Network ── */}
+      {isNetwork && (
+        <div className="spec-section">
+          <div className="sec-hd"><div className="sec-bar" style={{ '--sb': 'linear-gradient(180deg,#0891b2,#38bdf8)' } as any}></div>ข้อมูลอุปกรณ์เครือข่าย</div>
+          <div className="spec-grid">
+            <SpecItem label="IP Address" value={detail.ipAddress} mono />
+            <SpecItem label="MAC Address" value={detail.macAddress} mono />
+            <SpecItem label="จำนวน Port" value={detail.portCount} />
+            <SpecItem label="Port Speed" value={detail.portSpeed} />
+            <SpecItem label="Firmware" value={detail.firmwareVersion} />
+            <SpecItem label="WiFi Standard" value={detail.wifiStandard} />
+          </div>
+        </div>
+      )}
+
+      {/* ── Printer ── */}
+      {isPrinter && (
+        <div className="spec-section">
+          <div className="sec-hd"><div className="sec-bar" style={{ '--sb': 'linear-gradient(180deg,#dc2626,#f87171)' } as any}></div>ข้อมูลเครื่องพิมพ์</div>
+          <div className="spec-grid">
+            <SpecItem label="ประเภทเครื่องพิมพ์" value={detail.printerType} />
+            <SpecItem label="ขนาดกระดาษ" value={detail.paperSizes} />
+            <SpecItem label="รุ่นหมึก" value={detail.cartridgeModel} />
+            <SpecItem label="IP Address" value={detail.ipAddress} mono />
+            <SpecItem label="จำนวนหน้าที่พิมพ์" value={detail.pageCount} />
+          </div>
+        </div>
+      )}
+
+      {/* ── Purchase / Warranty ── */}
+      <div className="spec-section">
+        <div className="sec-hd"><div className="sec-bar" style={{ '--sb': 'linear-gradient(180deg,#059669,#34d399)' } as any}></div>จัดซื้อ / ประกัน</div>
+        <div className="spec-grid">
+          <SpecItem label="วันที่ซื้อ" value={asset.purchaseDate ? new Date(asset.purchaseDate).toLocaleDateString('th-TH') : null} />
+          <SpecItem label="วันหมดประกัน" value={asset.warrantyEndDate ? new Date(asset.warrantyEndDate).toLocaleDateString('th-TH') : null} colorClass="warn" />
+          <SpecItem label="ราคาซื้อ" value={asset.purchasePrice != null ? `฿${Number(asset.purchasePrice).toLocaleString('th-TH')}` : null} />
+          <SpecItem label="PO Number" value={asset.poNumber} mono />
+          <SpecItem label="PR Number" value={asset.prNumber} mono />
+          <SpecItem label="PO Date" value={asset.poDate ? new Date(asset.poDate).toLocaleDateString('th-TH') : null} />
+          <SpecItem label="Vendor" value={asset.vendor} />
+          <SpecItem label="งบประมาณ" value={asset.budget} />
+          <SpecItem label="อายุอุปกรณ์" value={asset.age != null ? `${asset.age} ปี` : null} />
+        </div>
+      </div>
+
+      {/* ── Owner ── */}
+      <div className="spec-section">
+        <div className="sec-hd"><div className="sec-bar" style={{ '--sb': 'linear-gradient(180deg,#dc2626,#f87171)' } as any}></div>ผู้ถือครอง</div>
+        <div className="spec-grid">
+          <SpecItem label="ชื่อผู้ใช้" value={asset.ownerName} />
+          <SpecItem label="แผนก" value={asset.departmentId} />
+          <SpecItem label="Location" value={asset.location} />
+          <SpecItem label="ชั้น" value={asset.floor} />
+        </div>
+      </div>
+
+      {/* Remark */}
+      {asset.remark && (
+        <div className="spec-section">
+          <div className="sec-hd"><div className="sec-bar" style={{ '--sb': 'linear-gradient(180deg,#6b7280,#9ca3af)' } as any}></div>หมายเหตุ</div>
+          <div style={{ padding: '10px 12px', borderRadius: '10px', background: 'rgba(248,247,255,.7)', border: '1px solid rgba(99,102,241,.07)', fontSize: '13px', color: '#374151', lineHeight: 1.6 }}>
+            {asset.remark}
+          </div>
+        </div>
+      )}
+
+      {/* Asset image */}
+      {asset.image && (
+        <div className="spec-section" style={{ marginTop: '16px' }}>
+          <div className="sec-hd"><div className="sec-bar" style={{ '--sb': 'linear-gradient(180deg,#6366f1,#8b5cf6)' } as any}></div>รูปภาพทะเบียนทรัพย์สิน</div>
+          <img src={asset.image} alt="Asset" style={{ maxWidth: '100%', borderRadius: '12px', border: '1px solid rgba(99,102,241,.12)' }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── History tab ─────────────────────────────────────────────── */
+function HistoryTab({ asset }: { asset: any }) {
+  const history = asset.assetHistory || [];
+  if (history.length === 0) return (
+    <div className="glass" style={{ padding: '32px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>ไม่มีประวัติการเปลี่ยนแปลง</div>
+  );
+  return (
+    <div className="glass" style={{ padding: '18px' }}>
+      <div className="timeline">
+        {history.map((h: any, i: number) => {
+          const icon = HISTORY_ICON[h.actionType] || '📋';
+          const dotClass = HISTORY_DOT[h.actionType] || 'tl-dot-edit';
+          const label = HISTORY_LABEL[h.actionType] || h.actionType;
+          const detail = [h.fromStatus, h.toStatus, h.fromOwner, h.toOwner, h.fromLoc, h.toLoc, h.note].filter(Boolean).join(' → ');
+          return (
+            <div className="tl-item" key={h.id ?? i}>
+              {i < history.length - 1 && <div className="tl-line"></div>}
+              <div className={`tl-dot ${dotClass}`}>{icon}</div>
+              <div className="tl-body">
+                <div className="tl-action">{label}</div>
+                {detail && <div className="tl-detail">{detail}</div>}
+                <div className="tl-meta">
+                  <span>{new Date(h.createdAt).toLocaleString('th-TH')}</span>
+                  {h.changedBy && <span className="tl-actor"><div className="ava-xs av-b">{String(h.changedBy).substring(0, 2).toUpperCase()}</div> {h.changedBy}</span>}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ─── PM tab ──────────────────────────────────────────────────── */
+function PMTab({ asset }: { asset: any }) {
+  const runs = asset.pmRuns || [];
+  if (runs.length === 0) return (
+    <div className="glass" style={{ padding: '32px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>ยังไม่มีประวัติ PM</div>
+  );
+  return (
+    <div className="glass" style={{ padding: '18px' }}>
+      <div className="pm-list">
+        {runs.map((r: any) => {
+          const performer = r.performer?.displayName || r.performer?.adUsername || r.performer?.username || '-';
+          const statusOk = r.status === 'COMPLETED';
+          return (
+            <div className="pm-item" key={r.id}>
+              <div className="pm-item-hd">
+                <div>
+                  <div className="pm-year">
+                    PM ปี {r.year}
+                    <span className={`pill ${statusOk ? 'p-ok' : 'p-warn'}`} style={{ fontSize: '10px', marginLeft: '6px' }}>
+                      {statusOk ? '✓' : '⏳'} {PM_LABEL[r.status] || r.status}
+                    </span>
+                  </div>
+                  <div className="pm-staff">
+                    <div className="ava-xs av-b" style={{ width: '20px', height: '20px', fontSize: '9px' }}>{performer.substring(0, 2).toUpperCase()}</div>
+                    {performer} · {r.completedAt ? new Date(r.completedAt).toLocaleDateString('th-TH') : (r.performedAt ? new Date(r.performedAt).toLocaleDateString('th-TH') : '-')}
+                  </div>
+                </div>
+              </div>
+              {r.checklist && r.checklist.length > 0 && (
+                <div className="pm-checks">
+                  {r.checklist.map((c: any) => (
+                    <div className="pm-check" key={c.id ?? c.label}>
+                      <div className={`chk-ic ${c.checked ? 'chk-y' : 'chk-n'}`}>{c.checked ? '✓' : '✗'}</div>
+                      {c.label}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {r.score != null && (
+                <div className="pm-score">
+                  <span className="stars">{'★'.repeat(r.score)}{'☆'.repeat(5 - r.score)}</span>
+                  <span style={{ color: '#1e1b4b', fontWeight: 700 }}>{r.score}/5</span>
+                  <span>· ความพึงพอใจผู้ใช้</span>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Main Page ───────────────────────────────────────────────── */
 export default function AssetDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [asset, setAsset] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-
-  const categoryName = asset?.category?.name || '';
-  const typeLower = asset?.type?.toLowerCase() || '';
-
-  const isComputer = useMemo(() => {
-    if (categoryName) {
-      return categoryName === 'คอมพิวเตอร์';
-    }
-    const t = typeLower.trim();
-    if (t === 'pc') return true;
-    return ['notebook', 'pc desktop', 'macbook', 'mini pc', 'all-in-one', 'thin client', 'computer'].some(k => t.includes(k));
-  }, [categoryName, typeLower]);
-
-  const isMonitor = useMemo(() => {
-    if (categoryName) {
-      return categoryName === 'จอภาพ';
-    }
-    return typeLower.includes('monitor');
-  }, [categoryName, typeLower]);
+  const [activeTab, setActiveTab] = useState('spec');
+  const [showQR, setShowQR] = useState(false);
 
   useEffect(() => {
     if (id) {
-      assetAPI.get(parseInt(id)).then((res) => setAsset(res.data)).finally(() => setLoading(false));
+      assetAPI.get(parseInt(id))
+        .then((res) => setAsset(res.data))
+        .finally(() => setLoading(false));
     }
   }, [id]);
 
-  function renderDetailSection(type: string, detail: any) {
-    const t = type?.toLowerCase() || '';
-    const cat = categoryName?.toLowerCase() || '';
+  /* Warranty calculation */
+  const warrantyDaysLeft = useMemo(() => {
+    if (!asset?.warrantyEndDate) return null;
+    return Math.max(0, Math.round((new Date(asset.warrantyEndDate).getTime() - Date.now()) / 86400000));
+  }, [asset]);
 
-    // อุปกรณ์สื่อสาร (Phone / Tablet / IPAD)
-    if (
-      cat === 'อุปกรณ์สื่อสาร' ||
-      ['smartphone', 'tablet', 'mobile hotspot', 'ipad'].some(k => t.includes(k))
-    ) {
-      return (
-        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-          <CardContent sx={{ p: 3 }}>
-            <SectionTitle>ข้อมูลอุปกรณ์สื่อสาร</SectionTitle>
-            <Grid container spacing={2.5}>
-              <InfoItem label="IMEI 1" value={detail.imei1} />
-              <InfoItem label="IMEI 2" value={detail.imei2} />
-              <InfoItem label="เบอร์โทรศัพท์" value={detail.phoneNumber} />
-              <InfoItem label="OS" value={detail.osType} />
-              <InfoItem label="OS Version" value={detail.osVersion} />
-              <InfoItem label="ความจุ (Storage)" value={detail.storageCapacity} />
-              <InfoItem label="RAM" value={detail.ram} />
-              <InfoItem label="สี" value={detail.color} />
-              <InfoItem label="ผู้ให้บริการ (SIM/Carrier)" value={detail.simProvider} />
-              <InfoItem label="MDM Enrolled" value={detail.mdmEnrolled === true ? 'ลงทะเบียนแล้ว' : detail.mdmEnrolled === false ? 'ยังไม่ได้ลงทะเบียน' : null} />
-            </Grid>
-          </CardContent>
-        </Card>
-      );
-    }
-
-    // จอภาพ (Monitor)
-    if (
-      cat === 'จอภาพ' ||
-      t.includes('monitor')
-    ) {
-      return (
-        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-          <CardContent sx={{ p: 3 }}>
-            <SectionTitle>ข้อมูลจอภาพ</SectionTitle>
-            <Grid container spacing={2.5}>
-              <InfoItem label="ขนาดจอ (นิ้ว)" value={detail.screenSize} />
-              <InfoItem label="ความละเอียด" value={detail.resolution} />
-              <InfoItem label="ประเภทแผง (Panel Type)" value={detail.panelType} />
-              <InfoItem label="อัตรารีเฟรช" value={detail.refreshRate} />
-              <InfoItem label="พอร์ตเชื่อมต่อ" value={detail.ports} />
-              <InfoItem label="มีลำโพง" value={detail.hasSpeaker === true ? 'มี' : detail.hasSpeaker === false ? 'ไม่มี' : null} />
-              <InfoItem label="Curved" value={detail.curved === true ? 'จอโค้ง' : detail.curved === false ? 'จอแบน' : null} />
-            </Grid>
-          </CardContent>
-        </Card>
-      );
-    }
-
-    // อุปกรณ์นำเสนอ/AV
-    if (
-      cat === 'อุปกรณ์นำเสนอ/av' ||
-      ['projector', 'conference speaker', 'webcam', 'docking station', 'presentation clicker', 'speaker', 'docking'].some(k => t.includes(k))
-    ) {
-      if (t.includes('projector')) {
-        return (
-          <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-            <CardContent sx={{ p: 3 }}>
-              <SectionTitle>ข้อมูล Projector</SectionTitle>
-              <Grid container spacing={2.5}>
-                <InfoItem label="ความสว่าง (Lumens)" value={detail.lumens} />
-                <InfoItem label="ความละเอียด" value={detail.resolution} />
-                <InfoItem label="Throw Ratio" value={detail.throwRatio} />
-                <InfoItem label="ชั่วโมงหลอดที่ใช้แล้ว" value={detail.lampHours} />
-                <InfoItem label="ช่องสัญญาณเข้า (Input)" value={detail.connectionType} />
-              </Grid>
-            </CardContent>
-          </Card>
-        );
-      }
-      if (t.includes('webcam')) {
-        return (
-          <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-            <CardContent sx={{ p: 3 }}>
-              <SectionTitle>ข้อมูล Webcam</SectionTitle>
-              <Grid container spacing={2.5}>
-                <InfoItem label="ความละเอียด" value={detail.resolution} />
-                <InfoItem label="FPS" value={detail.fps} />
-                <InfoItem label="การเชื่อมต่อ" value={detail.connectionType} />
-              </Grid>
-            </CardContent>
-          </Card>
-        );
-      }
-      if (t.includes('docking')) {
-        return (
-          <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-            <CardContent sx={{ p: 3 }}>
-              <SectionTitle>ข้อมูล Docking Station</SectionTitle>
-              <Grid container spacing={2.5}>
-                <InfoItem label="มาตรฐานเชื่อมต่อ" value={detail.usbStandard} />
-                <InfoItem label="จำนวนพอร์ต" value={detail.portCount} />
-                <InfoItem label="Power Delivery (W)" value={detail.powerDelivery} />
-              </Grid>
-            </CardContent>
-          </Card>
-        );
-      }
-      if (t.includes('conference speaker') || t.includes('speaker')) {
-        return (
-          <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-            <CardContent sx={{ p: 3 }}>
-              <SectionTitle>ข้อมูล Conference Speaker</SectionTitle>
-              <Grid container spacing={2.5}>
-                <InfoItem label="การเชื่อมต่อ" value={detail.connectionType} />
-                <InfoItem label="กำลังไฟ (W)" value={detail.powerRating} />
-              </Grid>
-            </CardContent>
-          </Card>
-        );
-      }
-      if (t.includes('clicker') || t.includes('presentation clicker')) {
-        return (
-          <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-            <CardContent sx={{ p: 3 }}>
-              <SectionTitle>ข้อมูล Presentation Clicker</SectionTitle>
-              <Grid container spacing={2.5}>
-                <InfoItem label="ช่วงระยะ (Range)" value={detail.range} />
-                <InfoItem label="ประเภท Receiver" value={detail.receiverType} />
-                <InfoItem label="แบตเตอรี่" value={detail.batteryType} />
-              </Grid>
-            </CardContent>
-          </Card>
-        );
-      }
-      // Generic AV
-      return (
-        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-          <CardContent sx={{ p: 3 }}>
-            <SectionTitle>ข้อมูลอุปกรณ์ AV</SectionTitle>
-            <Grid container spacing={2.5}>
-              <InfoItem label="การเชื่อมต่อ" value={detail.connectionType} />
-              <InfoItem label="กำลังไฟ (W)" value={detail.powerRating} />
-            </Grid>
-          </CardContent>
-        </Card>
-      );
-    }
-
-    // Network / อุปกรณ์เครือข่าย
-    if (
-      cat === 'อุปกรณ์เครือข่าย' ||
-      ['switch', 'router', 'access point', 'firewall', 'modem', 'network'].some(k => t.includes(k))
-    ) {
-      return (
-        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-          <CardContent sx={{ p: 3 }}>
-            <SectionTitle>ข้อมูลอุปกรณ์เครือข่าย</SectionTitle>
-            <Grid container spacing={2.5}>
-              {t.includes('access point') && (
-                <>
-                  <InfoItem label="WiFi Standard" value={detail.wifiStandard} />
-                  <InfoItem label="ย่านความถี่ (Band)" value={detail.band} />
-                </>
-              )}
-              <InfoItem label="จำนวน Port" value={detail.portCount} />
-              <InfoItem label="ความเร็ว Port" value={detail.portSpeed} />
-              <InfoItem label="IP Address" value={detail.ipAddress} />
-              <InfoItem label="MAC Address" value={detail.macAddress} />
-              <InfoItem label="Firmware" value={detail.firmwareVersion} />
-              <InfoItem label="ตำแหน่งในตู้ Rack" value={detail.locationRack} />
-              {t.includes('switch') && (
-                <>
-                  <InfoItem label="PoE Support" value={detail.hasPoE === true ? 'รองรับ' : detail.hasPoE === false ? 'ไม่รองรับ' : null} />
-                  <InfoItem label="VLAN Support" value={detail.vlanSupport === true ? 'รองรับ' : detail.vlanSupport === false ? 'ไม่รองรับ' : null} />
-                </>
-              )}
-              <InfoItem label="จัดการได้ (Managed)" value={detail.isManaged === true ? 'Managed' : detail.isManaged === false ? 'Unmanaged' : null} />
-            </Grid>
-          </CardContent>
-        </Card>
-      );
-    }
-
-    // Rack & Infrastructure / UPS
-    if (
-      cat === 'rack & infrastructure' ||
-      ['server rack', 'pdu', 'ups', 'enclosure', 'rack'].some(k => t.includes(k))
-    ) {
-      const isUPS = t.includes('ups');
-      return (
-        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-          <CardContent sx={{ p: 3 }}>
-            <SectionTitle>ข้อมูล {isUPS ? 'UPS' : 'Rack / Infrastructure'}</SectionTitle>
-            <Grid container spacing={2.5}>
-              <InfoItem label="ประเภท" value={detail.subType} />
-              {isUPS ? (
-                <>
-                  <InfoItem label="ความจุ (VA)" value={detail.vaCapacity} />
-                  <InfoItem label="Watt ที่รองรับ" value={detail.wattCapacity} />
-                  <InfoItem label="Runtime (นาที)" value={detail.batteryRuntime} />
-                  <InfoItem label="ประเภทแบตเตอรี่" value={detail.batteryType} />
-                  <InfoItem label="จำนวน Outlet" value={detail.outletCount} />
-                  <InfoItem label="ตำแหน่งติดตั้ง" value={detail.rackLocation} />
-                </>
-              ) : (
-                <>
-                  <InfoItem label="Rack Units" value={detail.rackUnits} />
-                  <InfoItem label="Power Capacity" value={detail.powerCapacity} />
-                  <InfoItem label="ตำแหน่งติดตั้ง" value={detail.rackLocation} />
-                </>
-              )}
-            </Grid>
-          </CardContent>
-        </Card>
-      );
-    }
-
-    // เครื่องพิมพ์ (Printer)
-    if (
-      cat === 'เครื่องพิมพ์' ||
-      t.includes('printer')
-    ) {
-      return (
-        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-          <CardContent sx={{ p: 3 }}>
-            <SectionTitle>ข้อมูลเครื่องพิมพ์</SectionTitle>
-            <Grid container spacing={2.5}>
-              <InfoItem label="ประเภทเครื่องพิมพ์" value={detail.printerType} />
-              <InfoItem label="พิมพ์สี/ขาวดำ" value={detail.isColor === true ? 'สี (Color)' : detail.isColor === false ? 'ขาวดำ (Mono)' : null} />
-              <InfoItem label="ขนาดกระดาษ" value={detail.paperSizes} />
-              <InfoItem label="พิมพ์สองหน้า (Duplex)" value={detail.duplexSupport === true ? 'รองรับ' : detail.duplexSupport === false ? 'ไม่รองรับ' : null} />
-              <InfoItem label="เชื่อมต่อเครือข่าย" value={detail.isNetworkEnabled === true ? 'มี Network' : detail.isNetworkEnabled === false ? 'ไม่มี' : (detail.networkReady === true ? 'มี Network' : detail.networkReady === false ? 'ไม่มี' : null)} />
-              <InfoItem label="รุ่นหมึก/Cartridge" value={detail.cartridgeModel} />
-              <InfoItem label="IP Address" value={detail.ipAddress} />
-              <InfoItem label="MAC Address" value={detail.macAddress} />
-              <InfoItem label="จำนวนหน้าที่พิมพ์แล้ว" value={detail.pageCount} />
-            </Grid>
-          </CardContent>
-        </Card>
-      );
-    }
-
-    // สายสัญญาณ (Cable)
-    if (
-      cat === 'สายสัญญาณ' ||
-      ['hdmi', 'displayport', 'usb-c', 'lan cable', 'power cable', 'audio cable'].some(k => t.includes(k))
-    ) {
-      return (
-        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-          <CardContent sx={{ p: 3 }}>
-            <SectionTitle>ข้อมูลสายสัญญาณ</SectionTitle>
-            <Grid container spacing={2.5}>
-              <InfoItem label="ประเภทสาย" value={detail.cableType} />
-              <InfoItem label="ความยาว" value={detail.length} />
-              <InfoItem label="จำนวนคงเหลือ" value={detail.stockQuantity} />
-              <InfoItem label="จุดสั่งซื้อ (Min Stock)" value={detail.minimumStock} />
-            </Grid>
-          </CardContent>
-        </Card>
-      );
-    }
-
-    // Consumable / วัสดุสิ้นเปลือง
-    if (
-      cat === 'วัสดุสิ้นเปลือง' ||
-      ['toner', 'ink', 'cartridge', 'battery', 'adapter', 'charger', 'consumable', 'paper', 'drum', 'ribbon'].some(k => t.includes(k))
-    ) {
-      return (
-        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-          <CardContent sx={{ p: 3 }}>
-            <SectionTitle>ข้อมูลวัสดุสิ้นเปลือง</SectionTitle>
-            <Grid container spacing={2.5}>
-              <InfoItem label="ประเภทวัสดุสิ้นเปลือง" value={detail.consumableType} />
-              <InfoItem label="ใช้งานร่วมกับ" value={detail.compatibleWith} />
-              <InfoItem label="จำนวนคงเหลือ" value={detail.stockQuantity} />
-              <InfoItem label="จุดสั่งซื้อ (Min Stock)" value={detail.minimumStock} />
-              <InfoItem label="วันหมดอายุ" value={detail.expiryDate ? new Date(detail.expiryDate).toLocaleDateString('th-TH') : null} />
-            </Grid>
-          </CardContent>
-        </Card>
-      );
-    }
-
-    return null;
-  }
+  const totalBorrows = asset?.pmRuns?.length ?? 0;
+  const completedPMs = asset?.pmRuns?.filter((r: any) => r.status === 'COMPLETED').length ?? 0;
 
   if (loading) return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
       <CircularProgress size={32} />
-    </Box>
+    </div>
   );
-  if (!asset) return <Typography>ไม่พบทรัพย์สิน</Typography>;
+  if (!asset) return <div style={{ padding: '32px', color: '#6b7280' }}>ไม่พบทรัพย์สิน</div>;
+
+  const statusClass = STATUS_CLASS[asset.status] || 'p-gray';
+  const statusLabel = STATUS_LABEL[asset.status] || asset.status;
+  const icon = getTypeIcon(asset.type);
+  const historyCount = asset.assetHistory?.length ?? 0;
 
   return (
-    <Box sx={{ maxWidth: 1200, mx: 'auto', px: { xs: 2, md: 4 }, py: 3 }}>
-      {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Button
-          size="small"
-          startIcon={<ArrowBackIcon sx={{ fontSize: 18 }} />}
-          onClick={() => navigate('/assets')}
-          sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary' } }}
-        >
-          กลับ
-        </Button>
-        <Typography variant="h5" fontWeight={500} sx={{ letterSpacing: -0.3 }}>
-          รายละเอียดทรัพย์สิน
-        </Typography>
-        <Button
-          variant="contained"
-          size="small"
-          startIcon={<EditIcon sx={{ fontSize: 18 }} />}
-          onClick={() => navigate(`/assets/${id}/edit`)}
-          sx={{
-            borderRadius: 1,
-            fontWeight: 500,
-            textTransform: 'none',
-            px: 2,
-            boxShadow: 'none',
-            '&:hover': { boxShadow: 'none' },
+    <>
+      {/* ── Inline CSS (scoped) ── */}
+      <style>{`
+        .ad-root{font-family:'Sarabun',sans-serif;position:relative}
+        .ad-orb{position:fixed;border-radius:50%;filter:blur(80px);pointer-events:none;z-index:0}
+        .ad-o1{width:420px;height:420px;background:rgba(99,102,241,.08);top:-140px;left:-100px}
+        .ad-o2{width:300px;height:300px;background:rgba(139,92,246,.07);bottom:-80px;right:-60px}
+        .ad-grid-bg{position:fixed;inset:0;background-image:radial-gradient(circle,rgba(99,102,241,.08) 1px,transparent 1px);background-size:28px 28px;pointer-events:none;z-index:0}
+        .ad-page{position:relative;z-index:1;max-width:900px;margin:0 auto;padding:16px 20px 40px}
+
+        .glass{background:rgba(255,255,255,.65);border:1px solid rgba(255,255,255,.85);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-radius:14px;box-shadow:0 4px 24px rgba(99,102,241,.07),0 1px 3px rgba(0,0,0,.04)}
+
+        /* breadcrumb */
+        .bc{display:flex;align-items:center;gap:6px;font-size:12px;color:#9ca3af;margin-bottom:14px}
+        .bc a{color:#6366f1;text-decoration:none;font-weight:500;cursor:pointer}
+        .bc a:hover{text-decoration:underline}
+        .bc-sep{color:#d1d5db}
+
+        /* hero */
+        .hero{padding:20px 24px;margin-bottom:16px}
+        .hero-top{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap}
+        .hero-icon{width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#4f46e5,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;box-shadow:0 4px 16px rgba(99,102,241,.3)}
+        .hero-info{flex:1;min-width:0}
+        .hero-name{font-size:18px;font-weight:700;color:#1e1b4b;line-height:1.2}
+        .hero-sub{font-size:12px;color:#6b7280;margin-top:3px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+        .hero-code{font-family:monospace;font-size:12px;font-weight:700;color:#4338ca;background:rgba(99,102,241,.08);padding:2px 8px;border-radius:6px}
+        .hero-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+        .btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:10px;font-size:12px;font-family:'Sarabun',sans-serif;cursor:pointer;font-weight:600;border:1px solid;transition:all .15s}
+        .btn-primary{background:linear-gradient(135deg,#4f46e5,#7c3aed);border-color:rgba(124,58,237,.3);color:#fff;box-shadow:0 3px 10px rgba(99,102,241,.25)}
+        .btn-ghost{background:rgba(255,255,255,.7);border-color:rgba(99,102,241,.2);color:#4338ca}
+        .btn-ghost:hover{background:rgba(99,102,241,.06)}
+        .btn-danger{background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.2);color:#dc2626}
+
+        /* pills */
+        .pill{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
+        .p-ok{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.22);color:#059669}
+        .p-warn{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.22);color:#d97706}
+        .p-err{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:#dc2626}
+        .p-purple{background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.22);color:#4338ca}
+        .p-gray{background:rgba(107,114,128,.07);border:1px solid rgba(107,114,128,.18);color:#6b7280}
+        .sdot{width:5px;height:5px;border-radius:50%;background:currentColor}
+
+        /* quick stats */
+        .qstrip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+        .qs{padding:12px 14px;text-align:center}
+        .qs-val{font-size:18px;font-weight:800;color:#1e1b4b;line-height:1}
+        .qs-lbl{font-size:10px;color:#9ca3af;margin-top:3px}
+
+        /* warranty */
+        .warranty-bar{background:rgba(255,255,255,.5);border:1px solid rgba(99,102,241,.12);border-radius:10px;padding:12px 14px;margin-bottom:16px}
+        .wb-hd{display:flex;justify-content:space-between;font-size:11px;margin-bottom:6px;flex-wrap:wrap;gap:6px}
+        .wb-label{color:#9ca3af}
+        .wb-val{color:#4338ca;font-weight:700}
+        .wb-track{background:rgba(99,102,241,.1);border-radius:4px;height:6px}
+        .wb-fill{height:6px;border-radius:4px;background:linear-gradient(90deg,#4f46e5,#7c3aed);transition:width .4s}
+        .wb-fill.warn{background:linear-gradient(90deg,#d97706,#fbbf24)}
+        .wb-fill.err{background:linear-gradient(90deg,#ef4444,#f87171)}
+
+        /* tabs */
+        .tabs{display:flex;gap:4px;background:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.8);border-radius:12px;padding:4px;margin-bottom:16px;backdrop-filter:blur(12px);flex-wrap:wrap}
+        .tab-btn{flex:1;min-width:70px;padding:8px 10px;border-radius:9px;border:none;background:none;font-size:12px;font-weight:600;color:#9ca3af;cursor:pointer;font-family:'Sarabun',sans-serif;display:flex;align-items:center;justify-content:center;gap:5px;transition:all .15s;white-space:nowrap}
+        .tab-btn.active{background:#fff;color:#4338ca;box-shadow:0 2px 8px rgba(99,102,241,.12)}
+        .tab-btn:hover:not(.active){color:#6366f1;background:rgba(255,255,255,.5)}
+
+        /* spec */
+        .spec-section{margin-bottom:16px}
+        .sec-hd{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.06em}
+        .sec-bar{width:3px;height:14px;border-radius:2px;flex-shrink:0;background:var(--sb,linear-gradient(180deg,#4f46e5,#7c3aed))}
+        .spec-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+        @media(max-width:600px){.spec-grid{grid-template-columns:1fr 1fr}.qstrip{grid-template-columns:1fr 1fr}}
+        .spec-item{padding:10px 12px;border-radius:10px;background:rgba(248,247,255,.7);border:1px solid rgba(99,102,241,.07)}
+        .spec-lbl{font-size:10px;color:#9ca3af;margin-bottom:3px;font-weight:500}
+        .spec-val{font-size:13px;color:#1e1b4b;font-weight:600}
+        .spec-val.mono{font-family:monospace;font-size:12px;color:#4338ca}
+        .spec-val.warn{color:#d97706}
+        .spec-val.err{color:#dc2626}
+        .toggle-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700}
+        .tc-yes{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.22);color:#059669}
+        .tc-no{background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.18);color:#dc2626}
+
+        /* timeline */
+        .timeline{display:flex;flex-direction:column;gap:0}
+        .tl-item{display:flex;gap:12px;position:relative}
+        .tl-item:not(:last-child) .tl-line{position:absolute;left:15px;top:32px;bottom:0;width:1px;background:rgba(99,102,241,.12)}
+        .tl-dot{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;margin-top:2px;border:2px solid;position:relative;z-index:1}
+        .tl-dot-create{background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3)}
+        .tl-dot-edit{background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.25)}
+        .tl-dot-borrow{background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.28)}
+        .tl-dot-return{background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.25)}
+        .tl-dot-pm{background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.25)}
+        .tl-body{flex:1;padding-bottom:16px}
+        .tl-action{font-size:12px;font-weight:700;color:#1e1b4b}
+        .tl-detail{font-size:11.5px;color:#6b7280;margin-top:2px;line-height:1.5}
+        .tl-meta{font-size:10.5px;color:#d1d5db;margin-top:3px;display:flex;gap:10px;flex-wrap:wrap}
+        .tl-actor{display:inline-flex;align-items:center;gap:4px;color:#9ca3af}
+        .ava-xs{width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff}
+        .av-b{background:linear-gradient(135deg,#3b82f6,#6366f1)}
+        .av-p{background:linear-gradient(135deg,#7c3aed,#a855f7)}
+
+        /* PM */
+        .pm-list{display:flex;flex-direction:column;gap:8px}
+        .pm-item{padding:14px 16px;border-radius:12px;border:1px solid rgba(99,102,241,.1);background:rgba(248,247,255,.6)}
+        .pm-item-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+        .pm-year{font-size:13px;font-weight:700;color:#1e1b4b}
+        .pm-checks{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:8px}
+        @media(max-width:500px){.pm-checks{grid-template-columns:1fr 1fr}}
+        .pm-check{display:flex;align-items:center;gap:5px;font-size:11px;color:#374151}
+        .chk-ic{width:16px;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0}
+        .chk-y{background:rgba(16,185,129,.15);color:#059669;border:1px solid rgba(16,185,129,.25)}
+        .chk-n{background:rgba(239,68,68,.1);color:#dc2626;border:1px solid rgba(239,68,68,.2)}
+        .pm-score{display:flex;align-items:center;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(99,102,241,.07);font-size:11px;color:#9ca3af}
+        .stars{color:#f59e0b;font-size:13px}
+        .pm-staff{font-size:11px;color:#6b7280;display:flex;align-items:center;gap:4px;margin-top:2px}
+      `}</style>
+
+      <div className="ad-root">
+        <div className="ad-orb ad-o1"></div>
+        <div className="ad-orb ad-o2"></div>
+        <div className="ad-grid-bg"></div>
+
+        <div className="ad-page">
+          {/* Breadcrumb */}
+          <div className="bc">
+            <a onClick={() => navigate('/assets')}>ทรัพย์สิน IT</a>
+            <span className="bc-sep">›</span>
+            <span>{asset.assetCode}</span>
+          </div>
+
+          {/* Hero card */}
+          <div className="glass hero">
+            <div className="hero-top">
+              <div className="hero-icon">{icon}</div>
+              <div className="hero-info">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <div className="hero-name">{asset.brand} {asset.model}{asset.assetName ? ` — ${asset.assetName}` : ''}</div>
+                  <span className={`pill ${statusClass}`}><span className="sdot"></span>{statusLabel}</span>
+                </div>
+                <div className="hero-sub">
+                  <span className="hero-code">{asset.assetCode}</span>
+                  {asset.type && <span>{asset.type}</span>}
+                  {asset.location && <><span>·</span><span>{asset.location}{asset.floor ? ` ชั้น ${asset.floor}` : ''}</span></>}
+                  {asset.departmentId && <><span>·</span><span>แผนก {asset.departmentId}</span></>}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
+                  {asset.age != null && (
+                    <div className="hero-code" style={{ background: 'rgba(245,158,11,.1)', color: '#b45309' }}>อายุ {asset.age} ปี</div>
+                  )}
+                  {asset.serialNo && (
+                    <div style={{ fontSize: '11px', color: '#9ca3af' }}>S/N: {asset.serialNo}</div>
+                  )}
+                </div>
+              </div>
+              {asset.purchasePrice != null && (
+                <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                  <div style={{ fontSize: '22px', fontWeight: 800, color: '#4f46e5' }}>
+                    ฿{Number(asset.purchasePrice).toLocaleString('th-TH')}
+                  </div>
+                  <div style={{ fontSize: '10px', color: '#9ca3af', marginTop: '1px' }}>ราคาซื้อ</div>
+                </div>
+              )}
+            </div>
+
+            <div className="hero-actions">
+              <button className="btn btn-ghost" onClick={() => navigate(`/assets/${id}/edit`)}>✏️ แก้ไข</button>
+              <button className="btn btn-ghost" style={{ background: 'rgba(245,158,11,.08)', borderColor: 'rgba(245,158,11,.3)', color: '#b45309' }} onClick={() => setShowQR(true)}>📲 QR Code</button>
+              <button className="btn btn-ghost" onClick={() => navigate(`/assets/print-qr?ids=${id}`)}>🖨 พิมพ์สติ๊กเกอร์</button>
+              <button className="btn btn-ghost" onClick={() => navigate('/assets')}>← กลับรายการ</button>
+            </div>
+          </div>
+
+          {/* Quick stats */}
+          <div className="qstrip">
+            <div className="glass qs">
+              <div className="qs-val">{historyCount}</div>
+              <div className="qs-lbl">ประวัติการเปลี่ยนแปลง</div>
+            </div>
+            <div className="glass qs">
+              <div className="qs-val" style={{ color: '#7c3aed' }}>{totalBorrows}</div>
+              <div className="qs-lbl">บันทึก PM</div>
+            </div>
+            <div className="glass qs">
+              <div className="qs-val" style={{ color: '#059669' }}>{completedPMs}</div>
+              <div className="qs-lbl">PM เสร็จแล้ว</div>
+            </div>
+            <div className="glass qs">
+              <div className="qs-val" style={{ color: warrantyDaysLeft === 0 ? '#dc2626' : warrantyDaysLeft != null && warrantyDaysLeft < 180 ? '#d97706' : '#4f46e5' }}>
+                {warrantyDaysLeft != null ? warrantyDaysLeft.toLocaleString('th-TH') : '—'}
+              </div>
+              <div className="qs-lbl">วันหมดประกัน</div>
+            </div>
+          </div>
+
+          {/* Warranty bar */}
+          <WarrantyBar purchaseDate={asset.purchaseDate} warrantyEndDate={asset.warrantyEndDate} />
+
+          {/* Tabs */}
+          <div className="tabs">
+            {[
+              { key: 'spec', label: '🔧 สเปก' },
+              { key: 'history', label: '📋 ประวัติ' },
+              { key: 'pm', label: '🛠 PM' },
+            ].map(tab => (
+              <button
+                key={tab.key}
+                className={`tab-btn${activeTab === tab.key ? ' active' : ''}`}
+                onClick={() => setActiveTab(tab.key)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Tab panels */}
+          {activeTab === 'spec' && <SpecTab asset={asset} />}
+          {activeTab === 'history' && <HistoryTab asset={asset} />}
+          {activeTab === 'pm' && <PMTab asset={asset} />}
+        </div>
+      </div>
+
+      {/* ── QR Modal ───────────────────────────────────────────── */}
+      {showQR && (
+        <div
+          onClick={() => setShowQR(false)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)',
+            zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         >
-          แก้ไข
-        </Button>
-      </Box>
-
-      {/* Asset Code & Status */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 4, pb: 3, borderBottom: 1, borderColor: 'divider' }}>
-        <Typography variant="h4" fontWeight={600} sx={{ letterSpacing: -0.5 }}>
-          {asset.assetCode}{asset.assetName ? ` - ${asset.assetName}` : ''}
-        </Typography>
-        <Chip
-          label={statusLabels[asset.status] || asset.status}
-          color={(statusColors[asset.status] as any) || 'default'}
-          size="small"
-          sx={{ fontWeight: 500 }}
-        />
-        {asset.brand && asset.model && (
-          <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
-            {asset.brand} {asset.model}
-          </Typography>
-        )}
-      </Box>
-
-      {/* รูปภาพทะเบียนทรัพย์สิน */}
-      {asset.image && (
-        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider', mb: 3 }}>
-          <CardContent sx={{ p: 3 }}>
-            <SectionTitle>รูปภาพทะเบียนทรัพย์สิน</SectionTitle>
-            <Box
-              sx={{
-                width: '100%',
-                maxWidth: 600,
-                mx: 'auto',
-                borderRadius: 2,
-                overflow: 'hidden',
-                border: '1px solid',
-                borderColor: 'divider',
-              }}
-            >
-              <img
-                src={asset.image}
-                alt="Asset registration"
-                style={{ width: '100%', height: 'auto', display: 'block' }}
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: '#fff', borderRadius: '16px', padding: '28px',
+              minWidth: '260px', textAlign: 'center',
+              boxShadow: '0 24px 64px rgba(0,0,0,.2)',
+            }}
+          >
+            <div style={{ fontSize: '13px', fontWeight: 700, color: '#111827', marginBottom: '16px' }}>
+              QR Code — {asset.assetCode}
+            </div>
+            <div style={{ display: 'inline-block', padding: '12px', background: '#fff', border: '1.5px solid #e5e7eb', borderRadius: '10px' }}>
+              <QRCode
+                value={`${window.location.origin}/assets/${asset.id}`}
+                size={160}
+                level="M"
               />
-            </Box>
-          </CardContent>
-        </Card>
+            </div>
+            <div style={{ marginTop: '10px', fontSize: '11px', color: '#6b7280' }}>
+              {[asset.brand, asset.model].filter(Boolean).join(' ') || asset.assetName}
+            </div>
+            <div style={{ fontSize: '10px', color: '#9ca3af', marginTop: '2px' }}>
+              S/N: {asset.serialNo}
+            </div>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '16px' }}>
+              <button
+                className="btn btn-ghost"
+                onClick={() => { setShowQR(false); navigate(`/assets/print-qr?ids=${id}`); }}
+              >
+                🖨 พิมพ์สติ๊กเกอร์
+              </button>
+              <button className="btn btn-ghost" onClick={() => setShowQR(false)}>
+                ✕ ปิด
+              </button>
+            </div>
+          </div>
+        </div>
       )}
-
-      <Stack spacing={3}>
-        {/* ข้อมูลทั่วไป */}
-        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-          <CardContent sx={{ p: 3 }}>
-            <SectionTitle>ข้อมูลทั่วไป</SectionTitle>
-            <Grid container spacing={2.5}>
-              <InfoItem label="ชื่อทรัพย์สิน" value={asset.assetName} />
-              <InfoItem label="Serial Number" value={asset.serialNo} />
-              <InfoItem label="ประเภทอุปกรณ์" value={asset.type} />
-              <InfoItem label="ยี่ห้อ (Brand)" value={asset.brand} />
-              <InfoItem label="รุ่น (Model)" value={asset.model} />
-              <InfoItem label="Company" value={asset.company} />
-              <InfoItem label="Computer Name เดิม" value={asset.oldAssetCode} />
-              <InfoItem label="Domain Name" value={asset.domainName} />
-            </Grid>
-          </CardContent>
-        </Card>
-
-        {/* ผู้ถือครองและสถานที่ */}
-        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-          <CardContent sx={{ p: 3 }}>
-            <SectionTitle>ผู้ถือครองและสถานที่</SectionTitle>
-            <Grid container spacing={2.5}>
-              <InfoItem label="ผู้ถือครอง" value={asset.ownerName} />
-              <InfoItem label="แผนก" value={asset.departmentId} />
-              <InfoItem label="Location" value={asset.location} />
-              <InfoItem label="Floor" value={asset.floor} />
-            </Grid>
-          </CardContent>
-        </Card>
-
-        {/* OS/Software และ Hardware */}
-        {isComputer && !isMonitor && (
-          <Grid container spacing={3}>
-            <Grid item xs={12} lg={5}>
-              <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider', height: '100%' }}>
-                <CardContent sx={{ p: 3 }}>
-                  <SectionTitle>OS และ Software</SectionTitle>
-                  <Grid container spacing={2.5}>
-                    <InfoItem label="OS" value={asset.osType} />
-                    <InfoItem label="Windows" value={asset.osVersion} />
-                    <InfoItem label="MS Office" value={asset.officeLicense} />
-                    <InfoItem label="Antivirus" value={asset.antivirusStatus} />
-                  </Grid>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            <Grid item xs={12} lg={7}>
-              <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider', height: '100%' }}>
-                <CardContent sx={{ p: 3 }}>
-                  <SectionTitle>Hardware</SectionTitle>
-                  <Grid container spacing={2.5}>
-                    <InfoItem label="CPU" value={asset.cpu} />
-                    <InfoItem label="Generation" value={asset.cpuGeneration} />
-                    <InfoItem label="GPU" value={asset.gpu} />
-                    <InfoItem label="RAM" value={asset.ram} />
-                    <InfoItem label="RAM Slot1" value={asset.ramSlot1} />
-                    <InfoItem label="RAM Slot2" value={asset.ramSlot2} />
-                    <InfoItem label="Storage 1" value={asset.storage1} />
-                    <InfoItem label="Storage 2" value={asset.storage2} />
-                  </Grid>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
-        )}
-
-        {/* Type-specific detail */}
-        {asset.detail && renderDetailSection(asset.type, asset.detail)}
-
-        {/* ข้อมูลจัดซื้อ */}
-        <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-          <CardContent sx={{ p: 3 }}>
-            <SectionTitle>ข้อมูลจัดซื้อ</SectionTitle>
-            <Grid container spacing={2.5}>
-              <InfoItem label="PR No." value={asset.prNumber} />
-              <InfoItem label="งบประมาณ" value={asset.budget} />
-              <InfoItem label="PO Date" value={asset.poDate ? new Date(asset.poDate).toLocaleDateString('th-TH') : null} />
-              <InfoItem label="PO No." value={asset.poNumber} />
-              <InfoItem label="Vendor" value={asset.vendor} />
-              <InfoItem label="วันที่ซื้อ" value={asset.purchaseDate ? new Date(asset.purchaseDate).toLocaleDateString('th-TH') : null} />
-              <InfoItem label="วันหมดประกัน" value={asset.warrantyEndDate ? new Date(asset.warrantyEndDate).toLocaleDateString('th-TH') : null} />
-              <InfoItem label="ราคาจัดซื้อ" value={asset.purchasePrice !== null && asset.purchasePrice !== undefined ? `${asset.purchasePrice.toLocaleString('th-TH')} บาท` : null} />
-              <InfoItem label="อายุ (ปี)" value={asset.age} />
-              <InfoItem label="หมายเหตุ" value={asset.remark} fullWidth />
-            </Grid>
-          </CardContent>
-        </Card>
-
-        {/* ประวัติการเปลี่ยนแปลง */}
-        {asset.assetHistory?.length > 0 && (
-          <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-            <CardContent sx={{ p: 3 }}>
-              <SectionTitle>ประวัติการเปลี่ยนแปลง</SectionTitle>
-              <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 1, border: 'none' }}>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 500, fontSize: '0.75rem', color: 'text.secondary', py: 1.5 }}>วันที่</TableCell>
-                      <TableCell sx={{ fontWeight: 500, fontSize: '0.75rem', color: 'text.secondary', py: 1.5 }}>การกระทำ</TableCell>
-                      <TableCell sx={{ fontWeight: 500, fontSize: '0.75rem', color: 'text.secondary', py: 1.5 }}>จาก</TableCell>
-                      <TableCell sx={{ fontWeight: 500, fontSize: '0.75rem', color: 'text.secondary', py: 1.5 }}>ไป</TableCell>
-                      <TableCell sx={{ fontWeight: 500, fontSize: '0.75rem', color: 'text.secondary', py: 1.5 }}>หมายเหตุ</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {asset.assetHistory.map((h: any) => (
-                      <TableRow key={h.id}>
-                        <TableCell sx={{ fontSize: '0.875rem', py: 1.5 }}>{new Date(h.createdAt).toLocaleString('th-TH')}</TableCell>
-                        <TableCell sx={{ fontSize: '0.875rem', py: 1.5 }}>{historyActionLabels[h.actionType] || h.actionType}</TableCell>
-                        <TableCell sx={{ fontSize: '0.875rem', py: 1.5 }}>{h.fromStatus || h.fromOwner || h.fromLoc || '-'}</TableCell>
-                        <TableCell sx={{ fontSize: '0.875rem', py: 1.5 }}>{h.toStatus || h.toOwner || h.toLoc || '-'}</TableCell>
-                        <TableCell sx={{ fontSize: '0.875rem', py: 1.5 }}>{h.note || '-'}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* ประวัติการทำ PM */}
-        {asset.pmRuns?.length > 0 && (
-          <Card variant="outlined" sx={{ borderRadius: 1, borderColor: 'divider' }}>
-            <CardContent sx={{ p: 3 }}>
-              <SectionTitle>ประวัติการทำ PM</SectionTitle>
-              <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 1, border: 'none' }}>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 500, fontSize: '0.75rem', color: 'text.secondary', py: 1.5 }}>ปี</TableCell>
-                      <TableCell sx={{ fontWeight: 500, fontSize: '0.75rem', color: 'text.secondary', py: 1.5 }}>สถานะ</TableCell>
-                      <TableCell sx={{ fontWeight: 500, fontSize: '0.75rem', color: 'text.secondary', py: 1.5 }}>ผู้ดำเนินการ</TableCell>
-                      <TableCell sx={{ fontWeight: 500, fontSize: '0.75rem', color: 'text.secondary', py: 1.5 }}>วันที่ดำเนินการ</TableCell>
-                      <TableCell sx={{ fontWeight: 500, fontSize: '0.75rem', color: 'text.secondary', py: 1.5 }}>แล้วเสร็จ</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {asset.pmRuns.map((r: any) => (
-                      <TableRow key={r.id}>
-                        <TableCell sx={{ fontWeight: 500, fontSize: '0.875rem', py: 1.5 }}>{r.year}</TableCell>
-                        <TableCell sx={{ py: 1.5 }}>
-                          <Chip
-                            label={pmStatusLabels[r.status] || r.status}
-                            size="small"
-                            color={r.status === 'COMPLETED' ? 'success' : r.status === 'IN_PROGRESS' ? 'warning' : 'default'}
-                            sx={{ fontWeight: 500, fontSize: '0.75rem' }}
-                          />
-                        </TableCell>
-                        <TableCell sx={{ fontSize: '0.875rem', py: 1.5 }}>{r.performer?.displayName || r.performer?.adUsername || '-'}</TableCell>
-                        <TableCell sx={{ fontSize: '0.875rem', py: 1.5 }}>{r.performedAt ? new Date(r.performedAt).toLocaleString('th-TH') : '-'}</TableCell>
-                        <TableCell sx={{ fontSize: '0.875rem', py: 1.5 }}>{r.completedAt ? new Date(r.completedAt).toLocaleString('th-TH') : '-'}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </CardContent>
-          </Card>
-        )}
-      </Stack>
-    </Box>
+    </>
   );
 }

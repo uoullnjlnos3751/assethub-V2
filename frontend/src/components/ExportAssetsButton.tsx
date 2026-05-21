@@ -132,7 +132,44 @@ export default function ExportAssetsButton() {
         'หมายเหตุ': asset.remark,
       }));
 
-      const ws = XLSX.utils.json_to_sheet(data);
+      const emptyRow = {
+        'รหัสทรัพย์สิน': '',
+        'Serial No.': '',
+        'ประเภท': '',
+        'ยี่ห้อ': '',
+        'รุ่น': '',
+        'CPU': '',
+        'Gen': '',
+        'RAM': '',
+        'RAM Detail': '',
+        'Storage 1': '',
+        'Storage 2': '',
+        'RAM Slot 1': '',
+        'RAM Slot 2': '',
+        'GPU': '',
+        'OS Type': '',
+        'S/N Computer': '',
+        'OS Version': '',
+        'Windows License': '',
+        'Office License': '',
+        'Antivirus Status': '',
+        'Domain Name': '',
+        'Vendor': '',
+        'PO Number': '',
+        'PO Date': '',
+        'PR Number': '',
+        'วันซื้อ': '',
+        'อายุการใช้งาน': '',
+        'เจ้าของ': '',
+        'แผนก': '',
+        'สถานที่': '',
+        'ชั้น': '',
+        'บริษัท': '',
+        'สถานะ': '',
+        'หมายเหตุ': '',
+      };
+
+      const ws = XLSX.utils.json_to_sheet(data.length > 0 ? data : [emptyRow]);
       const csv = XLSX.utils.sheet_to_csv(ws, { FS: ',', blankrows: false });
       
       const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
