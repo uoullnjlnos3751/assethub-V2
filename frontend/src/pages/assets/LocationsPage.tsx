@@ -9,9 +9,11 @@ export default function LocationsPage() {
       <Grid container spacing={4}>
         <Grid item xs={12} md={6}>
             <MasterDataPage
-              title="สถานที่ตั้ง (Location)"
+              title="📍 สถานที่ตั้ง (Location)"
               subtitle="จัดการสถานที่ตั้งหรือไซต์สำหรับทรัพย์สิน"
-              itemLabel="สถานที่ตั้ง (Location)"
+              itemLabel="สถานที่ตั้ง"
+              icon="📍"
+              accentColor="#8b5cf6"
               showCompanyField
               fetchItems={assetAPI.locations}
               createItem={assetAPI.createLocation}
@@ -22,9 +24,11 @@ export default function LocationsPage() {
         </Grid>
         <Grid item xs={12} md={6}>
           <MasterDataPage
-            title="บริษัท (Company)"
+            title="🏢 บริษัท (Company)"
             subtitle="จัดการรายชื่อบริษัทสำหรับทรัพย์สิน"
-            itemLabel="บริษัท (Company)"
+            itemLabel="บริษัท"
+            icon="🏢"
+            accentColor="#f59e0b"
             fetchItems={assetAPI.companies}
             createItem={assetAPI.createCompany}
             updateItem={assetAPI.updateCompany}

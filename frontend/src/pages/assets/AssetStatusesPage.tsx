@@ -14,9 +14,11 @@ const statusOptions = [
 export default function AssetStatusesPage() {
   return (
     <MasterDataPage
-      title="สถานะอุปกรณ์ (Asset Status)"
+      title="🏷️ สถานะอุปกรณ์ (Asset Status)"
       subtitle="จัดการชื่อและรายละเอียดของสถานะอุปกรณ์ที่ระบบรองรับ"
-      itemLabel="สถานะอุปกรณ์"
+      itemLabel="สถานะ"
+      icon="🏷️"
+      accentColor="#f59e0b"
       fetchItems={assetAPI.assetStatuses}
       createItem={assetAPI.createAssetStatus}
       updateItem={assetAPI.updateAssetStatus}
