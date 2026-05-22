@@ -67,6 +67,7 @@ export default function PMDashboardPage() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
+            <button className="pmd-btn pmd-btn-outline" onClick={() => navigate('/pm/schedule')}>📅 Gantt Chart</button>
             <button className="pmd-btn pmd-btn-outline" onClick={() => navigate('/pm/templates')}>📝 Template</button>
             <button className="pmd-btn pmd-btn-outline" onClick={() => navigate('/pm/runs')}>🔧 ทำ PM</button>
             <button className="pmd-btn pmd-btn-primary" onClick={() => navigate('/pm/plans')}>＋ สร้างแผน</button>
@@ -113,6 +114,7 @@ export default function PMDashboardPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 10, marginBottom: 18 }}>
           {[
             { icon: '📋', title: 'แผน PM', sub: `${plans.length} แผน`, color: '#0ea5e9', bg: '#f0f9ff', onClick: () => navigate('/pm/plans') },
+            { icon: '📅', title: 'กำหนดการ PM (Gantt)', sub: 'Gantt Chart แผนรายสัปดาห์', color: '#10b981', bg: '#f0fdf4', onClick: () => navigate('/pm/schedule') },
             { icon: '🔧', title: 'ทำ PM Checklist', sub: `${remaining} รายการรอ`, color: '#f59e0b', bg: '#fffbeb', onClick: () => navigate('/pm/runs') },
             { icon: '📝', title: 'จัดการ Template', sub: 'Customize Checklist', color: '#8b5cf6', bg: '#f5f3ff', onClick: () => navigate('/pm/templates') },
           ].map(a => (
@@ -164,9 +166,10 @@ export default function PMDashboardPage() {
                     const isDone = pct >= 100;
 
                     return (
-                      <tr key={plan.id} style={{ borderBottom: '1px solid #f1f5f9' }}
+                      <tr key={plan.id} style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer' }}
                         onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#f8fafc'}
                         onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ''}
+                        onClick={() => navigate(`/pm/runs?planId=${plan.id}`)}
                       >
                         <td style={{ padding: '10px 14px' }}>
                           <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 12 }}>{label || 'ทั่วไป'}</div>

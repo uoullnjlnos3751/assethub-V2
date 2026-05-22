@@ -30,6 +30,7 @@ export const authAPI = {
   login: (username: string, password: string) => api.post('/auth/login', { username, password }),
   checkExpiry: (username: string, password: string) => api.post('/auth/check-expiry', { username, password }),
   me: () => api.get('/auth/me'),
+  publicSettings: () => api.get('/auth/settings'),
 };
 
 // Assets
@@ -98,6 +99,7 @@ export const assetAPI = {
 export const borrowAPI = {
   createRequest: (data: any) => api.post('/borrow/requests', data),
   myRequests: (params?: any) => api.get('/borrow/requests', { params }),
+  cancelRequest: (id: number) => api.delete(`/borrow/requests/${id}`),
   myItems: () => api.get('/borrow/my-items'),
   myHistory: () => api.get('/borrow/my-history'),
   myExtensions: () => api.get('/borrow/my-extensions'),
@@ -117,6 +119,7 @@ export const borrowAPI = {
 export const pmAPI = {
   templates: () => api.get('/pm/templates'),
   createTemplate: (data: any) => api.post('/pm/templates', data),
+  updateTemplate: (id: number, data: any) => api.put(`/pm/templates/${id}`, data),
   plans: (params?: any) => api.get('/pm/plans', { params }),
   createPlan: (data: any) => api.post('/pm/plans', data),
   generate: (planId: number) => api.post(`/pm/plans/${planId}/generate`),
@@ -128,16 +131,23 @@ export const pmAPI = {
 // Admin
 export const adminAPI = {
   users: (params?: any) => api.get('/admin/users', { params }),
+  getUser: (id: number) => api.get(`/admin/users/${id}`),
   searchADUsers: (q: string) => api.get('/admin/users/search-ad', { params: { q } }),
   createUserFromAD: (data: any) => api.post('/admin/users/from-ad', data),
+  createLocalUser: (data: { username: string; password: string; displayName: string; role?: string }) => api.post('/admin/users/local', data),
+  setLocalPassword: (id: number, password: string) => api.put(`/admin/users/${id}/local-password`, { password }),
   updateRole: (id: number, role: string) => api.put(`/admin/users/${id}/role`, { role }),
   toggleActive: (id: number) => api.put(`/admin/users/${id}/toggle-active`),
   deleteUser: (id: number) => api.delete(`/admin/users/${id}`),
   settings: () => api.get('/admin/settings'),
   updateSettings: (data: any) => api.put('/admin/settings', data),
+  testEmail: (data: any) => api.post('/admin/test-email', data),
+  ping: () => api.get('/admin/ping'),
   notificationTemplates: () => api.get('/admin/notification-templates'),
   updateNotificationTemplate: (id: number, data: any) => api.put(`/admin/notification-templates/${id}`, data),
+  resetNotificationTemplate: (id: number) => api.post(`/admin/notification-templates/${id}/reset`),
   notificationLogs: (params?: any) => api.get('/admin/notification-logs', { params }),
+  forceLogoutAll: () => api.post('/admin/force-logout-all'),
 };
 
 // Dashboard

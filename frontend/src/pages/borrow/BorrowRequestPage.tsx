@@ -1,470 +1,463 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import {
-  Box, Typography, Card, CardContent, Chip, Grid, Button, TextField,
-  Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
-  CircularProgress, Alert, Divider, List, ListItem, ListItemText,
-  InputAdornment, IconButton, Checkbox, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow
-} from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
-import ClearIcon from '@mui/icons-material/Clear';
-import AddIcon from '@mui/icons-material/Add';
-import DeleteIcon from '@mui/icons-material/Delete';
-import Inventory2Icon from '@mui/icons-material/Inventory2';
-import DevicesIcon from '@mui/icons-material/Devices';
 import { assetAPI, borrowAPI, inventoryAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function BorrowRequestPage() {
-  const { user } = useAuth();
+  const { user, systemSettings } = useAuth();
+  const effectiveBorrowDays = systemSettings?.borrowDays ?? parseInt(import.meta.env.VITE_BORROW_DUE_DAYS || '3');
   const [searchParams] = useSearchParams();
-  const [assets, setAssets] = useState<any[]>([]);
+  const navigate = useNavigate();
   const initialAssetId = searchParams.get('assetId');
+
+  // Assets
+  const [assets, setAssets] = useState<any[]>([]);
   const [selected, setSelected] = useState<number[]>(initialAssetId ? [parseInt(initialAssetId)] : []);
   const [selectedAssets, setSelectedAssets] = useState<any[]>([]);
+  const [assetSearch, setAssetSearch] = useState('');
+  const [filterType, setFilterType] = useState('');
+  const [filterLocation, setFilterLocation] = useState('');
+  const [assetHover, setAssetHover] = useState<any>(null);
+
+  // Inventory
+  const [inventoryItems, setInventoryItems] = useState<any[]>([]);
+  const [selectedInventory, setSelectedInventory] = useState<Array<{ item: any; qty: number }>>([]);
+  const [invSearch, setInvSearch] = useState('');
+
+  // Form
   const [purpose, setPurpose] = useState('');
   const [notes, setNotes] = useState('');
   const [location, setLocation] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [activeTab, setActiveTab] = useState(0);
-  const [openDialog, setOpenDialog] = useState(false);
-  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [toast, setToast] = useState('');
+  const [toastType, setToastType] = useState<'ok' | 'err'>('ok');
+  const [overdueItems, setOverdueItems] = useState<any[]>([]);
 
-  // Inventory items state
-  const [inventoryItems, setInventoryItems] = useState<any[]>([]);
-  const [invLoading, setInvLoading] = useState(false);
-  const [selectedInventory, setSelectedInventory] = useState<Array<{ item: any; qty: number }>>([]);
-
-  const borrowDays = parseInt(import.meta.env.VITE_BORROW_DUE_DAYS || '3');
+  const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => { setToast(msg); setToastType(type); setTimeout(() => setToast(''), 3500); };
 
   useEffect(() => {
-    assetAPI.list({ status: 'Available', limit: 200 })
-      .then((res) => setAssets(res.data.data || []))
-      .catch(() => setAssets([]))
-      .finally(() => setLoading(false));
+    Promise.all([
+      assetAPI.list({ status: 'Available', limit: 500 }),
+      inventoryAPI.list({ limit: 500 }),
+      borrowAPI.myItems(),
+    ]).then(([aRes, iRes, itemsRes]) => {
+      setAssets(aRes.data.data || []);
+      setInventoryItems(iRes.data.data || []);
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      const overdue = (itemsRes.data || []).filter((item: any) => item.dueDate && new Date(item.dueDate) < now);
+      setOverdueItems(overdue);
+    }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
-    const foundAssets = selected.map((id) => assets.find((a: any) => a.id === id)).filter(Boolean);
-    setSelectedAssets(foundAssets);
+    setSelectedAssets(selected.map(id => assets.find((a: any) => a.id === id)).filter(Boolean));
   }, [selected, assets]);
 
-  useEffect(() => {
-    if (activeTab === 1) {
-      setInvLoading(true);
-      inventoryAPI.list({ limit: 200 })
-        .then((res) => setInventoryItems(res.data.data || []))
-        .catch(() => setInventoryItems([]))
-        .finally(() => setInvLoading(false));
-    }
-  }, [activeTab]);
+  // Derived filter lists
+  const allTypes = [...new Set(assets.map((a: any) => a.deviceType || a.category || '').filter(Boolean))].sort();
+  const allLocations = [...new Set(assets.map((a: any) => a.location || '').filter(Boolean))].sort();
 
-  const toggleInventorySelect = (item: any) => {
-    setSelectedInventory((prev) => {
-      if (prev.find((s) => s.item.id === item.id)) {
-        return prev.filter((s) => s.item.id !== item.id);
-      }
-      return [...prev, { item, qty: 1 }];
-    });
-  };
-
-  const updateInvQty = (itemId: number, qty: number) => {
-    setSelectedInventory((prev) =>
-      prev.map((s) => (s.item.id === itemId ? { ...s, qty: Math.min(s.item.availableQuantity, Math.max(1, qty)) } : s))
-    );
-  };
-
-  const removeInventoryItem = (itemId: number) => {
-    setSelectedInventory((prev) => prev.filter((s) => s.item.id !== itemId));
-  };
-
-  const filteredAssets = assets.filter((a) =>
-    searchTerm === '' ||
-    a.assetCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    a.serialNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    a.brand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    a.model?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredAssets = assets.filter(a =>
+    (assetSearch === '' ||
+      a.assetCode?.toLowerCase().includes(assetSearch.toLowerCase()) ||
+      a.serialNo?.toLowerCase().includes(assetSearch.toLowerCase()) ||
+      a.brand?.toLowerCase().includes(assetSearch.toLowerCase()) ||
+      a.model?.toLowerCase().includes(assetSearch.toLowerCase())
+    ) &&
+    (filterType === '' || (a.deviceType || a.category || '') === filterType) &&
+    (filterLocation === '' || a.location === filterLocation)
   );
 
-  const toggleSelect = (id: number) => {
-    setSelected((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
+  const filteredInventory = inventoryItems.filter(i =>
+    i.availableQuantity > 0 &&
+    (invSearch === '' || i.name?.toLowerCase().includes(invSearch.toLowerCase()) || i.category?.toLowerCase().includes(invSearch.toLowerCase()))
+  );
+
+  const toggleAsset = (id: number) => setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const removeAsset = (id: number) => setSelected(prev => prev.filter(x => x !== id));
+
+  const toggleInventory = (item: any) => {
+    setSelectedInventory(prev => prev.find(s => s.item.id === item.id)
+      ? prev.filter(s => s.item.id !== item.id)
+      : [...prev, { item, qty: 1 }]);
+  };
+  const updateQty = (itemId: number, qty: number) => {
+    setSelectedInventory(prev => prev.map(s => s.item.id === itemId
+      ? { ...s, qty: Math.min(s.item.availableQuantity, Math.max(1, qty)) } : s));
   };
 
-  const removeSelected = (id: number) => {
-    setSelected((prev) => prev.filter((x) => x !== id));
+  const totalSelected = selected.length + selectedInventory.length;
+
+  const getBorrowDurationText = () => {
+    if (!dueDate) {
+      return `(${effectiveBorrowDays} \u0e27\u0e31\u0e19)`;
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selectedDue = new Date(dueDate);
+    selectedDue.setHours(0, 0, 0, 0);
+    const diffTime = selectedDue.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    if (isNaN(diffDays) || diffDays < 0) return '';
+    return `(${diffDays} \u0e27\u0e31\u0e19)`;
   };
 
   const handleSubmit = async () => {
-    if (selected.length === 0 && selectedInventory.length === 0) {
-      setError('กรุณาเลือกทรัพย์สินหรือวัสดุอย่างน้อย 1 รายการ');
+    if (totalSelected === 0) { showToast('⚠ กรุณาเลือกทรัพย์สินหรือวัสดุอย่างน้อย 1 รายการ', 'err'); return; }
+    if (!purpose.trim()) { showToast('⚠ กรุณากรอกวัตถุประสงค์การยืม', 'err'); return; }
+
+    const maxItems = systemSettings?.maxItemsPerRequest ?? 5;
+    if (totalSelected > maxItems) {
+      showToast(`⚠ สามารถยืมได้สูงสุดไม่เกิน ${maxItems} รายการต่อคำขอ`, 'err');
       return;
     }
-    if (!purpose.trim()) {
-      setError('กรุณากรอกวัตถุประสงค์การยืม');
-      return;
+
+    const maxDays = systemSettings?.maxBorrowDays ?? 30;
+    if (dueDate) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const selectedDue = new Date(dueDate);
+      selectedDue.setHours(0, 0, 0, 0);
+      const diffTime = selectedDue.getTime() - today.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      if (diffDays > maxDays) {
+        showToast(`⚠ ระยะเวลาการยืมสูงสุดไม่เกิน ${maxDays} วัน`, 'err');
+        return;
+      }
     }
 
     setSubmitting(true);
-    setError('');
-
     try {
       await borrowAPI.createRequest({
         assetIds: selected,
-        inventoryItems: selectedInventory.map((s) => ({ inventoryItemId: s.item.id, quantity: s.qty })),
-        purpose,
-        notes,
-        location,
-        dueDate: dueDate || new Date(Date.now() + borrowDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        inventoryItems: selectedInventory.map(s => ({ inventoryItemId: s.item.id, quantity: s.qty })),
+        purpose, notes, location,
+        dueDate: dueDate || new Date(Date.now() + effectiveBorrowDays * 86400000).toISOString().split('T')[0],
       });
-      setSuccess('สร้างคำขอยืมสำเร็จ');
+      showToast('✅ ส่งคำขอยืมเรียบร้อยแล้ว');
       setTimeout(() => navigate('/borrow/my-requests'), 1500);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'เกิดข้อผิดพลาด');
-    } finally {
-      setSubmitting(false);
-    }
+      showToast(`❌ ${err.response?.data?.error || 'เกิดข้อผิดพลาด'}`, 'err');
+    } finally { setSubmitting(false); }
   };
 
-  if (loading)
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-        <CircularProgress />
-      </Box>
-    );
+  if (loading) return (
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+      <div style={{ textAlign: 'center', color: '#64748b' }}><div style={{ fontSize: '2rem', marginBottom: 8 }}>⏳</div><div>กำลังโหลดรายการ...</div></div>
+    </div>
+  );
 
   return (
-    <Box sx={{ pb: 4 }}>
+    <div style={{ paddingBottom: 48, maxWidth: 1200, margin: '0 auto' }}>
+      {toast && (
+        <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 9999, background: toastType === 'ok' ? '#1e293b' : '#dc2626', color: '#fff', padding: '12px 20px', borderRadius: 10, fontWeight: 600, boxShadow: '0 4px 20px rgba(0,0,0,0.3)', fontSize: '0.9rem', maxWidth: 360 }}>
+          {toast}
+        </div>
+      )}
+
       {/* Header */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" fontWeight={700} gutterBottom>
-          ยืมทรัพย์สิน
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          เลือกทรัพย์สินที่ต้องการยืม และระบุรายละเอียดการยืม
-        </Typography>
-      </Box>
+      <div style={{ marginBottom: 28 }}>
+        <h2 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 800, color: '#0f172a' }}>{"\u0e22\u0e37\u0e21\u0e17\u0e23\u0e31\u0e1e\u0e22\u0e4c\u0e2a\u0e34\u0e19"}</h2>
+        <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '0.9rem' }}>{"\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e17\u0e35\u0e48\u0e15\u0e49\u0e2d\u0e07\u0e01\u0e32\u0e23\u0e22\u0e37\u0e21 \u0e41\u0e25\u0e49\u0e27\u0e01\u0e23\u0e2d\u0e01\u0e23\u0e32\u0e22\u0e25\u0e30\u0e40\u0e2d\u0e35\u0e22\u0e14"}</p>
+      </div>
 
-      {/* Alerts */}
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-          {error}
-        </Alert>
+      {overdueItems.length > 0 && (
+        <div style={{ background: 'linear-gradient(135deg, #fef2f2, #ffe4e6)', border: '1px solid #fecdd3', borderRadius: 14, padding: '16px 20px', marginBottom: 24, boxShadow: '0 4px 12px rgba(220, 38, 38, 0.05)' }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+            <span style={{ fontSize: '1.3rem', marginTop: -2 }}>⚠️</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 800, color: '#991b1b', fontSize: '0.92rem', marginBottom: 4 }}>
+                {"\u0e04\u0e38\u0e13\u0e21\u0e35\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e22\u0e37\u0e21\u0e17\u0e35\u0e48\u0e40\u0e01\u0e34\u0e19\u0e01\u0e33\u0e2b\u0e19\u0e14\u0e2a\u0e48\u0e07\u0e04\u0e37\u0e19 \u0e01\u0e23\u0e38\u0e13\u0e32\u0e2a\u0e48\u0e07\u0e04\u0e37\u0e19\u0e2b\u0e23\u0e37\u0e2d\u0e02\u0e2d\u0e15\u0e48\u0e2d\u0e40\u0e27\u0e25\u0e32\u0e01\u0e48\u0e2d\u0e19\u0e17\u0e33\u0e01\u0e32\u0e23\u0e22\u0e37\u0e21\u0e43\u0e2b\u0e21\u0e48"}
+              </div>
+              <div style={{ fontSize: '0.8rem', color: '#b91c1c', marginTop: 8 }}>
+                <strong style={{ display: 'block', marginBottom: 6 }}>{"\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e17\u0e35\u0e48\u0e40\u0e01\u0e34\u0e19\u0e01\u0e33\u0e2b\u0e19\u0e14:"}</strong>
+                <ul style={{ margin: '4px 0 0', paddingLeft: 20 }}>
+                  {overdueItems.map((item: any) => (
+                    <li key={item.id}>
+                      {item.asset ? `${item.asset.assetCode} - ${item.asset.brand} ${item.asset.model}` : item.inventoryItem?.name}{' '}
+                      ({new Date(item.dueDate).toLocaleDateString('th-TH')})
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
-      {success && (
-        <Alert severity="success" sx={{ mb: 2 }}>
-          {success}
-        </Alert>
-      )}
 
-      <Grid container spacing={3}>
-        {/* Form Section */}
-        <Grid item xs={12} md={8}>
-          <Card sx={{ mb: 3 }}>
-            <CardContent>
-              <Typography variant="h6" fontWeight={600} gutterBottom>
-                ข้อมูลการยืม
-              </Typography>
-              <Divider sx={{ mb: 2 }} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 24, alignItems: 'start' }}>
+        {/* Left: Form + Selection */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-              <Box sx={{ mb: 3 }}>
-                <TextField
-                  label="วัตถุประสงค์การยืม *"
-                  fullWidth
-                  multiline
-                  rows={2}
-                  value={purpose}
-                  onChange={(e) => setPurpose(e.target.value)}
-                  placeholder="เช่น ใช้ในการประชุม, ใช้สำหรับ Project XYZ"
-                  error={purpose.trim() === '' && submitting}
-                  helperText={purpose.trim() === '' && submitting ? 'จำเป็นต้องกรอก' : ''}
-                />
-              </Box>
+          {/* Borrow Info Card */}
+          <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '20px 24px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+            <h3 style={{ margin: '0 0 16px', fontSize: '1rem', fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>📋</span> ข้อมูลการยืม
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#374151', marginBottom: 6 }}>วัตถุประสงค์การยืม <span style={{ color: '#dc2626' }}>*</span></label>
+                <textarea value={purpose} onChange={e => setPurpose(e.target.value)} rows={2}
+                  placeholder="เช่น ใช้ในการประชุม, ใช้สำหรับโปรเจกต์ XYZ"
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: `1px solid ${purpose.trim() === '' && submitting ? '#dc2626' : '#e2e8f0'}`, fontSize: '0.9rem', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#374151', marginBottom: 6 }}>สถานที่/หน่วยงานที่ใช้งาน</label>
+                <input value={location} onChange={e => setLocation(e.target.value)}
+                  placeholder="เช่น สำนักงานใหญ่ ชั้น 5"
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: '0.9rem', boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', fontWeight: 700, color: '#374151', marginBottom: 6 }}>
+                  <span>{"\u0e01\u0e33\u0e2b\u0e19\u0e14\u0e04\u0e37\u0e19"}</span>
+                  <span style={{ color: '#0ea5e9', fontWeight: 800 }}>{getBorrowDurationText()}</span>
+                </label>
+                <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: '0.9rem', boxSizing: 'border-box' }} />
+                <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: 4 }}>{"\u0e04\u0e48\u0e32\u0e40\u0e23\u0e34\u0e48\u0e21\u0e15\u0e49\u0e19"} {effectiveBorrowDays} {"\u0e27\u0e31\u0e19\u0e19\u0e31\u0e1a\u0e08\u0e32\u0e01\u0e27\u0e31\u0e19\u0e19\u0e35\u0e49"} ({"\u0e2a\u0e39\u0e07\u0e2a\u0e39\u0e14"} {systemSettings?.maxBorrowDays ?? 30} {"\u0e27\u0e31\u0e19"})</div>
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#374151', marginBottom: 6 }}>หมายเหตุ</label>
+                <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
+                  placeholder="ข้อมูลเพิ่มเติม (ถ้ามี)"
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: '0.9rem', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+              </div>
+            </div>
+          </div>
 
-              <Box sx={{ mb: 3 }}>
-                <TextField
-                  label="สถานที่/หน่วยงานที่ใช้งาน"
-                  fullWidth
-                  size="small"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  placeholder="เช่น สำนักงานใหญ่ ชั้น 5, โรงงาน A"
-                />
-              </Box>
+          {/* Asset / Inventory Selection Card */}
+          <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '20px 24px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+            {/* Tabs */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              {[{ label: `🖥 ทรัพย์สิน IT (${assets.length})`, value: 0 }, { label: `📦 วัสดุสิ้นเปลือง (${inventoryItems.filter(i => i.availableQuantity > 0).length})`, value: 1 }].map(t => (
+                <button key={t.value} onClick={() => setActiveTab(t.value)}
+                  style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid ${activeTab === t.value ? '#0ea5e9' : '#e2e8f0'}`, background: activeTab === t.value ? '#e0f2fe' : '#f8fafc', color: activeTab === t.value ? '#0284c7' : '#64748b', fontWeight: activeTab === t.value ? 700 : 500, cursor: 'pointer', fontSize: '0.85rem' }}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
 
-              <Box sx={{ mb: 3 }}>
-                <TextField
-                  label="หมายเหตุเพิ่มเติม"
-                  fullWidth
-                  multiline
-                  rows={2}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="ระบุข้อมูลเพิ่มเติม (ถ้ามี)"
-                />
-              </Box>
+            {activeTab === 0 ? (
+              <>
+                {/* Filters */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 10, marginBottom: 14 }}>
+                  <div style={{ position: 'relative' }}>
+                    <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}>🔍</span>
+                    <input value={assetSearch} onChange={e => setAssetSearch(e.target.value)}
+                      placeholder="ค้นหา รหัส / Serial / ยี่ห้อ / รุ่น"
+                      style={{ width: '100%', padding: '9px 12px 9px 32px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: '0.85rem', boxSizing: 'border-box' }} />
+                  </div>
+                  <select value={filterType} onChange={e => setFilterType(e.target.value)}
+                    style={{ padding: '9px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: '0.85rem', color: filterType ? '#0284c7' : '#6b7280', background: filterType ? '#f0f9ff' : '#fff', minWidth: 130 }}>
+                    <option value="">ทุกประเภท</option>
+                    {allTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                  <select value={filterLocation} onChange={e => setFilterLocation(e.target.value)}
+                    style={{ padding: '9px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: '0.85rem', color: filterLocation ? '#0284c7' : '#6b7280', background: filterLocation ? '#f0f9ff' : '#fff', minWidth: 130 }}>
+                    <option value="">ทุกสถานที่</option>
+                    {allLocations.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+                </div>
 
-              <Box sx={{ mb: 3 }}>
-                <TextField
-                  label="กำหนดคืนเมื่อ"
-                  type="date"
-                  fullWidth
-                  InputLabelProps={{ shrink: true }}
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                  inputProps={{
-                    min: new Date().toISOString().split('T')[0],
-                  }}
-                  helperText={`ค่าเริ่มต้น: ${borrowDays} วัน นับจากวันนี้`}
-                />
-              </Box>
-            </CardContent>
-          </Card>
-
-          {/* Asset/Inventory Selection */}
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                <Button
-                  variant={activeTab === 0 ? 'contained' : 'outlined'}
-                  size="small"
-                  startIcon={<DevicesIcon />}
-                  onClick={() => setActiveTab(0)}
-                >
-                  ทรัพย์สิน IT ({assets.length})
-                </Button>
-                <Button
-                  variant={activeTab === 1 ? 'contained' : 'outlined'}
-                  size="small"
-                  startIcon={<Inventory2Icon />}
-                  onClick={() => setActiveTab(1)}
-                >
-                  วัสดุสิ้นเปลือง ({inventoryItems.length})
-                </Button>
-              </Box>
-              <Divider sx={{ mb: 2 }} />
-
-              {activeTab === 0 ? (
-                <>
-                  <Box sx={{ mb: 2 }}>
-                    <TextField
-                      label="ค้นหาทรัพย์สิน"
-                      fullWidth
-                      size="small"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <SearchIcon />
-                          </InputAdornment>
-                        ),
-                        endAdornment: searchTerm && (
-                          <InputAdornment position="end">
-                            <ClearIcon
-                              sx={{ cursor: 'pointer' }}
-                              onClick={() => setSearchTerm('')}
-                            />
-                          </InputAdornment>
-                        ),
-                      }}
-                      placeholder="รหัส, Serial, ยี่ห้อ, รุ่น"
-                    />
-                  </Box>
-
-                  <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Chip label={`พบทั้งหมด ${filteredAssets.length} รายการ`} variant="outlined" color="primary" />
-                    <Chip label={`เลือกแล้ว ${selected.length}`} color="success" variant="filled" />
-                  </Box>
-
-                  <TableContainer sx={{ maxHeight: 350, border: '1px solid rgba(0,0,0,0.1)', borderRadius: 2 }}>
-                    <Table size="small" stickyHeader>
-                      <TableHead>
-                        <TableRow sx={{ backgroundColor: 'rgba(37, 99, 235, 0.05)' }}>
-                          <TableCell padding="checkbox" width={40}></TableCell>
-                          <TableCell width={100}>รหัส</TableCell>
-                          <TableCell width={100}>Serial No.</TableCell>
-                          <TableCell>ยี่ห้อ/รุ่น</TableCell>
-                          <TableCell width={100}>สถานที่</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {filteredAssets.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
-                              <Typography color="text.secondary">
-                                {assets.length === 0 ? 'ไม่มีทรัพย์สินที่พร้อมให้ยืม' : 'ไม่พบผลการค้นหา'}
-                              </Typography>
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          filteredAssets.map((a) => (
-                            <TableRow key={a.id} hover selected={selected.includes(a.id)} onClick={() => toggleSelect(a.id)} sx={{ cursor: 'pointer' }}>
-                              <TableCell padding="checkbox"><Checkbox checked={selected.includes(a.id)} /></TableCell>
-                              <TableCell sx={{ fontWeight: 500 }}>{a.assetCode}</TableCell>
-                              <TableCell>{a.serialNo || '-'}</TableCell>
-                              <TableCell>{`${a.brand || ''} ${a.model || ''}`.trim() || '-'}</TableCell>
-                              <TableCell>{a.location || '-'}</TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                </>
-              ) : (
-                <>
-                  {invLoading ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress /></Box>
-                  ) : (
-                    <TableContainer sx={{ maxHeight: 350, border: '1px solid rgba(0,0,0,0.1)', borderRadius: 2 }}>
-                      <Table size="small" stickyHeader>
-                        <TableHead>
-                          <TableRow sx={{ backgroundColor: 'rgba(46, 125, 50, 0.05)' }}>
-                            <TableCell padding="checkbox" width={40}></TableCell>
-                            <TableCell>ชื่อรายการ</TableCell>
-                            <TableCell>หมวด</TableCell>
-                            <TableCell>คงเหลือ</TableCell>
-                            <TableCell>หน่วย</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {inventoryItems.filter((i) => i.availableQuantity > 0).length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
-                                <Typography color="text.secondary">ไม่มีวัสดุคงเหลือให้ยืม</Typography>
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            inventoryItems.filter((i) => i.availableQuantity > 0).map((item) => (
-                              <TableRow key={item.id} hover selected={selectedInventory.some((s) => s.item.id === item.id)} onClick={() => toggleInventorySelect(item)} sx={{ cursor: 'pointer' }}>
-                                <TableCell padding="checkbox"><Checkbox checked={selectedInventory.some((s) => s.item.id === item.id)} /></TableCell>
-                                <TableCell sx={{ fontWeight: 500 }}>{item.name}</TableCell>
-                                <TableCell><Chip label={item.category} size="small" variant="outlined" /></TableCell>
-                                <TableCell>{item.availableQuantity}</TableCell>
-                                <TableCell>{item.unit}</TableCell>
-                              </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  )}
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Summary Section */}
-        <Grid item xs={12} md={4}>
-          <Card sx={{ position: 'sticky', top: 20 }}>
-            <CardContent>
-              <Typography variant="h6" fontWeight={600} gutterBottom>
-                สรุปการยืม
-              </Typography>
-              <Divider sx={{ mb: 2 }} />
-
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="body2" color="text.secondary" gutterBottom>ผู้ขอ</Typography>
-                <Typography variant="body1" fontWeight={600}>{user?.displayName || user?.adUsername || '-'}</Typography>
-              </Box>
-
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="body2" color="text.secondary" gutterBottom>จำนวนรายการที่เลือก</Typography>
-                <Typography variant="h4" fontWeight={700} color="primary">
-                  {selected.length + selectedInventory.length}
-                </Typography>
-              </Box>
-
-              <Typography variant="subtitle2" fontWeight={600} gutterBottom>
-                รายการที่เลือก:
-              </Typography>
-
-              <Box sx={{ mb: 3, maxHeight: 300, overflow: 'auto' }}>
-                {selectedAssets.length === 0 && selectedInventory.length === 0 ? (
-                  <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
-                    ยังไม่มีการเลือกรายการ
-                  </Typography>
-                ) : (
-                  <>
-                    {selectedAssets.map((asset) => (
-                      <Box key={asset.id} sx={{ p: 1.5, mb: 1, backgroundColor: 'rgba(37, 99, 235, 0.05)', borderRadius: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Typography variant="body2" fontWeight={600}>{asset.assetCode}</Typography>
-                          <Typography variant="caption" color="text.secondary">{asset.serialNo}</Typography>
-                        </Box>
-                        <Button size="small" color="error" onClick={() => removeSelected(asset.id)}><DeleteIcon fontSize="small" /></Button>
-                      </Box>
-                    ))}
-                    {selectedInventory.map(({ item, qty }) => (
-                      <Box key={item.id} sx={{ p: 1.5, mb: 1, backgroundColor: 'rgba(46, 125, 50, 0.05)', borderRadius: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Typography variant="body2" fontWeight={600}>{item.name}</Typography>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                            <TextField
-                              size="small"
-                              type="number"
-                              value={qty}
-                              onChange={(e) => updateInvQty(item.id, parseInt(e.target.value) || 1)}
-                              inputProps={{ min: 1, max: item.availableQuantity }}
-                              sx={{ width: 70, '& input': { fontSize: '0.8rem', py: 0.5 } }}
-                            />
-                            <Typography variant="caption" color="text.secondary">{item.unit}</Typography>
-                          </Box>
-                        </Box>
-                        <Button size="small" color="error" onClick={() => removeInventoryItem(item.id)}><DeleteIcon fontSize="small" /></Button>
-                      </Box>
-                    ))}
-                  </>
+                {/* Active filters */}
+                {(filterType || filterLocation) && (
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+                    {filterType && <span style={{ background: '#e0f2fe', color: '#0284c7', borderRadius: 20, padding: '2px 10px', fontSize: '0.75rem', fontWeight: 600 }}>🏷 {filterType} <button onClick={() => setFilterType('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0284c7', fontWeight: 700, padding: 0, marginLeft: 4 }}>✕</button></span>}
+                    {filterLocation && <span style={{ background: '#e0f2fe', color: '#0284c7', borderRadius: 20, padding: '2px 10px', fontSize: '0.75rem', fontWeight: 600 }}>📍 {filterLocation} <button onClick={() => setFilterLocation('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0284c7', fontWeight: 700, padding: 0, marginLeft: 4 }}>✕</button></span>}
+                  </div>
                 )}
-              </Box>
 
-              <Divider sx={{ my: 2 }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <span style={{ fontSize: '0.78rem', color: '#64748b' }}>พบ <strong>{filteredAssets.length}</strong> รายการ</span>
+                  <span style={{ background: selected.length > 0 ? '#dcfce7' : '#f1f5f9', color: selected.length > 0 ? '#16a34a' : '#94a3b8', borderRadius: 20, padding: '2px 10px', fontSize: '0.75rem', fontWeight: 700 }}>เลือกแล้ว {selected.length}</span>
+                </div>
 
-              <Button
-                variant="contained"
-                fullWidth
-                size="large"
-                onClick={handleSubmit}
-                disabled={submitting || (selected.length === 0 && selectedInventory.length === 0) || !purpose.trim()}
-                sx={{ mb: 1 }}
-              >
-                {submitting ? (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <CircularProgress size={20} />
-                    <span>กำลังส่ง...</span>
-                  </Box>
-                ) : (
-                  'ส่งคำขอยืม'
+                {/* Asset Table */}
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden', maxHeight: 350, overflowY: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc', position: 'sticky', top: 0 }}>
+                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8', width: 36 }}></th>
+                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>รหัส</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>ยี่ห้อ/รุ่น</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>ประเภท</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>สถานที่</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredAssets.length === 0 ? (
+                        <tr><td colSpan={5} style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>ไม่พบรายการ</td></tr>
+                      ) : filteredAssets.map((a, idx) => {
+                        const isSelected = selected.includes(a.id);
+                        return (
+                          <tr key={a.id}
+                            onClick={() => toggleAsset(a.id)}
+                            onMouseEnter={() => setAssetHover(a)}
+                            onMouseLeave={() => setAssetHover(null)}
+                            style={{ borderTop: idx > 0 ? '1px solid #f1f5f9' : 'none', background: isSelected ? '#f0f9ff' : 'transparent', cursor: 'pointer', transition: 'background 0.1s' }}>
+                            <td style={{ padding: '10px 12px' }}>
+                              <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${isSelected ? '#0ea5e9' : '#d1d5db'}`, background: isSelected ? '#0ea5e9' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}>
+                                {isSelected && <span style={{ color: '#fff', fontSize: '0.7rem', fontWeight: 900 }}>✓</span>}
+                              </div>
+                            </td>
+                            <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0f172a' }}>
+                              <div>{a.assetCode}</div>
+                              <div style={{ fontSize: '0.73rem', color: '#94a3b8', fontWeight: 400 }}>{a.serialNo || '-'}</div>
+                            </td>
+                            <td style={{ padding: '10px 12px', color: '#374151' }}>{`${a.brand || ''} ${a.model || ''}`.trim() || '-'}</td>
+                            <td style={{ padding: '10px 12px' }}>
+                              {(a.deviceType || a.category) ? <span style={{ background: '#f1f5f9', color: '#475569', borderRadius: 20, padding: '2px 8px', fontSize: '0.72rem', fontWeight: 600 }}>{a.deviceType || a.category}</span> : <span style={{ color: '#cbd5e1' }}>-</span>}
+                            </td>
+                            <td style={{ padding: '10px 12px', color: '#64748b', fontSize: '0.8rem' }}>{a.location || '-'}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Hover detail tooltip */}
+                {assetHover && !selected.includes(assetHover.id) && (
+                  <div style={{ marginTop: 10, padding: '10px 14px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 10, fontSize: '0.82rem', color: '#0369a1' }}>
+                    <strong>{assetHover.assetCode}</strong> · {assetHover.brand} {assetHover.model}
+                    {assetHover.cpu && <> · CPU: {assetHover.cpu}</>}
+                    {assetHover.ram && <> · RAM: {assetHover.ram}</>}
+                    {assetHover.os && <> · OS: {assetHover.os}</>}
+                  </div>
                 )}
-              </Button>
+              </>
+            ) : (
+              <>
+                <div style={{ position: 'relative', marginBottom: 14 }}>
+                  <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}>🔍</span>
+                  <input value={invSearch} onChange={e => setInvSearch(e.target.value)}
+                    placeholder="ค้นหาวัสดุ..."
+                    style={{ width: '100%', padding: '9px 12px 9px 32px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: '0.85rem', boxSizing: 'border-box' }} />
+                </div>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden', maxHeight: 350, overflowY: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc', position: 'sticky', top: 0 }}>
+                        <th style={{ padding: '10px 12px', width: 36 }}></th>
+                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>ชื่อรายการ</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>หมวด</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#94a3b8' }}>คงเหลือ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredInventory.length === 0 ? (
+                        <tr><td colSpan={4} style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>ไม่มีวัสดุให้ยืม</td></tr>
+                      ) : filteredInventory.map((item, idx) => {
+                        const isSel = selectedInventory.some(s => s.item.id === item.id);
+                        return (
+                          <tr key={item.id} onClick={() => toggleInventory(item)}
+                            style={{ borderTop: idx > 0 ? '1px solid #f1f5f9' : 'none', background: isSel ? '#f0fdf4' : 'transparent', cursor: 'pointer' }}>
+                            <td style={{ padding: '10px 12px' }}>
+                              <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${isSel ? '#16a34a' : '#d1d5db'}`, background: isSel ? '#16a34a' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                {isSel && <span style={{ color: '#fff', fontSize: '0.7rem', fontWeight: 900 }}>✓</span>}
+                              </div>
+                            </td>
+                            <td style={{ padding: '10px 12px', fontWeight: 600, color: '#0f172a' }}>{item.name}</td>
+                            <td style={{ padding: '10px 12px' }}><span style={{ background: '#f1f5f9', color: '#475569', borderRadius: 20, padding: '2px 8px', fontSize: '0.72rem' }}>{item.category}</span></td>
+                            <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>{item.availableQuantity} {item.unit}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
 
-              <Button
-                variant="outlined"
-                fullWidth
-                size="large"
-                onClick={() => navigate('/borrow/my-requests')}
-              >
-                ยกเลิก
-              </Button>
+        {/* Right: Summary Card (sticky) */}
+        <div style={{ position: 'sticky', top: 20 }}>
+          <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '20px 22px', boxShadow: '0 4px 20px rgba(0,0,0,0.07)' }}>
+            <h3 style={{ margin: '0 0 4px', fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>สรุปการยืม</h3>
+            <div style={{ borderTop: '1px solid #f1f5f9', marginTop: 12, paddingTop: 14 }}>
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', marginBottom: 3 }}>ผู้ขอ</div>
+                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>{user?.displayName || user?.adUsername || '-'}</div>
+              </div>
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', marginBottom: 3 }}>รายการที่เลือก</div>
+                <div style={{ fontSize: '2rem', fontWeight: 900, color: totalSelected > 0 ? '#0ea5e9' : '#94a3b8' }}>{totalSelected}</div>
+              </div>
 
-              <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid rgba(0,0,0,0.1)' }}>
-                <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
-                  ℹ️ กำหนดคืนอัตโนมัติใน <strong>{borrowDays} วัน</strong> นับจากวันที่ยืม
-                </Typography>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-    </Box>
+              {/* Selected items list */}
+              <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 16 }}>
+                {selectedAssets.map(a => (
+                  <div key={a.id} style={{ padding: '10px 12px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 9, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.assetCode}</div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{a.brand} {a.model}</div>
+                    </div>
+                    <button onClick={() => removeAsset(a.id)}
+                      style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1rem', lineHeight: 1, padding: 2 }}>✕</button>
+                  </div>
+                ))}
+                {selectedInventory.map(({ item, qty }) => (
+                  <div key={item.id} style={{ padding: '10px 12px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 9 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#0f172a' }}>{item.name}</div>
+                      <button onClick={() => setSelectedInventory(prev => prev.filter(s => s.item.id !== item.id))}
+                        style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1rem', lineHeight: 1, padding: 2 }}>✕</button>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <button onClick={() => updateQty(item.id, qty - 1)} style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer', fontWeight: 700 }}>-</button>
+                      <span style={{ fontWeight: 700, minWidth: 24, textAlign: 'center' }}>{qty}</span>
+                      <button onClick={() => updateQty(item.id, qty + 1)} style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer', fontWeight: 700 }}>+</button>
+                      <span style={{ fontSize: '0.78rem', color: '#64748b' }}>{item.unit} (คงเหลือ {item.availableQuantity})</span>
+                    </div>
+                  </div>
+                ))}
+                {totalSelected === 0 && (
+                  <div style={{ padding: '20px', textAlign: 'center', color: '#cbd5e1', fontSize: '0.85rem' }}>
+                    <div style={{ fontSize: '1.8rem', marginBottom: 6 }}>📋</div>
+                    ยังไม่มีรายการที่เลือก
+                  </div>
+                )}
+              </div>
+
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 14 }}>
+                <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  ℹ️ {"\u0e01\u0e33\u0e2b\u0e19\u0e14\u0e04\u0e37\u0e19\u0e2d\u0e31\u0e15\u0e42\u0e19\u0e21\u0e31\u0e15\u0e34"} <strong style={{ color: '#374151' }}>{effectiveBorrowDays} {"\u0e27\u0e31\u0e19"}</strong> {"\u0e19\u0e31\u0e1a\u0e08\u0e32\u0e01\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48\u0e22\u0e37\u0e21"} ({"\u0e2a\u0e39\u0e07\u0e2a\u0e39\u0e14"} {systemSettings?.maxBorrowDays ?? 30} {"\u0e27\u0e31\u0e19"})
+                </div>
+                <button onClick={handleSubmit} disabled={submitting || totalSelected === 0 || !purpose.trim() || overdueItems.length > 0}
+                  style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', background: totalSelected === 0 || !purpose.trim() || overdueItems.length > 0 ? '#e2e8f0' : '#0ea5e9', color: totalSelected === 0 || !purpose.trim() || overdueItems.length > 0 ? '#94a3b8' : '#fff', fontWeight: 800, fontSize: '0.95rem', cursor: totalSelected === 0 || !purpose.trim() || overdueItems.length > 0 ? 'not-allowed' : 'pointer', transition: 'all 0.2s', marginBottom: 8 }}
+                  title={overdueItems.length > 0 ? "\u0e04\u0e38\u0e13\u0e44\u0e21\u0e48\u0e2a\u0e32\u0e21\u0e32\u0e23\u0e16\u0e22\u0e37\u0e21\u0e17\u0e23\u0e31\u0e1e\u0e22\u0e4c\u0e2a\u0e34\u0e19\u0e43\u0e2b\u0e21\u0e48\u0e44\u0e14\u0e49 \u0e40\u0e19\u0e37\u0e48\u0e2d\u0e07\u0e08\u0e32\u0e01\u0e21\u0e35\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e04\u0e49\u0e32\u0e07\u0e2a\u0e48\u0e07\u0e04\u0e37\u0e19\u0e40\u0e01\u0e34\u0e19\u0e01\u0e33\u0e2b\u0e19\u0e14" : ""}>
+                  {submitting ? '⏳ ...' : overdueItems.length > 0 ? "\u0e04\u0e38\u0e13\u0e44\u0e21\u0e48\u0e2a\u0e32\u0e21\u0e32\u0e23\u0e16\u0e22\u0e37\u0e21\u0e43\u0e2b\u0e21\u0e48\u0e44\u0e14\u0e49" : `📤 \u0e2a\u0e48\u0e07\u0e04\u0e33\u0e02\u0e2d\u0e22\u0e37\u0e21${totalSelected > 0 ? ` (${totalSelected} \u0e23\u0e32\u0e22\u0e01\u0e32\u0e23)` : ''}`}
+                </button>
+                <button onClick={() => navigate('/borrow/my-requests')}
+                  style={{ width: '100%', padding: '10px', borderRadius: 10, border: '1px solid #e2e8f0', background: '#f8fafc', color: '#64748b', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>
+                  {"\u0e22\u0e01\u0e40\u0e25\u0e34\u0e01"}
+                </button>
+              </div>
+
+              {/* Policy Card */}
+              <div style={{ background: 'linear-gradient(135deg, #f8fafc, #f1f5f9)', borderRadius: 14, border: '1px solid #e2e8f0', padding: '16px 20px', marginTop: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+                <h4 style={{ margin: '0 0 10px', fontSize: '0.85rem', fontWeight: 800, color: '#475569', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span>🛡️</span> {"\u0e19\u0e42\u0e22\u0e1a\u0e32\u0e22\u0e01\u0e32\u0e23\u0e22\u0e37\u0e21\u0e04\u0e37\u0e19"}
+                </h4>
+                <div style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', flexDirection: 'column', gap: 8, lineHeight: 1.4 }}>
+                  <div>{"1. \u0e2a\u0e32\u0e21\u0e32\u0e23\u0e16\u0e22\u0e37\u0e21\u0e17\u0e23\u0e31\u0e1e\u0e22\u0e4c\u0e2a\u0e34\u0e19\u0e41\u0e25\u0e30\u0e27\u0e31\u0e2a\u0e14\u0e38\u0e2a\u0e34\u0e49\u0e19\u0e40\u0e1b\u0e25\u0e37\u0e2d\u0e07\u0e44\u0e14\u0e49\u0e15\u0e32\u0e21\u0e42\u0e04\u0e27\u0e15\u0e32\u0e17\u0e35\u0e48\u0e01\u0e33\u0e2b\u0e19\u0e14"}</div>
+                  <div>{"2. \u0e08\u0e33\u0e19\u0e27\u0e19\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e17\u0e35\u0e48\u0e22\u0e37\u0e21\u0e44\u0e14\u0e49\u0e2a\u0e39\u0e07\u0e2a\u0e38\u0e14:"} <strong style={{ color: '#0ea5e9' }}>{systemSettings?.maxItemsPerRequest ?? 5} {"\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e15\u0e48\u0e2d\u0e04\u0e33\u0e02\u0e2d"}</strong></div>
+                  <div>{"3. \u0e23\u0e30\u0e22\u0e30\u0e40\u0e27\u0e25\u0e32\u0e01\u0e32\u0e23\u0e22\u0e37\u0e21\u0e2a\u0e39\u0e07\u0e2a\u0e38\u0e14:"} <strong style={{ color: '#0ea5e9' }}>{systemSettings?.maxBorrowDays ?? 30} {"\u0e27\u0e31\u0e19"}</strong></div>
+                  <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: 8, color: '#b91c1c' }}>
+                    {"4. \u0e01\u0e23\u0e38\u0e13\u0e32\u0e2a\u0e48\u0e07\u0e04\u0e37\u0e19\u0e17\u0e23\u0e31\u0e1e\u0e22\u0e4c\u0e2a\u0e34\u0e19\u0e15\u0e23\u0e07\u0e40\u0e27\u0e25\u0e32 \u0e2b\u0e32\u0e01\u0e21\u0e35\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e40\u0e01\u0e34\u0e19\u0e01\u0e33\u0e2b\u0e19\u0e14\u0e2a\u0e48\u0e07\u0e04\u0e37\u0e19 \u0e08\u0e30\u0e15\u0e49\u0e2d\u0e07\u0e04\u0e37\u0e19\u0e17\u0e23\u0e31\u0e1e\u0e22\u0e4c\u0e2a\u0e34\u0e19\u0e19\u0e31\u0e49\u0e19\u0e01\u0e48\u0e2d\u0e19\u0e08\u0e36\u0e07\u0e08\u0e30\u0e22\u0e37\u0e21\u0e43\u0e2b\u0e21\u0e48\u0e44\u0e14\u0e49"}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

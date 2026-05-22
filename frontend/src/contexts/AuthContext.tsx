@@ -10,12 +10,28 @@ interface User {
   role: string;
 }
 
+interface SystemSettings {
+  systemName: string;
+  organizationName: string;
+  logoUrl: string | null;
+  timezone: string;
+  showWelcomeBanner: boolean;
+  allowExtension: boolean;
+  maxExtensionsPerRequest: number;
+  maxBorrowDays: number;
+  borrowDays: number;
+  maxItemsPerRequest: number;
+  overdueWarningDays: number;
+}
+
 interface AuthContextType {
   user: User | null;
   token: string | null;
   loading: boolean;
+  systemSettings: SystemSettings | null;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
+  refreshSettings: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>(null!);
@@ -24,6 +40,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
   const [loading, setLoading] = useState(true);
+  const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
+
+  const refreshSettings = async () => {
+    try {
+      const res = await authAPI.publicSettings();
+      setSystemSettings(res.data);
+    } catch (err) {
+      console.error('Failed to load system settings:', err);
+    }
+  };
+
+  useEffect(() => {
+    refreshSettings();
+  }, []);
 
   useEffect(() => {
     if (token) {
@@ -52,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, systemSettings, login, logout, refreshSettings }}>
       {children}
     </AuthContext.Provider>
   );

@@ -211,7 +211,17 @@ router.get('/requests', authenticate, async (req: Request, res: Response, next: 
         skip: (pageNum - 1) * limitNum,
         take: limitNum,
         orderBy: { createdAt: 'desc' },
-        include: { items: { include: { asset: true, inventoryItem: true } }, approvals: { orderBy: { actedAt: 'desc' } } },
+        include: {
+          items: { include: { asset: true, inventoryItem: true } },
+          approvals: {
+            include: { approver: { select: { displayName: true, adUsername: true } } },
+            orderBy: { actedAt: 'desc' }
+          },
+          extensions: {
+            include: { items: true },
+            orderBy: { createdAt: 'desc' }
+          }
+        },
       }),
       prisma.borrowRequest.count({ where }),
     ]);

@@ -533,24 +533,29 @@ export default function AssetFormPage() {
 
           <form id="asset-form" onSubmit={handleSubmit}>
 
-            {/* ① ข้อมูลพื้นฐาน */}
-            <SecCard title="ข้อมูลพื้นฐาน" sub="ทุกประเภทอุปกรณ์">
-              <div className="row r3">
-                <FG label="Asset Code" required>
-                  <FInput value={form.assetCode} onChange={v => setFormField('assetCode', 'Asset Code', v)} disabled={!!id} placeholder="เช่น HQ-PS-N001" />
-                  {id && <div className="hint">ไม่สามารถเปลี่ยน Asset Code ได้</div>}
+              {/* ① ข้อมูลพื้นฐานทรัพย์สิน */}
+            <SecCard title="ข้อมูลพื้นฐานทรัพย์สิน" sub="Core Asset Identification">
+              <div className="row r2">
+                <FG label="เลขครุภัณฑ์ (Asset Code)" required>
+                  <FInput value={form.assetCode} onChange={v => setFormField('assetCode', 'เลขครุภัณฑ์ (Asset Code)', v)} disabled={!!id} placeholder="เช่น HQ-PS-N001" />
+                  {id && <div className="hint">ไม่สามารถเปลี่ยนเลขครุภัณฑ์ได้</div>}
                 </FG>
+                <FG label="ชื่อทรัพย์สิน / รหัสทรัพย์สิน">
+                  <FInput value={form.assetName} onChange={v => setFormField('assetName', 'ชื่อทรัพย์สิน / รหัสทรัพย์สิน', v)} placeholder="ชื่อสำหรับเรียกทรัพย์สิน หรือ รหัสพัสดุภายในองค์กร" />
+                </FG>
+              </div>
+              <div className="row r3">
                 <FG label="ยี่ห้อ (Brand)" required>
                   <FInput value={form.brand} onChange={v => setFormField('brand', 'ยี่ห้อ', v)} placeholder="เช่น Dell, HP, Lenovo" />
                 </FG>
                 <FG label="รุ่น (Model)">
                   <FInput value={form.model} onChange={v => setFormField('model', 'รุ่น', v)} placeholder="เช่น Latitude 5530" />
                 </FG>
-              </div>
-              <div className="row r3">
-                <FG label="Serial Number">
+                <FG label="หมายเลขซีเรียล (S/N)">
                   <FInput value={form.serialNo} onChange={v => setFormField('serialNo', 'Serial No.', v)} placeholder="Serial No." />
                 </FG>
+              </div>
+              <div className="row r3">
                 <FG label="หมวดหมู่">
                   <FSelect value={selectedCategory ? String(selectedCategory) : ''} onChange={v => {
                     const catId = v ? parseInt(v) : null;
@@ -570,67 +575,38 @@ export default function AssetFormPage() {
                   </FSelect>
                 </FG>
               </div>
+            </SecCard>
+
+            {/* ② ข้อมูลการครอบครองและตำแหน่งพิกัด */}
+            <SecCard title="ข้อมูลการครอบครองและตำแหน่งพิกัด" sub="Ownership & Location" barColor="linear-gradient(180deg,#8b5cf6,#a855f7)">
               <div className="row r3">
-                <FG label="ชื่อผู้ถือครอง">
-                  <FInput value={form.ownerName} onChange={v => setFormField('ownerName', 'ผู้ถือครอง', v)} placeholder="ชื่อ-นามสกุล" />
+                <FG label="ผู้ใช้งานหลัก (End User)">
+                  <FInput value={form.ownerName} onChange={v => setFormField('ownerName', 'ผู้รับผิดชอบหลัก', v)} placeholder="ชื่อ-นามสกุล ผู้ใช้งานหลัก" />
                 </FG>
-                <FG label="แผนก">
+                <FG label="แผนกที่ใช้งาน">
                   <FSelect value={form.departmentId} onChange={v => setFormField('departmentId', 'แผนก', v)}>
                     <option value="">ไม่ระบุ</option>
                     {departmentOptions.map(d => <option key={d} value={d}>{d}</option>)}
                   </FSelect>
                 </FG>
-                <FG label="Company">
+                <FG label="บริษัท (Company)">
                   <FSelect value={form.company} onChange={v => setFormField('company', 'Company', v)}>
                     <option value="">ไม่ระบุ</option>
                     {companyOptions.map(c => <option key={c} value={c}>{c}</option>)}
                   </FSelect>
                 </FG>
               </div>
-              <div className="row r3">
-                <FG label="Location">
+              <div className="row r2">
+                <FG label="สถานที่ติดตั้ง / อาคาร">
                   <FSelect value={form.location} onChange={v => setFormField('location', 'Location', v)}>
                     <option value="">ไม่ระบุ</option>
                     {locationOptions.map(l => <option key={l} value={l}>{l}</option>)}
                   </FSelect>
                 </FG>
-                <FG label="ชั้น / ห้อง">
-                  <FInput value={form.floor} onChange={v => setFormField('floor', 'ชั้น', v)} placeholder="เช่น 23, B1" />
-                </FG>
-                <FG label="Asset Name">
-                  <FInput value={form.assetName} onChange={v => setFormField('assetName', 'Asset Name', v)} placeholder="ชื่อทรัพย์สิน (ถ้ามี)" />
+                <FG label="ชั้น / บริเวณห้อง">
+                  <FInput value={form.floor} onChange={v => setFormField('floor', 'ชั้น', v)} placeholder="เช่น ชั้น 4 ห้องประชุมใหญ่, B1 คลังพัสดุ" />
                 </FG>
               </div>
-
-              {/* Status pills */}
-              <div className="fg" style={{ marginBottom: 12 }}>
-                <label className="lbl">สถานะ <span style={{ fontSize: '10px', color: '#c4b5fd', background: 'rgba(99,102,241,.08)', padding: '1px 6px', borderRadius: '20px' }}>คลิกเพื่อเปลี่ยน</span></label>
-                <div className="status-row">
-                  {statusOptions.map(opt => (
-                    <button type="button" key={opt.value}
-                      className={`status-opt ${opt.cls}${form.status === opt.value ? ' sel' : ''}`}
-                      onClick={() => setFormField('status', 'สถานะ', opt.value)}>
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="row r2">
-                <FG label="Domain Name">
-                  <FSelect value={form.domainName} onChange={v => setFormField('domainName', 'Domain Name', v)}>
-                    <option value="">ไม่ระบุ</option>
-                    {domainOptions.map(d => <option key={d} value={d}>{d}</option>)}
-                  </FSelect>
-                </FG>
-                <FG label="Old Asset Code / Computer Name เดิม">
-                  <FInput value={form.oldAssetCode} onChange={v => setFormField('oldAssetCode', 'Old Code', v)} placeholder="ชื่อเครื่องเดิม" />
-                </FG>
-              </div>
-
-              <FG label="หมายเหตุ">
-                <FTextarea value={form.remark} onChange={v => setFormField('remark', 'หมายเหตุ', v)} placeholder="หมายเหตุเพิ่มเติม..." />
-              </FG>
             </SecCard>
 
             {/* ② Hardware (Computer only) */}
@@ -886,28 +862,81 @@ export default function AssetFormPage() {
               </SecCard>
             )}
 
-            {/* ④ จัดซื้อ / ประกัน */}
-            <SecCard title="จัดซื้อ & ประกัน" barColor="linear-gradient(180deg,#059669,#34d399)">
-              <div className="row r4">
-                <FG label="วันที่ซื้อ"><FInput type="date" value={form.purchaseDate} onChange={v => setFormField('purchaseDate', 'วันที่ซื้อ', v)} /></FG>
-                <FG label="วันหมดประกัน"><FInput type="date" value={form.warrantyEndDate} onChange={v => setFormField('warrantyEndDate', 'วันหมดประกัน', v)} /></FG>
-                <FG label="ราคาซื้อ (บาท)"><FInput type="number" value={form.purchasePrice} onChange={v => setFormField('purchasePrice', 'ราคาซื้อ', v)} /></FG>
-                <FG label="อายุ (ปี)"><FInput value={assetAge} readOnly /><div className="hint">คำนวณอัตโนมัติ</div></FG>
+             {/* ④ ข้อมูลการจัดซื้อและการเงิน */}
+            <SecCard title="ข้อมูลการจัดซื้อและการเงิน" sub="Procurement & Finance" barColor="linear-gradient(180deg,#059669,#34d399)">
+              <div className="row r3">
+                <FG label="วันที่จัดซื้อ / วันรับมอบ">
+                  <FInput type="date" value={form.purchaseDate} onChange={v => setFormField('purchaseDate', 'วันที่จัดซื้อ / วันรับมอบ', v)} />
+                </FG>
+                <FG label="มูลค่าจัดซื้อ (ไม่รวม VAT)">
+                  <FInput type="number" value={form.purchasePrice} onChange={v => setFormField('purchasePrice', 'มูลค่าจัดซื้อ', v)} placeholder="ราคาประเมินหรือราคาจัดซื้อจริง" />
+                </FG>
+                <FG label="อายุการใช้งาน (ปี)">
+                  <FInput value={assetAge} readOnly placeholder="คำนวณอัตโนมัติ" />
+                  <div className="hint">คำนวณจากวันที่ซื้อ</div>
+                </FG>
               </div>
-              <div className="row r4">
-                <FG label="PO Date"><FInput type="date" value={form.poDate} onChange={v => setFormField('poDate', 'PO Date', v)} /></FG>
-                <FG label="PO Number"><FInput value={form.poNumber} onChange={v => setFormField('poNumber', 'PO Number', v)} placeholder="เช่น PO-2568-0042" /></FG>
-                <FG label="PR Number"><FInput value={form.prNumber} onChange={v => setFormField('prNumber', 'PR Number', v)} placeholder="เช่น PR-2568-0031" /></FG>
-                <FG label="งบประมาณ"><FInput value={form.budget} onChange={v => setFormField('budget', 'งบประมาณ', v)} /></FG>
+              <div className="row r3">
+                <FG label="เลขที่ใบขอซื้อ (PR No.)">
+                  <FInput value={form.prNumber} onChange={v => setFormField('prNumber', 'PR Number', v)} placeholder="เช่น PR-2568-0031" />
+                </FG>
+                <FG label="เลขที่ใบสั่งซื้อ (PO No.)">
+                  <FInput value={form.poNumber} onChange={v => setFormField('poNumber', 'PO Number', v)} placeholder="เช่น PO-2568-0042" />
+                </FG>
+                <FG label="วันที่ออกใบสั่งซื้อ (PO Date)">
+                  <FInput type="date" value={form.poDate} onChange={v => setFormField('poDate', 'PO Date', v)} />
+                </FG>
               </div>
               <div className="row r2">
-                <FG label="Vendor / ผู้ขาย">
+                <FG label="แหล่งงบประมาณ / โครงการ">
+                  <FInput value={form.budget} onChange={v => setFormField('budget', 'งบประมาณ', v)} placeholder="เช่น งบประมาณปี 2569 / โครงการพัฒนาระบบ" />
+                </FG>
+                <FG label="คู่ค้า / ผู้จัดจำหน่าย (Vendor)">
                   <FSelect value={form.vendor} onChange={v => setFormField('vendor', 'Vendor', v)}>
                     <option value="">ไม่ระบุ</option>
                     {vendorOptions.map(v => <option key={v} value={v}>{v}</option>)}
                   </FSelect>
                 </FG>
               </div>
+            </SecCard>
+
+            {/* ⑤ การรับประกันและประวัติ */}
+            <SecCard title="การรับประกันและประวัติ" sub="Warranty & Lifecycle" barColor="linear-gradient(180deg,#e11d48,#f43f5e)">
+              <div className="row r2">
+                <FG label="วันสิ้นสุดระยะรับประกัน">
+                  <FInput type="date" value={form.warrantyEndDate} onChange={v => setFormField('warrantyEndDate', 'วันสิ้นสุดระยะรับประกัน', v)} />
+                </FG>
+                <FG label="โดเมนคอมพิวเตอร์ (Domain Name)">
+                  <FSelect value={form.domainName} onChange={v => setFormField('domainName', 'Domain Name', v)}>
+                    <option value="">ไม่ระบุ</option>
+                    {domainOptions.map(d => <option key={d} value={d}>{d}</option>)}
+                  </FSelect>
+                </FG>
+              </div>
+
+              {/* Status pills */}
+              <div className="fg" style={{ marginBottom: 12 }}>
+                <label className="lbl">สถานะการใช้งาน <span style={{ fontSize: '10px', color: '#f43f5e', background: 'rgba(225,29,72,.08)', padding: '1px 6px', borderRadius: '20px' }}>คลิกเพื่อเปลี่ยน</span></label>
+                <div className="status-row">
+                  {statusOptions.map(opt => (
+                    <button type="button" key={opt.value}
+                      className={`status-opt ${opt.cls}${form.status === opt.value ? ' sel' : ''}`}
+                      onClick={() => setFormField('status', 'สถานะการใช้งาน', opt.value)}>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="row r1">
+                <FG label="รหัสทรัพย์สินเดิม (ถ้ามี)">
+                  <FInput value={form.oldAssetCode} onChange={v => setFormField('oldAssetCode', 'รหัสทรัพย์สินเดิม', v)} placeholder="กรณีต้องการอ้างอิงรหัสเดิมของโครงการหรือแท็กเกรดเดิม" />
+                </FG>
+              </div>
+
+              <FG label="บันทึกเพิ่มเติม / หมายเหตุ">
+                <FTextarea value={form.remark} onChange={v => setFormField('remark', 'หมายเหตุ', v)} placeholder="รายละเอียดข้อบกพร่อง, หมายเหตุอุปกรณ์เสริม หรืออื่นๆ..." />
+              </FG>
             </SecCard>
 
             {/* ⑤ รูปภาพ */}

@@ -114,7 +114,6 @@ export default function PMTemplatePage() {
     setTemplateModal({ open: true, template: t });
   };
 
-  /* ── Save template ── */
   const handleSave = async () => {
     if (!editingTemplate.name.trim()) { showToast('⚠️ กรุณาระบุชื่อ Template'); return; }
     if (editingTemplate.templateItems.length === 0) { showToast('⚠️ ต้องมีรายการ Checklist อย่างน้อย 1 ข้อ'); return; }
@@ -122,20 +121,31 @@ export default function PMTemplatePage() {
     try {
       const payload = {
         name: editingTemplate.name.trim(),
-        description: editingTemplate.description.trim(),
+        description: editingTemplate.description?.trim() || '',
         items: editingTemplate.templateItems.map((item, idx) => ({
           ...item,
           order: idx + 1,
         })),
       };
-      await pmAPI.createTemplate(payload);
-      showToast(`✅ บันทึก Template "${editingTemplate.name}" สำเร็จ`);
+
+      const isEdit = Boolean(templateModal.template?.id);
+      if (isEdit) {
+        // PUT — update existing template
+        await pmAPI.updateTemplate(templateModal.template!.id!, payload);
+        showToast(`✅ อัปเดต Template "${editingTemplate.name}" สำเร็จ`);
+      } else {
+        // POST — create new template
+        await pmAPI.createTemplate(payload);
+        showToast(`✅ สร้าง Template "${editingTemplate.name}" สำเร็จ`);
+      }
+
       setTemplateModal({ open: false, template: null });
       fetchTemplates();
     } catch (err: any) {
-      showToast(`❌ ${err.response?.data?.error || 'บันทึกไม่สำเร็จ'}`);
+      showToast(`❌ ${err.response?.data?.error || err.message || 'บันทึกไม่สำเร็จ'}`);
     } finally { setSaving(false); }
   };
+
 
   /* ── Item management ── */
   const addItem = () => {
@@ -393,7 +403,7 @@ export default function PMTemplatePage() {
         <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end', gap: 8, flexShrink: 0 }}>
           <button className="pmt-btn pmt-btn-outline" onClick={() => setTemplateModal({ open: false, template: null })}>ยกเลิก</button>
           <button className="pmt-btn pmt-btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? '⏳ กำลังบันทึก...' : '💾 บันทึก Template'}
+            {saving ? '⏳ กำลังบันทึก...' : templateModal.template?.id ? '💾 อัปเดต Template' : '💾 บันทึก Template'}
           </button>
         </div>
       </Modal>

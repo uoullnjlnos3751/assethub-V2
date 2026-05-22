@@ -156,6 +156,19 @@ const STATUS_CFG: Record<string, { label: string; color: string; pill: any }> = 
 // Asset category config
 const CAT_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16'];
 
+// Map category names to navigation paths
+const categoryNavMap: Record<string, string> = {
+  'คอมพิวเตอร์': '/assets?typeGroup=computers',
+  'จอภาพ': '/assets?typeGroup=monitors',
+  'เครื่องพิมพ์': '/assets?typeGroup=printers',
+  'อุปกรณ์เครือข่าย': '/assets?typeGroup=network',
+  'อุปกรณ์สื่อสาร': '/assets?typeGroup=phonesTablets',
+  'อุปกรณ์นำเสนอ/AV': '/assets?typeGroup=devices',
+  'Rack & Infrastructure': '/assets',
+  'สายสัญญาณ': '/inventory?category=Cable',
+  'วัสดุสิ้นเปลือง': '/inventory?category=Consumable',
+};
+
 // ── Main Dashboard ──────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -248,9 +261,9 @@ export default function DashboardPage() {
   const sparkValues = [3, 5, 4, 7, 6, pmDone || 5, maintenance || 2];
 
   // Donut segments from byCategory
-  const donutTotal = byCategory.reduce((s: number, c: any) => s + (c._count || 0), 0) || total;
+  const donutTotal = byCategory.reduce((s: number, c: any) => s + (c.assetCount ?? 0), 0) || total;
   const donutSegs = byCategory.slice(0, 6).map((c: any, i: number) => ({
-    value: c._count || 0,
+    value: c.assetCount ?? 0,
     color: CAT_COLORS[i % CAT_COLORS.length],
   }));
   if (donutSegs.length === 0) {
@@ -306,11 +319,12 @@ export default function DashboardPage() {
         gap: '10px',
         mb: '16px',
       }}>
-        <StatCard icon="💻" label="คอมพิวเตอร์"    value={byCategory.find((c:any) => /computer|notebook|pc/i.test(c.name))?._count || 0} color="#3b82f6" onClick={() => navigate('/assets?typeGroup=computers')} />
-        <StatCard icon="🖥️" label="จอภาพ"           value={byCategory.find((c:any) => /monitor/i.test(c.name))?._count || 0}   color="#10b981" onClick={() => navigate('/assets?typeGroup=monitors')} />
-        <StatCard icon="🖨️" label="เครื่องพิมพ์"     value={byCategory.find((c:any) => /print/i.test(c.name))?._count || 0}    color="#f59e0b" onClick={() => navigate('/assets?typeGroup=printers')} />
-        <StatCard icon="🌐" label="อุปกรณ์เครือข่าย" value={byCategory.find((c:any) => /network|switch|router/i.test(c.name))?._count || 0} color="#8b5cf6" onClick={() => navigate('/assets?typeGroup=network')} />
-        <StatCard icon="📱" label="โทรศัพท์/แท็บเล็ต" value={byCategory.find((c:any) => /phone|tablet|mobile/i.test(c.name))?._count || 0} color="#06b6d4" onClick={() => navigate('/assets?typeGroup=phonesTablets')} />
+        {byCategory.slice(0, 5).map((cat: any, i: number) => (
+          <StatCard key={cat.id || i} icon={cat.icon || '📦'} label={cat.name}
+            value={cat.assetCount ?? 0}
+            color={CAT_COLORS[i % CAT_COLORS.length]}
+            onClick={() => navigate(categoryNavMap[cat.name] || '/assets')} />
+        ))}
         <StatCard icon="📦" label="อุปกรณ์ทั้งหมด"  value={total} color="#374151" topBorder onClick={() => navigate('/assets')} />
         <StatCard icon="✏️"  label="งานซ่อมเปิดอยู่" value={maintenance}      color="#ef4444" sub="Maintenance" onClick={() => navigate('/assets?status=Maintenance')} />
         <StatCard icon="🔄" label="กำลังยืม"         value={borrowActive}     color="#f59e0b" onClick={() => navigate('/borrow/history')} />
@@ -397,7 +411,7 @@ export default function DashboardPage() {
                   <Typography sx={{ fontSize: '11px', color: '#4b5563', flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
                     {c.name || 'อื่นๆ'}
                   </Typography>
-                  <Typography sx={{ fontSize: '11px', fontWeight: 600, color: '#111827', flexShrink: 0 }}>{c._count}</Typography>
+                  <Typography sx={{ fontSize: '11px', fontWeight: 600, color: '#111827', flexShrink: 0 }}>{c.assetCount ?? 0}</Typography>
                 </Box>
               ))}
               {byCategory.length === 0 && (

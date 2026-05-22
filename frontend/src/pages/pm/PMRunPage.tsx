@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { pmAPI, assetAPI } from '../../services/api';
 import * as XLSX from 'xlsx';
 
@@ -81,11 +81,16 @@ function StarRating({ value, onChange }: { value: number; onChange: (v: number) 
 ───────────────────────────────────────────────────────────────── */
 export default function PMRunPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const planIdParam = searchParams.get('planId') || '';
+
   const [runs, setRuns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-  const [filterPlan, setFilterPlan] = useState('');
+  const [filterPlan, setFilterPlan] = useState(planIdParam);
+  const [filterType, setFilterType] = useState('');
+  const [filterStaff, setFilterStaff] = useState('');
   const [plans, setPlans] = useState<any[]>([]);
   const [pmModal, setPMModal] = useState<{ open: boolean; run: any }>({ open: false, run: null });
   const [answers, setAnswers] = useState<Record<string, any>>({});
@@ -104,13 +109,25 @@ export default function PMRunPage() {
 
   useEffect(() => { fetchData(); }, []);
 
+  useEffect(() => {
+    if (planIdParam) {
+      setFilterPlan(planIdParam);
+    }
+  }, [planIdParam]);
+
+  // Compute unique values for filtering options
+  const uniqueTypes = Array.from(new Set(runs.map(r => r.asset?.type).filter(Boolean))) as string[];
+  const uniqueStaff = Array.from(new Set(runs.map(r => r.performer?.displayName || r.staffName).filter(Boolean))) as string[];
+
   /* ── Filter ── */
   const filtered = runs.filter(r => {
     const q = search.toLowerCase();
     const matchQ = !q || (r.asset?.assetCode || '').toLowerCase().includes(q) || (r.asset?.ownerName || '').toLowerCase().includes(q) || (r.asset?.brand || '').toLowerCase().includes(q) || (r.asset?.model || '').toLowerCase().includes(q) || (r.asset?.serialNo || '').toLowerCase().includes(q);
     const matchStatus = !filterStatus || r.status === filterStatus;
     const matchPlan = !filterPlan || String(r.plan?.id) === filterPlan;
-    return matchQ && matchStatus && matchPlan;
+    const matchType = !filterType || r.asset?.type === filterType;
+    const matchStaff = !filterStaff || (r.performer?.displayName || r.staffName) === filterStaff;
+    return matchQ && matchStatus && matchPlan && matchType && matchStaff;
   });
 
   /* ── Open PM Checklist ── */
@@ -297,6 +314,14 @@ export default function PMRunPage() {
           <select className="pmr-input pmr-select" value={filterPlan} onChange={e => setFilterPlan(e.target.value)}>
             <option value="">ทุกแผน</option>
             {plans.map(p => <option key={p.id} value={p.id}>{p.deptTask || p.site || `Plan #${p.id}`}</option>)}
+          </select>
+          <select className="pmr-input pmr-select" value={filterType} onChange={e => setFilterType(e.target.value)}>
+            <option value="">ทุกประเภทอุปกรณ์</option>
+            {uniqueTypes.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <select className="pmr-input pmr-select" value={filterStaff} onChange={e => setFilterStaff(e.target.value)}>
+            <option value="">ทุกผู้ทำ PM</option>
+            {uniqueStaff.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
           <span style={{ fontSize: 11, color: '#94a3b8', whiteSpace: 'nowrap' }}>แสดง {filtered.length}/{runs.length}</span>
         </div>

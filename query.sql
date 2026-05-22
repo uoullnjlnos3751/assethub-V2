@@ -1,0 +1,1 @@
+﻿SELECT br.id, br.status, br."requestNo", bri."itemStatus", a.status as asset_status, c.id as checkout_id FROM borrow_requests br JOIN borrow_request_items bri ON bri."requestId" = br.id JOIN assets a ON a.id = bri."assetId" LEFT JOIN checkouts c ON c."requestId" = br.id WHERE br.id = 4;

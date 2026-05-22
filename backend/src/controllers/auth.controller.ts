@@ -41,4 +41,29 @@ export class AuthController {
       next(err);
     }
   }
+
+  static async settings(_req: Request, res: Response, next: NextFunction) {
+    try {
+      const { prisma } = await import('../index');
+      let settings = await prisma.notificationSetting.findFirst();
+      if (!settings) {
+        settings = await prisma.notificationSetting.create({ data: {} });
+      }
+      res.json({
+        systemName: settings.systemName || 'AssetHub',
+        organizationName: settings.organizationName || 'TRR Group',
+        logoUrl: settings.logoUrl || null,
+        timezone: settings.timezone || 'Asia/Bangkok',
+        showWelcomeBanner: settings.showWelcomeBanner ?? true,
+        allowExtension: settings.allowExtension ?? true,
+        maxExtensionsPerRequest: settings.maxExtensionsPerRequest ?? 2,
+        maxBorrowDays: settings.maxBorrowDays ?? 30,
+        borrowDays: settings.borrowDays ?? 3,
+        maxItemsPerRequest: settings.maxItemsPerRequest ?? 5,
+        overdueWarningDays: settings.overdueWarningDays ?? 3,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
 }

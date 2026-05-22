@@ -44,6 +44,7 @@ import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import { useAuth } from '../contexts/AuthContext';
 import Breadcrumbs from '../components/Breadcrumbs';
 import PageTransition from '../components/PageTransition';
@@ -85,14 +86,15 @@ const adminNav: NavEntry[] = [
     icon: <DevicesIcon fontSize="small" />,
     children: [
       { label: 'ทะเบียน IT Asset', path: '/assets', icon: <DevicesIcon fontSize="small" /> },
-      { label: 'Computers / Desktop PC', path: '/assets?typeGroup=computers', icon: <ComputerIcon fontSize="small" /> },
-      { label: 'Monitors', path: '/assets?typeGroup=monitors', icon: <DesktopWindowsIcon fontSize="small" /> },
-      { label: 'Devices', path: '/assets?typeGroup=devices', icon: <DevicesIcon fontSize="small" /> },
-      { label: 'Printers', path: '/assets?typeGroup=printers', icon: <PrintIcon fontSize="small" /> },
-      { label: 'Phones / Tablets', path: '/assets?typeGroup=phonesTablets', icon: <PhoneAndroidIcon fontSize="small" /> },
-      { label: 'Cables', path: '/inventory?category=Cable', icon: <CableIcon fontSize="small" /> },
-      { label: 'Network devices', path: '/assets?typeGroup=network', icon: <RouterIcon fontSize="small" /> },
-      { label: 'Consumables', path: '/inventory?category=Consumable', icon: <ScienceIcon fontSize="small" /> },
+      { label: 'คอมพิวเตอร์', path: '/assets?typeGroup=computers', icon: <ComputerIcon fontSize="small" /> },
+      { label: 'จอภาพ', path: '/assets?typeGroup=monitors', icon: <DesktopWindowsIcon fontSize="small" /> },
+      { label: 'เครื่องพิมพ์', path: '/assets?typeGroup=printers', icon: <PrintIcon fontSize="small" /> },
+      { label: 'อุปกรณ์เครือข่าย', path: '/assets?typeGroup=network', icon: <RouterIcon fontSize="small" /> },
+      { label: 'อุปกรณ์สื่อสาร', path: '/assets?typeGroup=phonesTablets', icon: <PhoneAndroidIcon fontSize="small" /> },
+      { label: 'อุปกรณ์นำเสนอ/AV', path: '/assets?typeGroup=devices', icon: <DevicesIcon fontSize="small" /> },
+      { label: 'Rack & Infrastructure', path: '/assets?typeGroup=devices', icon: <HandymanIcon fontSize="small" /> },
+      { label: 'สายสัญญาณ', path: '/inventory?category=Cable', icon: <CableIcon fontSize="small" /> },
+      { label: 'วัสดุสิ้นเปลือง', path: '/inventory?category=Consumable', icon: <ScienceIcon fontSize="small" /> },
       { label: 'ประเภทอุปกรณ์ (Device Types)', path: '/assets/device-types', icon: <CategoryIcon fontSize="small" /> },
       { label: 'สถานที่ตั้ง/ไซต์ (Location & Company)', path: '/assets/locations', icon: <LocationOnIcon fontSize="small" /> },
       { label: 'ผู้จำหน่าย (Vendor)', path: '/assets/vendors', icon: <StoreIcon fontSize="small" /> },
@@ -121,8 +123,9 @@ const adminNav: NavEntry[] = [
     icon: <BuildCircleIcon fontSize="small" />,
     children: [
       { label: 'PM Dashboard', path: '/pm', icon: <DashboardIcon fontSize="small" /> },
-      { label: 'PM Plans', path: '/pm/plans', icon: <AssignmentIcon fontSize="small" /> },
-      { label: 'PM Runs', path: '/pm/runs', icon: <PlayArrowIcon fontSize="small" /> },
+      { label: 'แผน PM', path: '/pm/plans', icon: <AssignmentIcon fontSize="small" /> },
+      { label: 'ทำ PM (Checklist)', path: '/pm/runs', icon: <PlayArrowIcon fontSize="small" /> },
+      { label: 'กำหนดการ PM (Gantt)', path: '/pm/schedule', icon: <CalendarTodayIcon fontSize="small" /> },
       { label: 'PM Template', path: '/pm/templates', icon: <DescriptionIcon fontSize="small" /> },
     ],
   },
@@ -175,7 +178,7 @@ export default function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
-  const { user, logout } = useAuth();
+  const { user, logout, systemSettings } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -374,29 +377,34 @@ export default function Layout() {
         borderBottom: '0.5px solid #e5e7eb',
         flexShrink: 0,
       }}>
-        {/* Logo box — amber square like HTML .sb-logo-icon */}
-        <Box sx={{
-          width: 34,
-          height: 34,
-          borderRadius: '8px',
-          background: '#f59e0b',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontWeight: 600,
-          fontSize: '13px',
-          color: '#fff',
-          flexShrink: 0,
-          letterSpacing: '-0.02em',
-        }}>
-          IT
-        </Box>
-        <Box>
-          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: '#111827', lineHeight: 1.2 }}>
-            IT Asset Pro
+        {systemSettings?.logoUrl ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, overflow: 'hidden', borderRadius: '8px', flexShrink: 0 }}>
+            <img src={systemSettings.logoUrl} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+          </Box>
+        ) : (
+          <Box sx={{
+            width: 34,
+            height: 34,
+            borderRadius: '8px',
+            background: '#f59e0b',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontWeight: 600,
+            fontSize: '13px',
+            color: '#fff',
+            flexShrink: 0,
+            letterSpacing: '-0.02em',
+          }}>
+            {(systemSettings?.systemName || 'IT').substring(0, 2).toUpperCase()}
+          </Box>
+        )}
+        <Box sx={{ minWidth: 0, flex: 1 }}>
+          <Typography noWrap sx={{ fontSize: '13px', fontWeight: 600, color: '#111827', lineHeight: 1.2 }}>
+            {systemSettings?.systemName || 'IT Asset Pro'}
           </Typography>
-          <Typography sx={{ fontSize: '10px', color: '#6b7280', lineHeight: 1 }}>
-            ระบบจัดการ IT ครบวงจร
+          <Typography noWrap sx={{ fontSize: '10px', color: '#6b7280', lineHeight: 1 }}>
+            {systemSettings?.organizationName || 'ระบบจัดการ IT ครบวงจร'}
           </Typography>
         </Box>
       </Box>
@@ -429,7 +437,7 @@ export default function Layout() {
           {user?.displayName?.charAt(0) || 'U'}
         </Avatar>
         <Box sx={{ overflow: 'hidden', flex: 1 }}>
-          <Typography sx={{ fontSize: '12px', fontWeight: 500, color: '#111827', lineHeight: 1.3, noWrap: true }}>
+          <Typography noWrap sx={{ fontSize: '12px', fontWeight: 500, color: '#111827', lineHeight: 1.3 }}>
             {user?.displayName || user?.adUsername}
           </Typography>
           <Typography sx={{ fontSize: '10px', color: '#f59e0b', lineHeight: 1 }}>
@@ -485,13 +493,13 @@ export default function Layout() {
           <Box>
             <Typography
               sx={{
-                fontWeight: 500,
+                fontWeight: 600,
                 color: '#111827',
                 fontSize: '15px',
                 lineHeight: 1.2,
               }}
             >
-              ระบบบริหารทรัพย์สิน IT
+              {systemSettings?.systemName || 'ระบบบริหารทรัพย์สิน IT'}
             </Typography>
           </Box>
 
@@ -582,7 +590,7 @@ export default function Layout() {
                 sx={{ color: '#ef4444', borderRadius: '6px', fontSize: '13px', fontWeight: 500 }}
               >
                 <LogoutIcon sx={{ mr: 1.5, fontSize: 16 }} />
-                ออกจากระบบ
+                {/* ออกจากระบบ */}
               </MenuItem>
             </Menu>
           </Box>

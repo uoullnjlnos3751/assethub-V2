@@ -7,7 +7,7 @@ import './LoginPage.css';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, systemSettings } = useAuth();
   
   const [isActive, setIsActive] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -152,11 +152,15 @@ export default function LoginPage() {
         {/* Sign In Section */}
         <div className="form-container sign-in">
           <form onSubmit={handleSignIn}>
-            <h1 className="form-title-large">Sign In</h1>
-            <div className="icon-container">
-               <Package size={40} className="text-brand-blue" />
+            <div className="icon-container" style={{ margin: '0.75rem 0' }}>
+               {systemSettings?.logoUrl ? (
+                 <img src={systemSettings.logoUrl} alt="Logo" style={{ height: '50px', maxWidth: '100%', objectFit: 'contain' }} />
+               ) : (
+                 <Package size={40} className="text-brand-blue" />
+               )}
             </div>
-            <span className="form-subtitle">Use your AD account to sign in</span>
+            <h1 className="form-title-large" style={{ marginBottom: '0.25rem' }}>{systemSettings?.systemName || 'AssetHub'}</h1>
+            <span className="form-subtitle">{systemSettings?.organizationName || 'Use your AD account to sign in'}</span>
 
             {error && !isActive && (
               <div className="error-alert">

@@ -15,6 +15,8 @@ model AppUser {
   department        String?
   role              UserRole          @default(USER)
   isActive          Boolean           @default(true)
+  authType          AuthType          @default(AD)
+  passwordHash      String?
   lastLoginAt       DateTime?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
@@ -508,6 +510,7 @@ model PMTemplate {
   id            Int              @id @default(autoincrement())
   year          Int
   name          String
+  description   String?
   active        Boolean          @default(true)
   plans         PMPlan[]
   templateItems PMTemplateItem[]
@@ -523,6 +526,7 @@ model PMTemplateItem {
   type       String
   required   Boolean       @default(false)
   group      String?
+  order      Int           @default(0)
   answers    PMRunAnswer[]
   template   PMTemplate    @relation(fields: [templateId], references: [id])
 
@@ -611,14 +615,18 @@ model NotificationSetting {
   // General
   systemName       String  @default("AssetHub")
   organizationName String  @default("TRR Group")
+  logoUrl          String?
   timezone         String  @default("Asia/Bangkok")
   darkMode         Boolean @default(false)
   showWelcomeBanner Boolean @default(true)
 
   // Borrow Rules
-  borrowDays       Int     @default(3)
-  maxItemsPerRequest Int   @default(5)
-  allowExtension   Boolean @default(true)
+  borrowDays              Int     @default(3)
+  maxBorrowDays           Int     @default(30)
+  maxItemsPerRequest      Int     @default(5)
+  allowExtension          Boolean @default(true)
+  maxExtensionsPerRequest Int     @default(2)
+  overdueWarningDays      Int     @default(3)
 
   // Notifications
   enableEmail      Boolean @default(true)
@@ -668,6 +676,11 @@ enum UserRole {
   USER
 }
 
+enum AuthType {
+  AD
+  LOCAL
+}
+
 enum AssetStatus {
   Available
   Borrowed
@@ -684,6 +697,7 @@ enum BorrowItemStatus {
   CheckedOut
   Returned
   PartiallyReturned
+  Cancelled
 }
 
 enum BorrowRequestStatus {
@@ -693,6 +707,7 @@ enum BorrowRequestStatus {
   CheckedOut
   PartiallyReturned
   Returned
+  Cancelled
 }
 
 enum ExtensionStatus {

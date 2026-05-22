@@ -19,26 +19,116 @@ router.get('/templates', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), asyn
 
 router.post('/templates', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { year, name, items } = req.body;
+    const { year, name, description, items } = req.body;
     const template = await prisma.pMTemplate.create({
       data: {
-        year: parseInt(year),
+        year: year ? parseInt(year) : new Date().getFullYear(),
         name,
+        description: description || null,
         templateItems: {
-          create: items.map((item: any) => ({
+          create: (items || []).map((item: any, idx: number) => ({
             key: item.key,
             label: item.label,
             type: item.type || 'boolean',
             required: item.required || false,
             group: item.group || null,
+            order: item.order || idx + 1,
           })),
         },
       },
-      include: { templateItems: true },
+      include: { templateItems: { orderBy: { order: 'asc' } } },
     });
     res.status(201).json(template);
   } catch (err) { next(err); }
 });
+
+router.put('/templates/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { name, description, items } = req.body;
+
+    if (!name) throw new AppError('ต้องระบุชื่อ Template', 400);
+
+    const incomingItems: any[] = items || [];
+
+    // Step 1: Update template name/description
+    await prisma.pMTemplate.update({
+      where: { id },
+      data: { name, description: description || null },
+    });
+
+    // Step 2: Get existing items for this template
+    const existingItems = await prisma.pMTemplateItem.findMany({ where: { templateId: id } });
+    const existingIds = new Set(existingItems.map(i => i.id));
+
+    // Step 3: Separate incoming items into "has id" (update) vs "no id" (create)
+    const toUpdate = incomingItems.filter(i => i.id && existingIds.has(i.id));
+    const toCreate = incomingItems.filter(i => !i.id);
+    const incomingIdSet = new Set(incomingItems.filter(i => i.id).map(i => i.id));
+
+    // Step 4: Items to potentially delete = existing items not in incoming list
+    const candidateDeleteIds = existingItems
+      .filter(i => !incomingIdSet.has(i.id))
+      .map(i => i.id);
+
+    // Step 5: Check which candidates have PMRunAnswer references (cannot delete)
+    const referencedItems = await prisma.pMRunAnswer.findMany({
+      where: { itemId: { in: candidateDeleteIds } },
+      select: { itemId: true },
+      distinct: ['itemId'],
+    });
+    const referencedIds = new Set(referencedItems.map(r => r.itemId));
+    const safeToDeleteIds = candidateDeleteIds.filter(i => !referencedIds.has(i));
+
+    await prisma.$transaction(async (tx) => {
+      // Delete items with no answer references
+      if (safeToDeleteIds.length > 0) {
+        await tx.pMTemplateItem.deleteMany({ where: { id: { in: safeToDeleteIds } } });
+      }
+
+      // Update existing items
+      for (const item of toUpdate) {
+        await tx.pMTemplateItem.update({
+          where: { id: item.id },
+          data: {
+            key: item.key,
+            label: item.label,
+            type: item.type || 'boolean',
+            required: item.required || false,
+            group: item.group || null,
+            order: item.order ?? 0,
+          },
+        });
+      }
+
+      // Create new items
+      if (toCreate.length > 0) {
+        await tx.pMTemplateItem.createMany({
+          data: toCreate.map((item, idx) => ({
+            templateId: id,
+            key: item.key || `item_${Date.now()}_${idx}`,
+            label: item.label,
+            type: item.type || 'boolean',
+            required: item.required || false,
+            group: item.group || null,
+            order: item.order ?? (toUpdate.length + idx + 1),
+          })),
+        });
+      }
+    });
+
+    const updated = await prisma.pMTemplate.findUnique({
+      where: { id },
+      include: { templateItems: { orderBy: { order: 'asc' } } },
+    });
+
+    // Warn if some items were kept due to existing answers
+    const keptCount = referencedIds.size;
+    res.json({ ...updated, _warning: keptCount > 0 ? `${keptCount} รายการที่มีข้อมูล PM ผูกอยู่ไม่ถูกลบ` : null });
+  } catch (err) { next(err); }
+});
+
+
 
 // ── PM Plans ──
 router.get('/plans', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {

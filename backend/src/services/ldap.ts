@@ -15,12 +15,17 @@ export interface LDAPUserInfo {
 }
 
 function createClient() {
-  return ldap.createClient({
+  const client = ldap.createClient({
     url: `ldap://${LDAP_HOST}:${LDAP_PORT}`,
     timeout: 10000,
     connectTimeout: 10000,
   });
+  client.on('error', (err: any) => {
+    console.error('LDAP Client Error (async):', err.message || err);
+  });
+  return client;
 }
+
 
 function buildBindUser(user: string) {
   if (user.includes('\\') || user.includes('@')) return user;
@@ -129,7 +134,7 @@ export async function authenticateLDAP(username: string, password: string): Prom
     console.error('LDAP Auth Error:', err);
     return null;
   } finally {
-    client.unbind();
+    try { client.unbind(); } catch (_) {}
   }
 }
 
@@ -236,7 +241,7 @@ export async function checkPasswordExpiry(username: string, password: string) {
           : `Your password has expired ${Math.abs(diffDays)} days ago.`
     };
   } finally {
-    client.unbind();
+    try { client.unbind(); } catch (_) {}
   }
 }
 
@@ -265,6 +270,6 @@ export async function searchADUsers(query: string): Promise<any[]> {
       };
     });
   } finally {
-    client.unbind();
+    try { client.unbind(); } catch (_) {}
   }
 }

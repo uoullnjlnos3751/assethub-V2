@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { adminAPI } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 function TabPanel(props: { children?: React.ReactNode; index: number; value: number }) {
   const { children, value, index, ...other } = props;
@@ -100,9 +101,11 @@ function EmailTemplateEditor({ templates, setTemplates, onSaveTemplate }: {
   setTemplates: React.Dispatch<React.SetStateAction<any[]>>;
   onSaveTemplate: (id: number, data: any) => void;
 }) {
+  const toast = useToast();
   const [editingId, setEditingId] = useState<number | null>(null);
   const [localSubject, setLocalSubject] = useState('');
   const [localBody, setLocalBody] = useState('');
+  const [resetting, setResetting] = useState(false);
 
   const editingTemplate = templates.find(t => t.id === editingId);
 
@@ -170,6 +173,23 @@ function EmailTemplateEditor({ templates, setTemplates, onSaveTemplate }: {
     setEditingId(null);
   };
 
+  const handleReset = async () => {
+    if (!editingTemplate) return;
+    if (window.confirm('คุณต้องการรีเซ็ตเทมเพลตนี้กลับเป็นค่าเริ่มต้นใช่หรือไม่?')) {
+      setResetting(true);
+      try {
+        const res = await adminAPI.resetNotificationTemplate(editingTemplate.id);
+        setLocalSubject(res.data.subjectTh);
+        setLocalBody(res.data.bodyTh);
+        toast.success('รีเซ็ตกลับเป็นค่าเริ่มต้นเรียบร้อย (กรุณากด บันทึก เพื่อยืนยันการบันทึก)');
+      } catch (err: any) {
+        toast.error(err.response?.data?.message || err.message || 'คืนค่าเริ่มต้นไม่สำเร็จ');
+      } finally {
+        setResetting(false);
+      }
+    }
+  };
+
   const insertPlaceholder = (placeholder: string) => {
     setLocalBody(prev => prev + placeholder);
   };
@@ -199,6 +219,9 @@ function EmailTemplateEditor({ templates, setTemplates, onSaveTemplate }: {
             </Box>
           </Box>
           <Box sx={{ ml: 'auto', display: 'flex', gap: 1 }}>
+            <Button variant="outlined" size="small" color="error" onClick={handleReset} disabled={resetting}>
+              {resetting ? 'กำลังรีเซ็ต...' : 'คืนค่าเริ่มต้น'}
+            </Button>
             <Button variant="outlined" size="small" onClick={handleCancel}>ยกเลิก</Button>
             <Button variant="contained" size="small" startIcon={<SaveIcon size={16} />} onClick={handleSave}>บันทึก</Button>
           </Box>
@@ -291,7 +314,7 @@ function EmailTemplateEditor({ templates, setTemplates, onSaveTemplate }: {
     <Box>
       <Box sx={{ mb: 3 }}>
         <Typography variant="h6" fontWeight={700} sx={{ mb: 0.5 }}>Templates อีเมลแจ้งเตือน</Typography>
-        <Typography variant="body2" color="text.secondary">เลือก Template ที่ต้องการแก้ไข หรือดูตัวอย่าง</Typography>
+        <Typography variant="body2" color="text.secondary">เลือก Template ที่ต้องการแก้ไข หรือคืนค่าเริ่มต้น</Typography>
       </Box>
 
       {TEMPLATE_GROUPS.map(group => {
@@ -372,14 +395,27 @@ function EmailTemplateEditor({ templates, setTemplates, onSaveTemplate }: {
 
 export default function SettingsPage() {
   const toast = useToast();
+  const { refreshSettings } = useAuth();
   const [tabValue, setTabValue] = useState(0);
   const [settings, setSettings] = useState<any>(null);
+  const [originalSettings, setOriginalSettings] = useState<any>(null); // For tracking unsaved modifications
   const [templates, setTemplates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [logs, setLogs] = useState<any[]>([]);
   const [logTotal, setLogTotal] = useState(0);
   const [logLoading, setLogLoading] = useState(false);
+
+  // Connection Check States
+  const [pingResult, setPingResult] = useState<any>(null);
+  const [pingLoading, setPingLoading] = useState(false);
+
+  // SMTP Test Email States
+  const [testEmailRecipient, setTestEmailRecipient] = useState('');
+  const [testingEmail, setTestingEmail] = useState(false);
+
+  // Force Logout States
+  const [loggingOutAll, setLoggingOutAll] = useState(false);
 
   const borrowDays = parseInt(settings?.borrowDays || '3');
   const maxItems = parseInt(settings?.maxItemsPerRequest || '5');
@@ -392,10 +428,19 @@ export default function SettingsPage() {
       .finally(() => setLogLoading(false));
   };
 
+  const fetchPingStatus = () => {
+    setPingLoading(true);
+    adminAPI.ping()
+      .then((res) => { setPingResult(res.data); })
+      .catch(() => { toast.error('ไม่สามารถเรียกข้อมูลสถานะเชื่อมต่อได้'); })
+      .finally(() => setPingLoading(false));
+  };
+
   useEffect(() => {
     Promise.all([adminAPI.settings(), adminAPI.notificationTemplates()])
       .then(([s, t]) => {
         setSettings(s.data || {});
+        setOriginalSettings(s.data || {});
         setTemplates(t.data || []);
       })
       .catch(() => toast.error('ไม่สามารถโหลดการตั้งค่าได้'))
@@ -403,18 +448,33 @@ export default function SettingsPage() {
     fetchLogs();
   }, []);
 
+  useEffect(() => {
+    if (tabValue === 5) {
+      fetchPingStatus();
+    }
+  }, [tabValue]);
+
+  const isDirty = () => {
+    if (!settings || !originalSettings) return false;
+    return JSON.stringify(settings) !== JSON.stringify(originalSettings);
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
-      await adminAPI.updateSettings({
+      const dataToSave = {
         systemName: settings?.systemName || 'AssetHub',
         organizationName: settings?.organizationName || 'TRR Group',
+        logoUrl: settings?.logoUrl || '',
         timezone: settings?.timezone || 'Asia/Bangkok',
         darkMode: settings?.darkMode || false,
         showWelcomeBanner: settings?.showWelcomeBanner ?? true,
         borrowDays: parseInt(settings?.borrowDays || '3'),
+        maxBorrowDays: parseInt(settings?.maxBorrowDays || '30'),
         maxItemsPerRequest: parseInt(settings?.maxItemsPerRequest || '5'),
         allowExtension: settings?.allowExtension ?? true,
+        maxExtensionsPerRequest: parseInt(settings?.maxExtensionsPerRequest || '2'),
+        overdueWarningDays: parseInt(settings?.overdueWarningDays || '3'),
         enableEmail: settings?.enableEmail ?? true,
         smtpHost: settings?.smtpHost || '',
         smtpPort: settings?.smtpPort || '587',
@@ -435,7 +495,12 @@ export default function SettingsPage() {
         lineSendMode: settings?.lineSendMode || 'broadcast',
         lineUserIds: settings?.lineUserIds || '',
         lineEnabledStatuses: settings?.lineEnabledStatuses || '',
-      });
+      };
+
+      const res = await adminAPI.updateSettings(dataToSave);
+      setSettings(res.data || dataToSave);
+      setOriginalSettings(res.data || dataToSave);
+      await refreshSettings();
       toast.success('บันทึกการตั้งค่าเรียบร้อยแล้ว');
     } catch {
       toast.error('เกิดข้อผิดพลาดในการบันทึก');
@@ -448,15 +513,60 @@ export default function SettingsPage() {
     try {
       await adminAPI.updateNotificationTemplate(id, data);
       toast.success('อัปเดต Template เรียบร้อย');
+      // refresh templates list
+      const t = await adminAPI.notificationTemplates();
+      setTemplates(t.data || []);
     } catch {
       toast.error('เกิดข้อผิดพลาด');
+    }
+  };
+
+  const handleTestEmail = async () => {
+    if (!testEmailRecipient) {
+      toast.error('กรุณากรอกอีเมลปลายทางสำหรับการทดสอบ');
+      return;
+    }
+    setTestingEmail(true);
+    try {
+      const res = await adminAPI.testEmail({
+        to: testEmailRecipient,
+        smtpHost: settings?.smtpHost,
+        smtpPort: settings?.smtpPort,
+        smtpUser: settings?.smtpUser,
+        smtpPass: settings?.smtpPass,
+        smtpFromEmail: settings?.smtpFromEmail,
+        smtpFromName: settings?.smtpFromName,
+      });
+      if (res.data.success) {
+        toast.success(res.data.message || 'ส่งอีเมลทดสอบเรียบร้อยแล้ว');
+      } else {
+        toast.error(res.data.message || 'ส่งอีเมลทดสอบล้มเหลว');
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || err.message || 'เกิดข้อผิดพลาดในการทดสอบ');
+    } finally {
+      setTestingEmail(false);
+    }
+  };
+
+  const handleForceLogoutAll = async () => {
+    if (window.confirm('คำเตือน: คุณต้องการบังคับให้เซสชันของทุกอุปกรณ์สิ้นสุดลงทันที (รวมถึงตัวคุณด้วย) ใช่หรือไม่?')) {
+      setLoggingOutAll(true);
+      try {
+        const res = await adminAPI.forceLogoutAll();
+        toast.success(res.data.message || 'สั่งการล้างเซสชันทั้งหมดสำเร็จ');
+      } catch (err: any) {
+        toast.error(err.response?.data?.message || err.message || 'เกิดข้อผิดพลาด');
+      } finally {
+        setLoggingOutAll(false);
+      }
     }
   };
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}><CircularProgress /></Box>;
 
   return (
-    <Box sx={{ pb: 4 }}>
+    <Box sx={{ pb: 10, position: 'relative' }}>
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <SettingsIcon /> ตั้งค่าระบบ
@@ -475,14 +585,35 @@ export default function SettingsPage() {
         </Tabs>
       </Paper>
 
+      {/* ── Tab 0: General ── */}
       <TabPanel value={tabValue} index={0}>
         <Grid container spacing={3}>
           <Grid item xs={12} md={6}>
-            <Card>
+            <Card sx={{ borderRadius: 2.5 }}>
               <CardContent>
                 <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>ข้อมูลระบบ</Typography>
                 <TextField label="ชื่อระบบ" fullWidth size="small" value={settings?.systemName || 'AssetHub'} onChange={(e) => setSettings({ ...settings, systemName: e.target.value })} sx={{ mb: 2 }} />
                 <TextField label="ชื่อองค์กร" fullWidth size="small" value={settings?.organizationName || 'TRR Group'} onChange={(e) => setSettings({ ...settings, organizationName: e.target.value })} sx={{ mb: 2 }} />
+                <TextField
+                  label="Logo URL"
+                  fullWidth
+                  size="small"
+                  value={settings?.logoUrl || ''}
+                  onChange={(e) => setSettings({ ...settings, logoUrl: e.target.value })}
+                  placeholder="https://your-domain.com/path-to-logo.png"
+                  sx={{ mb: 2 }}
+                />
+                {settings?.logoUrl && (
+                  <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2, p: 1.5, border: '1px dashed #cbd5e1', borderRadius: 2, bgcolor: '#f8fafc' }}>
+                    <img
+                      src={settings.logoUrl}
+                      alt="Logo preview"
+                      style={{ maxHeight: 40, maxWidth: 120, objectFit: 'contain' }}
+                      onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                    />
+                    <Typography variant="caption" color="text.secondary">ตัวอย่างการแสดงโลโก้บนระบบ</Typography>
+                  </Box>
+                )}
                 <FormControl fullWidth size="small">
                   <InputLabel>เขตเวลา</InputLabel>
                   <Select value={settings?.timezone || 'Asia/Bangkok'} label="เขตเวลา" onChange={(e) => setSettings({ ...settings, timezone: e.target.value })}>
@@ -493,40 +624,51 @@ export default function SettingsPage() {
             </Card>
           </Grid>
           <Grid item xs={12} md={6}>
-            <Card>
+            <Card sx={{ borderRadius: 2.5 }}>
               <CardContent>
                 <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>การแสดงผล</Typography>
                 <FormControlLabel control={<Switch checked={settings?.darkMode || false} onChange={(e) => setSettings({ ...settings, darkMode: e.target.checked })} />} label="โหมดมืด (Coming Soon)" disabled />
-                <FormControlLabel control={<Switch checked={settings?.showWelcomeBanner || true} onChange={(e) => setSettings({ ...settings, showWelcomeBanner: e.target.checked })} />} label="แสดงแบนเนอร์ต้อนรับ" />
+                <Box sx={{ display: 'block', mt: 1 }}>
+                  <FormControlLabel control={<Switch checked={settings?.showWelcomeBanner ?? true} onChange={(e) => setSettings({ ...settings, showWelcomeBanner: e.target.checked })} />} label="แสดงแบนเนอร์ต้อนรับ" />
+                </Box>
               </CardContent>
             </Card>
           </Grid>
         </Grid>
       </TabPanel>
 
+      {/* ── Tab 1: Borrow Rules ── */}
       <TabPanel value={tabValue} index={1}>
         <Grid container spacing={3}>
           <Grid item xs={12} md={6}>
-            <Card>
+            <Card sx={{ borderRadius: 2.5 }}>
               <CardContent>
                 <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>ระยะเวลาการยืม</Typography>
-                <TextField label="วันยืมมาตรฐาน (วัน)" type="number" fullWidth size="small" value={borrowDays} onChange={(e) => setSettings({ ...settings, borrowDays: e.target.value })} InputProps={{ inputProps: { min: 1, max: 30 } }} sx={{ mb: 2 }} />
-                <Typography variant="body2" color="text.secondary">กำหนดวันคืนอัตโนมัติเมื่อสร้างคำขอยืมใหม่</Typography>
+                <TextField label="วันยืมมาตรฐาน (วัน)" type="number" fullWidth size="small" value={borrowDays} onChange={(e) => setSettings({ ...settings, borrowDays: e.target.value })} InputProps={{ inputProps: { min: 1 } }} sx={{ mb: 2 }} />
+                <TextField label="จำนวนวันยืมสูงสุดต่อคำขอ (วัน)" type="number" fullWidth size="small" value={settings?.maxBorrowDays || 30} onChange={(e) => setSettings({ ...settings, maxBorrowDays: e.target.value })} InputProps={{ inputProps: { min: 1 } }} sx={{ mb: 2 }} />
+                <TextField label="ระยะเวลาเตือนก่อนเกินกำหนด (วัน)" type="number" fullWidth size="small" value={settings?.overdueWarningDays || 3} onChange={(e) => setSettings({ ...settings, overdueWarningDays: e.target.value })} InputProps={{ inputProps: { min: 1 } }} sx={{ mb: 2 }} />
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>กำหนดระยะเวลาสำหรับการส่งแจ้งเตือนก่อนทรัพย์สินหมดอายุสัญญาการยืม</Typography>
               </CardContent>
             </Card>
           </Grid>
           <Grid item xs={12} md={6}>
-            <Card>
+            <Card sx={{ borderRadius: 2.5 }}>
               <CardContent>
                 <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>ข้อจำกัด</Typography>
                 <TextField label="จำนวนรายการสูงสุดต่อคำขอ" type="number" fullWidth size="small" value={maxItems} onChange={(e) => setSettings({ ...settings, maxItemsPerRequest: e.target.value })} InputProps={{ inputProps: { min: 1, max: 20 } }} sx={{ mb: 2 }} />
-                <FormControlLabel control={<Switch checked={settings?.allowExtension || true} onChange={(e) => setSettings({ ...settings, allowExtension: e.target.checked })} />} label="อนุญาตให้ขยายวันยืม" />
+                <Box sx={{ mb: 2 }}>
+                  <FormControlLabel control={<Switch checked={settings?.allowExtension ?? true} onChange={(e) => setSettings({ ...settings, allowExtension: e.target.checked })} />} label="อนุญาตให้ขอต่ออายุ (Extension)" />
+                </Box>
+                {settings?.allowExtension && (
+                  <TextField label="จำนวนครั้งในการขอต่ออายุสูงสุดต่อคำขอ" type="number" fullWidth size="small" value={settings?.maxExtensionsPerRequest || 2} onChange={(e) => setSettings({ ...settings, maxExtensionsPerRequest: e.target.value })} InputProps={{ inputProps: { min: 1, max: 10 } }} sx={{ mb: 2 }} />
+                )}
               </CardContent>
             </Card>
           </Grid>
         </Grid>
       </TabPanel>
 
+      {/* ── Tab 2: Notifications ── */}
       <TabPanel value={tabValue} index={2}>
         <Box>
           {/* ── Header Banner ── */}
@@ -547,9 +689,6 @@ export default function SettingsPage() {
                 <Typography variant="body2" fontWeight={600}>{new Date().toLocaleTimeString('th-TH')}</Typography>
               </Box>
               <Chip label={settings?.enableLine ? 'เปิดใช้งาน' : 'ปิดใช้งาน'} size="small" sx={{ bgcolor: settings?.enableLine ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.15)', color: '#fff', fontWeight: 600, backdropFilter: 'blur(4px)' }} />
-              <Button variant="contained" size="small" sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: '#fff', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' }, backdropFilter: 'blur(4px)' }}>
-                ทดสอบส่ง
-              </Button>
             </Box>
           </Paper>
 
@@ -665,7 +804,7 @@ export default function SettingsPage() {
               <Card sx={{ borderRadius: 2.5, height: '100%' }}>
                 <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1 }}>
                   <MailIcon size={18} color="#e74c3c" />
-                  <Typography variant="subtitle2" fontWeight={700}>ช่องทางอีเมล</Typography>
+                  <Typography variant="subtitle2" fontWeight={700}>ช่องทางอีเมล & SMTP Server</Typography>
                 </Box>
                 <CardContent sx={{ p: 2.5 }}>
                   <FormControlLabel
@@ -677,7 +816,7 @@ export default function SettingsPage() {
                   <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ mb: 1, display: 'block' }}>ตั้งค่า SMTP Server</Typography>
                   <Grid container spacing={1.5}>
                     <Grid item xs={8}>
-                      <TextField label="Host" fullWidth size="small" value={settings?.smtpHost || ''} onChange={(e) => setSettings({ ...settings, smtpHost: e.target.value })} placeholder="smtp.gmail.com" />
+                      <TextField label="Host" fullWidth size="small" value={settings?.smtpHost || ''} onChange={(e) => setSettings({ ...settings, smtpHost: e.target.value })} placeholder="smtp.office365.com" />
                     </Grid>
                     <Grid item xs={4}>
                       <TextField label="Port" fullWidth size="small" value={settings?.smtpPort || '587'} onChange={(e) => setSettings({ ...settings, smtpPort: e.target.value })} placeholder="587" />
@@ -695,9 +834,30 @@ export default function SettingsPage() {
                       <TextField label="From Name" fullWidth size="small" value={settings?.smtpFromName || ''} onChange={(e) => setSettings({ ...settings, smtpFromName: e.target.value })} placeholder="AssetHub" />
                     </Grid>
                   </Grid>
-                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                    เว้นว่างไว้เพื่อใช้ค่าเริ่มต้นจาก environment variables
-                  </Typography>
+
+                  <Divider sx={{ my: 2.5 }} />
+                  <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>ทดสอบระบบส่งอีเมล</Typography>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <TextField
+                      label="อีเมลปลายทาง"
+                      size="small"
+                      placeholder="target@company.com"
+                      value={testEmailRecipient}
+                      onChange={(e) => setTestEmailRecipient(e.target.value)}
+                      sx={{ flex: 1 }}
+                    />
+                    <Button
+                      variant="outlined"
+                      color="secondary"
+                      size="small"
+                      startIcon={testingEmail ? <CircularProgress size={16} /> : <SendIcon size={16} />}
+                      onClick={handleTestEmail}
+                      disabled={testingEmail}
+                      sx={{ height: 40 }}
+                    >
+                      ทดสอบส่ง
+                    </Button>
+                  </Stack>
                 </CardContent>
               </Card>
             </Grid>
@@ -812,66 +972,6 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          {/* ── Save ── */}
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
-            <Button variant="contained" size="large" startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />} onClick={handleSave} disabled={saving}
-              sx={{ borderRadius: 2, px: 4, fontWeight: 700 }}>
-              บันทึกการตั้งค่า
-            </Button>
-          </Box>
-
-          {/* ── Send Announcement ── */}
-          <Card sx={{ borderRadius: 2.5, mb: 3 }}>
-            <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1 }}>
-              <SendIcon size={18} color="#f59e0b" />
-              <Typography variant="subtitle2" fontWeight={700}>ส่งข้อความประกาศ</Typography>
-            </Box>
-            <CardContent sx={{ p: 2.5 }}>
-              <TextField label="หัวข้อ เช่น 'แจ้งปิดระบบบำรุงรักษา'" fullWidth size="small" sx={{ mb: 2 }} />
-              <TextField label="เนื้อหาข้อความ..." fullWidth size="small" multiline rows={3} sx={{ mb: 2 }} />
-              <Button variant="contained" color="warning" startIcon={<SendIcon size={16} />} disabled={!settings?.enableLine}>
-                ส่งข้อความเลย
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* ── Theme ── */}
-          <Card sx={{ borderRadius: 2.5, mb: 3 }}>
-            <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1 }}>
-              <MessageCircleIcon size={18} color="#8b5cf6" />
-              <Typography variant="subtitle2" fontWeight={700}>ธีมการแจ้งเตือน</Typography>
-            </Box>
-            <CardContent sx={{ p: 2.5 }}>
-              <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>สีและไอคอนสำหรับแต่ละสถานะใน Flex Message</Typography>
-              <Grid container spacing={2}>
-                {[
-                  { icon: '🆕', label: 'รอรับเรื่อง', en: 'New Request', color: '#f97316', bg: '#fff7ed' },
-                  { icon: '🤝', label: 'รับเรื่องแล้ว', en: 'Accepted', color: '#6366f1', bg: '#eef2ff' },
-                  { icon: '🔧', label: 'กำลังดำเนินการ', en: 'In Progress', color: '#3b82f6', bg: '#eff6ff' },
-                  { icon: '📦', label: 'รอชิ้นส่วน', en: 'Waiting Parts', color: '#f59e0b', bg: '#fffbeb' },
-                  { icon: '✅', label: 'เสร็จสิ้น', en: 'Completed', color: '#10b981', bg: '#f0fdf4' },
-                  { icon: '❌', label: 'ยกเลิก', en: 'Cancelled', color: '#ef4444', bg: '#fef2f2' },
-                ].map(s => (
-                  <Grid item xs={6} sm={4} md={2} key={s.label}>
-                    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, textAlign: 'center', bgcolor: s.bg, borderColor: s.color + '30' }}>
-                      <Typography variant="h5" sx={{ mb: 0.5 }}>{s.icon}</Typography>
-                      <Typography variant="caption" fontWeight={700} sx={{ color: s.color, display: 'block' }}>{s.label}</Typography>
-                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem' }}>{s.en}</Typography>
-                    </Paper>
-                  </Grid>
-                ))}
-              </Grid>
-            </CardContent>
-          </Card>
-
-          {/* ── Tips ── */}
-          <Alert severity="info" sx={{ borderRadius: 2, mb: 3 }} icon={<SmartphoneIcon size={20} />}>
-            <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>💡 คำแนะนำ</Typography>
-            <Typography variant="caption" color="text.secondary">
-              • Broadcast: ผู้ใช้ต้อง Add บอทเป็นเพื่อนก่อน | • Push: ต้องมี User ID จากการ webhook ของ LINE | • Flex Message รองรับเฉพาะ LINE app เท่านั้น | • Logging ทุกการแจ้งเตือนถูกบันทึกไว้ด้านล่าง
-            </Typography>
-          </Alert>
-
           {/* ── History Log ── */}
           <Card sx={{ borderRadius: 2.5 }}>
             <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -932,71 +1032,189 @@ export default function SettingsPage() {
         </Box>
       </TabPanel>
 
+      {/* ── Tab 3: Templates ── */}
       <TabPanel value={tabValue} index={3}>
         <EmailTemplateEditor templates={templates} setTemplates={setTemplates} onSaveTemplate={handleSaveTemplate} />
       </TabPanel>
 
+      {/* ── Tab 4: Security ── */}
       <TabPanel value={tabValue} index={4}>
         <Grid container spacing={3}>
           <Grid item xs={12} md={6}>
-            <Card>
+            <Card sx={{ borderRadius: 2.5 }}>
               <CardContent>
                 <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>นโยบายรหัสผ่าน</Typography>
-                <FormControlLabel control={<Switch checked={settings?.requireStrongPassword || true} onChange={(e) => setSettings({ ...settings, requireStrongPassword: e.target.checked })} />} label="บังคับใช้รหัสผ่านที่ซับซ้อน" />
+                <FormControlLabel control={<Switch checked={settings?.requireStrongPassword ?? true} onChange={(e) => setSettings({ ...settings, requireStrongPassword: e.target.checked })} />} label="บังคับใช้รหัสผ่านที่ซับซ้อน (Strong Password)" />
                 <TextField label="อายุรหัสผ่าน (วัน)" type="number" fullWidth size="small" value={settings?.passwordExpiryDays || '90'} onChange={(e) => setSettings({ ...settings, passwordExpiryDays: e.target.value })} sx={{ mt: 2 }} />
               </CardContent>
             </Card>
           </Grid>
           <Grid item xs={12} md={6}>
-            <Card>
+            <Card sx={{ borderRadius: 2.5 }}>
               <CardContent>
-                <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>เซสชัน</Typography>
-                <TextField label="หมดอายุเซสชัน (ชั่วโมง)" type="number" fullWidth size="small" value={settings?.sessionTimeoutHours || '8'} onChange={(e) => setSettings({ ...settings, sessionTimeoutHours: e.target.value })} />
+                <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>การจัดการเซสชัน</Typography>
+                <TextField label="หมดอายุเซสชัน (ชั่วโมง)" type="number" fullWidth size="small" value={settings?.sessionTimeoutHours || '8'} onChange={(e) => setSettings({ ...settings, sessionTimeoutHours: e.target.value })} sx={{ mb: 3 }} />
+                
+                <Divider sx={{ mb: 2 }} />
+                <Typography variant="subtitle2" fontWeight={700} color="error" sx={{ mb: 1 }}>ควบคุมเซสชันขั้นสูง</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  บังคับยกเลิกความถูกต้องของ Token สำหรับทุกเซสชันในระบบทันที ทุกคนบนระบบ (รวมถึงผู้ดูแลระบบและคุณ) จะต้องทำการลงชื่อเข้าใช้งานใหม่อีกครั้ง
+                </Typography>
+                <Button
+                  variant="contained"
+                  color="error"
+                  size="small"
+                  onClick={handleForceLogoutAll}
+                  disabled={loggingOutAll}
+                  startIcon={loggingOutAll ? <CircularProgress size={16} color="inherit" /> : <LockIcon size={16} />}
+                  sx={{ fontWeight: 700 }}
+                >
+                  {loggingOutAll ? 'กำลังดำเนินการ...' : 'บังคับยกเลิกเซสชันทั้งหมด'}
+                </Button>
               </CardContent>
             </Card>
           </Grid>
         </Grid>
       </TabPanel>
 
+      {/* ── Tab 5: System Health ── */}
       <TabPanel value={tabValue} index={5}>
         <Grid container spacing={3}>
           <Grid item xs={12} md={6}>
-            <Card>
+            <Card sx={{ borderRadius: 2.5 }}>
               <CardContent>
-                <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>สถานะการเชื่อมต่อ</Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-                  <CheckCircleIcon color="success" size={20} />
-                  <Typography>Database: <strong>Connected</strong></Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                  <Typography variant="h6" fontWeight={700}>สถานะการเชื่อมต่อระบบ</Typography>
+                  <IconButton size="small" onClick={fetchPingStatus} disabled={pingLoading}>
+                    <RefreshIcon size={16} />
+                  </IconButton>
                 </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-                  <CheckCircleIcon color="success" size={20} />
-                  <Typography>LDAP: <strong>Active</strong></Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                  <AlertTriangleIcon color="warning" size={20} />
-                  <Typography>SMTP: <strong>Configured</strong></Typography>
-                </Box>
+                {pingLoading && !pingResult ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}><CircularProgress size={24} /></Box>
+                ) : (
+                  <Stack spacing={2}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 1.5, border: '1px solid #f1f5f9', borderRadius: 2 }}>
+                      {pingResult?.database?.status === 'ok' ? (
+                        <CheckCircleIcon color="success" size={24} />
+                      ) : (
+                        <AlertTriangleIcon color="error" size={24} />
+                      )}
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="subtitle2" fontWeight={700}>ฐานข้อมูล Database</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {pingResult?.database?.message || 'กำลังตรวจสอบ...'}
+                          {pingResult?.database?.latency !== undefined && ` (${pingResult.database.latency} ms)`}
+                        </Typography>
+                      </Box>
+                      <Chip label={pingResult?.database?.status === 'ok' ? 'ONLINE' : 'OFFLINE'} size="small" color={pingResult?.database?.status === 'ok' ? 'success' : 'error'} />
+                    </Box>
+
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 1.5, border: '1px solid #f1f5f9', borderRadius: 2 }}>
+                      {pingResult?.ldap?.status === 'ok' ? (
+                        <CheckCircleIcon color="success" size={24} />
+                      ) : (
+                        <AlertTriangleIcon color="error" size={24} />
+                      )}
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="subtitle2" fontWeight={700}>Active Directory / LDAP</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {pingResult?.ldap?.message || 'กำลังตรวจสอบ...'}
+                          {pingResult?.ldap?.latency !== undefined && ` (${pingResult.ldap.latency} ms)`}
+                        </Typography>
+                      </Box>
+                      <Chip label={pingResult?.ldap?.status === 'ok' ? 'ONLINE' : 'OFFLINE'} size="small" color={pingResult?.ldap?.status === 'ok' ? 'success' : 'error'} />
+                    </Box>
+
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 1.5, border: '1px solid #f1f5f9', borderRadius: 2 }}>
+                      {pingResult?.smtp?.status === 'ok' ? (
+                        <CheckCircleIcon color="success" size={24} />
+                      ) : (
+                        <AlertTriangleIcon color="error" size={24} />
+                      )}
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="subtitle2" fontWeight={700}>SMTP Mail Server</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {pingResult?.smtp?.message || 'กำลังตรวจสอบ...'}
+                          {pingResult?.smtp?.latency !== undefined && ` (${pingResult.smtp.latency} ms)`}
+                        </Typography>
+                      </Box>
+                      <Chip label={pingResult?.smtp?.status === 'ok' ? 'ONLINE' : 'OFFLINE'} size="small" color={pingResult?.smtp?.status === 'ok' ? 'success' : 'error'} />
+                    </Box>
+                  </Stack>
+                )}
               </CardContent>
             </Card>
           </Grid>
           <Grid item xs={12} md={6}>
-            <Card>
+            <Card sx={{ borderRadius: 2.5 }}>
               <CardContent>
-                <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>ข้อมูลระบบ</Typography>
-                <Typography variant="body2">Version: <strong>2.0.0</strong></Typography>
-                <Typography variant="body2">Environment: <strong>Production</strong></Typography>
-                <Typography variant="body2">Uptime: <strong>Running</strong></Typography>
+                <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>ข้อมูลเซิร์ฟเวอร์</Typography>
+                <Typography variant="body2" sx={{ mb: 1 }}>เวอร์ชันระบบ: <strong>2.0.0</strong></Typography>
+                <Typography variant="body2" sx={{ mb: 1 }}>โหมดการรัน: <strong>{process.env.NODE_ENV || 'development'}</strong></Typography>
+                <Typography variant="body2">สถานะระบบ: <strong>กำลังทำงาน (Running)</strong></Typography>
               </CardContent>
             </Card>
           </Grid>
         </Grid>
       </TabPanel>
 
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
-        <Button variant="contained" size="large" startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />} onClick={handleSave} disabled={saving}>
-          บันทึกการเปลี่ยนแปลงทั้งหมด
-        </Button>
-      </Box>
+      {/* ── Bottom Save bar (Standard) ── */}
+      {!isDirty() && (
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
+          <Button variant="contained" size="large" startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />} onClick={handleSave} disabled={saving}>
+            บันทึกการตั้งค่าทั้งหมด
+          </Button>
+        </Box>
+      )}
+
+      {/* ── Modern Premium Floating Sticky Save Bar (Triggered when dirty) ── */}
+      {isDirty() && (
+        <Paper
+          elevation={10}
+          sx={{
+            position: 'fixed',
+            bottom: 24,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 1100,
+            width: 'calc(100% - 48px)',
+            maxWidth: 800,
+            p: 2,
+            borderRadius: 4,
+            bgcolor: 'rgba(30, 41, 59, 0.95)',
+            backdropFilter: 'blur(10px)',
+            color: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.25)',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <AlertTriangleIcon color="#f59e0b" size={20} />
+            <Typography variant="body2" fontWeight={600}>คุณมีการเปลี่ยนแปลงการตั้งค่าที่ยังไม่ได้บันทึก</Typography>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1.5 }}>
+            <Button
+              variant="text"
+              sx={{ color: '#cbd5e1', '&:hover': { color: '#fff' } }}
+              onClick={() => setSettings(JSON.parse(JSON.stringify(originalSettings)))}
+            >
+              ยกเลิก
+            </Button>
+            <Button
+              variant="contained"
+              color="success"
+              startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <SaveIcon size={16} />}
+              onClick={handleSave}
+              disabled={saving}
+              sx={{ px: 3, fontWeight: 700, borderRadius: 2 }}
+            >
+              บันทึกการเปลี่ยนแปลง
+            </Button>
+          </Box>
+        </Paper>
+      )}
     </Box>
   );
 }

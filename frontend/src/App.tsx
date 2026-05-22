@@ -21,6 +21,7 @@ import ExtensionQueuePage from './pages/borrow/ExtensionQueuePage';
 import PMDashboardPage from './pages/pm/PMDashboardPage';
 import PMPlanListPage from './pages/pm/PMPlanListPage';
 import PMRunPage from './pages/pm/PMRunPage';
+import PMSchedulePage from './pages/pm/PMSchedulePage';
 import DeviceTypesPage from './pages/assets/DeviceTypesPage';
 import LocationsPage from './pages/assets/LocationsPage';
 import VendorsPage from './pages/assets/VendorsPage';
@@ -88,6 +89,7 @@ export default function App() {
         <Route path="pm" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><PMDashboardPage /></ProtectedRoute>} />
         <Route path="pm/plans" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><PMPlanListPage /></ProtectedRoute>} />
         <Route path="pm/runs" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><PMRunPage /></ProtectedRoute>} />
+        <Route path="pm/schedule" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><PMSchedulePage /></ProtectedRoute>} />
         <Route path="pm/templates" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><PMTemplatePage /></ProtectedRoute>} />
         {/* Reports */}
         <Route path="reports/assets" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><ReportAssetsPage /></ProtectedRoute>} />

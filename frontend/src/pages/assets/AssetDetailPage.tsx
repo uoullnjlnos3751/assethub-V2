@@ -117,19 +117,20 @@ function SpecTab({ asset }: { asset: any }) {
   return (
     <div className="glass" style={{ padding: '18px' }}>
       {/* ── General ── */}
-      <div className="spec-section">
-        <div className="sec-hd"><div className="sec-bar" style={{ '--sb': 'linear-gradient(180deg,#6366f1,#8b5cf6)' } as any}></div>ข้อมูลทั่วไป</div>
-        <div className="spec-grid">
-          <SpecItem label="ชื่อทรัพย์สิน" value={asset.assetName} />
-          <SpecItem label="ประเภท" value={asset.type} />
-          <SpecItem label="ยี่ห้อ" value={asset.brand} />
-          <SpecItem label="รุ่น" value={asset.model} />
-          <SpecItem label="Serial No." value={asset.serialNo} mono />
-          <SpecItem label="Company" value={asset.company} />
-          <SpecItem label="Old Asset Code" value={asset.oldAssetCode} mono />
-          <SpecItem label="Domain Name" value={asset.domainName} />
+        <div className="spec-section">
+          <div className="sec-hd"><div className="sec-bar" style={{ '--sb': 'linear-gradient(180deg,#6366f1,#8b5cf6)' } as any}></div>ข้อมูลพื้นฐานทรัพย์สิน</div>
+          <div className="spec-grid">
+            <SpecItem label="เลขครุภัณฑ์" value={asset.assetCode} mono />
+            <SpecItem label="ชื่อทรัพย์สิน" value={asset.assetName} />
+            <SpecItem label="ประเภท" value={asset.type} />
+            <SpecItem label="ยี่ห้อ" value={asset.brand} />
+            <SpecItem label="รุ่น" value={asset.model} />
+            <SpecItem label="Serial No." value={asset.serialNo} mono />
+            <SpecItem label="Company" value={asset.company} />
+            <SpecItem label="รหัสทรัพย์สินเดิม" value={asset.oldAssetCode} mono />
+            <SpecItem label="Domain Name" value={asset.domainName} />
+          </div>
         </div>
-      </div>
 
       {/* ── Computer Hardware ── */}
       {isComputer && !isMonitor && (
@@ -543,11 +544,12 @@ export default function AssetDetailPage() {
               <div className="hero-icon">{icon}</div>
               <div className="hero-info">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                  <div className="hero-name">{asset.brand} {asset.model}{asset.assetName ? ` — ${asset.assetName}` : ''}</div>
+                  <div className="hero-name">{asset.brand} {asset.model}</div>
                   <span className={`pill ${statusClass}`}><span className="sdot"></span>{statusLabel}</span>
                 </div>
                 <div className="hero-sub">
                   <span className="hero-code">{asset.assetCode}</span>
+                  {asset.assetName && <span className="hero-code" style={{ background: 'rgba(99,102,241,.1)', color: '#6366f1' }}>📝 {asset.assetName}</span>}
                   {asset.type && <span>{asset.type}</span>}
                   {asset.location && <><span>·</span><span>{asset.location}{asset.floor ? ` ชั้น ${asset.floor}` : ''}</span></>}
                   {asset.departmentId && <><span>·</span><span>แผนก {asset.departmentId}</span></>}

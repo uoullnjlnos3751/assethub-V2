@@ -15,4 +15,7 @@ router.post('/login', authLimiter, validate(loginSchema), AuthController.login);
 // ── Get Current User Details ──
 router.get('/me', authenticate, AuthController.me);
 
+// ── Public Settings ──
+router.get('/settings', AuthController.settings);
+
 export default router;
