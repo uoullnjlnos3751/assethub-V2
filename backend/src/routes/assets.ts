@@ -50,6 +50,11 @@ const withCalculatedAge = <T extends { purchaseDate?: Date | null }>(asset: T) =
   age: calculateAssetAge(asset.purchaseDate),
 });
 
+const withCalculatedWarranty = <T extends { warrantyEndDate?: Date | null }>(asset: T) => ({
+  ...asset,
+  warrantyDaysLeft: asset.warrantyEndDate ? Math.max(0, Math.round((new Date(asset.warrantyEndDate).getTime() - Date.now()) / 86400000)) : null,
+});
+
 const parseDate = (val: any): Date | null => {
   if (!val) return null;
   if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
@@ -100,6 +105,10 @@ const normalizeAssetPayload = (data: any, isCreate = false) => {
     if (ALLOWED_ASSET_FIELDS.has(key)) {
       filtered[key] = data[key];
     }
+  }
+
+  if (filtered.assetCode === '-' || filtered.assetCode === '' || filtered.assetCode === null) {
+    filtered.assetCode = null;
   }
 
   return {
@@ -309,7 +318,7 @@ const ASSET_TYPE_GROUPS: Record<string, string[]> = {
 
 router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { search, status, department, location, type, typeGroup, page = '1', limit = '50' } = req.query;
+    const { search, status, department, location, type, typeGroup, categoryId, cpu, ram, warrantyExpiringInDays, ownerName, page = '1', limit = '50' } = req.query;
     const pageNum = parseInt(page as string);
     const limitNum = Math.min(parseInt(limit as string), 100);
     const skip = (pageNum - 1) * limitNum;
@@ -318,18 +327,38 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
     if (status) where.status = status as string;
     if (department) where.departmentId = department as string;
     if (location) where.location = location as string;
+    if (categoryId) where.categoryId = parseInt(categoryId as string);
     if (type) {
       where.type = type as string;
     } else if (typeGroup && ASSET_TYPE_GROUPS[String(typeGroup)]) {
       where.type = { in: ASSET_TYPE_GROUPS[String(typeGroup)] };
     }
+    if (ownerName) {
+      where.ownerName = { contains: ownerName as string, mode: 'insensitive' };
+    }
+    if (cpu) {
+      where.cpu = { contains: cpu as string, mode: 'insensitive' };
+    }
+    if (ram) {
+      where.OR = [...(where.OR || []), { ram: { contains: ram as string, mode: 'insensitive' } }];
+    }
     if (search) {
       where.OR = [
+        ...(where.OR || []),
         { assetCode: { contains: search as string, mode: 'insensitive' } },
         { serialNo: { contains: search as string, mode: 'insensitive' } },
         { model: { contains: search as string, mode: 'insensitive' } },
         { ownerName: { contains: search as string, mode: 'insensitive' } },
       ];
+    }
+    // warranty expiring within N days
+    if (warrantyExpiringInDays) {
+      const days = parseInt(warrantyExpiringInDays as string);
+      if (!isNaN(days)) {
+        const now = new Date();
+        const future = new Date(Date.now() + days * 86400000);
+        where.warrantyEndDate = { gte: now, lte: future };
+      }
     }
 
     // Data scoping: USER can only see Available assets
@@ -338,11 +367,45 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
     }
 
     const [assets, total] = await Promise.all([
-      prisma.asset.findMany({ where, skip, take: limitNum, orderBy: { createdAt: 'desc' } }),
+      prisma.asset.findMany({ where, skip, take: limitNum, orderBy: { createdAt: 'desc' }, include: { category: { select: { id: true, name: true, icon: true } }, consumableDetail: { select: { stockQuantity: true, minimumStock: true } } } }),
       prisma.asset.count({ where }),
     ]);
 
-    res.json({ data: assets.map(withCalculatedAge), total, page: pageNum, totalPages: Math.ceil(total / limitNum) });
+    // compute heldDays for each asset (days since last OWNER_CHANGE)
+    const assetIds = assets.map(a => a.id);
+    const lastOwnerChanges = assetIds.length > 0 ? await prisma.assetHistory.findMany({
+      where: { assetId: { in: assetIds }, actionType: 'OWNER_CHANGE' },
+      orderBy: { createdAt: 'desc' },
+      distinct: ['assetId'],
+      select: { assetId: true, createdAt: true },
+    }) : [];
+    const heldDaysMap = new Map(lastOwnerChanges.map(h => [h.assetId, Math.max(0, Math.round((Date.now() - new Date(h.createdAt).getTime()) / 86400000))]));
+
+    const enriched = assets.map(a => withCalculatedWarranty(withCalculatedAge({
+      ...a,
+      heldDays: heldDaysMap.get(a.id) ?? (a.ownerName ? 0 : null),
+    })));
+
+    res.json({ data: enriched, total, page: pageNum, totalPages: Math.ceil(total / limitNum) });
+  } catch (err) { next(err); }
+  });
+
+router.get('/check-duplicate', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { assetCode, serialNo, assetName, excludeId } = req.query;
+    const where: any[] = [];
+    if (assetCode) where.push({ assetCode: assetCode as string });
+    if (serialNo) where.push({ serialNo: serialNo as string });
+    if (assetName) where.push({ assetName: assetName as string });
+    if (where.length === 0) return res.json({ duplicates: {} });
+    const whereClause: any = { OR: where };
+    if (excludeId) whereClause.NOT = { id: parseInt(excludeId as string) };
+    const existing = await prisma.asset.findMany({ where: whereClause, select: { id: true, assetCode: true, serialNo: true, assetName: true } });
+    const duplicates: Record<string, boolean> = {};
+    if (assetCode) duplicates.assetCode = existing.some(a => a.assetCode === assetCode);
+    if (serialNo) duplicates.serialNo = existing.some(a => a.serialNo === serialNo);
+    if (assetName) duplicates.assetName = existing.some(a => a.assetName === assetName);
+    res.json({ duplicates });
   } catch (err) { next(err); }
 });
 
@@ -875,13 +938,29 @@ function getAssetDetail(prisma: any, assetId: number, type?: string | null) {
 
   router.get('/export/excel', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const typeParam = req.query.type as string;
+      const { type: typeParam, search, status, categoryId, type: typeFilter, typeGroup, department, location } = req.query;
       let whereClause: any = {};
-      if (typeParam) {
-        if (ASSET_TYPE_GROUPS[typeParam]) {
-          whereClause = { type: { in: ASSET_TYPE_GROUPS[typeParam] } };
-        } else {
-          whereClause = { type: typeParam };
+
+      if (search) {
+        whereClause.OR = [
+          { assetCode: { contains: search as string, mode: 'insensitive' } },
+          { serialNo: { contains: search as string, mode: 'insensitive' } },
+          { model: { contains: search as string, mode: 'insensitive' } },
+          { ownerName: { contains: search as string, mode: 'insensitive' } },
+        ];
+      }
+      if (status) whereClause.status = status as string;
+      if (categoryId) whereClause.categoryId = parseInt(categoryId as string);
+      if (typeFilter) whereClause.type = typeFilter as string;
+      if (typeGroup && ASSET_TYPE_GROUPS[String(typeGroup)]) {
+        whereClause.type = { in: ASSET_TYPE_GROUPS[String(typeGroup)] };
+      }
+      if (department) whereClause.departmentId = department as string;
+      if (location) whereClause.location = location as string;
+      // backward compat: single type param (non-filtered export)
+      if (!search && !status && !categoryId && !typeFilter && !typeGroup && !department && !location) {
+        if (typeParam && !ASSET_TYPE_GROUPS[String(typeParam)]) {
+          whereClause = { type: typeParam as string };
         }
       }
 
@@ -901,113 +980,513 @@ function getAssetDetail(prisma: any, assetId: number, type?: string | null) {
         },
         orderBy: { updatedAt: 'desc' }
       });
-  
+    
       const rows = assets.map(asset => {
         let details: any = {};
-        if (asset.computerDetail) details = { ...asset.computerDetail };
-        if (asset.phoneDetail) details = { ...asset.phoneDetail };
-        if (asset.monitorDetail) details = { ...asset.monitorDetail };
-        if (asset.deviceDetail) details = { ...asset.deviceDetail };
-        if (asset.networkDeviceDetail) details = { ...asset.networkDeviceDetail };
-        if (asset.rackDetail) details = { ...asset.rackDetail };
-        if (asset.printerDetail) details = { ...asset.printerDetail };
-        if (asset.cableDetail) details = { ...asset.cableDetail };
-        if (asset.consumableDetail) details = { ...asset.consumableDetail };
-        
-        delete details.id;
-        delete details.assetId;
+        if (asset.computerDetail) {
+          details = {
+            'CPU': asset.computerDetail.cpu,
+            'Generation': asset.computerDetail.cpuGeneration,
+            'GPU': asset.computerDetail.gpu,
+            'RAM': asset.computerDetail.ram,
+            'RAM Detail': '',
+            'RAM Slot1': asset.computerDetail.ramSlot1,
+            'RAM Slot2': asset.computerDetail.ramSlot2,
+            'Storage 1': asset.computerDetail.storage1,
+            'Storage 2': asset.computerDetail.storage2,
+            'OS': asset.computerDetail.osType,
+            'Windows Version': asset.computerDetail.osVersion,
+            'Windows License': asset.computerDetail.windowsLicense,
+            'MS Office': asset.computerDetail.officeLicense,
+            'Antivirus': asset.computerDetail.antivirusStatus,
+            'S/N Computer': asset.computerDetail.snComputer,
+            'Domain Name': asset.computerDetail.domainName,
+          };
+        }
+        if (asset.phoneDetail) {
+          details = {
+            'IMEI 1': asset.phoneDetail.imei1,
+            'IMEI 2': asset.phoneDetail.imei2,
+            'OS Version': asset.phoneDetail.osVersion,
+            'Storage': asset.phoneDetail.storageCapacity,
+            'RAM': asset.phoneDetail.ram,
+            'Phone Number': asset.phoneDetail.phoneNumber,
+            'MDM Enrolled': asset.phoneDetail.mdmEnrolled ? 'Yes' : 'No',
+            'SIM Provider': asset.phoneDetail.simProvider,
+          };
+        }
+        if (asset.monitorDetail) {
+          details = {
+            'Screen Size': asset.monitorDetail.screenSize,
+            'Resolution': asset.monitorDetail.resolution,
+            'Panel Type': asset.monitorDetail.panelType,
+            'Refresh Rate': asset.monitorDetail.refreshRate,
+            'Ports': asset.monitorDetail.ports,
+            'Has Speaker': asset.monitorDetail.hasSpeaker ? 'Yes' : 'No',
+            'Curved': asset.monitorDetail.curved ? 'Yes' : 'No',
+          };
+        }
+        if (asset.deviceDetail) {
+          details = {
+            'Device Type': asset.deviceDetail.deviceType,
+            'Connection': asset.deviceDetail.connectionType,
+            'Power Source': asset.deviceDetail.powerSource,
+            'RGB Support': asset.deviceDetail.rgbSupport ? 'Yes' : 'No',
+          };
+        }
+        if (asset.networkDeviceDetail) {
+          details = {
+            'Network Type': asset.networkDeviceDetail.networkType,
+            'IP Address': asset.networkDeviceDetail.ipAddress,
+            'MAC Address': asset.networkDeviceDetail.macAddress,
+            'Firmware': asset.networkDeviceDetail.firmwareVersion,
+            'Port Count': asset.networkDeviceDetail.portCount,
+            'Rack Location': asset.networkDeviceDetail.locationRack,
+            'PoE Support': asset.networkDeviceDetail.poeSupport ? 'Yes' : 'No',
+          };
+        }
+        if (asset.rackDetail) {
+          details = {
+            'Sub Type': asset.rackDetail.subType,
+            'Rack Units': asset.rackDetail.rackUnits,
+            'Power Capacity': asset.rackDetail.powerCapacity,
+            'Rack Location': asset.rackDetail.rackLocation,
+          };
+        }
+        if (asset.printerDetail) {
+          details = {
+            'Printer Type': asset.printerDetail.printerType,
+            'Is Color': asset.printerDetail.isColor ? 'Yes' : 'No',
+            'Network Ready': asset.printerDetail.networkReady ? 'Yes' : 'No',
+            'IP Address': asset.printerDetail.ipAddress,
+            'MAC Address': asset.printerDetail.macAddress,
+            'Page Count': asset.printerDetail.pageCount,
+            'Duplex Support': asset.printerDetail.duplexSupport ? 'Yes' : 'No',
+          };
+        }
+        if (asset.cableDetail) {
+          details = {
+            'Cable Type': asset.cableDetail.cableType,
+            'Length': asset.cableDetail.length,
+            'Stock': asset.cableDetail.stockQuantity,
+            'Min Stock': asset.cableDetail.minimumStock,
+          };
+        }
+        if (asset.consumableDetail) {
+          details = {
+            'Consumable Type': asset.consumableDetail.consumableType,
+            'Compatible With': asset.consumableDetail.compatibleWith,
+            'Stock': asset.consumableDetail.stockQuantity,
+            'Min Stock': asset.consumableDetail.minimumStock,
+            'Expiry Date': asset.consumableDetail.expiryDate ? new Date(asset.consumableDetail.expiryDate).toISOString().split('T')[0] : '',
+          };
+        }
         
         return {
-          'Asset ID': asset.id,
-          'Asset Code': asset.assetCode,
-          'Asset Name': asset.assetName,
-          'Serial No': asset.serialNo,
-          'Type': asset.type,
-          'Category': asset.category?.name || '',
-          'Status': asset.status,
-          'Brand': asset.brand,
-          'Model': asset.model,
+          'ID': asset.id,
+          'เลขครุภัณฑ์': asset.assetCode,
+          'ชื่อทรัพย์สิน': asset.assetName,
+          'Serial No.': asset.serialNo,
+          'ประเภท': asset.type,
+          'หมวดหมู่': asset.category?.name || '',
+          'สถานะ': asset.status,
+          'ยี่ห้อ': asset.brand,
+          'รุ่น': asset.model,
           'Company': asset.company,
-          'Owner': asset.ownerName,
-          'Department': asset.departmentId,
-          'Location': asset.location,
-          'Floor': asset.floor,
-          'Old Asset Code': asset.oldAssetCode,
+          'ผู้ถือครอง': asset.ownerName,
+          'แผนก': asset.departmentId,
+          'ที่ตั้ง': asset.location,
+          'ชั้น': asset.floor,
+          'รหัสทรัพย์สินเดิม': asset.oldAssetCode,
           'Domain Name': asset.domainName,
-          'PO Number': asset.poNumber,
+          'PO No.': asset.poNumber,
           'PO Date': asset.poDate ? asset.poDate.toISOString().split('T')[0] : '',
-          'PR Number': asset.prNumber,
-          'Purchase Date': asset.purchaseDate ? asset.purchaseDate.toISOString().split('T')[0] : '',
+          'PR No.': asset.prNumber,
+          'วันที่จัดซื้อ': asset.purchaseDate ? asset.purchaseDate.toISOString().split('T')[0] : '',
           'Vendor': asset.vendor,
-          'Budget': asset.budget,
-          'Remark': asset.remark,
-          'Created At': asset.createdAt.toISOString(),
-          'Updated At': asset.updatedAt.toISOString(),
+          'งบประมาณ': asset.budget,
+          'หมายเหตุ': asset.remark,
+          'วันที่สร้าง': asset.createdAt.toISOString(),
+          'วันที่แก้ไขล่าสุด': asset.updatedAt.toISOString(),
           ...details
         };
       });
-  
+    
       const emptyRow = {
-        'Asset ID': '',
-        'Asset Code': '',
-        'Asset Name': '',
-        'Serial No': '',
-        'Type': '',
-        'Category': '',
-        'Status': '',
-        'Brand': '',
-        'Model': '',
+        'ID': '',
+        'เลขครุภัณฑ์': '',
+        'ชื่อทรัพย์สิน': '',
+        'Serial No.': '',
+        'ประเภท': '',
+        'หมวดหมู่': '',
+        'สถานะ': '',
+        'ยี่ห้อ': '',
+        'รุ่น': '',
         'Company': '',
-        'Owner': '',
-        'Department': '',
-        'Location': '',
-        'Floor': '',
-        'Old Asset Code': '',
+        'ผู้ถือครอง': '',
+        'แผนก': '',
+        'ที่ตั้ง': '',
+        'ชั้น': '',
+        'รหัสทรัพย์สินเดิม': '',
         'Domain Name': '',
-        'PO Number': '',
+        'PO No.': '',
         'PO Date': '',
-        'PR Number': '',
-        'Purchase Date': '',
+        'PR No.': '',
+        'วันที่จัดซื้อ': '',
         'Vendor': '',
-        'Budget': '',
-        'Remark': '',
-        'Created At': '',
-        'Updated At': ''
+        'งบประมาณ': '',
+        'หมายเหตุ': '',
+        'วันที่สร้าง': '',
+        'วันที่แก้ไขล่าสุด': '',
       };
 
-      const sheetsData: Record<string, any[]> = {};
-      if (rows.length === 0) {
-        sheetsData['Assets'] = [emptyRow];
-      } else {
-        rows.forEach((row, index) => {
-          const type = assets[index].type || 'Other';
-          if (!sheetsData[type]) sheetsData[type] = [];
-          sheetsData[type].push(row);
-        });
-      }
-
+      const ws = xlsx.utils.json_to_sheet(rows.length > 0 ? rows : [emptyRow]);
       const workbook = xlsx.utils.book_new();
-      for (const [sheetName, sheetRows] of Object.entries(sheetsData)) {
-        const ws = xlsx.utils.json_to_sheet(sheetRows.length > 0 ? sheetRows : [emptyRow]);
-        
-        // Excel sheet names cannot exceed 31 chars and cannot contain certain chars
-        let safeName = sheetName.replace(/[\\/*?:\[\]]/g, '').substring(0, 31);
-        if (!safeName) safeName = 'Sheet';
-        
-        // Ensure unique name
-        let finalName = safeName;
-        let counter = 1;
-        while (workbook.SheetNames.includes(finalName)) {
-          finalName = `${safeName.substring(0, 28)}_${counter}`;
-          counter++;
-        }
-        
-        xlsx.utils.book_append_sheet(workbook, ws, finalName);
-      }
+      xlsx.utils.book_append_sheet(workbook, ws, 'Assets');
 
       const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-  
       res.setHeader('Content-Disposition', 'attachment; filename="assets_export.xlsx"');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.send(buffer);
+    } catch (err) { next(err); }
+  });
+
+  router.get('/export/csv', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { search, status, categoryId, type: typeFilter, typeGroup, department, location } = req.query;
+      let whereClause: any = {};
+
+      if (search) {
+        whereClause.OR = [
+          { assetCode: { contains: search as string, mode: 'insensitive' } },
+          { serialNo: { contains: search as string, mode: 'insensitive' } },
+          { model: { contains: search as string, mode: 'insensitive' } },
+          { ownerName: { contains: search as string, mode: 'insensitive' } },
+        ];
+      }
+      if (status) whereClause.status = status as string;
+      if (categoryId) whereClause.categoryId = parseInt(categoryId as string);
+      if (typeFilter) whereClause.type = typeFilter as string;
+      if (typeGroup && ASSET_TYPE_GROUPS[String(typeGroup)]) {
+        whereClause.type = { in: ASSET_TYPE_GROUPS[String(typeGroup)] };
+      }
+      if (department) whereClause.departmentId = department as string;
+      if (location) whereClause.location = location as string;
+
+      const assets = await prisma.asset.findMany({
+        where: whereClause,
+        include: {
+          category: true,
+          computerDetail: true,
+          phoneDetail: true,
+          monitorDetail: true,
+          deviceDetail: true,
+          networkDeviceDetail: true,
+          rackDetail: true,
+          printerDetail: true,
+          cableDetail: true,
+          consumableDetail: true,
+        },
+        orderBy: { updatedAt: 'desc' }
+      });
+
+      const rows = assets.map(asset => {
+        let details: any = {};
+        if (asset.computerDetail) {
+          details = {
+            'CPU': asset.computerDetail.cpu,
+            'Generation': asset.computerDetail.cpuGeneration,
+            'GPU': asset.computerDetail.gpu,
+            'RAM': asset.computerDetail.ram,
+            'RAM Detail': '',
+            'RAM Slot1': asset.computerDetail.ramSlot1,
+            'RAM Slot2': asset.computerDetail.ramSlot2,
+            'Storage 1': asset.computerDetail.storage1,
+            'Storage 2': asset.computerDetail.storage2,
+            'OS': asset.computerDetail.osType,
+            'Windows Version': asset.computerDetail.osVersion,
+            'Windows License': asset.computerDetail.windowsLicense,
+            'MS Office': asset.computerDetail.officeLicense,
+            'Antivirus': asset.computerDetail.antivirusStatus,
+            'S/N Computer': asset.computerDetail.snComputer,
+          };
+        }
+        if (asset.phoneDetail) {
+          details = {
+            'IMEI 1': asset.phoneDetail.imei1,
+            'IMEI 2': asset.phoneDetail.imei2,
+            'OS Version': asset.phoneDetail.osVersion,
+            'Storage': asset.phoneDetail.storageCapacity,
+            'RAM': asset.phoneDetail.ram,
+            'Phone Number': asset.phoneDetail.phoneNumber,
+            'MDM Enrolled': asset.phoneDetail.mdmEnrolled ? 'Yes' : 'No',
+            'SIM Provider': asset.phoneDetail.simProvider,
+          };
+        }
+        if (asset.monitorDetail) {
+          details = {
+            'Screen Size': asset.monitorDetail.screenSize,
+            'Resolution': asset.monitorDetail.resolution,
+            'Panel Type': asset.monitorDetail.panelType,
+            'Refresh Rate': asset.monitorDetail.refreshRate,
+            'Ports': asset.monitorDetail.ports,
+            'Has Speaker': asset.monitorDetail.hasSpeaker ? 'Yes' : 'No',
+            'Curved': asset.monitorDetail.curved ? 'Yes' : 'No',
+          };
+        }
+        if (asset.deviceDetail) {
+          details = {
+            'Device Type': asset.deviceDetail.deviceType,
+            'Connection': asset.deviceDetail.connectionType,
+            'Power Source': asset.deviceDetail.powerSource,
+            'RGB Support': asset.deviceDetail.rgbSupport ? 'Yes' : 'No',
+          };
+        }
+        if (asset.networkDeviceDetail) {
+          details = {
+            'Network Type': asset.networkDeviceDetail.networkType,
+            'IP Address': asset.networkDeviceDetail.ipAddress,
+            'MAC Address': asset.networkDeviceDetail.macAddress,
+            'Firmware': asset.networkDeviceDetail.firmwareVersion,
+            'Port Count': asset.networkDeviceDetail.portCount,
+            'Rack Location': asset.networkDeviceDetail.locationRack,
+            'PoE Support': asset.networkDeviceDetail.poeSupport ? 'Yes' : 'No',
+          };
+        }
+        if (asset.rackDetail) {
+          details = {
+            'Sub Type': asset.rackDetail.subType,
+            'Rack Units': asset.rackDetail.rackUnits,
+            'Power Capacity': asset.rackDetail.powerCapacity,
+            'Rack Location': asset.rackDetail.rackLocation,
+          };
+        }
+        if (asset.printerDetail) {
+          details = {
+            'Printer Type': asset.printerDetail.printerType,
+            'Is Color': asset.printerDetail.isColor ? 'Yes' : 'No',
+            'Network Ready': asset.printerDetail.networkReady ? 'Yes' : 'No',
+            'IP Address': asset.printerDetail.ipAddress,
+            'MAC Address': asset.printerDetail.macAddress,
+            'Page Count': asset.printerDetail.pageCount,
+            'Duplex Support': asset.printerDetail.duplexSupport ? 'Yes' : 'No',
+          };
+        }
+        if (asset.cableDetail) {
+          details = {
+            'Cable Type': asset.cableDetail.cableType,
+            'Length': asset.cableDetail.length,
+            'Stock': asset.cableDetail.stockQuantity,
+            'Min Stock': asset.cableDetail.minimumStock,
+          };
+        }
+        if (asset.consumableDetail) {
+          details = {
+            'Consumable Type': asset.consumableDetail.consumableType,
+            'Compatible With': asset.consumableDetail.compatibleWith,
+            'Stock': asset.consumableDetail.stockQuantity,
+            'Min Stock': asset.consumableDetail.minimumStock,
+            'Expiry Date': asset.consumableDetail.expiryDate ? new Date(asset.consumableDetail.expiryDate).toISOString().split('T')[0] : '',
+          };
+        }
+        
+        return {
+          'ID': asset.id,
+          'เลขครุภัณฑ์': asset.assetCode,
+          'ชื่อทรัพย์สิน': asset.assetName,
+          'Serial No.': asset.serialNo,
+          'ประเภท': asset.type,
+          'หมวดหมู่': asset.category?.name || '',
+          'สถานะ': asset.status,
+          'ยี่ห้อ': asset.brand,
+          'รุ่น': asset.model,
+          'Company': asset.company,
+          'ผู้ถือครอง': asset.ownerName,
+          'แผนก': asset.departmentId,
+          'ที่ตั้ง': asset.location,
+          'ชั้น': asset.floor,
+          'รหัสทรัพย์สินเดิม': asset.oldAssetCode,
+          'Domain Name': asset.domainName,
+          'PO No.': asset.poNumber,
+          'PO Date': asset.poDate ? asset.poDate.toISOString().split('T')[0] : '',
+          'PR No.': asset.prNumber,
+          'วันที่จัดซื้อ': asset.purchaseDate ? asset.purchaseDate.toISOString().split('T')[0] : '',
+          'Vendor': asset.vendor,
+          'งบประมาณ': asset.budget,
+          'หมายเหตุ': asset.remark,
+          'วันที่สร้าง': asset.createdAt.toISOString(),
+          'วันที่แก้ไขล่าสุด': asset.updatedAt.toISOString(),
+          ...details
+        };
+      });
+
+      const ws = xlsx.utils.json_to_sheet(rows.length > 0 ? rows : []);
+      const csv = xlsx.utils.sheet_to_csv(ws, { FS: ',', blankrows: false });
+      
+      res.setHeader('Content-Disposition', 'attachment; filename="assets_export.csv"');
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.send('\uFEFF' + csv);
+    } catch (err) { next(err); }
+  });
+
+  router.post('/export/by-ids', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        throw new AppError('No asset IDs provided', 400);
+      }
+
+      const assets = await prisma.asset.findMany({
+        where: { id: { in: ids } },
+        include: {
+          category: true,
+          computerDetail: true,
+          phoneDetail: true,
+          monitorDetail: true,
+          deviceDetail: true,
+          networkDeviceDetail: true,
+          rackDetail: true,
+          printerDetail: true,
+          cableDetail: true,
+          consumableDetail: true,
+        },
+        orderBy: { updatedAt: 'desc' }
+      });
+      const rows = assets.map(asset => {
+        let details: any = {};
+        if (asset.computerDetail) {
+          details = {
+            'CPU': asset.computerDetail.cpu,
+            'Generation': asset.computerDetail.cpuGeneration,
+            'GPU': asset.computerDetail.gpu,
+            'RAM': asset.computerDetail.ram,
+            'RAM Detail': '',
+            'RAM Slot1': asset.computerDetail.ramSlot1,
+            'RAM Slot2': asset.computerDetail.ramSlot2,
+            'Storage 1': asset.computerDetail.storage1,
+            'Storage 2': asset.computerDetail.storage2,
+            'OS': asset.computerDetail.osType,
+            'Windows Version': asset.computerDetail.osVersion,
+            'Windows License': asset.computerDetail.windowsLicense,
+            'MS Office': asset.computerDetail.officeLicense,
+            'Antivirus': asset.computerDetail.antivirusStatus,
+            'S/N Computer': asset.computerDetail.snComputer,
+            'Domain Name': asset.computerDetail.domainName,
+          };
+        }
+        if (asset.phoneDetail) {
+          details = {
+            'IMEI 1': asset.phoneDetail.imei1,
+            'IMEI 2': asset.phoneDetail.imei2,
+            'OS Version': asset.phoneDetail.osVersion,
+            'Storage': asset.phoneDetail.storageCapacity,
+            'RAM': asset.phoneDetail.ram,
+            'Phone Number': asset.phoneDetail.phoneNumber,
+            'MDM Enrolled': asset.phoneDetail.mdmEnrolled ? 'Yes' : 'No',
+            'SIM Provider': asset.phoneDetail.simProvider,
+          };
+        }
+        if (asset.monitorDetail) {
+          details = {
+            'Screen Size': asset.monitorDetail.screenSize,
+            'Resolution': asset.monitorDetail.resolution,
+            'Panel Type': asset.monitorDetail.panelType,
+            'Refresh Rate': asset.monitorDetail.refreshRate,
+            'Ports': asset.monitorDetail.ports,
+            'Has Speaker': asset.monitorDetail.hasSpeaker ? 'Yes' : 'No',
+            'Curved': asset.monitorDetail.curved ? 'Yes' : 'No',
+          };
+        }
+        if (asset.deviceDetail) {
+          details = {
+            'Device Type': asset.deviceDetail.deviceType,
+            'Connection': asset.deviceDetail.connectionType,
+            'Power Source': asset.deviceDetail.powerSource,
+            'RGB Support': asset.deviceDetail.rgbSupport ? 'Yes' : 'No',
+          };
+        }
+        if (asset.networkDeviceDetail) {
+          details = {
+            'Network Type': asset.networkDeviceDetail.networkType,
+            'IP Address': asset.networkDeviceDetail.ipAddress,
+            'MAC Address': asset.networkDeviceDetail.macAddress,
+            'Firmware': asset.networkDeviceDetail.firmwareVersion,
+            'Port Count': asset.networkDeviceDetail.portCount,
+            'Rack Location': asset.networkDeviceDetail.locationRack,
+            'PoE Support': asset.networkDeviceDetail.poeSupport ? 'Yes' : 'No',
+          };
+        }
+        if (asset.rackDetail) {
+          details = {
+            'Sub Type': asset.rackDetail.subType,
+            'Rack Units': asset.rackDetail.rackUnits,
+            'Power Capacity': asset.rackDetail.powerCapacity,
+            'Rack Location': asset.rackDetail.rackLocation,
+          };
+        }
+        if (asset.printerDetail) {
+          details = {
+            'Printer Type': asset.printerDetail.printerType,
+            'Is Color': asset.printerDetail.isColor ? 'Yes' : 'No',
+            'Network Ready': asset.printerDetail.networkReady ? 'Yes' : 'No',
+            'IP Address': asset.printerDetail.ipAddress,
+            'MAC Address': asset.printerDetail.macAddress,
+            'Page Count': asset.printerDetail.pageCount,
+            'Duplex Support': asset.printerDetail.duplexSupport ? 'Yes' : 'No',
+          };
+        }
+        if (asset.cableDetail) {
+          details = {
+            'Cable Type': asset.cableDetail.cableType,
+            'Length': asset.cableDetail.length,
+            'Stock': asset.cableDetail.stockQuantity,
+            'Min Stock': asset.cableDetail.minimumStock,
+          };
+        }
+        if (asset.consumableDetail) {
+          details = {
+            'Consumable Type': asset.consumableDetail.consumableType,
+            'Compatible With': asset.consumableDetail.compatibleWith,
+            'Stock': asset.consumableDetail.stockQuantity,
+            'Min Stock': asset.consumableDetail.minimumStock,
+            'Expiry Date': asset.consumableDetail.expiryDate ? new Date(asset.consumableDetail.expiryDate).toISOString().split('T')[0] : '',
+          };
+        }
+        
+        return {
+          'ID': asset.id,
+          'เลขครุภัณฑ์': asset.assetCode,
+          'ชื่อทรัพย์สิน': asset.assetName,
+          'Serial No.': asset.serialNo,
+          'ประเภท': asset.type,
+          'หมวดหมู่': asset.category?.name || '',
+          'สถานะ': asset.status,
+          'ยี่ห้อ': asset.brand,
+          'รุ่น': asset.model,
+          'Company': asset.company,
+          'ผู้ถือครอง': asset.ownerName,
+          'แผนก': asset.departmentId,
+          'ที่ตั้ง': asset.location,
+          'ชั้น': asset.floor,
+          'รหัสทรัพย์สินเดิม': asset.oldAssetCode,
+          'Domain Name': asset.domainName,
+          'PO No.': asset.poNumber,
+          'PO Date': asset.poDate ? asset.poDate.toISOString().split('T')[0] : '',
+          'PR No.': asset.prNumber,
+          'วันที่จัดซื้อ': asset.purchaseDate ? asset.purchaseDate.toISOString().split('T')[0] : '',
+          'Vendor': asset.vendor,
+          'งบประมาณ': asset.budget,
+          'หมายเหตุ': asset.remark,
+          'วันที่สร้าง': asset.createdAt.toISOString(),
+          'วันที่แก้ไขล่าสุด': asset.updatedAt.toISOString(),
+          ...details
+        };
+      });
+      const ws = xlsx.utils.json_to_sheet(rows);
+      const workbook = xlsx.utils.book_new();
+      xlsx.utils.book_append_sheet(workbook, ws, 'Assets');
+      const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+      res.setHeader('Content-Disposition', 'attachment; filename="selected_assets_export.xlsx"');
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.send(buffer);
     } catch (err) {
@@ -1019,27 +1498,36 @@ function getAssetDetail(prisma: any, assetId: number, type?: string | null) {
     try {
       if (!req.file) throw new AppError('ไม่พบไฟล์ที่อัปโหลด', 400);
   
-      const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
+      let buf = req.file.buffer;
+      // Strip UTF-8 BOM if present
+      if (buf.length > 3 && buf[0] === 0xEF && buf[1] === 0xBB && buf[2] === 0xBF) {
+        buf = buf.slice(3);
+      }
+      // XLSX starts with PK (ZIP magic). CSV must be decoded as UTF-8 string.
+      const isCSV = buf.length < 2 || buf[0] !== 0x50 || buf[1] !== 0x4B;
+      const workbook = isCSV
+        ? xlsx.read(buf.toString('utf8'), { type: 'string' })
+        : xlsx.read(buf, { type: 'buffer' });
       
       const allRows: any[] = [];
       for (const sheetName of workbook.SheetNames) {
         const sheet = workbook.Sheets[sheetName];
-        const rows: any[] = xlsx.utils.sheet_to_json(sheet);
+        const rows: any[] = xlsx.utils.sheet_to_json(sheet, { defval: '' });
         allRows.push(...rows);
       }
-  
+
       let success = 0, errors = 0;
       
       for (const row of allRows) {
         try {
-          const assetCode = row['Asset Code'] || row['รหัสทรัพย์สิน'];
-          const serialNo = row['Serial No'] || row['Serial Number'] || row['SerialNumber'];
+          const assetCode = row['เลขครุภัณฑ์'] || row['Asset Code'] || row['รหัสทรัพย์สิน'];
+          const serialNo = row['Serial No.'] || row['Serial No'] || row['Serial Number'] || row['SerialNumber'];
           
           if (!assetCode && !serialNo) {
             errors++;
             continue;
           }
-  
+
           const categoryName = row['Category'] || row['หมวดหมู่'];
           let categoryId = null;
           if (categoryName) {
@@ -1050,40 +1538,59 @@ function getAssetDetail(prisma: any, assetId: number, type?: string | null) {
             });
             categoryId = cat.id;
           }
-  
+
           const poDate = row['PO Date'] ? new Date(row['PO Date']) : null;
-          const purchaseDate = row['Purchase Date'] ? new Date(row['Purchase Date']) : null;
+          const purchaseDateStr = row['วันที่จัดซื้อ'] || row['Purchase Date'];
+          const purchaseDate = purchaseDateStr ? new Date(purchaseDateStr) : null;
           const budgetVal = row['Budget'] || row['งบประมาณ'];
   
-          const assetData = {
-            assetCode: assetCode ? String(assetCode) : String(serialNo),
-            assetName: row['Asset Name'] || row['ชื่อทรัพย์สิน'] || '',
-            serialNo: serialNo ? String(serialNo) : String(assetCode),
-            type: row['Type'] || row['ประเภทอุปกรณ์'] || '',
+          const finalAssetCode = assetCode && String(assetCode) !== '-' ? String(assetCode) : null;
+          const finalSerialNo = serialNo ? String(serialNo) : null;
+
+          const assetData: any = {
+            assetCode: finalAssetCode,
+            assetName: String(row['Asset Name'] || row['ชื่อทรัพย์สิน'] || ''),
+            serialNo: String(finalSerialNo),
+            type: String(row['ประเภท'] || row['Type'] || row['ประเภทอุปกรณ์'] || ''),
             categoryId,
-            status: row['Status'] || row['สถานะ'] || 'Available',
-            brand: row['Brand'] || row['ยี่ห้อ'] || '',
-            model: row['Model'] || row['รุ่น'] || '',
-            company: row['Company'] || row['บริษัท'] || '',
-            ownerName: row['Owner'] || row['ผู้ถือครอง'] || '',
-            departmentId: row['Department'] || row['แผนก'] || '',
-            location: row['Location'] || row['สถานที่'] || '',
-            floor: row['Floor'] || row['ชั้น'] || '',
-            oldAssetCode: row['Old Asset Code'] || row['รหัสทรัพย์สินเดิม'] || null,
-            domainName: row['Domain Name'] || '',
-            poNumber: row['PO Number'] || row['เลขที่ PO'] || '',
+            status: String(row['Status'] || row['สถานะ'] || 'Available'),
+            brand: String(row['Brand'] || row['ยี่ห้อ'] || ''),
+            model: String(row['Model'] || row['รุ่น'] || ''),
+            company: String(row['Company'] || row['บริษัท'] || ''),
+            ownerName: String(row['Owner'] || row['ผู้ถือครอง'] || ''),
+            departmentId: String(row['Department'] || row['แผนก'] || ''),
+            location: String(row['ที่ตั้ง'] || row['Location'] || row['สถานที่'] || ''),
+            floor: String(row['Floor'] || row['ชั้น'] || ''),
+            oldAssetCode: (row['Old Asset Code'] || row['รหัสทรัพย์สินเดิม']) ? String(row['Old Asset Code'] || row['รหัสทรัพย์สินเดิม']) : null,
+            domainName: String(row['Domain Name'] || ''),
+            poNumber: String(row['PO No.'] || row['PO Number'] || row['เลขที่ PO'] || ''),
             poDate: poDate && !isNaN(poDate.getTime()) ? poDate : null,
-            prNumber: row['PR Number'] || row['เลขที่ PR'] || '',
+            prNumber: String(row['PR No.'] || row['PR Number'] || row['เลขที่ PR'] || ''),
             purchaseDate: purchaseDate && !isNaN(purchaseDate.getTime()) ? purchaseDate : null,
-            vendor: row['Vendor'] || '',
+            vendor: String(row['Vendor'] || ''),
             budget: budgetVal ? String(budgetVal) : null,
-            remark: row['Remark'] || row['หมายเหตุ'] || ''
+            remark: String(row['Remark'] || row['หมายเหตุ'] || '')
           };
   
-          const existing = await prisma.asset.findFirst({
-            where: assetCode ? { assetCode: String(assetCode) } : { serialNo: String(serialNo) }
-          });
-  
+          const validSerialNo = serialNo && String(serialNo) !== '-' ? String(serialNo) : null;
+          const assetNameVal = String(row['Asset Name'] || row['ชื่อทรัพย์สิน'] || '').trim();
+          
+          let existing = null;
+          if (finalAssetCode) {
+            existing = await prisma.asset.findUnique({ where: { assetCode: finalAssetCode } });
+          }
+          if (!existing && validSerialNo) {
+            existing = await prisma.asset.findUnique({ where: { serialNo: validSerialNo } });
+          }
+          if (assetNameVal) {
+            const dup = await prisma.asset.findFirst({
+              where: { assetName: assetNameVal, NOT: existing ? { id: existing.id } : undefined }
+            });
+            if (dup) {
+              errors++;
+              continue;
+            }
+          }
           let savedAsset;
           if (existing) {
             savedAsset = await prisma.asset.update({ where: { id: existing.id }, data: assetData });
@@ -1092,12 +1599,52 @@ function getAssetDetail(prisma: any, assetId: number, type?: string | null) {
           }
   
           if (savedAsset.type) {
-            await upsertAssetDetail(prisma, savedAsset.id, savedAsset.type, row);
+            // Normalize export column headers to Prisma detail field names
+            const detailFieldMap: Record<string, string> = {
+              'CPU': 'cpu', 'Generation': 'cpuGeneration', 'GPU': 'gpu',
+              'RAM': 'ram', 'RAM Detail': 'ramDetail', 'RAM Slot1': 'ramSlot1', 'RAM Slot2': 'ramSlot2',
+              'Storage 1': 'storage1', 'Storage 2': 'storage2',
+              'OS': 'osType', 'Windows Version': 'osVersion',
+              'Windows License': 'windowsLicense', 'MS Office': 'officeLicense',
+              'Antivirus': 'antivirusStatus', 'S/N Computer': 'snComputer',
+              'IMEI 1': 'imei1', 'IMEI 2': 'imei2',
+              'Storage': 'storageCapacity', 'Phone Number': 'phoneNumber',
+              'SIM Provider': 'simProvider', 'MDM Enrolled': 'mdmEnrolled',
+              'Screen Size': 'screenSize', 'Resolution': 'resolution',
+              'Panel Type': 'panelType', 'Refresh Rate': 'refreshRate',
+              'Ports': 'ports', 'Has Speaker': 'hasSpeaker', 'Curved': 'curved',
+              'Device Type': 'deviceType', 'Connection': 'connectionType',
+              'Power Source': 'powerSource', 'RGB Support': 'rgbSupport',
+              'Network Type': 'networkType', 'IP Address': 'ipAddress',
+              'MAC Address': 'macAddress', 'Firmware': 'firmwareVersion',
+              'Port Count': 'portCount', 'Rack Location': 'locationRack',
+              'PoE Support': 'poeSupport',
+              'Sub Type': 'subType', 'Rack Units': 'rackUnits',
+              'Power Capacity': 'powerCapacity',
+              'Printer Type': 'printerType', 'Is Color': 'isColor',
+              'Network Ready': 'networkReady', 'Page Count': 'pageCount',
+              'Duplex Support': 'duplexSupport',
+              'Cable Type': 'cableType', 'Length': 'length',
+              'Stock': 'stockQuantity', 'Min Stock': 'minimumStock',
+              'Consumable Type': 'consumableType', 'Compatible With': 'compatibleWith',
+              'Expiry Date': 'expiryDate',
+              'Domain Name': 'domainName',
+            };
+            const detailRow: any = { ...row };
+            for (const [exportKey, fieldName] of Object.entries(detailFieldMap)) {
+              if (row[exportKey] !== undefined && row[exportKey] !== null && row[exportKey] !== '') {
+                const val = row[exportKey];
+                const isInt = ['portCount', 'pageCount', 'stockQuantity', 'minimumStock'].includes(fieldName);
+                detailRow[fieldName] = isInt ? parseInt(val as string, 10) : String(val);
+              }
+            }
+            await upsertAssetDetail(prisma, savedAsset.id, savedAsset.type, detailRow);
           }
           
           success++;
-        } catch (err) {
+        } catch (err: any) {
           console.error('Error importing row:', err);
+          require('fs').appendFileSync('import_errors.log', err.message + '\n');
           errors++;
         }
       }
@@ -1136,15 +1683,23 @@ router.post('/upsert', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async 
       throw new AppError('กรุณาระบุ Asset Code หรือ Serial Number');
     }
 
-    // Find existing asset
-    const existing = await prisma.asset.findFirst({
-      where: {
-        OR: [
-          assetCode ? { assetCode } : undefined,
-          serialNo ? { serialNo } : undefined,
-        ].filter(Boolean) as any[],
-      },
-    });
+    const validAssetCode = assetCode && String(assetCode) !== '-' ? String(assetCode) : null;
+    const validSerialNo = serialNo && String(serialNo) !== '-' ? String(serialNo) : null;
+
+    let existing = null;
+    if (validAssetCode) {
+      existing = await prisma.asset.findFirst({ where: { assetCode: validAssetCode } });
+    }
+    if (!existing && validSerialNo) {
+      existing = await prisma.asset.findFirst({ where: { serialNo: validSerialNo } });
+    }
+
+    if (data.assetName) {
+      const dup = await prisma.asset.findFirst({
+        where: { assetName: data.assetName, NOT: existing ? { id: existing.id } : undefined }
+      });
+      if (dup) throw new AppError('ชื่อทรัพย์สินนี้มีอยู่ในระบบแล้ว');
+    }
 
     if (existing) {
       const old = existing;
@@ -1192,10 +1747,18 @@ router.post('/', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: 
   try {
     const { detail, ...assetData } = req.body;
     const data = normalizeAssetPayload(assetData);
-    const existing = await prisma.asset.findFirst({
-      where: { OR: [{ assetCode: data.assetCode }, { serialNo: data.serialNo }] },
-    });
-    if (existing) throw new AppError('รหัสทรัพย์สินหรือ Serial Number มีอยู่ในระบบแล้ว');
+    if (data.assetCode) {
+      const dup = await prisma.asset.findUnique({ where: { assetCode: data.assetCode } });
+      if (dup) throw new AppError('รหัสทรัพย์สินนี้มีอยู่ในระบบแล้ว');
+    }
+    if (data.serialNo) {
+      const dup = await prisma.asset.findUnique({ where: { serialNo: data.serialNo } });
+      if (dup) throw new AppError('Serial Number นี้มีอยู่ในระบบแล้ว');
+    }
+    if (data.assetName) {
+      const dup = await prisma.asset.findFirst({ where: { assetName: data.assetName } });
+      if (dup) throw new AppError('ชื่อทรัพย์สินนี้มีอยู่ในระบบแล้ว');
+    }
 
     const asset = await prisma.asset.create({ data });
     await prisma.assetHistory.create({
@@ -1225,6 +1788,19 @@ router.put('/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req
 
     const { detail, ...assetData } = req.body;
     const data = normalizeAssetPayload(assetData);
+
+    if (data.assetCode && data.assetCode !== old.assetCode) {
+      const dup = await prisma.asset.findUnique({ where: { assetCode: data.assetCode } });
+      if (dup) throw new AppError('รหัสทรัพย์สินนี้มีอยู่ในระบบแล้ว');
+    }
+    if (data.serialNo && data.serialNo !== old.serialNo) {
+      const dup = await prisma.asset.findUnique({ where: { serialNo: data.serialNo } });
+      if (dup) throw new AppError('Serial Number นี้มีอยู่ในระบบแล้ว');
+    }
+    if (data.assetName && data.assetName !== old.assetName) {
+      const dup = await prisma.asset.findFirst({ where: { assetName: data.assetName } });
+      if (dup) throw new AppError('ชื่อทรัพย์สินนี้มีอยู่ในระบบแล้ว');
+    }
     
     const asset = await prisma.asset.update({ where: { id }, data });
 
@@ -1253,6 +1829,31 @@ router.delete('/:id', authenticate, authorize('SUPERADMIN'), async (req: Request
     const id = parseInt(req.params.id);
     await prisma.asset.delete({ where: { id } });
     res.json({ message: 'ลบทรัพย์สินเรียบร้อย' });
+  } catch (err) { next(err); }
+});
+
+router.post('/bulk-delete', authenticate, authorize('SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) throw new AppError('No asset IDs provided', 400);
+    const result = await prisma.asset.deleteMany({ where: { id: { in: ids } } });
+    res.json({ message: `ลบ ${result.count} รายการเรียบร้อย` });
+  } catch (err) { next(err); }
+});
+
+router.post('/bulk-update', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { ids, data } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) throw new AppError('No asset IDs provided', 400);
+    if (!data || Object.keys(data).length === 0) throw new AppError('No update data provided', 400);
+    const allowed = ['status', 'departmentId', 'location', 'floor', 'company', 'ownerName', 'categoryId', 'brand', 'model'];
+    const updateData: any = {};
+    for (const key of allowed) {
+      if (data[key] !== undefined) updateData[key] = data[key];
+    }
+    if (Object.keys(updateData).length === 0) throw new AppError('No valid fields to update', 400);
+    const result = await prisma.asset.updateMany({ where: { id: { in: ids } }, data: updateData });
+    res.json({ message: `อัปเดต ${result.count} รายการเรียบร้อย` });
   } catch (err) { next(err); }
 });
 

@@ -4,55 +4,82 @@ import ImportAssetsButton from '../../components/ImportAssetsButton';
 import { assetAPI } from '../../services/api';
 
 /* ─────────────────────────────────────────────────────────────────
-   Export columns (unchanged from original)
+   Export columns - synced with backend export headers
+   Format: [fieldName, displayLabel]
 ───────────────────────────────────────────────────────────────── */
 const exportColumns = [
-  ['assetCode', 'รหัสทรัพย์สิน'],
-  ['serialNo', 'Serial Number'],
-  ['type', 'ประเภทอุปกรณ์'],
-  ['brand', 'ยี่ห้อ (Brand)'],
-  ['model', 'รุ่น (Model)'],
+  ['id', 'ID'],
+  ['assetCode', 'เลขครุภัณฑ์'],
+  ['assetName', 'ชื่อทรัพย์สิน'],
+  ['serialNo', 'Serial No.'],
+  ['type', 'ประเภท'],
+  ['categoryId', 'หมวดหมู่'],
+  ['status', 'สถานะ'],
+  ['brand', 'ยี่ห้อ'],
+  ['model', 'รุ่น'],
   ['company', 'Company'],
-  ['oldAssetCode', 'Computer Name เดิม'],
   ['ownerName', 'ผู้ถือครอง'],
   ['departmentId', 'แผนก'],
-  ['location', 'Location'],
-  ['floor', 'Floor'],
-  ['status', 'สถานะ'],
+  ['location', 'ที่ตั้ง'],
+  ['floor', 'ชั้น'],
+  ['oldAssetCode', 'รหัสทรัพย์สินเดิม'],
   ['domainName', 'Domain Name'],
-  ['osType', 'OS'],
-  ['osVersion', 'Windows'],
-  ['officeLicense', 'MS Office'],
-  ['antivirusStatus', 'Antivirus'],
+  ['poNumber', 'PO No.'],
+  ['poDate', 'PO Date'],
+  ['prNumber', 'PR No.'],
+  ['purchaseDate', 'วันที่จัดซื้อ'],
+  ['vendor', 'Vendor'],
+  ['budget', 'งบประมาณ'],
+  ['remark', 'หมายเหตุ'],
+  ['createdAt', 'วันที่สร้าง'],
+  ['updatedAt', 'วันที่แก้ไขล่าสุด'],
+  // Computer details
   ['cpu', 'CPU'],
   ['cpuGeneration', 'Generation'],
   ['gpu', 'GPU'],
   ['ram', 'RAM'],
+  ['ramDetail', 'RAM Detail'],
   ['ramSlot1', 'RAM Slot1'],
   ['ramSlot2', 'RAM Slot2'],
   ['storage1', 'Storage 1'],
   ['storage2', 'Storage 2'],
-  ['prNumber', 'PR No.'],
-  ['budget', 'งบประมาณ'],
-  ['poDate', 'PO Date'],
-  ['poNumber', 'PO No.'],
-  ['vendor', 'Vendor'],
-  ['purchaseDate', 'วันที่ซื้อ'],
-  ['age', 'อายุ (ปี)'],
-  ['remark', 'หมายเหตุ'],
+  ['osType', 'OS'],
+  ['osVersion', 'Windows Version'],
+  ['windowsLicense', 'Windows License'],
+  ['officeLicense', 'MS Office'],
+  ['antivirusStatus', 'Antivirus'],
+  ['snComputer', 'S/N Computer'],
 ] as const;
 
-const formatDate = (value: unknown) => {
+const formatDate = (value: unknown, format: 'iso' | 'thai' = 'iso') => {
   if (!value) return '';
   const date = new Date(String(value));
   if (Number.isNaN(date.getTime())) return String(value);
+  if (format === 'thai') {
+    // Format: DD/MM/YYYY (Thai)
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear() + 543; // Convert to Buddhist Era
+    return `${day}/${month}/${year}`;
+  }
   return date.toISOString().split('T')[0];
 };
 
-const buildRows = (assets: any[]) => assets.map((asset) => {
+const buildRows = (assets: any[], dateFormat: 'iso' | 'thai' = 'iso') => assets.map((asset) => {
   const row: Record<string, any> = {};
   exportColumns.forEach(([field, label]) => {
-    row[label] = field === 'purchaseDate' || field === 'poDate' ? formatDate(asset[field]) : asset[field] ?? '';
+    let value = asset[field] ?? '';
+    
+    // Handle special field mappings
+    if (field === 'categoryId') {
+      value = asset.category?.name || '';
+    } else if (field === 'purchaseDate' || field === 'poDate') {
+      value = formatDate(value, dateFormat);
+    } else if (field === 'createdAt' || field === 'updatedAt') {
+      value = formatDate(value, dateFormat);
+    }
+    
+    row[label] = value;
   });
   return row;
 });
@@ -164,6 +191,7 @@ export default function ImportExportPage() {
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
   const [progress, setProgress] = useState('');
+  const [dateFormat, setDateFormat] = useState<'iso' | 'thai'>('iso');
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
@@ -177,14 +205,20 @@ export default function ImportExportPage() {
     try {
       const assets = await fetchAllAssets();
       setProgress(`กำลัง build ${assets.length} รายการ...`);
-      const rows = buildRows(assets);
+      const rows = buildRows(assets, dateFormat);
+      
       const sheetsData: Record<string, Record<string, any>[]> = {};
       rows.forEach((row, index) => {
         const type = assets[index].type || 'Other';
         if (!sheetsData[type]) sheetsData[type] = [];
         sheetsData[type].push(row);
+        // Show progress every 500 rows
+        if ((index + 1) % 500 === 0) {
+          setProgress(`กำลัง build ${index + 1} / ${assets.length} รายการ...`);
+        }
       });
       if (Object.keys(sheetsData).length === 0) sheetsData['Assets'] = [];
+      setProgress(`กำลังเขียนไฟล์ Excel...`);
       writeWorkbook(sheetsData, `assets-${new Date().toISOString().split('T')[0]}.xlsx`);
       showToast(`✅ ส่งออก Excel สำเร็จ ${assets.length} รายการ`);
     } catch (err: any) {
@@ -197,21 +231,18 @@ export default function ImportExportPage() {
   const exportCsv = async () => {
     setLoading(true); setError(''); setProgress('กำลัง export CSV...');
     try {
-      const assets = await fetchAllAssets();
-      const rows = buildRows(assets);
-      const emptyRow = Object.fromEntries(exportColumns.map(([, label]) => [label, '']));
-      const ws = XLSX.utils.json_to_sheet(rows.length > 0 ? rows : [emptyRow]);
-      const csv = XLSX.utils.sheet_to_csv(ws, { FS: ',', blankrows: false });
-      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+      setProgress('กำลังเรียก API...');
+      const response = await assetAPI.exportCSV();
+      const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `assets-${new Date().toISOString().split('T')[0]}.csv`;
+      link.setAttribute('download', `assets-${new Date().toISOString().split('T')[0]}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      showToast(`✅ ส่งออก CSV สำเร็จ ${assets.length} รายการ`);
+      showToast(`✅ ส่งออก CSV สำเร็จ`);
     } catch (err: any) {
       setError(err.message || 'ไม่สามารถส่งออกข้อมูลได้');
     } finally {
@@ -225,13 +256,65 @@ export default function ImportExportPage() {
       const res = await assetAPI.deviceTypes();
       const types = res.data.map((t: any) => t.name);
       if (types.length === 0) types.push('Computer', 'Monitor');
+      
+      // Create sample row with realistic data
+      const sampleRow = Object.fromEntries(exportColumns.map(([field, label]) => {
+        const sampleData: Record<string, string> = {
+          'ID': '1',
+          'เลขครุภัณฑ์': 'ASSET-2025-001',
+          'ชื่อทรัพย์สิน': 'Lenovo ThinkPad X1',
+          'Serial No.': 'SN123456789',
+          'ประเภท': 'Computer',
+          'หมวดหมู่': 'Notebook',
+          'สถานะ': 'InUse',
+          'ยี่ห้อ': 'Lenovo',
+          'รุ่น': 'ThinkPad X1 Carbon',
+          'Company': 'Company A',
+          'ผู้ถือครอง': 'John Doe',
+          'แผนก': 'IT',
+          'Location': 'Office Building',
+          'ชั้น': '5',
+          'รหัสทรัพย์สินเดิม': 'OLD-CODE-123',
+          'Domain Name': 'LAPTOP-001',
+          'PO No.': 'PO-2025-001',
+          'PO Date': '2025-01-15',
+          'PR No.': 'PR-2025-001',
+          'วันที่จัดซื้อ': '2025-01-20',
+          'Vendor': 'Lenovo Official',
+          'งบประมาณ': '50000',
+          'หมายเหตุ': 'Business notebook',
+          'วันที่สร้าง': '2025-01-25',
+          'วันที่แก้ไขล่าสุด': '2025-01-25',
+          'CPU': 'Intel Core i7',
+          'Generation': '12th Gen',
+          'GPU': 'Intel Iris Xe',
+          'RAM': '16GB',
+          'RAM Detail': 'DDR5 5600MHz',
+          'RAM Slot1': '8GB',
+          'RAM Slot2': '8GB',
+          'Storage 1': '512GB SSD',
+          'Storage 2': '-',
+          'OS': 'Windows',
+          'Windows Version': 'Windows 11 Pro',
+          'Windows License': 'XXXXX-XXXXX-XXXXX-XXXXX',
+          'MS Office': 'Microsoft 365',
+          'Antivirus': 'Windows Defender',
+          'S/N Computer': 'SN123456789',
+        };
+        return [label, sampleData[label] || ''];
+      }));
+      
       const emptyRow = Object.fromEntries(exportColumns.map(([, label]) => [label, '']));
       const sheetsData: Record<string, Record<string, any>[]> = {};
       types.forEach((type: string) => {
-        sheetsData[type] = [{ ...emptyRow, 'ประเภทอุปกรณ์': type }];
+        // Add sample row first, then empty template
+        sheetsData[type] = [
+          { ...sampleRow, 'ประเภท': type },
+          { ...emptyRow, 'ประเภท': type }
+        ];
       });
       writeWorkbook(sheetsData, 'asset-import-template.xlsx');
-      showToast('✅ ดาวน์โหลด Template สำเร็จ');
+      showToast('✅ ดาวน์โหลด Template สำเร็จ (มีตัวอย่างข้อมูล)');
     } catch {
       setError('ไม่สามารถดาวน์โหลด Template ได้');
     } finally {
@@ -349,7 +432,31 @@ export default function ImportExportPage() {
           </ActionCard>
         </div>
 
-        {/* ── Columns reference table ── */}
+        {/* ── Export Options ── */}
+        <div style={{
+          background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px',
+          padding: '12px 14px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap'
+        }}>
+          <span style={{ fontSize: '12px', fontWeight: 600, color: '#0f172a' }}>⚙️ ตัวเลือกการส่งออก:</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <label style={{ fontSize: '11px', color: '#475569' }}>รูปแบบวันที่:</label>
+            <select 
+              value={dateFormat} 
+              onChange={(e) => setDateFormat(e.target.value as 'iso' | 'thai')}
+              disabled={loading}
+              style={{
+                padding: '4px 8px', borderRadius: '6px', border: '1px solid #cbd5e1',
+                fontSize: '11px', fontFamily: 'Sarabun, sans-serif', cursor: 'pointer',
+                background: '#fff'
+              }}
+            >
+              <option value="iso">ISO (YYYY-MM-DD)</option>
+              <option value="thai">วันไทย (DD/MM/YYYY ค.ศ.)</option>
+            </select>
+          </div>
+        </div>
+
+        {/* ── 3-column action cards ── */}
         <div style={{
           background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden',
         }}>

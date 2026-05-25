@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { CircularProgress } from '@mui/material';
 import { assetAPI } from '../../services/api';
@@ -167,6 +167,27 @@ export default function AssetFormPage() {
   const [toastColor, setToastColor] = useState('#1e1b4b');
   const toastTimer = useRef<any>(null);
 
+  // Duplicate check
+  const [duplicates, setDuplicates] = useState<Record<string, boolean>>({});
+  const checkTimer = useRef<any>(null);
+
+  const checkDuplicate = useCallback(async (assetCode?: string, serialNo?: string, assetName?: string) => {
+    if (!assetCode && !serialNo && !assetName) { setDuplicates({}); return; }
+    try {
+      const res = await assetAPI.checkDuplicate({ assetCode, serialNo, assetName, excludeId: id ? parseInt(id) : undefined });
+      setDuplicates(res.data.duplicates || {});
+    } catch { /* ignore */ }
+  }, [id]);
+
+  useEffect(() => {
+    if (checkTimer.current) clearTimeout(checkTimer.current);
+    const code = form.assetCode?.trim();
+    const serial = form.serialNo?.trim();
+    const name = form.assetName?.trim();
+    checkTimer.current = setTimeout(() => checkDuplicate(code || undefined, serial || undefined, name || undefined), 600);
+    return () => { if (checkTimer.current) clearTimeout(checkTimer.current); };
+  }, [form.assetCode, form.serialNo, form.assetName, checkDuplicate]);
+
   const assetAge = useMemo(() => calculateAge(form.purchaseDate), [form.purchaseDate]);
 
   const typeLower = form.type?.toLowerCase() || '';
@@ -299,9 +320,9 @@ export default function AssetFormPage() {
   /* ─── Submit ─── */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.assetCode.trim()) {
-      setError('กรุณากรอกรหัสทรัพย์สิน (Asset Code)');
-      showToast('⚠️ กรุณากรอกรหัสทรัพย์สิน', '#b45309');
+    if (!form.serialNo.trim()) {
+      setError('กรุณากรอก Serial Number');
+      showToast('⚠️ กรุณากรอก Serial Number', '#b45309');
       return;
     }
     setLoading(true); setError('');
@@ -420,6 +441,7 @@ export default function AssetFormPage() {
         input[readonly]{background:rgba(248,247,255,.7);color:#6b7280}
         textarea{resize:vertical;min-height:68px}
         .hint{font-size:10.5px;color:#c4b5fd;margin-top:3px}
+        .hint.err{color:#ef4444;font-weight:600}
 
         /* status pills */
         .status-row{display:flex;gap:6px;flex-wrap:wrap}
@@ -536,12 +558,13 @@ export default function AssetFormPage() {
               {/* ① ข้อมูลพื้นฐานทรัพย์สิน */}
             <SecCard title="ข้อมูลพื้นฐานทรัพย์สิน" sub="Core Asset Identification">
               <div className="row r2">
-                <FG label="เลขครุภัณฑ์ (Asset Code)" required>
-                  <FInput value={form.assetCode} onChange={v => setFormField('assetCode', 'เลขครุภัณฑ์ (Asset Code)', v)} disabled={!!id} placeholder="เช่น HQ-PS-N001" />
-                  {id && <div className="hint">ไม่สามารถเปลี่ยนเลขครุภัณฑ์ได้</div>}
+                <FG label="เลขครุภัณฑ์ (Asset Code)">
+                  <FInput value={form.assetCode} onChange={v => setFormField('assetCode', 'เลขครุภัณฑ์ (Asset Code)', v)} placeholder="เช่น HQ-PS-N001" />
+                  {duplicates.assetCode && <div className="hint err">⚠️ เลขครุภัณฑ์นี้มีอยู่ในระบบแล้ว</div>}
                 </FG>
                 <FG label="ชื่อทรัพย์สิน / รหัสทรัพย์สิน">
                   <FInput value={form.assetName} onChange={v => setFormField('assetName', 'ชื่อทรัพย์สิน / รหัสทรัพย์สิน', v)} placeholder="ชื่อสำหรับเรียกทรัพย์สิน หรือ รหัสพัสดุภายในองค์กร" />
+                  {duplicates.assetName && <div className="hint err">⚠️ ชื่อทรัพย์สินนี้มีอยู่ในระบบแล้ว</div>}
                 </FG>
               </div>
               <div className="row r3">
@@ -553,6 +576,7 @@ export default function AssetFormPage() {
                 </FG>
                 <FG label="หมายเลขซีเรียล (S/N)">
                   <FInput value={form.serialNo} onChange={v => setFormField('serialNo', 'Serial No.', v)} placeholder="Serial No." />
+                  {duplicates.serialNo && <div className="hint err">⚠️ Serial number นี้มีอยู่ในระบบแล้ว</div>}
                 </FG>
               </div>
               <div className="row r3">

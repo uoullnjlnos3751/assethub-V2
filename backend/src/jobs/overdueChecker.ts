@@ -87,7 +87,13 @@ export async function checkOverdueBorrows() {
 }
 
 export function startOverdueChecker() {
-  checkOverdueBorrows();
-  setInterval(checkOverdueBorrows, 60 * 60 * 1000);
+  checkOverdueBorrows().catch(err => {
+    console.error('[OverdueChecker] Initial check failed:', err.message);
+  });
+  setInterval(() => {
+    checkOverdueBorrows().catch(err => {
+      console.error('[OverdueChecker] Periodic check failed:', err.message);
+    });
+  }, 60 * 60 * 1000);
   console.log('[OverdueChecker] Scheduled (interval: 1hr)');
 }

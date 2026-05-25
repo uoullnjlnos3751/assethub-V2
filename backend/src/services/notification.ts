@@ -251,6 +251,12 @@ async function sendTeams(eventType: string, payload: Record<string, any>) {
 
 // Run every 5 minutes in production via cron/scheduler
 export function startNotificationWorker() {
-  setInterval(processNotificationQueue, 5 * 60 * 1000);
+  setInterval(async () => {
+    try {
+      await processNotificationQueue();
+    } catch (err: any) {
+      console.error('Notification worker error:', err.message);
+    }
+  }, 5 * 60 * 1000);
   console.log('Notification worker started (interval: 5min)');
 }

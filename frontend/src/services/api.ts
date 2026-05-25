@@ -41,7 +41,15 @@ export const assetAPI = {
   upsert: (data: any) => api.post('/assets/upsert', data),
   update: (id: number, data: any) => api.put(`/assets/${id}`, data),
   delete: (id: number) => api.delete(`/assets/${id}`),
-  exportAssets: (type?: string) => api.get('/assets/export/excel', { params: type ? { type } : undefined, responseType: 'blob' }),
+  bulkDelete: (ids: number[]) => api.post('/assets/bulk-delete', { ids }),
+  bulkUpdate: (ids: number[], data: Record<string, any>) => api.post('/assets/bulk-update', { ids, data }),
+  exportAssets: (type?: string, filters?: Record<string, string>) => {
+    const params: any = type ? { type } : {};
+    if (filters) Object.assign(params, filters);
+    return api.get('/assets/export/excel', { params, responseType: 'blob' });
+  },
+  exportCSV: () => api.get('/assets/export/csv', { responseType: 'blob' }),
+  exportByIds: (ids: number[]) => api.post('/assets/export/by-ids', { ids }, { responseType: 'blob' }),
   importAssets: (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -93,6 +101,7 @@ export const assetAPI = {
   updateAssetStatus: (id: number, data: any) => api.put(`/assets/asset-statuses/${id}`, data),
   deleteAssetStatus: (id: number) => api.delete(`/assets/asset-statuses/${id}`),
   stats: (typeGroup: string) => api.get('/assets/stats', { params: { typeGroup } }),
+  checkDuplicate: (params: { assetCode?: string; serialNo?: string; assetName?: string; excludeId?: number }) => api.get('/assets/check-duplicate', { params }),
 };
 
 // Borrow
@@ -148,14 +157,25 @@ export const adminAPI = {
   resetNotificationTemplate: (id: number) => api.post(`/admin/notification-templates/${id}/reset`),
   notificationLogs: (params?: any) => api.get('/admin/notification-logs', { params }),
   forceLogoutAll: () => api.post('/admin/force-logout-all'),
+  backup: () => api.get('/admin/backup', { responseType: 'blob' }),
+  restore: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/admin/restore', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  clearAllAssets: () => api.post('/admin/clear-all-assets'),
 };
 
 // Dashboard
 export const dashboardAPI = {
   assetSummary: () => api.get('/dashboard/asset-summary'),
   borrowSummary: () => api.get('/dashboard/borrow-summary'),
-  pmSummary: () => api.get('/dashboard/pm-summary'),
+  pmSummary: (year?: number) => api.get('/dashboard/pm-summary', { params: { year } }),
+  borrowTrend: (year: number) => api.get(`/dashboard/borrow-trend?year=${year}`),
   recentActivity: () => api.get('/dashboard/recent-activity'),
+  proactiveAlerts: () => api.get('/dashboard/proactive-alerts'),
 };
 
 // Inventory

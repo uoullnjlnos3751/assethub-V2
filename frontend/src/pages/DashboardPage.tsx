@@ -176,6 +176,7 @@ export default function DashboardPage() {
   const [assetSummary, setAssetSummary] = useState<any>(null);
   const [borrowSummary, setBorrowSummary] = useState<any>(null);
   const [pmSummary, setPmSummary] = useState<any>(null);
+  const [proactiveAlerts, setProactiveAlerts] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -184,11 +185,13 @@ export default function DashboardPage() {
         dashboardAPI.assetSummary(),
         dashboardAPI.borrowSummary(),
         dashboardAPI.pmSummary(),
+        dashboardAPI.proactiveAlerts(),
       ])
-        .then(([a, b, p]) => {
+        .then(([a, b, p, pa]) => {
           setAssetSummary(a.data);
           setBorrowSummary(b.data);
           setPmSummary(p.data);
+          setProactiveAlerts(pa.data);
         })
         .finally(() => setLoading(false));
     } else {
@@ -272,11 +275,17 @@ export default function DashboardPage() {
 
   // Alerts list
   const alerts: { icon: string; text: string; sub: string; pill: any }[] = [];
-  if (borrowOverdue > 0) alerts.push({ icon: '⏰', text: `ยืมเกินกำหนด ${borrowOverdue} รายการ`, sub: 'กรุณาติดตามผู้ยืม', pill: 'red' });
-  if (borrowPending > 0) alerts.push({ icon: '⏳', text: `รออนุมัติ ${borrowPending} รายการ`, sub: 'คำขอยืมรอการตรวจสอบ', pill: 'orange' });
-  if (maintenance > 0)   alerts.push({ icon: '🔧', text: `ส่งซ่อม ${maintenance} รายการ`, sub: 'อุปกรณ์อยู่ระหว่างซ่อม', pill: 'yellow' });
-  if (pmPct < 50 && pmTotal > 0) alerts.push({ icon: '📅', text: `PM ยังเสร็จ ${pmPct}%`, sub: `เหลืออีก ${pmTotal - pmDone} แผน`, pill: 'yellow' });
-  if (alerts.length === 0) alerts.push({ icon: '✅', text: 'ไม่มีการแจ้งเตือนด่วน', sub: 'ระบบทำงานปกติทุกส่วน', pill: 'green' });
+  if (proactiveAlerts) {
+    if (proactiveAlerts.overdueItems > 0) alerts.push({ icon: '⏰', text: `ยืมเกินกำหนด ${proactiveAlerts.overdueItems} รายการ`, sub: 'กรุณาติดตามผู้ยืม', pill: 'red' });
+    if (proactiveAlerts.pendingApprovals > 0) alerts.push({ icon: '⏳', text: `รออนุมัติ ${proactiveAlerts.pendingApprovals} รายการ`, sub: 'คำขอยืมรอการตรวจสอบ', pill: 'orange' });
+    if (proactiveAlerts.upcomingPMs > 0) alerts.push({ icon: '📅', text: `มีแผน PM ในสัปดาห์นี้ ${proactiveAlerts.upcomingPMs} รายการ`, sub: 'เตรียมความพร้อมการตรวจนับ', pill: 'yellow' });
+  }
+
+  // If no proactive alerts, fallback to summaries-based alerts (or maintenance)
+  if (alerts.length === 0) {
+    if (maintenance > 0) alerts.push({ icon: '🔧', text: `ส่งซ่อม ${maintenance} รายการ`, sub: 'อุปกรณ์อยู่ระหว่างซ่อม', pill: 'yellow' });
+    if (alerts.length === 0) alerts.push({ icon: '✅', text: 'ไม่มีการแจ้งเตือนด่วน', sub: 'ระบบทำงานปกติทุกส่วน', pill: 'green' });
+  }
 
   // Quick links
   const quickLinks = [
@@ -311,6 +320,33 @@ export default function DashboardPage() {
           Live
         </Box>
       </Box>
+
+      {/* ── Proactive Alerts Bar ────────────────────────────────── */}
+      {proactiveAlerts && (
+        alerts.some(a => a.pill !== 'green') && (
+          <Box sx={{ mb: '16px', display: 'flex', gap: '10px', overflowX: 'auto', pb: '4px' }}>
+            {alerts.filter(a => a.pill !== 'green').map((alert, i) => (
+              <Box key={i} sx={{
+                minWidth: '280px',
+                bgcolor: alpha(alert.pill === 'red' ? '#ef4444' : alert.pill === 'orange' ? '#f59e0b' : '#fcd34d', 0.1),
+                border: '1px solid',
+                borderColor: alert.pill === 'red' ? '#fca5a5' : alert.pill === 'orange' ? '#fdba74' : '#fde68a',
+                borderRadius: '10px',
+                p: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+              }}>
+                <Box sx={{ fontSize: '24px' }}>{alert.icon}</Box>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{alert.text}</Typography>
+                  <Typography sx={{ fontSize: '11px', color: '#4b5563', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{alert.sub}</Typography>
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        )
+      )}
 
       {/* ── Asset summary grid (12 tiles) ───────────────────────── */}
       <Box sx={{

@@ -5,6 +5,7 @@ import { AppError } from '../middleware/errorHandler';
 import { searchADUsers } from '../services/ldap';
 import { AuthService } from '../services/auth.service';
 import { invalidateSettingsCache } from '../services/notification';
+import multer from 'multer';
 
 const router = Router();
 
@@ -405,6 +406,174 @@ router.get('/notification-logs', authenticate, authorize('SUPERADMIN'), async (r
       prisma.notificationOutbox.count(),
     ]);
     res.json({ data, total, page: pageNum, totalPages: Math.ceil(total / limitNum) });
+  } catch (err) { next(err); }
+});
+
+// ── Backup & Restore ──
+router.get('/backup', authenticate, authorize('SUPERADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const [assets, categories, companies, vendors, locations, statuses, deviceTypes] = await Promise.all([
+      prisma.asset.findMany({
+        include: {
+          category: true, computerDetail: true, phoneDetail: true, monitorDetail: true,
+          deviceDetail: true, networkDeviceDetail: true, rackDetail: true, printerDetail: true,
+          cableDetail: true, consumableDetail: true,
+        }
+      }),
+      prisma.category.findMany({ include: { types: true } }),
+      prisma.company.findMany(),
+      prisma.vendor.findMany(),
+      prisma.assetLocation.findMany(),
+      prisma.assetStatusMaster.findMany(),
+      prisma.deviceType.findMany(),
+    ]);
+
+    const backup = {
+      version: '1.0',
+      exportedAt: new Date().toISOString(),
+      data: { assets, categories, companies, vendors, locations, statuses, deviceTypes }
+    };
+
+    res.setHeader('Content-Disposition', `attachment; filename="assethub-backup-${new Date().toISOString().split('T')[0]}.json"`);
+    res.setHeader('Content-Type', 'application/json');
+    res.json(backup);
+  } catch (err) { next(err); }
+});
+
+const uploadBackup = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
+
+router.post('/restore', authenticate, authorize('SUPERADMIN'), uploadBackup.single('file'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.file) throw new AppError('ไม่พบไฟล์ที่อัปโหลด', 400);
+    const content = req.file.buffer.toString('utf-8');
+    const backup = JSON.parse(content);
+    if (!backup.version || !backup.data) throw new AppError('รูปแบบไฟล์ Backup ไม่ถูกต้อง', 400);
+
+    const { assets, categories, companies, vendors, locations, statuses, deviceTypes } = backup.data;
+
+    const result = await prisma.$transaction(async (tx) => {
+      let imported = 0; let skipped = 0;
+
+      // 1. Import reference data
+      if (Array.isArray(categories)) {
+        for (const cat of categories) {
+          await tx.category.upsert({
+            where: { id: cat.id ?? 0 }, create: { id: cat.id, name: cat.name, description: cat.description, icon: cat.icon || '📦' },
+            update: { name: cat.name, description: cat.description, icon: cat.icon || '📦' },
+          });
+          if (cat.types && Array.isArray(cat.types)) {
+            for (const t of cat.types) {
+              await tx.categoryType.upsert({
+                where: { id: t.id ?? 0 }, create: { id: t.id, name: t.name, categoryId: cat.id },
+                update: { name: t.name },
+              });
+            }
+          }
+        }
+      }
+      if (Array.isArray(companies)) {
+        for (const c of companies) {
+          await tx.company.upsert({ where: { id: c.id ?? 0 }, create: c, update: c });
+        }
+      }
+      if (Array.isArray(vendors)) {
+        for (const v of vendors) {
+          await tx.vendor.upsert({ where: { id: v.id ?? 0 }, create: v, update: v });
+        }
+      }
+      if (Array.isArray(locations)) {
+        for (const loc of locations) {
+          await tx.assetLocation.upsert({ where: { id: loc.id ?? 0 }, create: loc, update: loc });
+        }
+      }
+      if (Array.isArray(statuses)) {
+        for (const st of statuses) {
+          await tx.assetStatusMaster.upsert({ where: { id: st.id ?? 0 }, create: st, update: st });
+        }
+      }
+      if (Array.isArray(deviceTypes)) {
+        for (const dt of deviceTypes) {
+          await tx.deviceType.upsert({ where: { id: dt.id ?? 0 }, create: dt, update: dt });
+        }
+      }
+
+      // 2. Import assets (skip if assetCode already exists)
+      if (Array.isArray(assets)) {
+        for (const a of assets) {
+          const existing = a.assetCode ? await tx.asset.findUnique({ where: { assetCode: a.assetCode } }) : null;
+          if (existing) { skipped++; continue; }
+
+          const { computerDetail, phoneDetail, monitorDetail, deviceDetail, networkDeviceDetail, rackDetail, printerDetail, cableDetail, consumableDetail, category, ...assetData } = a;
+          const created = await tx.asset.create({ data: assetData });
+
+          // Restore detail records
+          if (computerDetail) {
+            const { id, assetId, ...detail } = computerDetail;
+            await tx.computerDetail.create({ data: { ...detail, assetId: created.id } });
+          }
+          if (phoneDetail) {
+            const { id, assetId, ...detail } = phoneDetail;
+            await tx.phoneDetail.create({ data: { ...detail, assetId: created.id } });
+          }
+          if (monitorDetail) {
+            const { id, assetId, ...detail } = monitorDetail;
+            await tx.monitorDetail.create({ data: { ...detail, assetId: created.id } });
+          }
+          if (deviceDetail) {
+            const { id, assetId, ...detail } = deviceDetail;
+            await tx.deviceDetail.create({ data: { ...detail, assetId: created.id } });
+          }
+          if (networkDeviceDetail) {
+            const { id, assetId, ...detail } = networkDeviceDetail;
+            await tx.networkDeviceDetail.create({ data: { ...detail, assetId: created.id } });
+          }
+          if (rackDetail) {
+            const { id, assetId, ...detail } = rackDetail;
+            await tx.rackDetail.create({ data: { ...detail, assetId: created.id } });
+          }
+          if (printerDetail) {
+            const { id, assetId, ...detail } = printerDetail;
+            await tx.printerDetail.create({ data: { ...detail, assetId: created.id } });
+          }
+          if (cableDetail) {
+            const { id, assetId, ...detail } = cableDetail;
+            await tx.cableDetail.create({ data: { ...detail, assetId: created.id } });
+          }
+          if (consumableDetail) {
+            const { id, assetId, ...detail } = consumableDetail;
+            await tx.consumableDetail.create({ data: { ...detail, assetId: created.id } });
+          }
+          imported++;
+        }
+      }
+      return { imported, skipped };
+    });
+
+    res.json({ message: `กู้คืนข้อมูลสำเร็จ: นำเข้า ${result.imported} รายการ, ข้าม ${result.skipped} รายการ (มีรหัสซ้ำ)` });
+  } catch (err) { next(err); }
+});
+
+// ── Clear All Assets ──
+router.post('/clear-all-assets', authenticate, authorize('SUPERADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Delete PM run answers and PM runs
+      await tx.pMRunAnswer.deleteMany();
+      await tx.pMRun.deleteMany();
+
+      // 2. Delete asset history
+      await tx.assetHistory.deleteMany();
+
+      // 3. Nullify assetId in BorrowRequestItem (optional FK)
+      await tx.borrowRequestItem.updateMany({ data: { assetId: null } });
+
+      // 4. Delete all assets (cascades to computerDetail, phoneDetail, etc.)
+      const count = await tx.asset.deleteMany();
+
+      return count;
+    });
+
+    res.json({ message: `ล้างข้อมูลทะเบียนทรัพย์สินทั้งหมด ${result.count} รายการเรียบร้อย` });
   } catch (err) { next(err); }
 });
 

@@ -3,9 +3,10 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   AppBar, Box, CssBaseline, Drawer, IconButton, List, ListItem, ListItemButton,
   ListItemIcon, ListItemText, Toolbar, Typography, Button, Avatar, Menu, MenuItem,
-  Divider, Collapse, alpha, useTheme, Badge
+  Divider, Collapse, alpha, useTheme, Badge, TextField, InputAdornment
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
+import SearchIcon from '@mui/icons-material/Search';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import DevicesIcon from '@mui/icons-material/Devices';
 import ComputerIcon from '@mui/icons-material/Computer';
@@ -178,9 +179,17 @@ export default function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const [searchQuery, setSearchQuery] = useState('');
   const { user, logout, systemSettings } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/assets?search=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
 
   const isAdmin = user?.role === 'IT_ADMIN' || user?.role === 'SUPERADMIN';
 
@@ -489,25 +498,53 @@ export default function Layout() {
             <MenuIcon sx={{ fontSize: 20 }} />
           </IconButton>
 
-          {/* Page title area */}
-          <Box>
-            <Typography
-              sx={{
-                fontWeight: 600,
-                color: '#111827',
-                fontSize: '15px',
-                lineHeight: 1.2,
-              }}
-            >
-              {systemSettings?.systemName || 'ระบบบริหารทรัพย์สิน IT'}
-            </Typography>
-          </Box>
+           {/* Page title area */}
+           <Box>
+             <Typography
+               sx={{
+                 fontWeight: 600,
+                 color: '#111827',
+                 fontSize: '15px',
+                 lineHeight: 1.2,
+               }}
+             >
+               {systemSettings?.systemName || 'ระบบบริหารทรัพย์สิน IT'}
+             </Typography>
+           </Box>
 
-          {/* Spacer */}
-          <Box sx={{ flex: 1 }} />
+           {/* Global Search Bar */}
+           <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center', px: 2 }}>
+             <form onSubmit={handleSearch} style={{ width: '100%', maxWidth: '400px', position: 'relative' }}>
+               <TextField
+                 fullWidth
+                 size="small"
+                 variant="outlined"
+                 placeholder="ค้นหาทรัพย์สิน..."
+                 value={searchQuery}
+                 onChange={(e) => setSearchQuery(e.target.value)}
+                 sx={{
+                   '& .MuiOutlinedInput-root': {
+                     borderRadius: '8px',
+                     bgcolor: alpha('#ffffff', 0.8),
+                     backdropFilter: 'blur(4px)',
+                     '& fieldset': { borderColor: '#e5e7eb' },
+                     '&:hover fieldset': { borderColor: '#d1d5db' },
+                   },
+                 }}
+                 InputProps={{
+                   startAdornment: (
+                     <InputAdornment position="start">
+                       <SearchIcon sx={{ color: '#9ca3af', fontSize: 20 }} />
+                     </InputAdornment>
+                   ),
+                 }}
+               />
+             </form>
+           </Box>
 
-          {/* Right side: notification + user */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+           {/* Right side: notification + user */}
+           <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+
             {/* Notification bell */}
             <IconButton
               size="small"

@@ -28,8 +28,13 @@ export default function BorrowRequestPage() {
   const [purpose, setPurpose] = useState('');
   const [notes, setNotes] = useState('');
   const [location, setLocation] = useState('');
-  const [dueDate, setDueDate] = useState('');
+  const [dueDate, setDueDate] = useState(new Date(Date.now() + effectiveBorrowDays * 86400000).toISOString().split('T')[0]);
   const [activeTab, setActiveTab] = useState(0);
+
+  useEffect(() => {
+    const defaultDue = new Date(Date.now() + effectiveBorrowDays * 86400000).toISOString().split('T')[0];
+    setDueDate(prev => prev || defaultDue);
+  }, [effectiveBorrowDays]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState('');
@@ -58,7 +63,7 @@ export default function BorrowRequestPage() {
   }, [selected, assets]);
 
   // Derived filter lists
-  const allTypes = [...new Set(assets.map((a: any) => a.deviceType || a.category || '').filter(Boolean))].sort();
+  const allTypes = [...new Set(assets.map((a: any) => a.deviceType || a.category?.name || '').filter(Boolean))].sort();
   const allLocations = [...new Set(assets.map((a: any) => a.location || '').filter(Boolean))].sort();
 
   const filteredAssets = assets.filter(a =>
@@ -68,7 +73,7 @@ export default function BorrowRequestPage() {
       a.brand?.toLowerCase().includes(assetSearch.toLowerCase()) ||
       a.model?.toLowerCase().includes(assetSearch.toLowerCase())
     ) &&
-    (filterType === '' || (a.deviceType || a.category || '') === filterType) &&
+    (filterType === '' || (a.deviceType || a.category?.name || '') === filterType) &&
     (filterLocation === '' || a.location === filterLocation)
   );
 
@@ -311,7 +316,7 @@ export default function BorrowRequestPage() {
                             </td>
                             <td style={{ padding: '10px 12px', color: '#374151' }}>{`${a.brand || ''} ${a.model || ''}`.trim() || '-'}</td>
                             <td style={{ padding: '10px 12px' }}>
-                              {(a.deviceType || a.category) ? <span style={{ background: '#f1f5f9', color: '#475569', borderRadius: 20, padding: '2px 8px', fontSize: '0.72rem', fontWeight: 600 }}>{a.deviceType || a.category}</span> : <span style={{ color: '#cbd5e1' }}>-</span>}
+                              {(a.deviceType || a.category?.name) ? <span style={{ background: '#f1f5f9', color: '#475569', borderRadius: 20, padding: '2px 8px', fontSize: '0.72rem', fontWeight: 600 }}>{a.deviceType || a.category?.name}</span> : <span style={{ color: '#cbd5e1' }}>-</span>}
                             </td>
                             <td style={{ padding: '10px 12px', color: '#64748b', fontSize: '0.8rem' }}>{a.location || '-'}</td>
                           </tr>

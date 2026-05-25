@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { CircularProgress } from '@mui/material';
+import { Accordion, AccordionSummary, AccordionDetails, CircularProgress, Card, CardContent, Chip, Typography, alpha } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import QRCode from 'react-qr-code';
 import { assetAPI } from '../../services/api';
 
@@ -115,10 +116,13 @@ function SpecTab({ asset }: { asset: any }) {
   const isPrinter = t.includes('printer') || cat === 'เครื่องพิมพ์';
 
   return (
-    <div className="glass" style={{ padding: '18px' }}>
-      {/* ── General ── */}
-        <div className="spec-section">
-          <div className="sec-hd"><div className="sec-bar" style={{ '--sb': 'linear-gradient(180deg,#6366f1,#8b5cf6)' } as any}></div>ข้อมูลพื้นฐานทรัพย์สิน</div>
+    <div className="glass" style={{ padding: '12px' }}>
+      {/* General */}
+      <Accordion defaultExpanded disableGutters elevation={0} sx={{ bgcolor: 'transparent', '&:before': { display: 'none' }, mb: 1 }}>
+        <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ fontSize: 18 }} />} sx={{ minHeight: 0, py: 0.5, '& .MuiAccordionSummary-content': { m: 0 } }}>
+          <div className="sec-hd" style={{ marginBottom: 0 }}><div className="sec-bar" style={{ '--sb': 'linear-gradient(180deg,#6366f1,#8b5cf6)' } as any}></div>ข้อมูลพื้นฐานทรัพย์สิน</div>
+        </AccordionSummary>
+        <AccordionDetails sx={{ pt: 1.5, pb: 0.5, px: 0 }}>
           <div className="spec-grid">
             <SpecItem label="เลขครุภัณฑ์" value={asset.assetCode} mono />
             <SpecItem label="ชื่อทรัพย์สิน" value={asset.assetName} />
@@ -130,155 +134,190 @@ function SpecTab({ asset }: { asset: any }) {
             <SpecItem label="รหัสทรัพย์สินเดิม" value={asset.oldAssetCode} mono />
             <SpecItem label="Domain Name" value={asset.domainName} />
           </div>
-        </div>
+        </AccordionDetails>
+      </Accordion>
 
-      {/* ── Computer Hardware ── */}
+      {/* Computer Hardware */}
       {isComputer && !isMonitor && (
         <>
-          <div className="spec-section">
-            <div className="sec-hd"><div className="sec-bar"></div>Hardware</div>
-            <div className="spec-grid">
-              <SpecItem label="CPU" value={asset.cpu} />
-              <SpecItem label="Generation" value={asset.cpuGeneration} />
-              <SpecItem label="RAM" value={asset.ram} />
-              <SpecItem label="RAM Slot 1" value={asset.ramSlot1} />
-              <SpecItem label="RAM Slot 2" value={asset.ramSlot2} />
-              <SpecItem label="Storage 1" value={asset.storage1} />
-              <SpecItem label="Storage 2" value={asset.storage2} />
-              <SpecItem label="GPU" value={asset.gpu} />
-            </div>
-          </div>
-          <div className="spec-section">
-            <div className="sec-hd"><div className="sec-bar" style={{ '--sb': 'linear-gradient(180deg,#2563eb,#60a5fa)' } as any}></div>ระบบปฏิบัติการ</div>
-            <div className="spec-grid">
-              <SpecItem label="OS Type" value={asset.osType} />
-              <SpecItem label="OS Version" value={asset.osVersion} mono />
-              <SpecItem label="S/N Computer" value={asset.snComputer} mono />
-              <SpecItem label="Join Domain" value={asset.domainName} />
-              <SpecItem label="Windows License" value={asset.windowsLicense} />
-              <SpecItem label="MS Office" value={asset.officeLicense} />
-              <SpecItem label="Antivirus" value={asset.antivirusStatus} />
-            </div>
-          </div>
+          <Accordion defaultExpanded disableGutters elevation={0} sx={{ bgcolor: 'transparent', '&:before': { display: 'none' }, mb: 1 }}>
+            <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ fontSize: 18 }} />} sx={{ minHeight: 0, py: 0.5, '& .MuiAccordionSummary-content': { m: 0 } }}>
+              <div className="sec-hd" style={{ marginBottom: 0 }}><div className="sec-bar"></div>Hardware</div>
+            </AccordionSummary>
+            <AccordionDetails sx={{ pt: 1.5, pb: 0.5, px: 0 }}>
+              <div className="spec-grid">
+                <SpecItem label="CPU" value={asset.cpu} />
+                <SpecItem label="Generation" value={asset.cpuGeneration} />
+                <SpecItem label="RAM" value={asset.ram} />
+                <SpecItem label="RAM Slot 1" value={asset.ramSlot1} />
+                <SpecItem label="RAM Slot 2" value={asset.ramSlot2} />
+                <SpecItem label="Storage 1" value={asset.storage1} />
+                <SpecItem label="Storage 2" value={asset.storage2} />
+                <SpecItem label="GPU" value={asset.gpu} />
+              </div>
+            </AccordionDetails>
+          </Accordion>
+          <Accordion defaultExpanded disableGutters elevation={0} sx={{ bgcolor: 'transparent', '&:before': { display: 'none' }, mb: 1 }}>
+            <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ fontSize: 18 }} />} sx={{ minHeight: 0, py: 0.5, '& .MuiAccordionSummary-content': { m: 0 } }}>
+              <div className="sec-hd" style={{ marginBottom: 0 }}><div className="sec-bar" style={{ '--sb': 'linear-gradient(180deg,#2563eb,#60a5fa)' } as any}></div>ระบบปฏิบัติการ</div>
+            </AccordionSummary>
+            <AccordionDetails sx={{ pt: 1.5, pb: 0.5, px: 0 }}>
+              <div className="spec-grid">
+                <SpecItem label="OS Type" value={asset.osType} />
+                <SpecItem label="OS Version" value={asset.osVersion} mono />
+                <SpecItem label="S/N Computer" value={asset.snComputer} mono />
+                <SpecItem label="Join Domain" value={asset.domainName} />
+                <SpecItem label="Windows License" value={asset.windowsLicense} />
+                <SpecItem label="MS Office" value={asset.officeLicense} />
+                <SpecItem label="Antivirus" value={asset.antivirusStatus} />
+              </div>
+            </AccordionDetails>
+          </Accordion>
         </>
       )}
 
-      {/* ── Monitor ── */}
+      {/* Monitor */}
       {isMonitor && (
-        <div className="spec-section">
-          <div className="sec-hd"><div className="sec-bar"></div>ข้อมูลจอภาพ</div>
-          <div className="spec-grid">
-            <SpecItem label="ขนาดจอ (นิ้ว)" value={detail.screenSize} />
-            <SpecItem label="ความละเอียด" value={detail.resolution} />
-            <SpecItem label="Panel Type" value={detail.panelType} />
-            <SpecItem label="Refresh Rate" value={detail.refreshRate} />
-            <SpecItem label="พอร์ตเชื่อมต่อ" value={detail.ports} />
-            {detail.hasSpeaker !== undefined && detail.hasSpeaker !== null && (
-              <div className="spec-item">
-                <div className="spec-lbl">ลำโพงในตัว</div>
-                <BoolBadge value={detail.hasSpeaker} yes="มี" no="ไม่มี" />
-              </div>
-            )}
-            {detail.curved !== undefined && detail.curved !== null && (
-              <div className="spec-item">
-                <div className="spec-lbl">Curved</div>
-                <BoolBadge value={detail.curved} yes="จอโค้ง" no="จอแบน" />
-              </div>
-            )}
-          </div>
-        </div>
+        <Accordion defaultExpanded disableGutters elevation={0} sx={{ bgcolor: 'transparent', '&:before': { display: 'none' }, mb: 1 }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ fontSize: 18 }} />} sx={{ minHeight: 0, py: 0.5, '& .MuiAccordionSummary-content': { m: 0 } }}>
+            <div className="sec-hd" style={{ marginBottom: 0 }}><div className="sec-bar"></div>ข้อมูลจอภาพ</div>
+          </AccordionSummary>
+          <AccordionDetails sx={{ pt: 1.5, pb: 0.5, px: 0 }}>
+            <div className="spec-grid">
+              <SpecItem label="ขนาดจอ (นิ้ว)" value={detail.screenSize} />
+              <SpecItem label="ความละเอียด" value={detail.resolution} />
+              <SpecItem label="Panel Type" value={detail.panelType} />
+              <SpecItem label="Refresh Rate" value={detail.refreshRate} />
+              <SpecItem label="พอร์ตเชื่อมต่อ" value={detail.ports} />
+              {detail.hasSpeaker !== undefined && detail.hasSpeaker !== null && (
+                <div className="spec-item"><div className="spec-lbl">ลำโพงในตัว</div><BoolBadge value={detail.hasSpeaker} yes="มี" no="ไม่มี" /></div>
+              )}
+              {detail.curved !== undefined && detail.curved !== null && (
+                <div className="spec-item"><div className="spec-lbl">Curved</div><BoolBadge value={detail.curved} yes="จอโค้ง" no="จอแบน" /></div>
+              )}
+            </div>
+          </AccordionDetails>
+        </Accordion>
       )}
 
-      {/* ── Phone/Tablet ── */}
+      {/* Phone/Tablet */}
       {isPhone && (
-        <div className="spec-section">
-          <div className="sec-hd"><div className="sec-bar" style={{ '--sb': 'linear-gradient(180deg,#7c3aed,#a855f7)' } as any}></div>ข้อมูลอุปกรณ์สื่อสาร</div>
-          <div className="spec-grid">
-            <SpecItem label="IMEI 1" value={detail.imei1} mono />
-            <SpecItem label="IMEI 2" value={detail.imei2} mono />
-            <SpecItem label="เบอร์โทรศัพท์" value={detail.phoneNumber} />
-            <SpecItem label="OS" value={detail.osType} />
-            <SpecItem label="OS Version" value={detail.osVersion} />
-            <SpecItem label="Storage" value={detail.storageCapacity} />
-            <SpecItem label="RAM" value={detail.ram} />
-            <SpecItem label="สี" value={detail.color} />
-            <SpecItem label="SIM Provider" value={detail.simProvider} />
-          </div>
-        </div>
+        <Accordion defaultExpanded disableGutters elevation={0} sx={{ bgcolor: 'transparent', '&:before': { display: 'none' }, mb: 1 }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ fontSize: 18 }} />} sx={{ minHeight: 0, py: 0.5, '& .MuiAccordionSummary-content': { m: 0 } }}>
+            <div className="sec-hd" style={{ marginBottom: 0 }}><div className="sec-bar" style={{ '--sb': 'linear-gradient(180deg,#7c3aed,#a855f7)' } as any}></div>ข้อมูลอุปกรณ์สื่อสาร</div>
+          </AccordionSummary>
+          <AccordionDetails sx={{ pt: 1.5, pb: 0.5, px: 0 }}>
+            <div className="spec-grid">
+              <SpecItem label="IMEI 1" value={detail.imei1} mono />
+              <SpecItem label="IMEI 2" value={detail.imei2} mono />
+              <SpecItem label="เบอร์โทรศัพท์" value={detail.phoneNumber} />
+              <SpecItem label="OS" value={detail.osType} />
+              <SpecItem label="OS Version" value={detail.osVersion} />
+              <SpecItem label="Storage" value={detail.storageCapacity} />
+              <SpecItem label="RAM" value={detail.ram} />
+              <SpecItem label="สี" value={detail.color} />
+              <SpecItem label="SIM Provider" value={detail.simProvider} />
+            </div>
+          </AccordionDetails>
+        </Accordion>
       )}
 
-      {/* ── Network ── */}
+      {/* Network */}
       {isNetwork && (
-        <div className="spec-section">
-          <div className="sec-hd"><div className="sec-bar" style={{ '--sb': 'linear-gradient(180deg,#0891b2,#38bdf8)' } as any}></div>ข้อมูลอุปกรณ์เครือข่าย</div>
-          <div className="spec-grid">
-            <SpecItem label="IP Address" value={detail.ipAddress} mono />
-            <SpecItem label="MAC Address" value={detail.macAddress} mono />
-            <SpecItem label="จำนวน Port" value={detail.portCount} />
-            <SpecItem label="Port Speed" value={detail.portSpeed} />
-            <SpecItem label="Firmware" value={detail.firmwareVersion} />
-            <SpecItem label="WiFi Standard" value={detail.wifiStandard} />
-          </div>
-        </div>
+        <Accordion defaultExpanded disableGutters elevation={0} sx={{ bgcolor: 'transparent', '&:before': { display: 'none' }, mb: 1 }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ fontSize: 18 }} />} sx={{ minHeight: 0, py: 0.5, '& .MuiAccordionSummary-content': { m: 0 } }}>
+            <div className="sec-hd" style={{ marginBottom: 0 }}><div className="sec-bar" style={{ '--sb': 'linear-gradient(180deg,#0891b2,#38bdf8)' } as any}></div>ข้อมูลอุปกรณ์เครือข่าย</div>
+          </AccordionSummary>
+          <AccordionDetails sx={{ pt: 1.5, pb: 0.5, px: 0 }}>
+            <div className="spec-grid">
+              <SpecItem label="IP Address" value={detail.ipAddress} mono />
+              <SpecItem label="MAC Address" value={detail.macAddress} mono />
+              <SpecItem label="จำนวน Port" value={detail.portCount} />
+              <SpecItem label="Port Speed" value={detail.portSpeed} />
+              <SpecItem label="Firmware" value={detail.firmwareVersion} />
+              <SpecItem label="WiFi Standard" value={detail.wifiStandard} />
+            </div>
+          </AccordionDetails>
+        </Accordion>
       )}
 
-      {/* ── Printer ── */}
+      {/* Printer */}
       {isPrinter && (
-        <div className="spec-section">
-          <div className="sec-hd"><div className="sec-bar" style={{ '--sb': 'linear-gradient(180deg,#dc2626,#f87171)' } as any}></div>ข้อมูลเครื่องพิมพ์</div>
-          <div className="spec-grid">
-            <SpecItem label="ประเภทเครื่องพิมพ์" value={detail.printerType} />
-            <SpecItem label="ขนาดกระดาษ" value={detail.paperSizes} />
-            <SpecItem label="รุ่นหมึก" value={detail.cartridgeModel} />
-            <SpecItem label="IP Address" value={detail.ipAddress} mono />
-            <SpecItem label="จำนวนหน้าที่พิมพ์" value={detail.pageCount} />
-          </div>
-        </div>
+        <Accordion defaultExpanded disableGutters elevation={0} sx={{ bgcolor: 'transparent', '&:before': { display: 'none' }, mb: 1 }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ fontSize: 18 }} />} sx={{ minHeight: 0, py: 0.5, '& .MuiAccordionSummary-content': { m: 0 } }}>
+            <div className="sec-hd" style={{ marginBottom: 0 }}><div className="sec-bar" style={{ '--sb': 'linear-gradient(180deg,#dc2626,#f87171)' } as any}></div>ข้อมูลเครื่องพิมพ์</div>
+          </AccordionSummary>
+          <AccordionDetails sx={{ pt: 1.5, pb: 0.5, px: 0 }}>
+            <div className="spec-grid">
+              <SpecItem label="ประเภทเครื่องพิมพ์" value={detail.printerType} />
+              <SpecItem label="ขนาดกระดาษ" value={detail.paperSizes} />
+              <SpecItem label="รุ่นหมึก" value={detail.cartridgeModel} />
+              <SpecItem label="IP Address" value={detail.ipAddress} mono />
+              <SpecItem label="จำนวนหน้าที่พิมพ์" value={detail.pageCount} />
+            </div>
+          </AccordionDetails>
+        </Accordion>
       )}
 
-      {/* ── Purchase / Warranty ── */}
-      <div className="spec-section">
-        <div className="sec-hd"><div className="sec-bar" style={{ '--sb': 'linear-gradient(180deg,#059669,#34d399)' } as any}></div>จัดซื้อ / ประกัน</div>
-        <div className="spec-grid">
-          <SpecItem label="วันที่ซื้อ" value={asset.purchaseDate ? new Date(asset.purchaseDate).toLocaleDateString('th-TH') : null} />
-          <SpecItem label="วันหมดประกัน" value={asset.warrantyEndDate ? new Date(asset.warrantyEndDate).toLocaleDateString('th-TH') : null} colorClass="warn" />
-          <SpecItem label="ราคาซื้อ" value={asset.purchasePrice != null ? `฿${Number(asset.purchasePrice).toLocaleString('th-TH')}` : null} />
-          <SpecItem label="PO Number" value={asset.poNumber} mono />
-          <SpecItem label="PR Number" value={asset.prNumber} mono />
-          <SpecItem label="PO Date" value={asset.poDate ? new Date(asset.poDate).toLocaleDateString('th-TH') : null} />
-          <SpecItem label="Vendor" value={asset.vendor} />
-          <SpecItem label="งบประมาณ" value={asset.budget} />
-          <SpecItem label="อายุอุปกรณ์" value={asset.age != null ? `${asset.age} ปี` : null} />
-        </div>
-      </div>
+      {/* Purchase / Warranty */}
+      <Accordion defaultExpanded disableGutters elevation={0} sx={{ bgcolor: 'transparent', '&:before': { display: 'none' }, mb: 1 }}>
+        <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ fontSize: 18 }} />} sx={{ minHeight: 0, py: 0.5, '& .MuiAccordionSummary-content': { m: 0 } }}>
+          <div className="sec-hd" style={{ marginBottom: 0 }}><div className="sec-bar" style={{ '--sb': 'linear-gradient(180deg,#059669,#34d399)' } as any}></div>จัดซื้อ / ประกัน</div>
+        </AccordionSummary>
+        <AccordionDetails sx={{ pt: 1.5, pb: 0.5, px: 0 }}>
+          <div className="spec-grid">
+            <SpecItem label="วันที่ซื้อ" value={asset.purchaseDate ? new Date(asset.purchaseDate).toLocaleDateString('th-TH') : null} />
+            <SpecItem label="วันหมดประกัน" value={asset.warrantyEndDate ? new Date(asset.warrantyEndDate).toLocaleDateString('th-TH') : null} colorClass="warn" />
+            <SpecItem label="ราคาซื้อ" value={asset.purchasePrice != null ? `฿${Number(asset.purchasePrice).toLocaleString('th-TH')}` : null} />
+            <SpecItem label="PO Number" value={asset.poNumber} mono />
+            <SpecItem label="PR Number" value={asset.prNumber} mono />
+            <SpecItem label="PO Date" value={asset.poDate ? new Date(asset.poDate).toLocaleDateString('th-TH') : null} />
+            <SpecItem label="Vendor" value={asset.vendor} />
+            <SpecItem label="งบประมาณ" value={asset.budget} />
+            <SpecItem label="อายุอุปกรณ์" value={asset.age != null ? `${asset.age} ปี` : null} />
+          </div>
+        </AccordionDetails>
+      </Accordion>
 
-      {/* ── Owner ── */}
-      <div className="spec-section">
-        <div className="sec-hd"><div className="sec-bar" style={{ '--sb': 'linear-gradient(180deg,#dc2626,#f87171)' } as any}></div>ผู้ถือครอง</div>
-        <div className="spec-grid">
-          <SpecItem label="ชื่อผู้ใช้" value={asset.ownerName} />
-          <SpecItem label="แผนก" value={asset.departmentId} />
-          <SpecItem label="Location" value={asset.location} />
-          <SpecItem label="ชั้น" value={asset.floor} />
-        </div>
-      </div>
+      {/* Owner */}
+      <Accordion defaultExpanded disableGutters elevation={0} sx={{ bgcolor: 'transparent', '&:before': { display: 'none' }, mb: 1 }}>
+        <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ fontSize: 18 }} />} sx={{ minHeight: 0, py: 0.5, '& .MuiAccordionSummary-content': { m: 0 } }}>
+          <div className="sec-hd" style={{ marginBottom: 0 }}><div className="sec-bar" style={{ '--sb': 'linear-gradient(180deg,#dc2626,#f87171)' } as any}></div>ผู้ถือครอง</div>
+        </AccordionSummary>
+        <AccordionDetails sx={{ pt: 1.5, pb: 0.5, px: 0 }}>
+          <div className="spec-grid">
+            <SpecItem label="ชื่อผู้ใช้" value={asset.ownerName} />
+            <SpecItem label="แผนก" value={asset.departmentId} />
+            <SpecItem label="Location" value={asset.location} />
+            <SpecItem label="ชั้น" value={asset.floor} />
+          </div>
+        </AccordionDetails>
+      </Accordion>
 
       {/* Remark */}
       {asset.remark && (
-        <div className="spec-section">
-          <div className="sec-hd"><div className="sec-bar" style={{ '--sb': 'linear-gradient(180deg,#6b7280,#9ca3af)' } as any}></div>หมายเหตุ</div>
-          <div style={{ padding: '10px 12px', borderRadius: '10px', background: 'rgba(248,247,255,.7)', border: '1px solid rgba(99,102,241,.07)', fontSize: '13px', color: '#374151', lineHeight: 1.6 }}>
-            {asset.remark}
-          </div>
-        </div>
+        <Accordion disableGutters elevation={0} sx={{ bgcolor: 'transparent', '&:before': { display: 'none' }, mb: 1 }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ fontSize: 18 }} />} sx={{ minHeight: 0, py: 0.5, '& .MuiAccordionSummary-content': { m: 0 } }}>
+            <div className="sec-hd" style={{ marginBottom: 0 }}><div className="sec-bar" style={{ '--sb': 'linear-gradient(180deg,#6b7280,#9ca3af)' } as any}></div>หมายเหตุ</div>
+          </AccordionSummary>
+          <AccordionDetails sx={{ pt: 1.5, pb: 0.5, px: 0 }}>
+            <div style={{ padding: '10px 12px', borderRadius: '10px', background: 'rgba(248,247,255,.7)', border: '1px solid rgba(99,102,241,.07)', fontSize: '13px', color: '#374151', lineHeight: 1.6 }}>
+              {asset.remark}
+            </div>
+          </AccordionDetails>
+        </Accordion>
       )}
 
       {/* Asset image */}
       {asset.image && (
-        <div className="spec-section" style={{ marginTop: '16px' }}>
-          <div className="sec-hd"><div className="sec-bar" style={{ '--sb': 'linear-gradient(180deg,#6366f1,#8b5cf6)' } as any}></div>รูปภาพทะเบียนทรัพย์สิน</div>
-          <img src={asset.image} alt="Asset" style={{ maxWidth: '100%', borderRadius: '12px', border: '1px solid rgba(99,102,241,.12)' }} />
-        </div>
+        <Accordion defaultExpanded disableGutters elevation={0} sx={{ bgcolor: 'transparent', '&:before': { display: 'none' } }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ fontSize: 18 }} />} sx={{ minHeight: 0, py: 0.5, '& .MuiAccordionSummary-content': { m: 0 } }}>
+            <div className="sec-hd" style={{ marginBottom: 0 }}><div className="sec-bar" style={{ '--sb': 'linear-gradient(180deg,#6366f1,#8b5cf6)' } as any}></div>รูปภาพทะเบียนทรัพย์สิน</div>
+          </AccordionSummary>
+          <AccordionDetails sx={{ pt: 1.5, pb: 0.5, px: 0 }}>
+            <img src={asset.image} alt="Asset" style={{ maxWidth: '100%', borderRadius: '12px', border: '1px solid rgba(99,102,241,.12)' }} />
+          </AccordionDetails>
+        </Accordion>
       )}
     </div>
   );
@@ -379,6 +418,8 @@ export default function AssetDetailPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('spec');
   const [showQR, setShowQR] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [similarAssets, setSimilarAssets] = useState<any[]>([]);
 
   useEffect(() => {
     if (id) {
@@ -387,6 +428,33 @@ export default function AssetDetailPage() {
         .finally(() => setLoading(false));
     }
   }, [id]);
+
+  // recent view tracking
+  useEffect(() => {
+    if (!id) return;
+    try {
+      const key = 'assethub.recentAssets';
+      const recent: number[] = JSON.parse(localStorage.getItem(key) || '[]');
+      const updated = [parseInt(id), ...recent.filter(r => r !== parseInt(id))].slice(0, 10);
+      localStorage.setItem(key, JSON.stringify(updated));
+    } catch { /* ignore */ }
+  }, [id]);
+
+  // favorite check
+  useEffect(() => {
+    try {
+      const favs: number[] = JSON.parse(localStorage.getItem('assethub.favoriteAssets') || '[]');
+      setIsFavorite(favs.includes(parseInt(id!)));
+    } catch { setIsFavorite(false); }
+  }, [id]);
+
+  // load similar assets
+  useEffect(() => {
+    if (!asset?.categoryId) return;
+    assetAPI.list({ categoryId: asset.categoryId, limit: 5 })
+      .then((res) => setSimilarAssets((res.data.data || []).filter((a: any) => a.id !== asset.id)))
+      .catch(() => {});
+  }, [asset]);
 
   /* Warranty calculation */
   const warrantyDaysLeft = useMemo(() => {
@@ -408,6 +476,20 @@ export default function AssetDetailPage() {
   const statusLabel = STATUS_LABEL[asset.status] || asset.status;
   const icon = getTypeIcon(asset.type);
   const historyCount = asset.assetHistory?.length ?? 0;
+
+  const toggleFavorite = () => {
+    try {
+      const favs: number[] = JSON.parse(localStorage.getItem('assethub.favoriteAssets') || '[]');
+      const idNum = parseInt(id!);
+      if (isFavorite) {
+        localStorage.setItem('assethub.favoriteAssets', JSON.stringify(favs.filter(f => f !== idNum)));
+        setIsFavorite(false);
+      } else {
+        localStorage.setItem('assethub.favoriteAssets', JSON.stringify([idNum, ...favs]));
+        setIsFavorite(true);
+      }
+    } catch { /* ignore */ }
+  };
 
   return (
     <>
@@ -575,6 +657,7 @@ export default function AssetDetailPage() {
 
             <div className="hero-actions">
               <button className="btn btn-ghost" onClick={() => navigate(`/assets/${id}/edit`)}>✏️ แก้ไข</button>
+              <button className={`btn ${isFavorite ? 'btn-primary' : 'btn-ghost'}`} onClick={toggleFavorite}>{isFavorite ? '⭐' : '☆'} ดาวโปรด</button>
               <button className="btn btn-ghost" style={{ background: 'rgba(245,158,11,.08)', borderColor: 'rgba(245,158,11,.3)', color: '#b45309' }} onClick={() => setShowQR(true)}>📲 QR Code</button>
               <button className="btn btn-ghost" onClick={() => navigate(`/assets/print-qr?ids=${id}`)}>🖨 พิมพ์สติ๊กเกอร์</button>
               <button className="btn btn-ghost" onClick={() => navigate('/assets')}>← กลับรายการ</button>
@@ -627,6 +710,27 @@ export default function AssetDetailPage() {
           {activeTab === 'spec' && <SpecTab asset={asset} />}
           {activeTab === 'history' && <HistoryTab asset={asset} />}
           {activeTab === 'pm' && <PMTab asset={asset} />}
+
+          {/* Similar assets */}
+          {similarAssets.length > 0 && (
+            <div style={{ marginTop: '24px' }}>
+              <div className="sec-hd" style={{ marginBottom: '12px' }}><div className="sec-bar"></div>ทรัพย์สินใกล้เคียงในหมวดหมู่เดียวกัน</div>
+              <div style={{ display: 'grid', gap: '8px' }}>
+                {similarAssets.slice(0, 4).map((a: any) => (
+                  <div key={a.id} onClick={() => navigate(`/assets/${a.id}`)}
+                    style={{ cursor: 'pointer', padding: '10px 14px', borderRadius: '10px', background: 'rgba(248,247,255,.7)', border: '1px solid rgba(99,102,241,.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                    <div>
+                      <div style={{ fontSize: '12px', fontWeight: 700, color: '#1e1b4b' }}>{a.assetCode}</div>
+                      <div style={{ fontSize: '10px', color: '#6b7280' }}>{a.brand} {a.model} · {a.serialNo}</div>
+                    </div>
+                    <span className={`pill ${STATUS_CLASS[a.status] || 'p-gray'}`} style={{ fontSize: '10px', whiteSpace: 'nowrap' }}>
+                      <span className="sdot"></span>{STATUS_LABEL[a.status] || a.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

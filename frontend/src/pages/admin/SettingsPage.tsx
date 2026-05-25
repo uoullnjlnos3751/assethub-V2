@@ -4,6 +4,7 @@ import {
   Button, Alert, CircularProgress, Divider, Stack, Chip, Paper, Tabs, Tab, Fade,
   Select, MenuItem, InputLabel, FormControl, IconButton, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow,
+  Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
 } from '@mui/material';
 import {
   Settings as SettingsIcon,
@@ -23,6 +24,9 @@ import {
   Send as SendIcon,
   RefreshCw as RefreshIcon,
   MessageCircle as MessageCircleIcon,
+  Download as DownloadIcon,
+  Upload as UploadIcon,
+  Trash2 as TrashIcon,
 } from 'lucide-react';
 import { adminAPI } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
@@ -417,6 +421,13 @@ export default function SettingsPage() {
   // Force Logout States
   const [loggingOutAll, setLoggingOutAll] = useState(false);
 
+  // Data Management States
+  const [backingUp, setBackingUp] = useState(false);
+  const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const [restoring, setRestoring] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
+
   const borrowDays = parseInt(settings?.borrowDays || '3');
   const maxItems = parseInt(settings?.maxItemsPerRequest || '5');
 
@@ -582,6 +593,7 @@ export default function SettingsPage() {
           <Tab icon={<MailIcon size={18} />} iconPosition="start" label="Templates" />
           <Tab icon={<ShieldIcon size={18} />} iconPosition="start" label="ความปลอดภัย" />
           <Tab icon={<ServerIcon size={18} />} iconPosition="start" label="ระบบ" />
+          <Tab icon={<DatabaseIcon size={18} />} iconPosition="start" label="จัดการข้อมูล" />
         </Tabs>
       </Paper>
 
@@ -1157,6 +1169,170 @@ export default function SettingsPage() {
           </Grid>
         </Grid>
       </TabPanel>
+
+      {/* ── Tab 6: Data Management ── */}
+      <TabPanel value={tabValue} index={6}>
+        <Grid container spacing={3}>
+          {/* Backup Card */}
+          <Grid item xs={12} md={6}>
+            <Card sx={{ borderRadius: 2.5 }}>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                  <DownloadIcon size={24} color="#0ea5e9" />
+                  <Typography variant="h6" fontWeight={700}>ดาวน์โหลดข้อมูลสำรอง (Backup)</Typography>
+                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  ดาวน์โหลดข้อมูลทรัพย์สินทั้งหมด รวมถึงหมวดหมู่, บริษัท, ผู้ขาย, สถานที่ และประเภทอุปกรณ์ ในรูปแบบไฟล์ JSON
+                </Typography>
+                <Button
+                  variant="outlined"
+                  startIcon={backingUp ? <CircularProgress size={18} /> : <DownloadIcon size={18} />}
+                  onClick={async () => {
+                    setBackingUp(true);
+                    try {
+                      const response = await adminAPI.backup();
+                      const blob = new Blob([response.data], { type: 'application/json' });
+                      const url = URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.setAttribute('download', `assethub-backup-${new Date().toISOString().split('T')[0]}.json`);
+                      document.body.appendChild(link);
+                      link.click();
+                      link.remove();
+                      URL.revokeObjectURL(url);
+                      toast.success('ดาวน์โหลดข้อมูลสำรองสำเร็จ');
+                    } catch (err: any) {
+                      toast.error(err.response?.data?.message || err.message || 'เกิดข้อผิดพลาด');
+                    } finally {
+                      setBackingUp(false);
+                    }
+                  }}
+                  disabled={backingUp}
+                >
+                  {backingUp ? 'กำลังดาวน์โหลด...' : 'ดาวน์โหลด Backup'}
+                </Button>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Restore Card */}
+          <Grid item xs={12} md={6}>
+            <Card sx={{ borderRadius: 2.5 }}>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                  <UploadIcon size={24} color="#f59e0b" />
+                  <Typography variant="h6" fontWeight={700}>กู้คืนข้อมูล (Restore)</Typography>
+                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  อัปโหลดไฟล์ JSON Backup เพื่อกู้คืนข้อมูลทรัพย์สิน
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Button variant="outlined" component="label" sx={{ flexShrink: 0 }}>
+                    เลือกไฟล์
+                    <input type="file" hidden accept=".json" onChange={(e) => setRestoreFile(e.target.files?.[0] || null)} />
+                  </Button>
+                  {restoreFile && (
+                    <Typography variant="caption" color="text.secondary" noWrap sx={{ flex: 1 }}>
+                      {restoreFile.name}
+                    </Typography>
+                  )}
+                </Box>
+                <Button
+                  variant="contained"
+                  color="warning"
+                  sx={{ mt: 2 }}
+                  startIcon={restoring ? <CircularProgress size={18} /> : <UploadIcon size={18} />}
+                  onClick={async () => {
+                    if (!restoreFile) { toast.error('กรุณาเลือกไฟล์ Backup ก่อน'); return; }
+                    setRestoring(true);
+                    try {
+                      const res = await adminAPI.restore(restoreFile);
+                      toast.success(res.data.message || 'กู้คืนข้อมูลสำเร็จ');
+                      setRestoreFile(null);
+                    } catch (err: any) {
+                      toast.error(err.response?.data?.message || err.message || 'เกิดข้อผิดพลาด');
+                    } finally {
+                      setRestoring(false);
+                    }
+                  }}
+                  disabled={restoring || !restoreFile}
+                >
+                  {restoring ? 'กำลังกู้คืน...' : 'กู้คืนข้อมูล'}
+                </Button>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Clear Data Card */}
+          <Grid item xs={12}>
+            <Card sx={{ borderRadius: 2.5, border: '2px solid #fecaca' }}>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                  <TrashIcon size={24} color="#dc2626" />
+                  <Typography variant="h6" fontWeight={700} color="error">ล้างข้อมูลทะเบียนทรัพย์สิน</Typography>
+                </Box>
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  <strong>คำเตือน:</strong> การดำเนินการนี้จะลบข้อมูลทรัพย์สินทั้งหมดออกจากระบบ รวมถึงประวัติการซ่อมบำรุง (PM) และประวัติการเปลี่ยนแปลง (Asset History) 
+                  แต่จะยังคงข้อมูลคำขอยืมไว้ (โดยไม่เชื่อมโยงกับทรัพย์สิน) <strong>การดำเนินการนี้ไม่สามารถย้อนกลับได้</strong>
+                </Alert>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  แนะนำให้ดาวน์โหลด Backup ก่อนดำเนินการทุกครั้ง
+                </Typography>
+                <Button
+                  variant="contained"
+                  color="error"
+                  startIcon={clearing ? <CircularProgress size={18} /> : <TrashIcon size={18} />}
+                  onClick={() => setClearDialogOpen(true)}
+                  disabled={clearing}
+                >
+                  {clearing ? 'กำลังลบข้อมูล...' : 'ล้างข้อมูลทะเบียนทรัพย์สินทั้งหมด'}
+                </Button>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      </TabPanel>
+
+      {/* ── Confirmation Dialog for Clear Assets ── */}
+      <Dialog open={clearDialogOpen} onClose={() => setClearDialogOpen(false)}>
+        <DialogTitle>ยืนยันการล้างข้อมูลทะเบียนทรัพย์สิน</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            คุณแน่ใจหรือไม่ที่จะลบข้อมูลทะเบียนทรัพย์สินทั้งหมด? การกระทำนี้จะ:
+          </DialogContentText>
+          <Box component="ul" sx={{ mt: 1, pl: 2, color: 'text.secondary', fontSize: '0.875rem' }}>
+            <li>ลบข้อมูลทรัพย์สินทั้งหมด</li>
+            <li>ลบประวัติ PM (ซ่อมบำรุง)</li>
+            <li>ลบประวัติการเปลี่ยนแปลง (Asset History)</li>
+            <li>ยกเลิกการเชื่อมโยงทรัพย์สินกับคำขอยืม (แต่คงคำขอยืมไว้)</li>
+          </Box>
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            <strong>ไม่สามารถกู้คืนข้อมูลได้</strong> หากไม่มีไฟล์ Backup
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setClearDialogOpen(false)} color="inherit">ยกเลิก</Button>
+          <Button
+            onClick={async () => {
+              setClearDialogOpen(false);
+              setClearing(true);
+              try {
+                const res = await adminAPI.clearAllAssets();
+                toast.success(res.data.message || 'ล้างข้อมูลเรียบร้อย');
+              } catch (err: any) {
+                toast.error(err.response?.data?.message || err.message || 'เกิดข้อผิดพลาด');
+              } finally {
+                setClearing(false);
+              }
+            }}
+            color="error"
+            variant="contained"
+            disabled={clearing}
+          >
+            ยืนยัน ลบข้อมูลทั้งหมด
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* ── Bottom Save bar (Standard) ── */}
       {!isDirty() && (

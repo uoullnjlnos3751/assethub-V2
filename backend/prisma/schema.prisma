@@ -36,7 +36,7 @@ model AppUser {
 
 model Asset {
   id                 Int                     @id @default(autoincrement())
-  assetCode          String                  @unique
+  assetCode          String?                 @unique
   assetName          String?
   serialNo           String                  @unique
   type               String?

@@ -44,16 +44,18 @@ import SearchIcon from '@mui/icons-material/Search';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import ImageIcon from '@mui/icons-material/Image';
 import ImageOffIcon from '@mui/icons-material/ImageNotSupported';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import { WarningAmber as WarningAmberIcon, Verified as VerifiedIcon } from '@mui/icons-material';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import ComputerIcon from '@mui/icons-material/Computer';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
 import DesktopWindowsIcon from '@mui/icons-material/DesktopWindows';
 import DevicesIcon from '@mui/icons-material/Devices';
 import PrintIcon from '@mui/icons-material/Print';
 import PhoneAndroidIcon from '@mui/icons-material/PhoneAndroid';
 import RouterIcon from '@mui/icons-material/Router';
-import CableIcon from '@mui/icons-material/Cable';
-import ScienceIcon from '@mui/icons-material/Science';
-import { assetAPI, borrowAPI } from '../../services/api';
+import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { assetAPI, borrowAPI, categoryAPI } from '../../services/api';
 import ExportAssetsButton from '../../components/ExportAssetsButton';
 import ImportAssetsButton from '../../components/ImportAssetsButton';
 import { useAuth } from '../../contexts/AuthContext';
@@ -195,6 +197,8 @@ export default function AssetListPage() {
   const [status, setStatus] = useState(searchParams.get('status') || '');
   const [type, setType] = useState(searchParams.get('type') || '');
   const typeGroup = searchParams.get('typeGroup') || '';
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [categories, setCategories] = useState<any[]>([]);
   const [typeOptions, setTypeOptions] = useState<string[]>([]);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(50);
@@ -207,45 +211,12 @@ export default function AssetListPage() {
   const [extendReason, setExtendReason] = useState('');
   const [categoryStats, setCategoryStats] = useState<{ total: number; byStatus: { status: string; _count: number }[] } | null>(null);
   const navigate = useNavigate();
-
   const isAdmin = user?.role === 'IT_ADMIN' || user?.role === 'SUPERADMIN';
-  const isAvailableOnlyView = searchParams.get('status') === 'Available';
+  const isAvailableOnlyView = !typeGroup && user?.role === 'USER';
 
   useEffect(() => {
-    const s = searchParams.get('status');
-    if (s !== null) setStatus(s);
-    else setStatus('');
-    setType(searchParams.get('type') || '');
-    setPage(0);
-  }, [searchParams]);
-
-  const fetchAssets = async () => {
-    setLoading(true);
-    try {
-      const res = await assetAPI.list({
-        search,
-        status: status || undefined,
-        type: type || undefined,
-        typeGroup: !type && typeGroup ? typeGroup : undefined,
-        page: page + 1,
-        limit: pageSize,
-      });
-      setAssets(res.data.data);
-      setTotal(res.data.total);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { fetchAssets(); }, [page, pageSize, status, type, typeGroup]);
-
-  useEffect(() => {
-    if (typeGroup && isAdmin) {
-      assetAPI.stats(typeGroup).then((res) => setCategoryStats(res.data)).catch(() => setCategoryStats(null));
-    } else {
-      setCategoryStats(null);
-    }
-  }, [typeGroup, isAdmin]);
+    categoryAPI.all().then((res) => setCategories(res.data)).catch(() => setCategories([]));
+  }, []);
 
   useEffect(() => {
     assetAPI.typeOptions()
@@ -256,6 +227,44 @@ export default function AssetListPage() {
   useEffect(() => {
     localStorage.setItem(COLUMN_PREF_KEY, JSON.stringify(columnConfig));
   }, [columnConfig]);
+
+  const fetchAssets = async () => {
+    setLoading(true);
+    try {
+      const res = await assetAPI.list({
+        search,
+        status: status || undefined,
+        type: type || undefined,
+        typeGroup: !type && typeGroup ? typeGroup : undefined,
+        categoryId: selectedCategoryId || undefined,
+        page: page + 1,
+        limit: pageSize,
+      });
+      setAssets(res.data.data);
+      setTotal(res.data.total);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const groupedAssets = useMemo(() => {
+    const groups: Record<string, { name: string; icon?: React.ReactNode; assets: any[] }> = {};
+    const filteredAssets = selectedCategoryId 
+      ? assets.filter(a => a.categoryId === selectedCategoryId)
+      : assets;
+
+    filteredAssets.forEach(asset => {
+      const cat = asset.category;
+      const catName = cat?.name || 'อื่นๆ';
+      if (!groups[catName]) {
+        groups[catName] = { name: catName, icon: cat?.icon, assets: [] };
+      }
+      groups[catName].assets.push(asset);
+    });
+    return groups;
+  }, [assets, selectedCategoryId]);
+
+  useEffect(() => { fetchAssets(); }, [page, pageSize, status, type, typeGroup, selectedCategoryId]);
 
   const handleSearch = () => { setPage(0); fetchAssets(); };
 
@@ -283,6 +292,7 @@ export default function AssetListPage() {
       toast.error(err.response?.data?.error || 'ไม่สามารถขยายวันได้');
     }
   };
+
 
   const handleDelete = async (id: number) => {
     if (window.confirm('ต้องการลบทรัพย์สินนี้ใช่หรือไม่?')) {
@@ -547,8 +557,31 @@ export default function AssetListPage() {
           <Button variant="contained" startIcon={<SearchIcon />} onClick={handleSearch}>ค้นหา</Button>
         </Box>
       </Card>
-
+      
+      {/* Category Filter Chips — for user available-view */}
+      {isAvailableOnlyView && (
+        <Box sx={{ display: 'flex', gap: 1, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Typography variant="body2" fontWeight={600} color="text.secondary">หมวดหมู่:</Typography>
+          <Chip
+            label="ทั้งหมด"
+            onClick={() => setSelectedCategoryId(null)}
+            color={selectedCategoryId === null ? 'primary' : 'default'}
+            sx={{ fontWeight: 600 }}
+          />
+          {categories.map((cat) => (
+            <Chip
+              key={cat.id}
+              label={cat.name}
+              onClick={() => setSelectedCategoryId(cat.id)}
+              color={selectedCategoryId === cat.id ? 'primary' : 'default'}
+              sx={{ fontWeight: 600 }}
+            />
+          ))}
+        </Box>
+      )}
+ 
       {/* Category Header — shown when typeGroup is active */}
+
       {typeGroup && typeGroupLabels[typeGroup] && (
         <Card sx={{ mb: 3, overflow: 'visible' }}>
           <Box sx={{ height: 4, borderRadius: '16px 16px 0 0', background: 'linear-gradient(90deg, #FF6B00, #FF8C00)' }} />
@@ -722,56 +755,118 @@ export default function AssetListPage() {
           <EmptyState title="ไม่มีอุปกรณ์พร้อมยืม" description="ขณะนี้ไม่มีอุปกรณ์ว่างในระบบ" />
         ) : (
           <Grid container spacing={2.5}>
-            {assets.map((asset) => (
-              <Grid item xs={12} sm={6} lg={4} key={asset.id}>
-                <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'visible' }}>
-                  <Box sx={{ height: 4, bgcolor: 'linear-gradient(90deg, #FF6B00, #FF8C00)', borderRadius: '16px 16px 0 0', background: 'linear-gradient(90deg, #FF6B00, #FF8C00)' }} />
-                  <CardContent sx={{ flex: 1, p: 3 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 2 }}>
-                      <Box>
-                        <Typography fontWeight={800} fontSize="1.1rem" color="#0F172A">{asset.assetCode}</Typography>
-                        {asset.oldAssetCode && <Typography variant="caption" color="text.secondary">เดิม: {asset.oldAssetCode}</Typography>}
-                        <Typography variant="body2" color="text.secondary">{asset.brand} {asset.model}</Typography>
-                      </Box>
-                      <StatusChip status={asset.status} />
-                    </Box>
+            {Object.entries(groupedAssets).map(([categoryName, group]) => (
+              <Grid item xs={12} key={categoryName}>
+                <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Typography variant="h6" fontWeight={700}>{categoryName}</Typography>
+                  <Divider sx={{ flex: 1 }} />
+                </Box>
+                <Grid container spacing={2.5}>
+                  {group.assets.map((asset) => (
+                    <Grid item xs={12} sm={6} lg={4} key={asset.id}>
+                      <Card
+                        sx={{
+                          height: '100%', display: 'flex', flexDirection: 'column',
+                          position: 'relative', overflow: 'visible',
+                          '&:hover': { boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.12)}` },
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', gap: 2, p: 3, pb: 1.5 }}>
+                          <Box
+                            sx={{
+                              width: 80, height: 80, borderRadius: 2, overflow: 'hidden',
+                              flexShrink: 0, bgcolor: alpha(theme.palette.grey[500], 0.08),
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}
+                          >
+                            {asset.image ? (
+                              <Box component="img" src={asset.image} alt="" sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              <ImageIcon sx={{ fontSize: 32, color: theme.palette.grey[400] }} />
+                            )}
+                          </Box>
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
+                              <Typography fontWeight={800} fontSize="1.1rem" color="#0F172A" noWrap>{asset.assetCode}</Typography>
+                              <StatusChip status={asset.status} />
+                            </Box>
+                            {asset.assetName && (
+                              <Typography variant="body2" fontWeight={600} color="text.primary" noWrap sx={{ mt: 0.25 }}>
+                                {asset.assetName}
+                              </Typography>
+                            )}
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
+                              {[asset.type, asset.brand, asset.model].filter(Boolean).join(' · ')}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
+                              SN: {asset.serialNo}
+                            </Typography>
+                          </Box>
+                        </Box>
 
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2.5 }}>
-                      <Box sx={{ flex: '1 0 45%' }}>
-                        <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ display: 'block' }}>Serial</Typography>
-                        <Typography variant="body2" fontWeight={600}>{asset.serialNo}</Typography>
-                      </Box>
-                      {asset.cpu && <Box sx={{ flex: '1 0 45%' }}>
-                        <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ display: 'block' }}>CPU</Typography>
-                        <Typography variant="body2" fontWeight={600}>{asset.cpu}</Typography>
-                      </Box>}
-                      {asset.ram && <Box sx={{ flex: '1 0 45%' }}>
-                        <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ display: 'block' }}>RAM</Typography>
-                        <Typography variant="body2" fontWeight={600}>{asset.ram}</Typography>
-                      </Box>}
-                      {asset.storage1 && <Box sx={{ flex: '1 0 45%' }}>
-                        <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ display: 'block' }}>Storage</Typography>
-                        <Typography variant="body2" fontWeight={600}>{asset.storage1}</Typography>
-                      </Box>}
-                    </Box>
+                        {(asset.cpu || asset.ram || asset.storage1 || asset.osType) && (
+                          <Box sx={{ px: 3, pb: 2 }}>
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px', bgcolor: alpha(theme.palette.grey[500], 0.04), borderRadius: 2, p: 1.5 }}>
+                              {asset.cpu && (
+                                <Box><Typography variant="caption" fontWeight={600} color="text.secondary">CPU</Typography><Typography variant="body2" fontWeight={600}>{asset.cpu}</Typography></Box>
+                              )}
+                              {asset.ram && (
+                                <Box><Typography variant="caption" fontWeight={600} color="text.secondary">RAM</Typography><Typography variant="body2" fontWeight={600}>{asset.ram}</Typography></Box>
+                              )}
+                              {asset.storage1 && (
+                                <Box><Typography variant="caption" fontWeight={600} color="text.secondary">Storage</Typography><Typography variant="body2" fontWeight={600}>{asset.storage1}</Typography></Box>
+                              )}
+                              {asset.osType && (
+                                <Box><Typography variant="caption" fontWeight={600} color="text.secondary">OS</Typography><Typography variant="body2" fontWeight={600}>{asset.osType}</Typography></Box>
+                              )}
+                            </Box>
+                          </Box>
+                        )}
 
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, pt: 1.5, borderTop: `1px solid ${theme.palette.divider}` }}>
-                      <Typography variant="caption" color="text.secondary">ผู้ถือครอง:</Typography>
-                      <Typography variant="caption" fontWeight={600}>{asset.ownerName || '-'}</Typography>
-                    </Box>
-                  </CardContent>
-                  <Box sx={{ p: 2, pt: 0 }}>
-                    <Button
-                      variant="contained"
-                      fullWidth
-                      size="large"
-                      onClick={() => navigate(`/borrow/new?assetId=${asset.id}`)}
-                      sx={{ borderRadius: 2, py: 1.5, fontWeight: 700, fontSize: '0.95rem', boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}` }}
-                    >
-                      ขอยืมอุปกรณ์
-                    </Button>
-                  </Box>
-                </Card>
+                        <Box sx={{ px: 3, pb: 2, display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
+                          {(asset.location || asset.floor) && (
+                            <Chip
+                              icon={<LocationOnIcon sx={{ fontSize: 14 }} />}
+                              label={[asset.location, asset.floor && `ชั้น ${asset.floor}`].filter(Boolean).join(' ')}
+                              size="small" variant="outlined"
+                              sx={{ height: 24, '& .MuiChip-icon': { fontSize: 14, ml: 0.5 } }}
+                            />
+                          )}
+                          {asset.company && (
+                            <Chip label={asset.company} size="small" variant="outlined" sx={{ height: 24 }} />
+                          )}
+                          {asset.warrantyDaysLeft !== null && asset.warrantyDaysLeft !== undefined && (
+                            <Chip
+                              icon={<VerifiedIcon sx={{ fontSize: 14 }} />}
+                              label={asset.warrantyDaysLeft > 0 ? `รับประกัน ${asset.warrantyDaysLeft} วัน` : 'หมดประกัน'}
+                              size="small"
+                              variant="outlined"
+                              color={asset.warrantyDaysLeft > 90 ? 'success' : asset.warrantyDaysLeft > 0 ? 'warning' : 'error'}
+                              sx={{ height: 24, '& .MuiChip-icon': { fontSize: 14, ml: 0.5 } }}
+                            />
+                          )}
+                          {asset.ownerName && (
+                            <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
+                              {asset.ownerName}
+                            </Typography>
+                          )}
+                        </Box>
+
+                        <Box sx={{ mt: 'auto', p: 2, pt: 0 }}>
+                          <Button
+                            variant="contained"
+                            fullWidth
+                            size="large"
+                            onClick={() => navigate(`/borrow/new?assetId=${asset.id}`)}
+                            sx={{ borderRadius: 2, py: 1.5, fontWeight: 700, fontSize: '0.95rem', boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}` }}
+                          >
+                            ขอยืมอุปกรณ์
+                          </Button>
+                        </Box>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
               </Grid>
             ))}
           </Grid>
@@ -804,28 +899,7 @@ export default function AssetListPage() {
           </Typography>
           <List dense disablePadding>
             {columnConfig.map((config, index) => (
-              <ListItem
-                key={config.field}
-                divider
-                secondaryAction={(
-                  <Box sx={{ display: 'flex', gap: 0.5 }}>
-                    <Tooltip title="เลื่อนขึ้น">
-                      <span>
-                        <IconButton size="small" onClick={() => moveColumn(config.field, 'up')} disabled={index === 0}>
-                          <ArrowUpwardIcon fontSize="small" />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                    <Tooltip title="เลื่อนลง">
-                      <span>
-                        <IconButton size="small" onClick={() => moveColumn(config.field, 'down')} disabled={index === columnConfig.length - 1}>
-                          <ArrowDownwardIcon fontSize="small" />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                  </Box>
-                )}
-              >
+              <ListItem key={config.field} divider>
                 <Checkbox
                   edge="start"
                   checked={config.visible}
@@ -833,6 +907,14 @@ export default function AssetListPage() {
                   disabled={config.visible && visibleCount <= 1}
                 />
                 <ListItemText primary={config.label} secondary={config.visible ? 'แสดงในตาราง' : 'ซ่อนจากตาราง'} />
+                <Box sx={{ display: 'flex', gap: 0.5 }}>
+                  <IconButton size="small" onClick={() => moveColumn(config.field, 'up')} disabled={index === 0}>
+                    <ArrowUpwardIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton size="small" onClick={() => moveColumn(config.field, 'down')} disabled={index === columnConfig.length - 1}>
+                    <ArrowDownwardIcon fontSize="small" />
+                  </IconButton>
+                </Box>
               </ListItem>
             ))}
           </List>

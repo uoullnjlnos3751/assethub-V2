@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Button, Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress, Alert, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material';
+import { Button, Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress, Alert, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, alpha } from '@mui/material';
 import { Upload } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
@@ -8,6 +8,7 @@ import { assetAPI } from '../services/api';
 interface ImportedAsset {
   assetCode: string;
   serialNo: string;
+  assetName?: string;
   type: string;
   brand: string;
   model: string;
@@ -20,10 +21,9 @@ interface ImportedAsset {
   ramSlot1?: string;
   ramSlot2?: string;
   gpu?: string;
-   osType?: string;
-   snComputer?: string;
-   osVersion?: string;
-
+  osType?: string;
+  snComputer?: string;
+  osVersion?: string;
   windowsLicense?: string;
   officeLicense?: string;
   antivirusStatus?: string;
@@ -40,6 +40,7 @@ interface ImportedAsset {
   company?: string;
   status?: string;
   remark?: string;
+  isValid?: boolean;
 }
 
 export default function ImportAssetsButton() {
@@ -47,6 +48,7 @@ export default function ImportAssetsButton() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [previewData, setPreviewData] = useState<ImportedAsset[]>([]);
   const [fileName, setFileName] = useState('');
   const [encoding, setEncoding] = useState('UTF-8');
@@ -82,33 +84,33 @@ export default function ImportAssetsButton() {
 
             const mapped = jsonData.map((row: any) => {
               const item = {
-                assetCode: String(row['รหัสทรัพย์สิน'] || row['assetCode'] || row['New Comname'] || row['Asset Code'] || '').trim(),
+                assetCode: String(row['เลขครุภัณฑ์'] || row['รหัสทรัพย์สิน'] || row['assetCode'] || row['New Comname'] || row['Asset Code'] || '').trim(),
                 serialNo: String(row['Serial No.'] || row['serialNo'] || row['Serial Number'] || row['S/N Computer'] || '').trim(),
-                type: row['ประเภทอุปกรณ์'] || row['ประเภท'] || row['type'] || row['Type PC/Notebook'] || row['Type'],
-                brand: row['ยี่ห้อ (Brand)'] || row['ยี่ห้อ'] || row['brand'] || row['Brand'],
-                model: row['รุ่น (Model)'] || row['รุ่น'] || row['model'] || row['Model'],
+                assetName: String(row['ชื่อทรัพย์สิน'] || row['Asset Name'] || row['assetName'] || row['Name'] || '').trim(),
+                type: row['ประเภท'] || row['ประเภทอุปกรณ์'] || row['type'] || row['Type PC/Notebook'] || row['Type'],
+                brand: row['ยี่ห้อ'] || row['ยี่ห้อ (Brand)'] || row['brand'] || row['Brand'],
+                model: row['รุ่น'] || row['รุ่น (Model)'] || row['model'] || row['Model'],
                 cpu: row['CPU'] || row['cpu'],
                 cpuGeneration: row['Generation'] || row['Gen'] || row['cpuGeneration'],
                 ram: row['RAM'] || row['ram'] || row['Ram'],
                 ramDetail: row['RAM Detail'] || row['ramDetail'],
                 storage1: row['Storage 1'] || row['storage1'] || row['SSD'] || row['HD'],
                 storage2: row['Storage 2'] || row['storage2'],
-                ramSlot1: row['RAM Slot 1'] || row['ramSlot1'],
-                ramSlot2: row['RAM Slot 2'] || row['ramSlot2'],
+                ramSlot1: row['RAM Slot1'] || row['RAM Slot 1'] || row['ramSlot1'],
+                ramSlot2: row['RAM Slot2'] || row['RAM Slot 2'] || row['ramSlot2'],
                 gpu: row['GPU'] || row['gpu'],
-                 osType: row['OS Type'] || row['osType'] || row['OS'],
-                 snComputer: row['S/N Computer'] || row['snComputer'],
-
-                osVersion: row['OS Version'] || row['osVersion'] || row['Windows'],
+                osType: row['OS'] || row['OS Type'] || row['osType'],
+                snComputer: row['S/N Computer'] || row['snComputer'],
+                osVersion: row['Windows Version'] || row['OS Version'] || row['osVersion'] || row['Windows'],
                 windowsLicense: row['Windows License'] || row['windowsLicense'] || row['Window License No.'],
-                officeLicense: row['Office License'] || row['officeLicense'] || row['Office License No.'] || row['MS Office'],
-                antivirusStatus: row['Antivirus Status'] || row['antivirusStatus'] || row['Antivirus'],
+                officeLicense: row['MS Office'] || row['Office License'] || row['officeLicense'] || row['Office License No.'],
+                antivirusStatus: row['Antivirus'] || row['Antivirus Status'] || row['antivirusStatus'],
                 domainName: row['Domain Name'] || row['domainName'],
                 vendor: row['Vendor'] || row['vendor'],
-                poNumber: row['PO Number'] || row['poNumber'] || row['PO No.'],
+                poNumber: row['PO No.'] || row['PO Number'] || row['poNumber'],
                 poDate: row['PO Date'] || row['poDate'],
-                prNumber: row['PR Number'] || row['prNumber'] || row['PR No.'],
-                purchaseDate: row['วันที่ซื้อ'] || row['วันซื้อ'] || row['purchaseDate'] || row['PO Date'],
+                prNumber: row['PR No.'] || row['PR Number'] || row['prNumber'],
+                purchaseDate: row['วันที่จัดซื้อ'] || row['วันที่ซื้อ'] || row['วันซื้อ'] || row['purchaseDate'],
                 ownerName: row['ผู้ถือครอง'] || row['เจ้าของ'] || row['ownerName'] || row['Name'] || row['User Owner'],
                 departmentId: row['แผนก'] || row['departmentId'] || row['Dep.'],
                 location: row['Location'] || row['สถานที่'] || row['location'],
@@ -116,12 +118,13 @@ export default function ImportAssetsButton() {
                 company: row['Company'] || row['บริษัท'] || row['company'],
                 status: row['สถานะ'] || row['status'] || 'Available',
                 remark: row['หมายเหตุ'] || row['remark'] || row['Remark'],
+                isValid: !!String(row['Serial No.'] || row['serialNo'] || row['Serial Number'] || row['S/N Computer'] || '').trim(),
               };
               return item;
             });
             
             console.log('Mapped Excel Data (count):', mapped.length);
-            setPreviewData(mapped.filter(a => a.assetCode || a.serialNo));
+            setPreviewData(mapped);
             setOpen(true);
           } catch (err) {
             console.error('Excel processing error:', err);
@@ -149,32 +152,33 @@ export default function ImportAssetsButton() {
                 
                 const mapped = (results.data as any[])
                   .map((row: any) => ({
-                    assetCode: String(row['รหัสทรัพย์สิน'] || row['assetCode'] || row['New Comname'] || row['Asset Code'] || '').trim(),
+                    assetCode: String(row['เลขครุภัณฑ์'] || row['รหัสทรัพย์สิน'] || row['assetCode'] || row['New Comname'] || row['Asset Code'] || '').trim(),
                     serialNo: String(row['Serial No.'] || row['serialNo'] || row['Serial Number'] || row['S/N Computer'] || '').trim(),
-                    type: row['ประเภทอุปกรณ์'] || row['ประเภท'] || row['type'] || row['Type PC/Notebook'] || row['Type'],
-                    brand: row['ยี่ห้อ (Brand)'] || row['ยี่ห้อ'] || row['brand'] || row['Brand'],
-                    model: row['รุ่น (Model)'] || row['รุ่น'] || row['model'] || row['Model'],
+                    assetName: String(row['ชื่อทรัพย์สิน'] || row['Asset Name'] || row['assetName'] || row['Name'] || '').trim(),
+                    type: row['ประเภท'] || row['ประเภทอุปกรณ์'] || row['type'] || row['Type PC/Notebook'] || row['Type'],
+                    brand: row['ยี่ห้อ'] || row['ยี่ห้อ (Brand)'] || row['brand'] || row['Brand'],
+                    model: row['รุ่น'] || row['รุ่น (Model)'] || row['model'] || row['Model'],
                     cpu: row['CPU'] || row['cpu'],
                     cpuGeneration: row['Generation'] || row['Gen'] || row['cpuGeneration'],
                     ram: row['RAM'] || row['ram'] || row['Ram'],
                     ramDetail: row['RAM Detail'] || row['ramDetail'],
                     storage1: row['Storage 1'] || row['storage1'] || row['SSD'] || row['HD'],
                     storage2: row['Storage 2'] || row['storage2'],
-                    ramSlot1: row['RAM Slot 1'] || row['ramSlot1'],
-                    ramSlot2: row['RAM Slot 2'] || row['ramSlot2'],
+                    ramSlot1: row['RAM Slot1'] || row['RAM Slot 1'] || row['ramSlot1'],
+                    ramSlot2: row['RAM Slot2'] || row['RAM Slot 2'] || row['ramSlot2'],
                     gpu: row['GPU'] || row['gpu'],
-                    osType: row['OS Type'] || row['osType'] || row['OS'],
+                    osType: row['OS'] || row['OS Type'] || row['osType'],
                     snComputer: row['S/N Computer'] || row['snComputer'],
-                    osVersion: row['OS Version'] || row['osVersion'] || row['Windows'],
+                    osVersion: row['Windows Version'] || row['OS Version'] || row['osVersion'] || row['Windows'],
                     windowsLicense: row['Windows License'] || row['windowsLicense'] || row['Window License No.'],
-                    officeLicense: row['Office License'] || row['officeLicense'] || row['Office License No.'] || row['MS Office'],
-                    antivirusStatus: row['Antivirus Status'] || row['antivirusStatus'] || row['Antivirus'],
+                    officeLicense: row['MS Office'] || row['Office License'] || row['officeLicense'] || row['Office License No.'],
+                    antivirusStatus: row['Antivirus'] || row['Antivirus Status'] || row['antivirusStatus'],
                     domainName: row['Domain Name'] || row['domainName'],
                     vendor: row['Vendor'] || row['vendor'],
-                    poNumber: row['PO Number'] || row['poNumber'] || row['PO No.'],
+                    poNumber: row['PO No.'] || row['PO Number'] || row['poNumber'],
                     poDate: row['PO Date'] || row['poDate'],
-                    prNumber: row['PR Number'] || row['prNumber'] || row['PR No.'],
-                    purchaseDate: row['วันที่ซื้อ'] || row['วันซื้อ'] || row['purchaseDate'] || row['PO Date'],
+                    prNumber: row['PR No.'] || row['PR Number'] || row['prNumber'],
+                    purchaseDate: row['วันที่จัดซื้อ'] || row['วันที่ซื้อ'] || row['วันซื้อ'] || row['purchaseDate'],
                     ownerName: row['ผู้ถือครอง'] || row['เจ้าของ'] || row['ownerName'] || row['Name'] || row['User Owner'],
                     departmentId: row['แผนก'] || row['departmentId'] || row['Dep.'],
                     location: row['Location'] || row['สถานที่'] || row['location'],
@@ -182,17 +186,11 @@ export default function ImportAssetsButton() {
                     company: row['Company'] || row['บริษัท'] || row['company'],
                     status: row['สถานะ'] || row['status'] || 'Available',
                     remark: row['หมายเหตุ'] || row['remark'] || row['Remark'],
+                    isValid: !!String(row['Serial No.'] || row['serialNo'] || row['Serial Number'] || row['S/N Computer'] || '').trim(),
                   }));
                 
                 console.log('Mapped CSV Data (count):', mapped.length);
-                const valid = mapped.filter(a => a.assetCode || a.serialNo);
-                console.log('Valid rows:', valid.length);
-                
-                if (valid.length === 0) {
-                  setError('ไม่พบข้อมูลรหัสทรัพย์สินในไฟล์ กรุณาตรวจสอบหัวตาราง (Headers)');
-                }
-                
-                setPreviewData(valid);
+                setPreviewData(mapped);
                 setOpen(true);
               },
               error: (err: Error) => {
@@ -216,21 +214,24 @@ export default function ImportAssetsButton() {
     
     setLoading(true);
     setError('');
+    setSuccess('');
     try {
       console.log('--- STARTING IMPORT ---');
       const res = await assetAPI.importAssets(selectedFile);
-      const { success, errors, total } = res.data;
+      const { success: successCount, errors, total } = res.data;
       
-      console.log('--- IMPORT FINISHED ---', { success, errors, total });
+      console.log('--- IMPORT FINISHED ---', { successCount, errors, total });
 
-      if (success > 0) {
-        setError(`✓ นำเข้าสำเร็จ: ${success} รายการ, ล้มเหลว ${errors} รายการ จากทั้งหมด ${total} รายการ`);
+      if (successCount > 0) {
+        const msg = `นำเข้าสำเร็จ: ${successCount} รายการ${errors > 0 ? `, ล้มเหลว ${errors} รายการ` : ''} จากทั้งหมด ${total} รายการ`;
+        setSuccess(msg);
         setTimeout(() => {
           setOpen(false);
-          window.location.reload();
-        }, 3000);
+          window.location.href = window.location.pathname + window.location.search;
+        }, 2500);
       } else {
-        setError(`นำเข้าไม่สำเร็จ: ข้อมูลอาจซ้ำหรือไม่ถูกต้อง`);
+        const errMsg = res.data?.details || 'ข้อมูลอาจซ้ำหรือไม่ถูกต้อง';
+        setError(`นำเข้าไม่สำเร็จ: ${errMsg}`);
       }
     } catch (err: any) {
       console.error('Overall import error:', err);
@@ -263,12 +264,22 @@ export default function ImportAssetsButton() {
           ตรวจสอบข้อมูล - {fileName} ({previewData.length} รายการ)
         </DialogTitle>
         <DialogContent>
+          {success && (
+            <Alert 
+              severity="success" 
+              sx={{ mb: 2 }}
+              onClose={() => setSuccess('')}
+            >
+              ✅ {success}
+            </Alert>
+          )}
           {error && (
             <Alert 
-              severity={error.includes('✓') ? 'success' : 'error'} 
+              severity="error" 
               sx={{ mb: 2 }}
+              onClose={() => setError('')}
             >
-              {error}
+              ⚠️ {error}
             </Alert>
           )}
           
@@ -279,6 +290,7 @@ export default function ImportAssetsButton() {
                   <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                     <TableCell>รหัสทรัพย์สิน</TableCell>
                     <TableCell>Serial No.</TableCell>
+                    <TableCell>ชื่อทรัพย์สิน</TableCell>
                     <TableCell>ประเภท</TableCell>
                     <TableCell>ยี่ห้อ</TableCell>
                     <TableCell>รุ่น</TableCell>
@@ -288,9 +300,10 @@ export default function ImportAssetsButton() {
                 </TableHead>
                 <TableBody>
                   {previewData.slice(0, 10).map((asset, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell>{asset.assetCode}</TableCell>
-                      <TableCell>{asset.serialNo}</TableCell>
+                    <TableRow key={idx} sx={{ bgcolor: asset.isValid ? 'transparent' : alpha('#ef4444', 0.08) }}>
+                      <TableCell sx={{ color: asset.isValid ? 'inherit' : '#dc2626', fontWeight: asset.isValid ? 'inherit' : 600 }}>{asset.assetCode}</TableCell>
+                      <TableCell sx={{ color: asset.isValid ? 'inherit' : '#dc2626', fontWeight: asset.isValid ? 'inherit' : 600 }}>{asset.serialNo}</TableCell>
+                      <TableCell sx={{ fontSize: '0.85rem' }}>{asset.assetName || '-'}</TableCell>
                       <TableCell>{asset.type}</TableCell>
                       <TableCell>{asset.brand}</TableCell>
                       <TableCell>{asset.model}</TableCell>
@@ -307,13 +320,18 @@ export default function ImportAssetsButton() {
               แสดง 10 จาก {previewData.length} รายการ
             </Alert>
           )}
+          {previewData.some(a => !a.isValid) && (
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              มีบางรายการข้อมูลไม่ครบถ้วน (ขาด Serial No.) กรุณาตรวจสอบและแก้ไขก่อนนำเข้า
+            </Alert>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpen(false)} disabled={loading}>ยกเลิก</Button>
           <Button 
             onClick={handleImport} 
             variant="contained" 
-            disabled={loading || previewData.length === 0}
+            disabled={loading || previewData.length === 0 || previewData.some(a => !a.isValid)}
           >
             {loading ? <CircularProgress size={20} /> : 'นำเข้า'}
           </Button>
