@@ -41,9 +41,9 @@ const categories = [
     ],
   },
   {
-    name: 'อุปกรณ์นำเสนอ/AV',
-    icon: '📽️',
-    description: 'โปรเจคเตอร์และอุปกรณ์ AV',
+    name: 'อุปกรณ์ต่อพ่วง',
+    icon: '🔌',
+    description: 'อุปกรณ์ต่อพ่วงและ AV',
     sortOrder: 4,
     types: [
       { name: 'Projector', description: 'เครื่องฉายภาพ', detailTable: 'device_details', sortOrder: 1 },
@@ -51,6 +51,10 @@ const categories = [
       { name: 'Webcam', description: 'กล้องเว็บแคม', detailTable: 'device_details', sortOrder: 3 },
       { name: 'Docking Station', description: 'Docking Station', detailTable: 'device_details', sortOrder: 4 },
       { name: 'Presentation Clicker', description: 'รีโมทนำเสนอ', detailTable: 'device_details', sortOrder: 5 },
+      { name: 'Mouse', description: 'เมาส์', detailTable: 'device_details', sortOrder: 6 },
+      { name: 'Keyboard', description: 'คีย์บอร์ด', detailTable: 'device_details', sortOrder: 7 },
+      { name: 'Microphone', description: 'ไมโครโฟน', detailTable: 'device_details', sortOrder: 8 },
+      { name: 'Voice Recorder', description: 'เครื่องบันทึกเสียง', detailTable: 'device_details', sortOrder: 9 },
     ],
   },
   {
@@ -126,7 +130,27 @@ async function main() {
     const existing = await prisma.category.findUnique({ where: { name: catData.name } });
 
     if (existing) {
-      console.log(`⏭️  Category "${catData.name}" already exists, skipping`);
+      let added = 0;
+      for (const type of types) {
+        const existingCatType = await prisma.categoryType.findFirst({
+          where: { categoryId: existing.id, name: type.name },
+        });
+        if (!existingCatType) {
+          await prisma.categoryType.create({
+            data: { ...type, categoryId: existing.id },
+          });
+          added++;
+        }
+        const existingDevType = await prisma.deviceType.findUnique({ where: { name: type.name } });
+        if (!existingDevType) {
+          await prisma.deviceType.create({ data: { name: type.name, description: type.description, isActive: true } });
+        }
+      }
+      if (added > 0) {
+        console.log(`✅ Added ${added} new type(s) to category "${catData.name}"`);
+      } else {
+        console.log(`⏭️  Category "${catData.name}" already exists, all types present`);
+      }
       continue;
     }
 
@@ -138,6 +162,13 @@ async function main() {
         },
       },
     });
+
+    for (const type of types) {
+      const exists = await prisma.deviceType.findUnique({ where: { name: type.name } });
+      if (!exists) {
+        await prisma.deviceType.create({ data: { name: type.name, description: type.description, isActive: true } });
+      }
+    }
 
     console.log(`✅ Created category "${category.icon} ${category.name}" with ${types.length} types`);
   }

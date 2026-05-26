@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useMemo } from 'react';
 import { Button, Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress, Alert, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, alpha } from '@mui/material';
 import { Upload } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -209,18 +209,31 @@ export default function ImportAssetsButton() {
     processFile(encoding);
   };
 
+  const [errorDetails, setErrorDetails] = useState<{ serialNo: string; reason: string }[]>([]);
+
+  // Check for duplicate names in preview data
+  const previewNameDups = useMemo(() => {
+    const names = previewData.map(a => a.assetName?.trim()).filter(Boolean);
+    const seen: Record<string, number> = {};
+    const dups = new Set<string>();
+    names.forEach(n => { if (n) { if (seen[n]) dups.add(n); seen[n] = (seen[n] || 0) + 1; } });
+    return dups;
+  }, [previewData]);
+
   const handleImport = async () => {
     if (!selectedFile) return;
     
     setLoading(true);
     setError('');
     setSuccess('');
+    setErrorDetails([]);
     try {
-      console.log('--- STARTING IMPORT ---');
-      const res = await assetAPI.importAssets(selectedFile);
-      const { success: successCount, errors, total } = res.data;
+      console.log('--- STARTING IMPORT (JSON) ---');
+      const res = await assetAPI.importJson(previewData);
+      const { success: successCount, errors, total, errorDetails: details } = res.data;
       
       console.log('--- IMPORT FINISHED ---', { successCount, errors, total });
+      setErrorDetails(details || []);
 
       if (successCount > 0) {
         const msg = `นำเข้าสำเร็จ: ${successCount} รายการ${errors > 0 ? `, ล้มเหลว ${errors} รายการ` : ''} จากทั้งหมด ${total} รายการ`;
@@ -257,6 +270,14 @@ export default function ImportAssetsButton() {
         disabled={loading}
       >
         นำเข้า
+      </Button>
+      <Button
+        variant="text"
+        size="small"
+        sx={{ ml: 1, textTransform: 'none' }}
+        onClick={() => window.open('/api/assets/import/template', '_blank')}
+      >
+        ดาวน์โหลด Template
       </Button>
 
       <Dialog open={open} onClose={() => !loading && setOpen(false)} maxWidth="lg" fullWidth>
@@ -325,7 +346,20 @@ export default function ImportAssetsButton() {
               มีบางรายการข้อมูลไม่ครบถ้วน (ขาด Serial No.) กรุณาตรวจสอบและแก้ไขก่อนนำเข้า
             </Alert>
           )}
+          {previewNameDups.size > 0 && (
+            <Alert severity="warning" sx={{ mt: 1 }}>
+              มีชื่อทรัพย์สินซ้ำกันในไฟล์: {[...previewNameDups].join(', ')} — เฉพาะรายการแรกเท่านั้นที่จะนำเข้า
+            </Alert>
+          )}
         </DialogContent>
+          {errorDetails.length > 0 && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              <b>รายการที่ล้มเหลว ({errorDetails.length}):</b>
+              <ul style={{ margin: '4px 0 0', paddingLeft: 20 }}>
+                {errorDetails.map((e, i) => <li key={i}>{e.serialNo} — {e.reason}</li>)}
+              </ul>
+            </Alert>
+          )}
         <DialogActions>
           <Button onClick={() => setOpen(false)} disabled={loading}>ยกเลิก</Button>
           <Button 

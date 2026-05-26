@@ -17,6 +17,20 @@ async function getMaxItems(): Promise<number> {
   return settings?.maxItemsPerRequest ?? 5;
 }
 
+async function getActiveBorrowTypesByUser(userId: number): Promise<Set<string>> {
+  const activeItems = await prisma.borrowRequestItem.findMany({
+    where: {
+      request: { requesterUserId: userId },
+      itemStatus: { in: ['Pending', 'Approved', 'CheckedOut'] },
+      asset: { type: { not: null } },
+    },
+    include: { asset: { select: { type: true } } },
+  });
+  return new Set(
+    activeItems.map(i => i.asset?.type).filter((t): t is string => t != null)
+  );
+}
+
 async function getAllowExtension(): Promise<boolean> {
   const settings = await prisma.notificationSetting.findFirst();
   return settings?.allowExtension ?? true;
@@ -82,6 +96,16 @@ router.post('/requests', authenticate, validate(borrowRequestSchema), async (req
         throw new AppError('ทรัพย์สินบางรายการไม่พร้อมให้ยืม');
       }
       assets.push(...found);
+
+      // One person can borrow only 1 item per type
+      const activeTypes = await getActiveBorrowTypesByUser(req.user!.userId);
+      for (const asset of assets) {
+        if (asset.type && activeTypes.has(asset.type)) {
+          throw new AppError(
+            `คุณยืม "${asset.type}" อยู่แล้ว กรุณาคืน "${asset.type}" ก่อนจึงจะยืมเพิ่มได้`
+          );
+        }
+      }
     }
 
     // Validate inventory items

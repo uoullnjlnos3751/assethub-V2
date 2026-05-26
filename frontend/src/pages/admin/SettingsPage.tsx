@@ -3,7 +3,7 @@ import {
   Box, Typography, Card, CardContent, Grid, TextField, Switch, FormControlLabel,
   Button, Alert, CircularProgress, Divider, Stack, Chip, Paper, Tabs, Tab, Fade,
   Select, MenuItem, InputLabel, FormControl, IconButton, Table, TableBody,
-  TableCell, TableContainer, TableHead, TableRow,
+  TableCell, TableContainer, TableHead, TableRow, Checkbox,
   Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
 } from '@mui/material';
 import {
@@ -27,8 +27,9 @@ import {
   Download as DownloadIcon,
   Upload as UploadIcon,
   Trash2 as TrashIcon,
+  Search as SearchIcon,
 } from 'lucide-react';
-import { adminAPI } from '../../services/api';
+import { adminAPI, assetAPI } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -428,6 +429,21 @@ export default function SettingsPage() {
   const [clearing, setClearing] = useState(false);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
 
+  // Selective delete states
+  const [assetList, setAssetList] = useState<any[]>([]);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [assetSearch, setAssetSearch] = useState('');
+  const [assetListLoading, setAssetListLoading] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+
+  // Delete by type states
+  const [deviceTypes, setDeviceTypes] = useState<any[]>([]);
+  const [typeCounts, setTypeCounts] = useState<Record<string, number>>({});
+  const [typeToDelete, setTypeToDelete] = useState<string>('');
+  const [typeDeleteDialogOpen, setTypeDeleteDialogOpen] = useState(false);
+  const [typeDeleting, setTypeDeleting] = useState(false);
+
   const borrowDays = parseInt(settings?.borrowDays || '3');
   const maxItems = parseInt(settings?.maxItemsPerRequest || '5');
 
@@ -462,6 +478,10 @@ export default function SettingsPage() {
   useEffect(() => {
     if (tabValue === 5) {
       fetchPingStatus();
+    }
+    if (tabValue === 6) {
+      fetchAssetList();
+      fetchTypeCounts();
     }
   }, [tabValue]);
 
@@ -557,6 +577,69 @@ export default function SettingsPage() {
       toast.error(err.response?.data?.message || err.message || 'เกิดข้อผิดพลาดในการทดสอบ');
     } finally {
       setTestingEmail(false);
+    }
+  };
+
+  const fetchAssetList = async (search?: string) => {
+    setAssetListLoading(true);
+    try {
+      const params: any = { limit: 500 };
+      if (search) params.search = search;
+      const res = await assetAPI.list(params);
+      setAssetList(res.data.data || []);
+    } catch {
+      toast.error('ไม่สามารถโหลดรายการทรัพย์สินได้');
+    } finally {
+      setAssetListLoading(false);
+    }
+  };
+
+  const fetchTypeCounts = async () => {
+    try {
+      const typesRes = await assetAPI.deviceTypes();
+      const types = typesRes.data || [];
+      setDeviceTypes(types);
+      const counts: Record<string, number> = {};
+      await Promise.all(types.map(async (t: any) => {
+        try {
+          const res = await assetAPI.list({ type: t.name, limit: 1 });
+          counts[t.name] = res.data.total || 0;
+        } catch { counts[t.name] = 0; }
+      }));
+      setTypeCounts(counts);
+    } catch {
+      // silently fail
+    }
+  };
+
+  const handleDeleteByType = async () => {
+    setTypeDeleteDialogOpen(false);
+    setTypeDeleting(true);
+    try {
+      const res = await assetAPI.bulkDeleteByType(typeToDelete);
+      toast.success(res.data.message || `ลบ ${typeToDelete} เรียบร้อย`);
+      setTypeToDelete('');
+      fetchAssetList(assetSearch);
+      fetchTypeCounts();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || err.message || 'เกิดข้อผิดพลาด');
+    } finally {
+      setTypeDeleting(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    setBulkDeleteDialogOpen(false);
+    setBulkDeleting(true);
+    try {
+      const res = await assetAPI.bulkDelete(selectedIds);
+      toast.success(res.data.message || `ลบ ${selectedIds.length} รายการเรียบร้อย`);
+      setSelectedIds([]);
+      fetchAssetList(assetSearch);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || err.message || 'เกิดข้อผิดพลาด');
+    } finally {
+      setBulkDeleting(false);
     }
   };
 
@@ -1290,6 +1373,169 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
           </Grid>
+
+          {/* Selective Delete Card */}
+          <Grid item xs={12}>
+            <Card sx={{ borderRadius: 2.5 }}>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                  <TrashIcon size={24} color="#dc2626" />
+                  <Typography variant="h6" fontWeight={700} color="error">เลือกลบทรัพย์สินทีละรายการ</Typography>
+                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  ค้นหาและเลือกทรัพย์สินที่ต้องการลบ (แสดงสูงสุด 500 รายการ)
+                </Typography>
+
+                {/* Delete by type section */}
+                {deviceTypes.length > 0 && (
+                  <Box sx={{ mb: 3, p: 2, bgcolor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 2 }}>
+                    <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <TrashIcon size={16} color="#dc2626" /> ลบตามประเภท
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+                      {deviceTypes.map((t: any) => (
+                        <Paper
+                          key={t.name}
+                          variant="outlined"
+                          sx={{
+                            px: 1.5, py: 1, borderRadius: 2,
+                            display: 'flex', alignItems: 'center', gap: 1.5,
+                            bgcolor: '#fff', minWidth: 180,
+                          }}
+                        >
+                          <Typography variant="body2" fontWeight={600} sx={{ flex: 1, fontSize: '0.8rem' }}>
+                            {t.name}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', whiteSpace: 'nowrap' }}>
+                            {typeCounts[t.name] ?? '...'} รายการ
+                          </Typography>
+                          <Button
+                            size="small"
+                            color="error"
+                            variant="outlined"
+                            sx={{ minWidth: 0, px: 1, fontSize: '0.7rem' }}
+                            disabled={!typeCounts[t.name] || typeCounts[t.name] === 0 || typeDeleting}
+                            onClick={() => { setTypeToDelete(t.name); setTypeDeleteDialogOpen(true); }}
+                          >
+                            ลบ
+                          </Button>
+                        </Paper>
+                      ))}
+                    </Box>
+                  </Box>
+                )}
+
+                {/* Search + Actions */}
+                <Box sx={{ display: 'flex', gap: 2, mb: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <TextField
+                    size="small"
+                    placeholder="ค้นหาทรัพย์สิน..."
+                    value={assetSearch}
+                    onChange={(e) => setAssetSearch(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') fetchAssetList(assetSearch); }}
+                    slotProps={{ input: { startAdornment: <SearchIcon size={16} style={{ marginRight: 8, color: '#94a3b8' }} /> } }}
+                    sx={{ minWidth: 280 }}
+                  />
+                  <Button size="small" variant="outlined" onClick={() => fetchAssetList(assetSearch)} disabled={assetListLoading}>
+                    ค้นหา
+                  </Button>
+                  <Button size="small" variant="outlined" onClick={() => { setAssetSearch(''); fetchAssetList(); }} disabled={assetListLoading}>
+                    ล้าง
+                  </Button>
+                  <Box sx={{ flex: 1 }} />
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => {
+                      if (selectedIds.length === assetList.length) {
+                        setSelectedIds([]);
+                      } else {
+                        setSelectedIds(assetList.map((a: any) => a.id));
+                      }
+                    }}
+                    disabled={assetList.length === 0}
+                  >
+                    {selectedIds.length === assetList.length && assetList.length > 0 ? 'ยกเลิกทั้งหมด' : 'เลือกทั้งหมด'}
+                  </Button>
+                  <Button
+                    variant="contained"
+                    color="error"
+                    size="small"
+                    startIcon={bulkDeleting ? <CircularProgress size={16} color="inherit" /> : <TrashIcon size={16} />}
+                    onClick={() => setBulkDeleteDialogOpen(true)}
+                    disabled={selectedIds.length === 0 || bulkDeleting}
+                  >
+                    {bulkDeleting ? 'กำลังลบ...' : `ลบ ${selectedIds.length} รายการ`}
+                  </Button>
+                </Box>
+
+                {/* Asset Table */}
+                <TableContainer sx={{ maxHeight: 420, border: '1px solid #e2e8f0', borderRadius: 2 }}>
+                  <Table size="small" stickyHeader>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell padding="checkbox" sx={{ bgcolor: '#f8fafc' }}>
+                          <Checkbox
+                            checked={assetList.length > 0 && selectedIds.length === assetList.length}
+                            indeterminate={selectedIds.length > 0 && selectedIds.length < assetList.length}
+                            onChange={() => {
+                              if (selectedIds.length === assetList.length) {
+                                setSelectedIds([]);
+                              } else {
+                                setSelectedIds(assetList.map((a: any) => a.id));
+                              }
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', bgcolor: '#f8fafc' }}>ID</TableCell>
+                        <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', bgcolor: '#f8fafc' }}>เลขครุภัณฑ์</TableCell>
+                        <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', bgcolor: '#f8fafc' }}>ชื่อทรัพย์สิน</TableCell>
+                        <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', bgcolor: '#f8fafc' }}>Serial No.</TableCell>
+                        <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', bgcolor: '#f8fafc' }}>ประเภท</TableCell>
+                        <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', bgcolor: '#f8fafc' }}>สถานะ</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {assetListLoading ? (
+                        <TableRow><TableCell colSpan={7} align="center" sx={{ py: 4 }}><CircularProgress size={24} /></TableCell></TableRow>
+                      ) : assetList.length === 0 ? (
+                        <TableRow><TableCell colSpan={7} align="center" sx={{ py: 4, color: 'text.secondary' }}>ไม่พบรายการทรัพย์สิน</TableCell></TableRow>
+                      ) : assetList.map((asset: any) => (
+                        <TableRow
+                          key={asset.id}
+                          hover
+                          selected={selectedIds.includes(asset.id)}
+                          sx={{ cursor: 'pointer' }}
+                          onClick={() => {
+                            setSelectedIds(prev =>
+                              prev.includes(asset.id)
+                                ? prev.filter((id) => id !== asset.id)
+                                : [...prev, asset.id]
+                            );
+                          }}
+                        >
+                          <TableCell padding="checkbox">
+                            <Checkbox checked={selectedIds.includes(asset.id)} />
+                          </TableCell>
+                          <TableCell sx={{ fontSize: '0.75rem' }}>{asset.id}</TableCell>
+                          <TableCell sx={{ fontSize: '0.75rem' }}>{asset.assetCode || '-'}</TableCell>
+                          <TableCell sx={{ fontSize: '0.75rem', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{asset.assetName}</TableCell>
+                          <TableCell sx={{ fontSize: '0.75rem' }}>{asset.serialNo || '-'}</TableCell>
+                          <TableCell sx={{ fontSize: '0.75rem' }}>{asset.type || '-'}</TableCell>
+                          <TableCell sx={{ fontSize: '0.75rem' }}>{asset.status || '-'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+                {assetList.length > 0 && (
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                    {assetList.length} รายการ · เลือก {selectedIds.length} รายการ
+                  </Typography>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
         </Grid>
       </TabPanel>
 
@@ -1330,6 +1576,44 @@ export default function SettingsPage() {
             disabled={clearing}
           >
             ยืนยัน ลบข้อมูลทั้งหมด
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Confirmation Dialog for Bulk Delete ── */}
+      <Dialog open={bulkDeleteDialogOpen} onClose={() => setBulkDeleteDialogOpen(false)}>
+        <DialogTitle>ยืนยันการลบทรัพย์สิน</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            คุณแน่ใจหรือไม่ที่จะลบทรัพย์สินที่เลือก {selectedIds.length} รายการ?
+          </DialogContentText>
+          <Alert severity="error" sx={{ mt: 2 }}>
+            <strong>การดำเนินการนี้ไม่สามารถย้อนกลับได้</strong>
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBulkDeleteDialogOpen(false)} color="inherit">ยกเลิก</Button>
+          <Button onClick={handleBulkDelete} color="error" variant="contained" disabled={bulkDeleting}>
+            {bulkDeleting ? 'กำลังลบ...' : 'ยืนยัน ลบข้อมูล'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Confirmation Dialog for Delete by Type ── */}
+      <Dialog open={typeDeleteDialogOpen} onClose={() => setTypeDeleteDialogOpen(false)}>
+        <DialogTitle>ยืนยันการลบทรัพย์สินตามประเภท</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            คุณแน่ใจหรือไม่ที่จะลบทรัพย์สินประเภท <strong>{typeToDelete}</strong> ทั้งหมด <strong>{typeCounts[typeToDelete] ?? 0}</strong> รายการ?
+          </DialogContentText>
+          <Alert severity="error" sx={{ mt: 2 }}>
+            <strong>การดำเนินการนี้ไม่สามารถย้อนกลับได้</strong>
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setTypeDeleteDialogOpen(false)} color="inherit">ยกเลิก</Button>
+          <Button onClick={handleDeleteByType} color="error" variant="contained" disabled={typeDeleting}>
+            {typeDeleting ? 'กำลังลบ...' : 'ยืนยัน ลบทั้งหมด'}
           </Button>
         </DialogActions>
       </Dialog>

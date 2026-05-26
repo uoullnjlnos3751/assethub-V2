@@ -37,8 +37,9 @@ const calculateAge = (purchaseDate: string) => {
 };
 
 const typeGroupCategoryMap: Record<string, string> = {
-  computers: 'คอมพิวเตอร์', monitors: 'จอภาพ', devices: 'อุปกรณ์นำเสนอ/AV',
+  computers: 'คอมพิวเตอร์', monitors: 'จอภาพ', devices: 'อุปกรณ์ต่อพ่วง',
   printers: 'เครื่องพิมพ์', phonesTablets: 'อุปกรณ์สื่อสาร', network: 'อุปกรณ์เครือข่าย',
+  rack: 'Rack & Infrastructure',
 };
 
 function getTypeIcon(type: string): string {
@@ -202,7 +203,7 @@ export default function AssetFormPage() {
 
   const isMonitor = useMemo(() => catName === 'จอภาพ' || typeLower.includes('monitor'), [catName, typeLower]);
   const isPhone = useMemo(() => catName === 'อุปกรณ์สื่อสาร' || ['smartphone', 'tablet', 'mobile hotspot', 'ipad'].some(k => typeLower.includes(k)), [catName, typeLower]);
-  const isDevice = useMemo(() => catName === 'อุปกรณ์นำเสนอ/AV' || ['projector', 'conference speaker', 'webcam', 'docking station', 'presentation clicker'].some(k => typeLower.includes(k)), [catName, typeLower]);
+  const isDevice = useMemo(() => catName === 'อุปกรณ์ต่อพ่วง' || ['projector', 'conference speaker', 'webcam', 'docking station', 'presentation clicker', 'mouse', 'keyboard', 'microphone', 'voice recorder'].some(k => typeLower.includes(k)), [catName, typeLower]);
   const isNetwork = useMemo(() => catName === 'อุปกรณ์เครือข่าย' || ['switch', 'router', 'access point', 'firewall', 'modem'].some(k => typeLower.includes(k)), [catName, typeLower]);
   const isRack = useMemo(() => catName === 'Rack & Infrastructure' || ['server rack', 'pdu', 'ups', 'enclosure'].some(k => typeLower.includes(k)), [catName, typeLower]);
   const isPrinter = useMemo(() => catName === 'เครื่องพิมพ์' || typeLower.includes('printer'), [catName, typeLower]);

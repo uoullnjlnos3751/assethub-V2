@@ -42,6 +42,7 @@ export const assetAPI = {
   update: (id: number, data: any) => api.put(`/assets/${id}`, data),
   delete: (id: number) => api.delete(`/assets/${id}`),
   bulkDelete: (ids: number[]) => api.post('/assets/bulk-delete', { ids }),
+  bulkDeleteByType: (type: string) => api.post('/assets/bulk-delete-by-type', { type }),
   bulkUpdate: (ids: number[], data: Record<string, any>) => api.post('/assets/bulk-update', { ids, data }),
   exportAssets: (type?: string, filters?: Record<string, string>) => {
     const params: any = type ? { type } : {};
@@ -57,6 +58,7 @@ export const assetAPI = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
+  importJson: (rows: any[]) => api.post('/assets/import/json', { rows }),
   uploadImage: (id: number, formData: FormData) => {
     const token = localStorage.getItem('token');
     return axios.post(`/api/assets/${id}/image`, formData, {

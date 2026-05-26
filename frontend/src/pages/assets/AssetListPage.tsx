@@ -54,6 +54,7 @@ import DevicesIcon from '@mui/icons-material/Devices';
 import PrintIcon from '@mui/icons-material/Print';
 import PhoneAndroidIcon from '@mui/icons-material/PhoneAndroid';
 import RouterIcon from '@mui/icons-material/Router';
+import HandymanIcon from '@mui/icons-material/Handyman';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { assetAPI, borrowAPI, categoryAPI } from '../../services/api';
 import ExportAssetsButton from '../../components/ExportAssetsButton';
@@ -130,10 +131,11 @@ const columnDefaultsByField = new Map(defaultColumnConfig.map((config) => [confi
 const typeGroupLabels: Record<string, string> = {
   computers: 'คอมพิวเตอร์',
   monitors: 'จอภาพ',
-  devices: 'อุปกรณ์นำเสนอ/AV',
+  devices: 'อุปกรณ์ต่อพ่วง',
   printers: 'เครื่องพิมพ์',
   phonesTablets: 'อุปกรณ์สื่อสาร',
   network: 'อุปกรณ์เครือข่าย',
+  rack: 'Rack & Infrastructure',
 };
 
 const typeGroupIcons: Record<string, React.ReactNode> = {
@@ -143,15 +145,17 @@ const typeGroupIcons: Record<string, React.ReactNode> = {
   printers: <PrintIcon />,
   phonesTablets: <PhoneAndroidIcon />,
   network: <RouterIcon />,
+  rack: <HandymanIcon />,
 };
 
 const typeGroupDescriptions: Record<string, string> = {
   computers: 'คอมพิวเตอร์ตั้งโต๊ะ โน๊ตบุ๊ค และอุปกรณ์ประมวลผล',
   monitors: 'จอภาพทุกประเภทสำหรับการทำงาน',
-  devices: 'อุปกรณ์นำเสนอ/AV และอุปกรณ์ต่อพ่วง',
+  devices: 'อุปกรณ์ต่อพ่วง เมาส์ คีย์บอร์ด เว็บแคม ไมค์ ลำโพง',
   printers: 'เครื่องพิมพ์ทุกประเภท',
   phonesTablets: 'สมาร์ทโฟน แท็บเล็ต และอุปกรณ์สื่อสาร',
   network: 'อุปกรณ์เครือข่าย สวิตช์ เราเตอร์ ไฟร์วอลล์',
+  rack: 'แร็คเซิร์ฟเวอร์ PDU UPS และโครงสร้างพื้นฐาน',
 };
 
 const formatDate = (value: unknown) => {

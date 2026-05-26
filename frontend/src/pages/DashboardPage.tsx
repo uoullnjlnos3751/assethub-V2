@@ -163,8 +163,8 @@ const categoryNavMap: Record<string, string> = {
   'เครื่องพิมพ์': '/assets?typeGroup=printers',
   'อุปกรณ์เครือข่าย': '/assets?typeGroup=network',
   'อุปกรณ์สื่อสาร': '/assets?typeGroup=phonesTablets',
-  'อุปกรณ์นำเสนอ/AV': '/assets?typeGroup=devices',
-  'Rack & Infrastructure': '/assets',
+  'อุปกรณ์ต่อพ่วง': '/assets?typeGroup=devices',
+  'Rack & Infrastructure': '/assets?typeGroup=rack',
   'สายสัญญาณ': '/inventory?category=Cable',
   'วัสดุสิ้นเปลือง': '/inventory?category=Consumable',
 };

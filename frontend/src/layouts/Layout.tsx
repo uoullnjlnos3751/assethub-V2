@@ -83,7 +83,7 @@ const userNavItems: NavItem[] = [
 const adminNav: NavEntry[] = [
   { label: 'แดชบอร์ด', path: '/dashboard', icon: <DashboardIcon fontSize="small" /> },
   {
-    label: 'ทรัพย์สิน',
+    label: 'ทะเบียนทรัพย์สิน',
     icon: <DevicesIcon fontSize="small" />,
     children: [
       { label: 'ทะเบียน IT Asset', path: '/assets', icon: <DevicesIcon fontSize="small" /> },
@@ -92,18 +92,25 @@ const adminNav: NavEntry[] = [
       { label: 'เครื่องพิมพ์', path: '/assets?typeGroup=printers', icon: <PrintIcon fontSize="small" /> },
       { label: 'อุปกรณ์เครือข่าย', path: '/assets?typeGroup=network', icon: <RouterIcon fontSize="small" /> },
       { label: 'อุปกรณ์สื่อสาร', path: '/assets?typeGroup=phonesTablets', icon: <PhoneAndroidIcon fontSize="small" /> },
-      { label: 'อุปกรณ์นำเสนอ/AV', path: '/assets?typeGroup=devices', icon: <DevicesIcon fontSize="small" /> },
-      { label: 'Rack & Infrastructure', path: '/assets?typeGroup=devices', icon: <HandymanIcon fontSize="small" /> },
+      { label: 'อุปกรณ์ต่อพ่วง', path: '/assets?typeGroup=devices', icon: <DevicesIcon fontSize="small" /> },
+      { label: 'Rack & Infrastructure', path: '/assets?typeGroup=rack', icon: <HandymanIcon fontSize="small" /> },
+    ],
+  },
+  {
+    label: 'จัดการคลัง',
+    icon: <InventoryIcon fontSize="small" />,
+    children: [
+      { label: 'ภาพรวมคลังสินค้า', path: '/inventory', icon: <InventoryIcon fontSize="small" /> },
       { label: 'สายสัญญาณ', path: '/inventory?category=Cable', icon: <CableIcon fontSize="small" /> },
       { label: 'วัสดุสิ้นเปลือง', path: '/inventory?category=Consumable', icon: <ScienceIcon fontSize="small" /> },
-      { label: 'ประเภทอุปกรณ์ (Device Types)', path: '/assets/device-types', icon: <CategoryIcon fontSize="small" /> },
-      { label: 'สถานที่ตั้ง/ไซต์ (Location & Company)', path: '/assets/locations', icon: <LocationOnIcon fontSize="small" /> },
-      { label: 'ผู้จำหน่าย (Vendor)', path: '/assets/vendors', icon: <StoreIcon fontSize="small" /> },
-      { label: 'สถานะอุปกรณ์ (Asset Status)', path: '/assets/statuses', icon: <CheckCircleOutlineIcon fontSize="small" /> },
-      { label: 'นำเข้า/ส่งออก (Import/Export)', path: '/assets/import-export', icon: <ImportExportIcon fontSize="small" /> },
+    ],
+  },
+  {
+    label: 'เครื่องมือ',
+    icon: <ImportExportIcon fontSize="small" />,
+    children: [
+      { label: 'นำเข้า/ส่งออก', path: '/assets/import-export', icon: <ImportExportIcon fontSize="small" /> },
       { label: 'พิมพ์ QR สติ๊กเกอร์', path: '/assets/print-qr', icon: <PrintIcon fontSize="small" /> },
-      { label: 'Inventory', path: '/inventory', icon: <InventoryIcon fontSize="small" /> },
-      { label: 'จัดการหมวดหมู่ (Categories)', path: '/categories', icon: <CategoryManagementIcon fontSize="small" /> },
     ],
   },
   {
@@ -141,6 +148,18 @@ const adminNav: NavEntry[] = [
   },
   { label: 'จัดการผู้ใช้', path: '/admin/users', icon: <PeopleIcon fontSize="small" />, roles: ['SUPERADMIN'] },
   { label: 'ตั้งค่า', path: '/admin/settings', icon: <SettingsIcon fontSize="small" />, roles: ['SUPERADMIN'] },
+  {
+    label: 'ตั้งค่าข้อมูลพื้นฐาน',
+    icon: <CategoryIcon fontSize="small" />,
+    roles: ['SUPERADMIN', 'IT_ADMIN'],
+    children: [
+      { label: 'ประเภทอุปกรณ์ (Device Types)', path: '/assets/device-types', icon: <CategoryIcon fontSize="small" /> },
+      { label: 'สถานที่ตั้ง/ไซต์ (Location & Company)', path: '/assets/locations', icon: <LocationOnIcon fontSize="small" /> },
+      { label: 'ผู้จำหน่าย (Vendor)', path: '/assets/vendors', icon: <StoreIcon fontSize="small" /> },
+      { label: 'สถานะอุปกรณ์ (Asset Status)', path: '/assets/statuses', icon: <CheckCircleOutlineIcon fontSize="small" /> },
+      { label: 'จัดการหมวดหมู่ (Categories)', path: '/categories', icon: <CategoryManagementIcon fontSize="small" /> },
+    ],
+  },
   {
     label: 'ประวัติ',
     icon: <HistoryIcon fontSize="small" />,
@@ -227,12 +246,15 @@ export default function Layout() {
   // ── Section grouping for sidebar visual clarity ─────────────────────
   const getSectionLabel = (label: string): string | null => {
     if (label === 'แดชบอร์ด') return 'ภาพรวม';
-    if (label === 'ทรัพย์สิน') return 'จัดการทรัพย์สิน';
+    if (label === 'ทะเบียนทรัพย์สิน') return 'จัดการทรัพย์สิน';
+    if (label === 'จัดการคลัง') return null;
+    if (label === 'เครื่องมือ') return null;
     if (label === 'ยืม-คืน') return 'Service Desk';
     if (label === 'PM ตรวจนับ') return null;
     if (label === 'รายงาน') return 'รายงาน';
     if (label === 'จัดการผู้ใช้') return 'ผู้ดูแลระบบ';
     if (label === 'ตั้งค่า') return null;
+    if (label === 'ตั้งค่าข้อมูลพื้นฐาน') return null;
     if (label === 'ประวัติ') return null;
     return null;
   };

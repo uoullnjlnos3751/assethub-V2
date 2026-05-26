@@ -40,6 +40,7 @@ export default function BorrowRequestPage() {
   const [toast, setToast] = useState('');
   const [toastType, setToastType] = useState<'ok' | 'err'>('ok');
   const [overdueItems, setOverdueItems] = useState<any[]>([]);
+  const [blockedTypes, setBlockedTypes] = useState<string[]>([]);
 
   const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => { setToast(msg); setToastType(type); setTimeout(() => setToast(''), 3500); };
 
@@ -55,6 +56,13 @@ export default function BorrowRequestPage() {
       now.setHours(0, 0, 0, 0);
       const overdue = (itemsRes.data || []).filter((item: any) => item.dueDate && new Date(item.dueDate) < now);
       setOverdueItems(overdue);
+      const activeTypes = [...new Set(
+        (itemsRes.data || [])
+          .filter((item: any) => ['Pending', 'Approved', 'CheckedOut'].includes(item.itemStatus))
+          .map((item: any) => item.asset?.type)
+          .filter(Boolean)
+      )];
+      setBlockedTypes(activeTypes);
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
@@ -299,16 +307,28 @@ export default function BorrowRequestPage() {
                         <tr><td colSpan={5} style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>ไม่พบรายการ</td></tr>
                       ) : filteredAssets.map((a, idx) => {
                         const isSelected = selected.includes(a.id);
+                        const isTypeBlocked = a.type && blockedTypes.includes(a.type);
                         return (
                           <tr key={a.id}
-                            onClick={() => toggleAsset(a.id)}
-                            onMouseEnter={() => setAssetHover(a)}
+                            onClick={() => !isTypeBlocked && toggleAsset(a.id)}
+                            onMouseEnter={() => setAssetHover(isTypeBlocked ? null : a)}
                             onMouseLeave={() => setAssetHover(null)}
-                            style={{ borderTop: idx > 0 ? '1px solid #f1f5f9' : 'none', background: isSelected ? '#f0f9ff' : 'transparent', cursor: 'pointer', transition: 'background 0.1s' }}>
+                            style={{
+                              borderTop: idx > 0 ? '1px solid #f1f5f9' : 'none',
+                              background: isTypeBlocked ? '#f1f5f9' : isSelected ? '#f0f9ff' : 'transparent',
+                              cursor: isTypeBlocked ? 'not-allowed' : 'pointer',
+                              opacity: isTypeBlocked ? 0.5 : 1,
+                              transition: 'background 0.1s',
+                            }}
+                            title={isTypeBlocked ? `คุณยืม "${a.type}" อยู่แล้ว กรุณาคืนก่อนจึงจะยืมเพิ่มได้` : ''}>
                             <td style={{ padding: '10px 12px' }}>
-                              <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${isSelected ? '#0ea5e9' : '#d1d5db'}`, background: isSelected ? '#0ea5e9' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}>
-                                {isSelected && <span style={{ color: '#fff', fontSize: '0.7rem', fontWeight: 900 }}>✓</span>}
-                              </div>
+                              {isTypeBlocked ? (
+                                <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>🔒</span>
+                              ) : (
+                                <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${isSelected ? '#0ea5e9' : '#d1d5db'}`, background: isSelected ? '#0ea5e9' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}>
+                                  {isSelected && <span style={{ color: '#fff', fontSize: '0.7rem', fontWeight: 900 }}>✓</span>}
+                                </div>
+                              )}
                             </td>
                             <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0f172a' }}>
                               <div>{a.assetCode}</div>
