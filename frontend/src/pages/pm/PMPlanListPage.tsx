@@ -5,11 +5,9 @@ import { pmAPI, assetAPI } from '../../services/api';
 /* ─────────────────────────────────────────────────────────────
    Types
 ───────────────────────────────────────────────────────────────── */
-type PlanMode = 'department' | 'location';
-
 interface PlanForm {
   year: number;
-  mode: PlanMode;
+  company: string;
   site: string;
   deptTask: string;
   lead: string;
@@ -68,17 +66,34 @@ export default function PMPlanListPage() {
   const [templates, setTemplates] = useState<any[]>([]);
   const [deptOptions, setDeptOptions] = useState<string[]>([]);
   const [locOptions, setLocOptions] = useState<string[]>([]);
+  const [companyOptions, setCompanyOptions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [eligibility, setEligibility] = useState<any>(null);
+  const [eligibilityLoading, setEligibilityLoading] = useState(false);
+  const [generateEligibility, setGenerateEligibility] = useState<any>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [generateModal, setGenerateModal] = useState<{ open: boolean; plan: any }>({ open: false, plan: null });
   const [genMsg, setGenMsg] = useState('');
   const [toast, setToast] = useState('');
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [selectedPlanForEdit, setSelectedPlanForEdit] = useState<any>(null);
+  const [editForm, setEditForm] = useState<PlanForm>({
+    year: new Date().getFullYear(),
+    company: '',
+    site: '',
+    deptTask: '',
+    lead: '',
+    plannedDeviceCount: 10,
+    startDate: '',
+    endDate: '',
+    templateId: '',
+  });
 
   const [form, setForm] = useState<PlanForm>({
     year: new Date().getFullYear(),
-    mode: 'department',
+    company: '',
     site: '',
     deptTask: '',
     lead: '',
@@ -97,26 +112,90 @@ export default function PMPlanListPage() {
       pmAPI.templates(),
       assetAPI.departmentOptions(),
       assetAPI.locationOptions(),
-    ]).then(([p, t, d, l]) => {
+      assetAPI.companyOptions(),
+    ]).then(([p, t, d, l, c]) => {
       setPlans(p.data || []);
       setTemplates(t.data || []);
       setDeptOptions((d.data || []).map((x: any) => typeof x === 'string' ? x : x.name || x));
       setLocOptions((l.data || []).map((x: any) => typeof x === 'string' ? x : x.name || x));
+      setCompanyOptions((c.data || []).map((x: any) => typeof x === 'string' ? x : x.name || x));
     }).finally(() => setLoading(false));
   };
 
   useEffect(() => { fetchAll(); }, []);
 
+  useEffect(() => {
+    if (!modalOpen) return;
+    const companyVal = (form.company === '__ALL__' || !form.company) ? '' : form.company;
+    const siteVal = (form.site === '__ALL__' || !form.site) ? '' : form.site;
+    const deptVal = (form.deptTask === '__ALL__' || !form.deptTask) ? '' : form.deptTask;
+    if (!companyVal && !siteVal && !deptVal) {
+      setEligibility(null);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setEligibilityLoading(true);
+      pmAPI.eligibility({
+        year: form.year,
+        company: companyVal || undefined,
+        site: siteVal || undefined,
+        deptTask: deptVal || undefined,
+        plannedDeviceCount: form.plannedDeviceCount,
+      })
+        .then((res) => {
+          const data = res.data;
+          setEligibility(data);
+          setForm((prev) => (
+            prev.plannedDeviceCount === 10 && data.available > 0
+              ? { ...prev, plannedDeviceCount: data.available }
+              : prev
+          ));
+        })
+        .catch(() => setEligibility(null))
+        .finally(() => setEligibilityLoading(false));
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [modalOpen, form.year, form.company, form.site, form.deptTask, form.plannedDeviceCount]);
+
+  useEffect(() => {
+    const plan = generateModal.plan;
+    if (!generateModal.open || !plan) {
+      setGenerateEligibility(null);
+      return;
+    }
+    pmAPI.eligibility({
+      year: plan.year,
+      company: plan.company || undefined,
+      site: plan.site || undefined,
+      deptTask: plan.deptTask || undefined,
+      plannedDeviceCount: plan.plannedDeviceCount,
+    })
+      .then((res) => setGenerateEligibility(res.data))
+      .catch(() => setGenerateEligibility(null));
+  }, [generateModal.open, generateModal.plan]);
+
   const handleCreate = async () => {
     if (!form.startDate || !form.endDate) { showToast('⚠️ กรุณากำหนดวันเริ่มและวันสิ้นสุด'); return; }
-    const target = form.mode === 'department' ? form.deptTask : form.site;
-    if (!target) { showToast('⚠️ กรุณาเลือกกลุ่มเป้าหมาย'); return; }
+    
+    // Normalize target values
+    const companyVal = (form.company === '__ALL__' || !form.company) ? '' : form.company;
+    const siteVal = (form.site === '__ALL__' || !form.site) ? '' : form.site;
+    const deptVal = (form.deptTask === '__ALL__' || !form.deptTask) ? '' : form.deptTask;
+
+    if (!companyVal && !siteVal && !deptVal) {
+      showToast('⚠️ กรุณาระบุ บริษัท, สถานที่ หรือ แผนก อย่างใดอย่างหนึ่ง (ไม่สามารถเลือกเป็นทั้งหมดพร้อมกันได้)');
+      return;
+    }
+
     setSaving(true);
     try {
       await pmAPI.createPlan({
         year: form.year,
-        site: form.mode === 'location' ? form.site : '',
-        deptTask: form.mode === 'department' ? form.deptTask : '',
+        company: companyVal,
+        site: siteVal,
+        deptTask: deptVal,
         lead: form.lead,
         plannedDeviceCount: form.plannedDeviceCount,
         startDate: form.startDate,
@@ -125,9 +204,85 @@ export default function PMPlanListPage() {
       });
       showToast('✅ สร้างแผน PM สำเร็จ');
       setModalOpen(false);
+      setForm({
+        year: new Date().getFullYear(),
+        company: '',
+        site: '',
+        deptTask: '',
+        lead: '',
+        plannedDeviceCount: 10,
+        startDate: '',
+        endDate: '',
+        templateId: '',
+      });
       fetchAll();
     } catch (err: any) {
       showToast(`❌ ${err.response?.data?.error || 'สร้างแผนไม่สำเร็จ'}`);
+    } finally { setSaving(false); }
+  };
+
+  const handleOpenEdit = (plan: any) => {
+    setSelectedPlanForEdit(plan);
+    setEditForm({
+      year: plan.year,
+      company: plan.company || '',
+      site: plan.site || '',
+      deptTask: plan.deptTask || '',
+      lead: plan.lead || '',
+      plannedDeviceCount: plan.plannedDeviceCount || 0,
+      startDate: plan.startDate ? plan.startDate.substring(0, 10) : '',
+      endDate: plan.endDate ? plan.endDate.substring(0, 10) : '',
+      templateId: plan.templateId ? String(plan.templateId) : '',
+    });
+    setEditModalOpen(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!selectedPlanForEdit) return;
+    if (!editForm.startDate || !editForm.endDate) { showToast('⚠️ กรุณากำหนดวันเริ่มและวันสิ้นสุด'); return; }
+
+    const companyVal = (editForm.company === '__ALL__' || !editForm.company) ? '' : editForm.company;
+    const siteVal = (editForm.site === '__ALL__' || !editForm.site) ? '' : editForm.site;
+    const deptVal = (editForm.deptTask === '__ALL__' || !editForm.deptTask) ? '' : editForm.deptTask;
+
+    if (!companyVal && !siteVal && !deptVal) {
+      showToast('⚠️ กรุณาระบุ บริษัท, สถานที่ หรือ แผนก อย่างใดอย่างหนึ่ง (ไม่สามารถเลือกเป็นทั้งหมดพร้อมกันได้)');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await pmAPI.updatePlan(selectedPlanForEdit.id, {
+        year: editForm.year,
+        company: companyVal,
+        site: siteVal,
+        deptTask: deptVal,
+        lead: editForm.lead,
+        plannedDeviceCount: editForm.plannedDeviceCount,
+        startDate: editForm.startDate,
+        endDate: editForm.endDate,
+        templateId: editForm.templateId ? parseInt(editForm.templateId) : undefined,
+      });
+      showToast('✅ อัปเดตแผน PM สำเร็จ');
+      setEditModalOpen(false);
+      fetchAll();
+    } catch (err: any) {
+      showToast(`❌ ${err.response?.data?.error || 'แก้ไขแผนไม่สำเร็จ'}`);
+    } finally { setSaving(false); }
+  };
+
+  const handleDelete = async (planId: number) => {
+    if (!window.confirm('⚠️ คุณแน่ใจหรือไม่ว่าต้องการลบแผน PM นี้?\nการลบจะลบงานร่าง (Draft runs) ทั้งหมดในแผนงานนี้ด้วย และไม่สามารถกู้คืนได้')) {
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await pmAPI.deletePlan(planId);
+      showToast('✅ ลบแผน PM สำเร็จ');
+      fetchAll();
+    } catch (err: any) {
+      showToast(`❌ ${err.response?.data?.error || 'ลบแผนไม่สำเร็จ'}`);
     } finally { setSaving(false); }
   };
 
@@ -252,9 +407,9 @@ export default function PMPlanListPage() {
               const total = plan.totalCount ?? runs.length;
               const done = plan.completedCount ?? runs.filter((r: any) => r.status === 'COMPLETED').length;
               const pct = total > 0 ? Math.round(done / total * 100) : 0;
-              const isDept = Boolean(plan.deptTask);
-              const label = isDept ? plan.deptTask : plan.site;
-              const accentColor = isDept ? '#8b5cf6' : '#0ea5e9';
+              const labelParts = [plan.company, plan.site].filter(Boolean);
+              const siteLabel = labelParts.length > 0 ? labelParts.join(' - ') : '';
+              const deptLabel = plan.deptTask || 'ทุกแผนก';
 
               // Timeline
               const start = plan.startDate ? new Date(plan.startDate) : null;
@@ -266,17 +421,17 @@ export default function PMPlanListPage() {
 
               return (
                 <div className="pmp-plan-card" key={plan.id}>
-                  <div className="pmp-plan-stripe" style={{ background: accentColor }} />
+                  <div className="pmp-plan-stripe" style={{ background: '#0ea5e9' }} />
                   <div style={{ padding: '14px 16px' }}>
                     {/* Plan header */}
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ width: 32, height: 32, borderRadius: 8, background: `${accentColor}15`, border: `1px solid ${accentColor}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>
-                          {isDept ? '🏢' : '📍'}
+                        <div style={{ width: 32, height: 32, borderRadius: 8, background: '#0ea5e915', border: '1px solid #0ea5e930', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>
+                          📋
                         </div>
                         <div>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{label || 'ทั่วไป'}</div>
-                          <div style={{ fontSize: 10, color: '#94a3b8' }}>{isDept ? 'By Department' : 'By Location'} · ปี {plan.year + 543}</div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{deptLabel}</div>
+                          <div style={{ fontSize: 10, color: '#64748b', fontWeight: 500, marginTop: 1 }}>🏢 {siteLabel || 'ทุกบริษัท/ทุกสถานที่'}</div>
                         </div>
                       </div>
                       <span className="pmp-badge" style={{
@@ -339,6 +494,24 @@ export default function PMPlanListPage() {
                         onClick={() => navigate('/pm')}
                         title="ดู Dashboard"
                       >📊</button>
+
+                      <button
+                        className="pmp-btn pmp-btn-outline"
+                        onClick={() => handleOpenEdit(plan)}
+                        title="แก้ไขแผน PM"
+                      >✏️</button>
+
+                      <button
+                        className="pmp-btn pmp-btn-outline"
+                        style={{
+                          borderColor: done > 0 ? '#e2e8f0' : '#fecaca',
+                          color: done > 0 ? '#cbd5e1' : '#ef4444',
+                          cursor: done > 0 ? 'not-allowed' : 'pointer'
+                        }}
+                        disabled={done > 0}
+                        onClick={() => handleDelete(plan.id)}
+                        title={done > 0 ? "ไม่สามารถลบแผนได้เนื่องจากมีงานที่เสร็จสิ้นแล้ว" : "ลบแผน PM"}
+                      >🗑️</button>
                     </div>
                   </div>
                 </div>
@@ -360,37 +533,62 @@ export default function PMPlanListPage() {
             </select>
           </div>
 
-          {/* Mode selector */}
+          {/* Company selector */}
           <div>
-            <label className="pmp-label">กลุ่มเป้าหมาย PM</label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className={`pmp-mode-btn ${form.mode === 'department' ? 'active' : ''}`} onClick={() => setForm(p => ({ ...p, mode: 'department', site: '', deptTask: '' }))}>
-                🏢 ตามแผนก<br /><span style={{ fontSize: 10, fontWeight: 400, opacity: .7 }}>Department</span>
-              </button>
-              <button className={`pmp-mode-btn ${form.mode === 'location' ? 'active' : ''}`} onClick={() => setForm(p => ({ ...p, mode: 'location', site: '', deptTask: '' }))}>
-                📍 ตาม Location<br /><span style={{ fontSize: 10, fontWeight: 400, opacity: .7 }}>Site / สถานที่</span>
-              </button>
-            </div>
+            <label className="pmp-label">บริษัท (Company)</label>
+            <select className="pmp-input pmp-select" value={form.company} onChange={e => setForm(p => ({ ...p, company: e.target.value }))}>
+              <option value="">📌 ทุกบริษัท (All Companies)</option>
+              {companyOptions.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
           </div>
 
-          {/* Target dropdown */}
-          {form.mode === 'department' ? (
-            <div>
-              <label className="pmp-label">เลือกแผนก *</label>
-              <select className="pmp-input pmp-select" value={form.deptTask} onChange={e => setForm(p => ({ ...p, deptTask: e.target.value }))}>
-                <option value="">-- เลือกแผนก --</option>
-                {deptOptions.map(d => <option key={d} value={d}>{d}</option>)}
-                <option value="__ALL__">📌 ทุกแผนก (All Departments)</option>
-              </select>
-            </div>
-          ) : (
-            <div>
-              <label className="pmp-label">เลือก Location / Site *</label>
-              <select className="pmp-input pmp-select" value={form.site} onChange={e => setForm(p => ({ ...p, site: e.target.value }))}>
-                <option value="">-- เลือก Location --</option>
-                {locOptions.map(l => <option key={l} value={l}>{l}</option>)}
-                <option value="__ALL__">📌 ทุก Location</option>
-              </select>
+          {/* Location selector */}
+          <div>
+            <label className="pmp-label">สถานที่ / ไซต์ (Location/Site)</label>
+            <select className="pmp-input pmp-select" value={form.site} onChange={e => setForm(p => ({ ...p, site: e.target.value }))}>
+              <option value="">📌 ทุกสถานที่ (All Locations)</option>
+              {locOptions.map(l => <option key={l} value={l}>{l}</option>)}
+            </select>
+          </div>
+
+          {/* Department selector */}
+          <div>
+            <label className="pmp-label">แผนก (Department)</label>
+            <select className="pmp-input pmp-select" value={form.deptTask} onChange={e => setForm(p => ({ ...p, deptTask: e.target.value }))}>
+              <option value="">📌 ทุกแผนก (All Departments)</option>
+              {deptOptions.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+
+          {(eligibilityLoading || eligibility) && (
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#334155', marginBottom: 8 }}>
+                สรุปเครื่องที่สามารถสร้างงาน PM ได้
+              </div>
+              {eligibilityLoading ? (
+                <div style={{ fontSize: 11, color: '#64748b' }}>กำลังคำนวณจำนวนเครื่อง...</div>
+              ) : (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
+                    {[
+                      { label: 'ใน scope', value: eligibility.totalInScope, color: '#0ea5e9' },
+                      { label: 'มีงานปีนี้แล้ว', value: eligibility.alreadyInYear, color: '#64748b' },
+                      { label: 'เหลือสร้างได้', value: eligibility.available, color: '#10b981' },
+                      { label: 'จะสร้างได้', value: eligibility.creatable, color: '#f59e0b' },
+                    ].map((item) => (
+                      <div key={item.label} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 10px' }}>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: item.color, lineHeight: 1 }}>{item.value}</div>
+                        <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 3 }}>{item.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {eligibility.shortage > 0 && (
+                    <div style={{ marginTop: 8, fontSize: 11, color: '#dc2626' }}>
+                      จำนวนตามแผนมากกว่าเครื่องที่เหลืออยู่ {eligibility.shortage} เครื่อง
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
 
@@ -452,6 +650,152 @@ export default function PMPlanListPage() {
         </div>
       </Modal>
 
+      {/* ── Edit Plan Modal ── */}
+      <Modal open={editModalOpen} onClose={() => setEditModalOpen(false)} title="✏️ แก้ไขแผน PM">
+        {selectedPlanForEdit && (() => {
+          const runs = selectedPlanForEdit.runs || [];
+          const totalRuns = selectedPlanForEdit.totalCount ?? runs.length;
+          const completedRuns = selectedPlanForEdit.completedCount ?? runs.filter((r: any) => r.status === 'COMPLETED').length;
+          const hasCompletedRuns = completedRuns > 0;
+          const hasDraftRunsOnly = totalRuns > 0 && completedRuns === 0;
+          return (
+            <>
+              <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                
+                {hasCompletedRuns && (
+                  <div style={{ background: '#fff7ed', border: '1px solid #ffedd5', borderRadius: 8, padding: '10px 14px', fontSize: 11, color: '#c2410c' }}>
+                    ⚠️ แผนนี้มีเครื่องที่ดำเนินการตรวจเช็คเสร็จสิ้นแล้ว ไม่สามารถแก้ไขกลุ่มเป้าหมายหรือ Template ได้ เพื่อป้องกันความถูกต้องของข้อมูลประวัติ
+                  </div>
+                )}
+                {hasDraftRunsOnly && (
+                  <div style={{ background: '#eff6ff', border: '1px solid #dbeafe', borderRadius: 8, padding: '10px 14px', fontSize: 11, color: '#1d4ed8' }}>
+                    💡 แผนนี้ยังไม่มีเครื่องที่เริ่มตรวจเช็ค (มีเฉพาะงานร่าง Draft) หากท่านแก้ไขกลุ่มเป้าหมายหรือ Template ระบบจะลบงานร่างเดิมและดึงรายการเครื่องชุดใหม่มา Generate ให้อัตโนมัติ
+                  </div>
+                )}
+
+                {/* Year */}
+                <div>
+                  <label className="pmp-label">ปีที่วางแผน (พ.ศ.)</label>
+                  <select 
+                    className="pmp-input pmp-select" 
+                    value={editForm.year} 
+                    disabled={hasCompletedRuns}
+                    onChange={e => setEditForm(p => ({ ...p, year: +e.target.value }))}
+                  >
+                    {yearOptions.map(y => <option key={y} value={y}>พ.ศ. {y + 543} ({y})</option>)}
+                  </select>
+                </div>
+
+                {/* Company selector */}
+                <div>
+                  <label className="pmp-label">บริษัท (Company)</label>
+                  <select 
+                    className="pmp-input pmp-select" 
+                    value={editForm.company} 
+                    disabled={hasCompletedRuns}
+                    onChange={e => setEditForm(p => ({ ...p, company: e.target.value }))}
+                  >
+                    <option value="">📌 ทุกบริษัท (All Companies)</option>
+                    {companyOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+
+                {/* Location selector */}
+                <div>
+                  <label className="pmp-label">สถานที่ / ไซต์ (Location/Site)</label>
+                  <select 
+                    className="pmp-input pmp-select" 
+                    value={editForm.site} 
+                    disabled={hasCompletedRuns}
+                    onChange={e => setEditForm(p => ({ ...p, site: e.target.value }))}
+                  >
+                    <option value="">📌 ทุกสถานที่ (All Locations)</option>
+                    {locOptions.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+                </div>
+
+                {/* Department selector */}
+                <div>
+                  <label className="pmp-label">แผนก (Department)</label>
+                  <select 
+                    className="pmp-input pmp-select" 
+                    value={editForm.deptTask} 
+                    disabled={hasCompletedRuns}
+                    onChange={e => setEditForm(p => ({ ...p, deptTask: e.target.value }))}
+                  >
+                    <option value="">📌 ทุกแผนก (All Departments)</option>
+                    {deptOptions.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+
+                {/* Lead + Target count */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div>
+                    <label className="pmp-label">ผู้รับผิดชอบ (Lead)</label>
+                    <input className="pmp-input" placeholder="ชื่อผู้รับผิดชอบ" value={editForm.lead} onChange={e => setEditForm(p => ({ ...p, lead: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="pmp-label">จำนวนเครื่องตามแผน</label>
+                    <input 
+                      type="number" 
+                      className="pmp-input" 
+                      min={1} 
+                      value={editForm.plannedDeviceCount} 
+                      disabled={hasCompletedRuns}
+                      onChange={e => setEditForm(p => ({ ...p, plannedDeviceCount: +e.target.value }))} 
+                    />
+                  </div>
+                </div>
+
+                {/* Date range */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div>
+                    <label className="pmp-label">วันที่เริ่ม *</label>
+                    <input type="date" className="pmp-input" value={editForm.startDate} onChange={e => setEditForm(p => ({ ...p, startDate: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="pmp-label">วันที่สิ้นสุด *</label>
+                    <input type="date" className="pmp-input" value={editForm.endDate} onChange={e => setEditForm(p => ({ ...p, endDate: e.target.value }))} />
+                  </div>
+                </div>
+
+                {/* Duration hint */}
+                {editForm.startDate && editForm.endDate && (() => {
+                  const days = Math.round((new Date(editForm.endDate).getTime() - new Date(editForm.startDate).getTime()) / 86400000);
+                  const weeks = Math.ceil(days / 7);
+                  return days > 0 ? (
+                    <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, padding: '8px 12px', fontSize: 11, color: '#0369a1' }}>
+                      📅 ระยะเวลา {days} วัน ({weeks} สัปดาห์) · สิ้นสุด {fmtDate(editForm.endDate)}
+                    </div>
+                  ) : null;
+                })()}
+
+                {/* Template */}
+                <div>
+                  <label className="pmp-label">PM Template (Checklist)</label>
+                  <select 
+                    className="pmp-input pmp-select" 
+                    value={editForm.templateId} 
+                    disabled={hasCompletedRuns}
+                    onChange={e => setEditForm(p => ({ ...p, templateId: e.target.value }))}
+                  >
+                    <option value="">-- เลือก Template (ถ้ามี) --</option>
+                    {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end', gap: 8, flexShrink: 0 }}>
+                <button className="pmp-btn pmp-btn-outline" onClick={() => setEditModalOpen(false)}>ยกเลิก</button>
+                <button className="pmp-btn pmp-btn-primary" onClick={handleUpdate} disabled={saving}>
+                  {saving ? '⏳ กำลังบันทึก...' : '✅ บันทึกการแก้ไข'}
+                </button>
+              </div>
+            </>
+          );
+        })()}
+      </Modal>
+
       {/* ── Generate Workload Modal ── */}
       <Modal open={generateModal.open} onClose={() => setGenerateModal({ open: false, plan: null })} title="⚡ Generate งาน PM">
         <div style={{ padding: '18px 20px' }}>
@@ -464,6 +808,21 @@ export default function PMPlanListPage() {
               · 🎯 เป้าหมาย {generateModal.plan?.plannedDeviceCount} เครื่อง
             </div>
           </div>
+          {generateEligibility && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, marginBottom: 12 }}>
+              {[
+                { label: 'ใน scope', value: generateEligibility.totalInScope, color: '#0ea5e9' },
+                { label: 'มีงานปีนี้แล้ว', value: generateEligibility.alreadyInYear, color: '#64748b' },
+                { label: 'เหลือสร้างได้', value: generateEligibility.available, color: '#10b981' },
+                { label: 'กดแล้วจะสร้าง', value: generateEligibility.creatable, color: '#f59e0b' },
+              ].map((item) => (
+                <div key={item.label} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 10px' }}>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: item.color, lineHeight: 1 }}>{item.value}</div>
+                  <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 3 }}>{item.label}</div>
+                </div>
+              ))}
+            </div>
+          )}
           <p style={{ fontSize: 12, color: '#475569', lineHeight: 1.6, margin: 0 }}>
             ระบบจะสร้างรายการงาน PM สำหรับทรัพย์สินที่<strong>ยังไม่เคย PM</strong>ในปีนี้
             โดยกรองตาม{generateModal.plan?.deptTask ? 'แผนก' : 'Location'}ที่กำหนดในแผน

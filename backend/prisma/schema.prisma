@@ -540,6 +540,7 @@ model PMPlan {
   year               Int
   site               String?
   deptTask           String?
+  company            String?
   lead               String?
   plannedDeviceCount Int
   startDate          DateTime?
@@ -692,6 +693,7 @@ model Donation {
   createdById      Int
   createdBy        AppUser        @relation(fields: [createdById], references: [id])
   items            DonationItem[]
+  images           DonationImage[]
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 
@@ -706,9 +708,21 @@ model DonationItem {
   asset      Asset    @relation(fields: [assetId], references: [id])
   condition  String?
   notes      String?
+  image      String?  @db.Text
   createdAt  DateTime @default(now())
 
   @@map("donation_items")
+}
+
+model DonationImage {
+  id         Int      @id @default(autoincrement())
+  donationId Int
+  donation   Donation @relation(fields: [donationId], references: [id], onDelete: Cascade)
+  image      String   @db.Text
+  caption    String?
+  createdAt  DateTime @default(now())
+
+  @@map("donation_images")
 }
 
 enum UserRole {

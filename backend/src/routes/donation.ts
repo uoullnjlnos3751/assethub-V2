@@ -1,6 +1,27 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../index';
 import { authenticate, authorize } from '../middleware/auth';
+import multer from 'multer';
+
+class AppError extends Error {
+  statusCode: number;
+  constructor(message: string, statusCode: number) {
+    super(message);
+    this.statusCode = statusCode;
+  }
+}
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (_req: any, file: any, cb: any) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  },
+});
 
 const router = Router();
 
@@ -75,6 +96,7 @@ router.post('/', async (req: Request, res: Response) => {
         items: {
           include: { asset: true },
         },
+        images: { orderBy: { createdAt: 'asc' } },
       },
     });
 
@@ -99,6 +121,7 @@ router.get('/:id', async (req: Request, res: Response) => {
         items: {
           include: { asset: true },
         },
+        images: { orderBy: { createdAt: 'asc' } },
       },
     });
     if (!donation) {
@@ -163,6 +186,89 @@ router.delete('/:id', async (req: Request, res: Response) => {
     }
     res.status(500).json({ error: 'เกิดข้อผิดพลาดในการลบข้อมูล' });
   }
+});
+
+// ── Batch-level image upload ──
+router.post('/:id/images', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), upload.single('image'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const donation = await prisma.donation.findUnique({ where: { id } });
+    if (!donation) throw new AppError('ไม่พบข้อมูลการบริจาค', 404);
+    if (!req.file) throw new AppError('ไม่พบไฟล์รูปภาพ', 400);
+
+    const base64 = req.file.buffer.toString('base64');
+    const dataUrl = `data:${req.file.mimetype};base64,${base64}`;
+
+    const image = await prisma.donationImage.create({
+      data: {
+        donationId: id,
+        image: dataUrl,
+        caption: req.body.caption || null,
+      },
+    });
+
+    res.status(201).json({ data: image });
+  } catch (err) { next(err); }
+});
+
+// ── Delete batch-level image ──
+router.delete('/:id/images/:imageId', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const imageId = parseInt(req.params.imageId);
+
+    const image = await prisma.donationImage.findFirst({
+      where: { id: imageId, donationId: id },
+    });
+    if (!image) throw new AppError('ไม่พบรูปภาพ', 404);
+
+    await prisma.donationImage.delete({ where: { id: imageId } });
+    res.json({ message: 'ลบรูปภาพเรียบร้อย' });
+  } catch (err) { next(err); }
+});
+
+// ── Item-level image upload ──
+router.post('/:id/items/:itemId/image', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), upload.single('image'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const itemId = parseInt(req.params.itemId);
+
+    const item = await prisma.donationItem.findFirst({
+      where: { id: itemId, donationId: id },
+    });
+    if (!item) throw new AppError('ไม่พบรายการ', 404);
+    if (!req.file) throw new AppError('ไม่พบไฟล์รูปภาพ', 400);
+
+    const base64 = req.file.buffer.toString('base64');
+    const dataUrl = `data:${req.file.mimetype};base64,${base64}`;
+
+    const updated = await prisma.donationItem.update({
+      where: { id: itemId },
+      data: { image: dataUrl },
+    });
+
+    res.json({ message: 'อัพโหลดรูปภาพเรียบร้อย', image: updated.image });
+  } catch (err) { next(err); }
+});
+
+// ── Delete item-level image ──
+router.delete('/:id/items/:itemId/image', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const itemId = parseInt(req.params.itemId);
+
+    const item = await prisma.donationItem.findFirst({
+      where: { id: itemId, donationId: id },
+    });
+    if (!item) throw new AppError('ไม่พบรายการ', 404);
+
+    await prisma.donationItem.update({
+      where: { id: itemId },
+      data: { image: null },
+    });
+
+    res.json({ message: 'ลบรูปภาพเรียบร้อย' });
+  } catch (err) { next(err); }
 });
 
 export default router;

@@ -1,9 +1,9 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Button, Card, CardContent, TextField, Grid, Checkbox,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Chip, InputAdornment, alpha, Skeleton, Divider, Tooltip,
+  Chip, InputAdornment, alpha, Skeleton, Divider, Tooltip, IconButton,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SearchIcon from '@mui/icons-material/Search';
@@ -11,6 +11,9 @@ import InventoryIcon from '@mui/icons-material/Inventory';
 import BusinessIcon from '@mui/icons-material/Business';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import CloseIcon from '@mui/icons-material/Close';
 import { donationAPI } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 
@@ -28,14 +31,60 @@ export default function DonationFormPage() {
   const [notes, setNotes]                     = useState('');
   const [submitting, setSubmitting]           = useState(false);
   const [assetSearch, setAssetSearch]         = useState('');
+  const [batchFiles, setBatchFiles]           = useState<File[]>([]);
+  const [batchPreviews, setBatchPreviews]     = useState<string[]>([]);
+  const [itemImages, setItemImages]           = useState<Record<number, File>>({});
+  const [itemPreviews, setItemPreviews]       = useState<Record<number, string>>({});
   const navigate = useNavigate();
   const toast    = useToast();
+  const batchInputRef = useRef<HTMLInputElement>(null);
+  const itemInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
   useEffect(() => {
     donationAPI.retiredAssets()
       .then(res => setAssets(res.data.data))
       .catch(() => toast.error('ไม่สามารถโหลดข้อมูลทรัพย์สินได้'))
       .finally(() => setLoadingAssets(false));
+  }, []);
+
+  // Clean up object URLs on unmount
+  useEffect(() => {
+    return () => {
+      batchPreviews.forEach(url => URL.revokeObjectURL(url));
+      Object.values(itemPreviews).forEach(url => URL.revokeObjectURL(url));
+    };
+  }, []);
+
+  // ── Batch image handlers ──
+  const addBatchFiles = useCallback((files: FileList | File[]) => {
+    const newFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+    if (newFiles.length === 0) return;
+    const newPreviews = newFiles.map(f => URL.createObjectURL(f));
+    setBatchFiles(prev => [...prev, ...newFiles]);
+    setBatchPreviews(prev => [...prev, ...newPreviews]);
+  }, []);
+
+  const removeBatchFile = useCallback((index: number) => {
+    setBatchPreviews(prev => {
+      URL.revokeObjectURL(prev[index]);
+      return prev.filter((_, i) => i !== index);
+    });
+    setBatchFiles(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const handleBatchDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    if (e.dataTransfer.files.length > 0) addBatchFiles(e.dataTransfer.files);
+  }, [addBatchFiles]);
+
+  // ── Item image handlers ──
+  const setItemImage = useCallback((assetId: number, file: File) => {
+    const url = URL.createObjectURL(file);
+    setItemPreviews(prev => {
+      if (prev[assetId]) URL.revokeObjectURL(prev[assetId]);
+      return { ...prev, [assetId]: url };
+    });
+    setItemImages(prev => ({ ...prev, [assetId]: file }));
   }, []);
 
   const toggleSelect = (id: number) => {
@@ -66,7 +115,7 @@ export default function DonationFormPage() {
     try {
       const assetIds = Array.from(selectedIds);
       const conds    = assetIds.map(id => conditions[id] || '');
-      await donationAPI.create({
+      const res = await donationAPI.create({
         donationDate,
         recipientName:    recipientName.trim(),
         recipientAddress: recipientAddress.trim() || undefined,
@@ -78,6 +127,33 @@ export default function DonationFormPage() {
         conditions: conds,
       });
       toast.success('สร้างรายการบริจาคเรียบร้อย');
+
+      const donation = res.data.data ?? res.data;
+      const donationId: number = donation.id;
+
+      // Upload batch-level images
+      try {
+        for (const file of batchFiles) {
+          await donationAPI.uploadImage(donationId, file);
+        }
+      } catch {
+        toast.error('อัปโหลดรูปภาพ (batch) บางรายการไม่สำเร็จ');
+      }
+
+      // Upload item-level images
+      try {
+        const items: any[] = donation.items ?? [];
+        for (const [assetIdStr, file] of Object.entries(itemImages)) {
+          const assetId = Number(assetIdStr);
+          const item = items.find((it: any) => it.assetId === assetId);
+          if (item) {
+            await donationAPI.uploadItemImage(donationId, item.id, file);
+          }
+        }
+      } catch {
+        toast.error('อัปโหลดรูปภาพ (รายการ) บางรายการไม่สำเร็จ');
+      }
+
       navigate('/donations');
     } catch {
       toast.error('ไม่สามารถสร้างรายการบริจาคได้');
@@ -180,6 +256,70 @@ export default function DonationFormPage() {
                   value={notes}
                   onChange={e => setNotes(e.target.value)}
                 />
+              </Box>
+
+              {/* ── Batch Image Dropzone ── */}
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
+                  📷 หลักฐานรูปภาพ (Batch)
+                </Typography>
+                <Box
+                  onDrop={handleBatchDrop}
+                  onDragOver={e => e.preventDefault()}
+                  onClick={() => batchInputRef.current?.click()}
+                  sx={{
+                    border: '2px dashed',
+                    borderColor: '#6366F1',
+                    borderRadius: '8px',
+                    p: 3,
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    bgcolor: alpha('#6366F1', 0.04),
+                    transition: 'background-color 0.2s',
+                    '&:hover': { bgcolor: alpha('#6366F1', 0.08) },
+                  }}
+                >
+                  <CloudUploadIcon sx={{ fontSize: 32, color: '#6366F1', mb: 0.5 }} />
+                  <Typography variant="body2" color="text.secondary">
+                    คลิกหรือลากไฟล์รูปภาพมาวาง
+                  </Typography>
+                  <input
+                    ref={batchInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    hidden
+                    onChange={e => { if (e.target.files) addBatchFiles(e.target.files); e.target.value = ''; }}
+                  />
+                </Box>
+                {batchPreviews.length > 0 && (
+                  <Box sx={{ display: 'flex', gap: 1, mt: 1.5, overflowX: 'auto', pb: 0.5 }}>
+                    {batchPreviews.map((url, i) => (
+                      <Box key={i} sx={{ position: 'relative', flexShrink: 0 }}>
+                        <Box
+                          component="img"
+                          src={url}
+                          sx={{
+                            width: 64, height: 64, borderRadius: '8px',
+                            objectFit: 'cover', border: '1px solid', borderColor: 'divider',
+                          }}
+                        />
+                        <IconButton
+                          size="small"
+                          onClick={() => removeBatchFile(i)}
+                          sx={{
+                            position: 'absolute', top: -8, right: -8,
+                            bgcolor: 'error.main', color: '#fff',
+                            width: 20, height: 20,
+                            '&:hover': { bgcolor: 'error.dark' },
+                          }}
+                        >
+                          <CloseIcon sx={{ fontSize: 12 }} />
+                        </IconButton>
+                      </Box>
+                    ))}
+                  </Box>
+                )}
               </Box>
 
               {/* Selected summary */}
@@ -308,6 +448,7 @@ export default function DonationFormPage() {
                       <TableCell sx={{ fontWeight: 600 }}>Serial No.</TableCell>
                       <TableCell sx={{ fontWeight: 600 }}>ยี่ห้อ/รุ่น</TableCell>
                       <TableCell sx={{ fontWeight: 600 }}>สภาพ</TableCell>
+                      <TableCell sx={{ fontWeight: 600, width: 48 }}>📷</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -315,14 +456,14 @@ export default function DonationFormPage() {
                       Array.from({ length: 6 }).map((_, i) => (
                         <TableRow key={i}>
                           <TableCell padding="checkbox"><Skeleton variant="rectangular" width={20} height={20} /></TableCell>
-                          {[1, 2, 3, 4, 5].map(j => (
+                          {[1, 2, 3, 4, 5, 6].map(j => (
                             <TableCell key={j}><Skeleton variant="text" width="80%" /></TableCell>
                           ))}
                         </TableRow>
                       ))
                     ) : filteredAssets.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} align="center" sx={{ py: 5 }}>
+                        <TableCell colSpan={7} align="center" sx={{ py: 5 }}>
                           <InventoryIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
                           <Typography variant="body2" color="text.secondary">
                             {assetSearch ? 'ไม่พบทรัพย์สินที่ตรงกับการค้นหา' : 'ไม่มีทรัพย์สินที่ปลดระวางแล้ว'}
@@ -368,6 +509,45 @@ export default function DonationFormPage() {
                                   onClick={e => e.stopPropagation()}
                                   sx={{ minWidth: 130 }}
                                 />
+                              ) : (
+                                <Typography variant="caption" color="text.disabled">—</Typography>
+                              )}
+                            </TableCell>
+                            <TableCell onClick={e => e.stopPropagation()} sx={{ px: 0.5 }}>
+                              {isSelected ? (
+                                <>
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    hidden
+                                    ref={el => { itemInputRefs.current[a.id] = el; }}
+                                    onChange={e => {
+                                      const file = e.target.files?.[0];
+                                      if (file) setItemImage(a.id, file);
+                                      e.target.value = '';
+                                    }}
+                                  />
+                                  {itemPreviews[a.id] ? (
+                                    <Box
+                                      component="img"
+                                      src={itemPreviews[a.id]}
+                                      onClick={() => itemInputRefs.current[a.id]?.click()}
+                                      sx={{
+                                        width: 32, height: 32, borderRadius: '8px',
+                                        objectFit: 'cover', cursor: 'pointer',
+                                        border: '1px solid', borderColor: 'divider',
+                                      }}
+                                    />
+                                  ) : (
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => itemInputRefs.current[a.id]?.click()}
+                                      sx={{ color: '#6366F1' }}
+                                    >
+                                      <PhotoCameraIcon sx={{ fontSize: 18 }} />
+                                    </IconButton>
+                                  )}
+                                </>
                               ) : (
                                 <Typography variant="caption" color="text.disabled">—</Typography>
                               )}

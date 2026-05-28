@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { pmAPI, assetAPI } from '../../services/api';
+import { pmAPI } from '../../services/api';
 import * as XLSX from 'xlsx';
 
 /* ─────────────────────────────────────────────────────────────
@@ -134,7 +134,10 @@ export default function PMRunPage() {
   const openPM = (run: any) => {
     // Pre-fill from existing answers if run is in progress
     const pre: Record<string, any> = {};
-    (run.answers || []).forEach((a: any) => { pre[a.key || a.itemKey] = a.value; });
+    (run.answers || []).forEach((a: any) => {
+      const key = a.item?.key || a.key || a.itemKey;
+      if (key) pre[key] = a.value;
+    });
     setAnswers(pre);
     setPMModal({ open: true, run });
   };
@@ -147,18 +150,28 @@ export default function PMRunPage() {
   };
 
   /* ── Save PM ── */
-  const handleSave = async () => {
+  const handleSave = async (nextStatus: 'IN_PROGRESS' | 'COMPLETED' = 'COMPLETED') => {
     const run = pmModal.run;
     if (!run) return;
     setSaving(true);
     try {
       const items = getChecklistItems(run);
-      const answerList = items.map((item: any) => ({
+      const answerList = items.filter((item: any) => item.id).map((item: any) => ({
         itemId: item.id,
         key: item.key,
         value: answers[item.key] !== undefined ? String(answers[item.key]) : '',
       }));
-      await pmAPI.performRun(run.id, { answers: answerList });
+      if (items.length === 0 || answerList.length !== items.length) {
+        showToast('❌ แผน PM นี้ยังไม่มี Checklist Template');
+        return;
+      }
+      await pmAPI.performRun(run.id, { answers: answerList, status: nextStatus });
+      if (nextStatus === 'IN_PROGRESS') {
+        showToast(`✅ บันทึกร่าง PM สำหรับ ${run.asset?.assetCode} สำเร็จ`);
+        setPMModal({ open: false, run: null });
+        fetchData();
+        return;
+      }
       showToast(`✅ บันทึก PM สำหรับ ${run.asset?.assetCode} สำเร็จ`);
       setPMModal({ open: false, run: null });
       fetchData();
@@ -179,7 +192,7 @@ export default function PMRunPage() {
           'ยี่ห้อ': r.asset?.brand || '',
           'รุ่น': r.asset?.model || '',
           'ผู้ถือครอง': r.asset?.ownerName || '',
-          'แผนก': r.asset?.department || r.plan?.deptTask || '',
+          'แผนก': r.asset?.departmentId || r.plan?.deptTask || '',
           'Location': r.asset?.location || r.plan?.site || '',
           'แผน PM': r.plan?.deptTask || r.plan?.site || '',
           'สถานะ': r.status === 'COMPLETED' ? 'เสร็จแล้ว' : r.status === 'IN_PROGRESS' ? 'กำลังทำ' : 'รอดำเนินการ',
@@ -188,7 +201,7 @@ export default function PMRunPage() {
         };
         // Flatten checklist answers
         (r.answers || []).forEach((a: any) => {
-          row[a.label || a.key] = a.value;
+          row[a.item?.label || a.label || a.item?.key || a.key] = a.value;
         });
         return row;
       });
@@ -374,7 +387,7 @@ export default function PMRunPage() {
                       </td>
                       <td style={{ padding: '10px 14px', fontSize: 11, color: '#475569' }}>{r.asset?.ownerName || '—'}</td>
                       <td style={{ padding: '10px 14px', fontSize: 11, color: '#475569' }}>
-                        {r.asset?.department || r.plan?.deptTask || r.asset?.location || r.plan?.site || '—'}
+                        {r.asset?.departmentId || r.plan?.deptTask || r.asset?.location || r.plan?.site || '—'}
                       </td>
                       <td style={{ padding: '10px 14px' }}>
                         <span style={{ fontSize: 10, fontWeight: 600, background: '#f1f5f9', padding: '2px 8px', borderRadius: 5, color: '#64748b' }}>
@@ -429,7 +442,7 @@ export default function PMRunPage() {
               <div style={{ background: '#f8fafc', borderBottom: '1px solid #f1f5f9', padding: '10px 20px', display: 'flex', flexWrap: 'wrap', gap: 12 }}>
                 {[
                   { lbl: 'ผู้ถือครอง', val: pmModal.run.asset?.ownerName || '—' },
-                  { lbl: 'แผนก', val: pmModal.run.asset?.department || pmModal.run.plan?.deptTask || '—' },
+                  { lbl: 'แผนก', val: pmModal.run.asset?.departmentId || pmModal.run.plan?.deptTask || '—' },
                   { lbl: 'Location', val: pmModal.run.asset?.location || pmModal.run.plan?.site || '—' },
                   { lbl: 'Serial No.', val: pmModal.run.asset?.serialNo || '—' },
                 ].map(i => (
@@ -498,9 +511,12 @@ export default function PMRunPage() {
               <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end', gap: 8, flexShrink: 0 }}>
                 <button className="pmr-btn pmr-btn-outline" onClick={() => setPMModal({ open: false, run: null })}>ปิด</button>
                 {!isDoneRun && (
-                  <button className="pmr-btn pmr-btn-success" onClick={handleSave} disabled={saving}>
+                  <>
+                  <button className="pmr-btn pmr-btn-outline" onClick={() => handleSave('IN_PROGRESS')} disabled={saving}>บันทึกร่าง</button>
+                  <button className="pmr-btn pmr-btn-success" onClick={() => handleSave('COMPLETED')} disabled={saving}>
                     {saving ? '⏳ กำลังบันทึก...' : '💾 บันทึกผล PM'}
                   </button>
+                  </>
                 )}
               </div>
             </>

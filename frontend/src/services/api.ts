@@ -134,6 +134,9 @@ export const pmAPI = {
   updateTemplate: (id: number, data: any) => api.put(`/pm/templates/${id}`, data),
   plans: (params?: any) => api.get('/pm/plans', { params }),
   createPlan: (data: any) => api.post('/pm/plans', data),
+  updatePlan: (id: number, data: any) => api.put(`/pm/plans/${id}`, data),
+  deletePlan: (id: number) => api.delete(`/pm/plans/${id}`),
+  eligibility: (params: any) => api.get('/pm/plans/eligibility', { params }),
   generate: (planId: number) => api.post(`/pm/plans/${planId}/generate`),
   runs: (params?: any) => api.get('/pm/runs', { params }),
   performRun: (runId: number, data: any) => api.post(`/pm/runs/${runId}/perform`, data),
@@ -201,6 +204,27 @@ export const donationAPI = {
   create: (data: any) => api.post('/donations', data),
   update: (id: number, data: any) => api.put(`/donations/${id}`, data),
   delete: (id: number) => api.delete(`/donations/${id}`),
+  // Batch-level images
+  uploadImage: (id: number, file: File, caption?: string) => {
+    const fd = new FormData();
+    fd.append('image', file);
+    if (caption) fd.append('caption', caption);
+    return api.post(`/donations/${id}/images`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  deleteImage: (id: number, imageId: number) =>
+    api.delete(`/donations/${id}/images/${imageId}`),
+  // Item-level images
+  uploadItemImage: (id: number, itemId: number, file: File) => {
+    const fd = new FormData();
+    fd.append('image', file);
+    return api.post(`/donations/${id}/items/${itemId}/image`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  deleteItemImage: (id: number, itemId: number) =>
+    api.delete(`/donations/${id}/items/${itemId}/image`),
 };
 
 // Categories

@@ -314,6 +314,55 @@ async function upsertAssetDetail(prisma: any, assetId: number, type: string, det
 
 const ASSET_STATUS_OPTIONS = new Set(['Available', 'Borrowed', 'InUse', 'Maintenance', 'Retired', 'Lost']);
 
+const cleanMasterValue = (value: unknown) => {
+  const text = String(value ?? '').trim();
+  if (!text || text === '-' || text === '#N/A' || text === '0') return '';
+  return text;
+};
+
+async function syncMasterDataFromAsset(asset: {
+  type?: string | null;
+  location?: string | null;
+  company?: string | null;
+  vendor?: string | null;
+}) {
+  const type = cleanMasterValue(asset.type);
+  const location = cleanMasterValue(asset.location);
+  const company = cleanMasterValue(asset.company);
+  const vendor = cleanMasterValue(asset.vendor);
+
+  await prisma.$transaction([
+    ...(type ? [
+      prisma.deviceType.upsert({
+        where: { name: type },
+        update: {},
+        create: { name: type, description: type },
+      }),
+    ] : []),
+    ...(location ? [
+      prisma.assetLocation.upsert({
+        where: { name: location },
+        update: company ? { company } : {},
+        create: { name: location, description: location, company: company || null },
+      }),
+    ] : []),
+    ...(company ? [
+      prisma.company.upsert({
+        where: { name: company },
+        update: {},
+        create: { name: company },
+      }),
+    ] : []),
+    ...(vendor ? [
+      prisma.vendor.upsert({
+        where: { name: vendor },
+        update: {},
+        create: { name: vendor },
+      }),
+    ] : []),
+  ]);
+}
+
 const ASSET_TYPE_GROUPS: Record<string, string[]> = {
   computers: ['Computer', 'Notebook', 'PC Desktop', 'Desktop PC', 'Laptop', 'Workstation', 'Macbook', 'Mini PC', 'All-in-One', 'Thin Client'],
   monitors: ['Monitor', 'Monitor มาตรฐาน', 'Monitor Ultrawide', 'Monitor Curved', 'Monitor 4K'],
@@ -789,9 +838,25 @@ router.delete('/locations/:locationId', authenticate, authorize('IT_ADMIN', 'SUP
 
 router.post('/locations/import-from-assets', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const rows = await prisma.asset.findMany({ where: { location: { not: null } }, distinct: ['location'], select: { location: true }, orderBy: { location: 'asc' } });
-    const names = rows.map((row) => row.location?.trim()).filter(Boolean) as string[];
-    const result = await prisma.$transaction(names.map((name) => prisma.assetLocation.upsert({ where: { name }, update: {}, create: { name } })));
+    const rows = await prisma.asset.groupBy({
+      by: ['location', 'company'],
+      where: { location: { not: null } },
+      orderBy: { location: 'asc' },
+    });
+    const locationByName = new Map<string, string | null>();
+    for (const row of rows) {
+      const name = cleanMasterValue(row.location);
+      if (!name) continue;
+      const company = cleanMasterValue(row.company) || null;
+      if (!locationByName.has(name) || (!locationByName.get(name) && company)) {
+        locationByName.set(name, company);
+      }
+    }
+    const result = await prisma.$transaction(Array.from(locationByName.entries()).map(([name, company]) => prisma.assetLocation.upsert({
+      where: { name },
+      update: company ? { company } : {},
+      create: { name, description: name, company },
+    })));
     res.json({ imported: result.length });
   } catch (err) { next(err); }
 });
@@ -1651,12 +1716,14 @@ function getAssetDetail(prisma: any, assetId: number, type?: string | null) {
         const purchaseDate = purchaseDateStr ? new Date(purchaseDateStr) : null;
         const budgetVal = row['budget'] || row['Budget'] || row['งบประมาณ'];
 
-        const finalAssetCode = assetCode && String(assetCode) !== '-' ? String(assetCode) : null;
-        const finalSerialNo = serialNo ? String(serialNo) : null;
+        // Normalize assetCode: empty/blank/"-" → null to avoid unique constraint clash
+        const rawAssetCode = assetCode ? String(assetCode).trim() : '';
+        const finalAssetCode = rawAssetCode && rawAssetCode !== '-' ? rawAssetCode : null;
+        const finalSerialNo = serialNo ? String(serialNo).trim() : null;
 
         const assetData: any = {
           assetCode: finalAssetCode,
-          assetName: String(row['assetName'] || row['Asset Name'] || row['ชื่อทรัพย์สิน'] || ''),
+          assetName: String(row['assetName'] || row['Asset Name'] || row['ชื่อทรัพย์สิน'] || '').trim() || null,
           serialNo: String(finalSerialNo),
           type: String(row['type'] || row['ประเภท'] || row['Type'] || row['ประเภทอุปกรณ์'] || ''),
           categoryId,
@@ -1666,7 +1733,7 @@ function getAssetDetail(prisma: any, assetId: number, type?: string | null) {
           company: String(row['company'] || row['Company'] || row['บริษัท'] || ''),
           ownerName: String(row['ownerName'] || row['Owner'] || row['ผู้ถือครอง'] || ''),
           departmentId: String(row['departmentId'] || row['Department'] || row['แผนก'] || ''),
-          location: String(row['location'] || row['ที่ตั้ง'] || row['Location'] || row['สถานที่'] || ''),
+          location: String(row['location'] || row['ที่ตั้ง'] || row['Location'] || row['สถานที่'] || row['สถานที่ติดตั้ง'] || row['อาคาร'] || row['สถานที่ติดตั้ง/อาคาร'] || ''),
           floor: String(row['floor'] || row['Floor'] || row['ชั้น'] || ''),
           oldAssetCode: (row['Old Asset Code'] || row['รหัสทรัพย์สินเดิม']) ? String(row['Old Asset Code'] || row['รหัสทรัพย์สินเดิม']) : null,
           domainName: String(row['domainName'] || row['Domain Name'] || ''),
@@ -1689,8 +1756,9 @@ function getAssetDetail(prisma: any, assetId: number, type?: string | null) {
           remark: String(row['remark'] || row['Remark'] || row['หมายเหตุ'] || '')
         };
 
-        const assetNameVal = String(assetData.assetName).trim();
+        const assetNameVal = assetData.assetName ? String(assetData.assetName).trim() : '';
         
+        // Find existing asset by assetCode or serialNo
         let existing = null;
         if (finalAssetCode) {
           existing = await prisma.asset.findUnique({ where: { assetCode: finalAssetCode } });
@@ -1698,6 +1766,8 @@ function getAssetDetail(prisma: any, assetId: number, type?: string | null) {
         if (!existing && finalSerialNo) {
           existing = await prisma.asset.findUnique({ where: { serialNo: finalSerialNo } });
         }
+
+        // Check for assetName duplicate only if assetName is non-empty
         if (assetNameVal) {
           const dup = await prisma.asset.findFirst({
             where: { assetName: assetNameVal, NOT: existing ? { id: existing.id } : undefined }
@@ -1709,12 +1779,40 @@ function getAssetDetail(prisma: any, assetId: number, type?: string | null) {
           }
         }
 
+        // Before update, check if assetCode or serialNo would conflict with another record
+        if (existing) {
+          // Check assetCode conflict: another asset already has this assetCode
+          if (finalAssetCode) {
+            const codeConflict = await prisma.asset.findFirst({
+              where: { assetCode: finalAssetCode, NOT: { id: existing.id } }
+            });
+            if (codeConflict) {
+              errors++;
+              errorDetails.push({ serialNo: serialLabel, reason: `รหัสทรัพย์สิน "${finalAssetCode}" ซ้ำกับทรัพย์สินอื่น (ID: ${codeConflict.id})` });
+              continue;
+            }
+          }
+          // Check serialNo conflict: another asset already has this serialNo
+          if (finalSerialNo) {
+            const serialConflict = await prisma.asset.findFirst({
+              where: { serialNo: finalSerialNo, NOT: { id: existing.id } }
+            });
+            if (serialConflict) {
+              errors++;
+              errorDetails.push({ serialNo: serialLabel, reason: `Serial No. "${finalSerialNo}" ซ้ำกับทรัพย์สินอื่น (ID: ${serialConflict.id})` });
+              continue;
+            }
+          }
+        }
+
         let savedAsset;
         if (existing) {
           savedAsset = await prisma.asset.update({ where: { id: existing.id }, data: assetData });
         } else {
           savedAsset = await prisma.asset.create({ data: assetData });
         }
+
+        await syncMasterDataFromAsset(savedAsset);
 
         if (savedAsset.type) {
           const detailFieldMap: Record<string, string> = {
