@@ -79,6 +79,7 @@ export const assetAPI = {
   companyOptions: () => api.get('/assets/options/companies'),
   antivirusOptions: () => api.get('/assets/options/antivirus'),
   deviceTypes: () => api.get('/assets/device-types'),
+  filterOptions: () => api.get('/assets/filter-options'),
   createDeviceType: (data: any) => api.post('/assets/device-types', data),
   updateDeviceType: (id: number, data: any) => api.put(`/assets/device-types/${id}`, data),
   deleteDeviceType: (id: number) => api.delete(`/assets/device-types/${id}`),
@@ -190,6 +191,16 @@ export const inventoryAPI = {
   checkin: (id: number, data: any) => api.post(`/inventory/${id}/checkin`, data),
   checkout: (id: number, data: any) => api.post(`/inventory/${id}/checkout`, data),
   categories: () => api.get('/inventory/categories/list'),
+};
+
+// Donations
+export const donationAPI = {
+  retiredAssets: () => api.get('/donations/assets/retired'),
+  list: () => api.get('/donations'),
+  get: (id: number) => api.get(`/donations/${id}`),
+  create: (data: any) => api.post('/donations', data),
+  update: (id: number, data: any) => api.put(`/donations/${id}`, data),
+  delete: (id: number) => api.delete(`/donations/${id}`),
 };
 
 // Categories

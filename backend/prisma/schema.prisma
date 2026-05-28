@@ -28,6 +28,7 @@ model AppUser {
   checkouts         Checkout[]
   pmRunsPerformed   PMRun[]           @relation("PMRunPerformedBy")
   returns           Return[]
+  donations         Donation[]
 
   @@index([role, isActive])
   @@index([department])
@@ -92,6 +93,7 @@ model Asset {
   cableDetail        CableDetail?
   consumableDetail   ConsumableDetail?
   category           Category?               @relation(fields: [categoryId], references: [id])
+  donationItem       DonationItem?
 
   @@index([status, departmentId, location])
   @@index([type, brand])
@@ -668,6 +670,45 @@ model ScheduledJob {
   completedAt DateTime?
 
   @@map("scheduled_jobs")
+}
+
+enum DonationStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+model Donation {
+  id               Int            @id @default(autoincrement())
+  batchRef         String         @unique
+  donationDate     DateTime
+  recipientName    String
+  recipientAddress String?
+  recipientContact String?
+  recipientPhone   String?
+  approvalRef      String?
+  notes            String?
+  status           DonationStatus @default(PENDING)
+  createdById      Int
+  createdBy        AppUser        @relation(fields: [createdById], references: [id])
+  items            DonationItem[]
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@map("donations")
+}
+
+model DonationItem {
+  id         Int      @id @default(autoincrement())
+  donationId Int
+  donation   Donation @relation(fields: [donationId], references: [id], onDelete: Cascade)
+  assetId    Int      @unique
+  asset      Asset    @relation(fields: [assetId], references: [id])
+  condition  String?
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  @@map("donation_items")
 }
 
 enum UserRole {

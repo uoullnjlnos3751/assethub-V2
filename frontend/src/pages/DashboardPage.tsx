@@ -256,7 +256,7 @@ export default function DashboardPage() {
   const pmDone      = pmSummary?.completed || 0;
   const pmPct       = pct(pmDone, pmTotal);
 
-  const borrowActive  = borrowSummary?.activeBorrows || 0;
+  const borrowActive  = borrowSummary?.activeItems || 0;
   const borrowPending = borrowSummary?.pendingApproval || 0;
   const borrowOverdue = borrowSummary?.overdue || 0;
 

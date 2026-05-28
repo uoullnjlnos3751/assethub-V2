@@ -111,6 +111,7 @@ const adminNav: NavEntry[] = [
     children: [
       { label: 'นำเข้า/ส่งออก', path: '/assets/import-export', icon: <ImportExportIcon fontSize="small" /> },
       { label: 'พิมพ์ QR สติ๊กเกอร์', path: '/assets/print-qr', icon: <PrintIcon fontSize="small" /> },
+      { label: 'บริจาคทรัพย์สิน', path: '/donations', icon: <HandymanIcon fontSize="small" /> },
     ],
   },
   {

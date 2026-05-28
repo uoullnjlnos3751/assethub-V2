@@ -15,12 +15,14 @@ import {
   FormControl,
   Grid,
   IconButton,
+  InputAdornment,
   InputLabel,
   List,
   ListItem,
   ListItemText,
   MenuItem,
   Select,
+  Stack,
   TextField,
   Tooltip,
   Typography,
@@ -222,11 +224,13 @@ export default function AssetListPage() {
     categoryAPI.all().then((res) => setCategories(res.data)).catch(() => setCategories([]));
   }, []);
 
+  // Fetch overall status stats for the stat cards
   useEffect(() => {
-    assetAPI.typeOptions()
-      .then((res) => setTypeOptions(res.data || []))
-      .catch(() => setTypeOptions([]));
-  }, []);
+    if (!isAvailableOnlyView) {
+      assetAPI.stats(typeGroup || '').then((res) => setCategoryStats(res.data)).catch(() => {});
+    }
+  }, [typeGroup, isAvailableOnlyView]);
+
 
   useEffect(() => {
     localStorage.setItem(COLUMN_PREF_KEY, JSON.stringify(columnConfig));
@@ -524,31 +528,66 @@ export default function AssetListPage() {
         </Box>
       </Box>
 
+      {/* ── Stat Cards — shown for admin views only ── */}
+      {!isAvailableOnlyView && (
+        <Stack direction="row" spacing={2} sx={{ mb: 3, flexWrap: 'wrap' }}>
+          {[
+            { label: 'ทั้งหมด',      value: total,  color: '#6366F1', bg: alpha('#6366F1', 0.1), dot: '#6366F1', statusKey: '' },
+            { label: 'พร้อมใช้งาน', value: null,   color: '#059669', bg: alpha('#10B981', 0.1), dot: '#10B981', statusKey: 'Available' },
+            { label: 'ใช้งานประจำ', value: null,   color: '#2563EB', bg: alpha('#3B82F6', 0.1), dot: '#3B82F6', statusKey: 'InUse' },
+            { label: 'ซ่อมบำรุง',   value: null,   color: '#d97706', bg: alpha('#f59e0b', 0.1), dot: '#f59e0b', statusKey: 'Maintenance' },
+            { label: 'ปลดระวาง',    value: null,   color: '#6b7280', bg: alpha('#9ca3af', 0.1), dot: '#9ca3af', statusKey: 'Retired' },
+          ].map((s) => {
+            const count =
+              s.statusKey === ''
+                ? total
+                : (categoryStats?.byStatus.find((b) => b.status === s.statusKey)?._count ?? '—');
+            const isActive = s.statusKey === '' ? status === '' : status === s.statusKey;
+            return (
+              <Card
+                key={s.label}
+                onClick={() => { setStatus(s.statusKey); setPage(0); }}
+                sx={{
+                  flex: '1 1 auto', minWidth: 110, cursor: 'pointer',
+                  border: '1px solid',
+                  borderColor: isActive ? s.dot : 'divider',
+                  bgcolor: isActive ? s.bg : 'background.paper',
+                  transition: 'all 0.15s',
+                  '&:hover': { borderColor: s.dot, bgcolor: s.bg },
+                }}
+              >
+                <CardContent sx={{ py: '12px !important', px: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: s.dot, flexShrink: 0 }} />
+                    <Typography variant="caption" color="text.secondary" fontWeight={500} noWrap>{s.label}</Typography>
+                  </Box>
+                  <Typography variant="h5" fontWeight={700} sx={{ color: s.color, lineHeight: 1.2 }}>
+                    {typeof count === 'number' ? count.toLocaleString() : count}
+                  </Typography>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </Stack>
+      )}
+
       <Card sx={{ p: 2.5, mb: 3 }}>
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
           <TextField
-            label="ค้นหา"
+            placeholder="ค้นหาเลขครุภัณฑ์ ชื่อ S/N ยี่ห้อ..."
             size="small"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            sx={{ minWidth: 300, flex: 1 }}
-            InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} /> }}
+            sx={{ minWidth: 280, flex: 1 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                </InputAdornment>
+              ),
+            }}
           />
-          {!isAvailableOnlyView && (
-            <FormControl size="small" sx={{ minWidth: 160 }}>
-              <InputLabel>สถานะ</InputLabel>
-              <Select value={status} label="สถานะ" onChange={(e) => { setStatus(e.target.value); setPage(0); }}>
-                <MenuItem value="">ทั้งหมด</MenuItem>
-                <MenuItem value="Available">พร้อมใช้งาน</MenuItem>
-                <MenuItem value="Borrowed">กำลังยืม</MenuItem>
-                <MenuItem value="InUse">ใช้งานประจำ</MenuItem>
-                <MenuItem value="Maintenance">ซ่อมบำรุง</MenuItem>
-                <MenuItem value="Retired">ปลดระวาง</MenuItem>
-                <MenuItem value="Lost">สูญหาย</MenuItem>
-              </Select>
-            </FormControl>
-          )}
           <FormControl size="small" sx={{ minWidth: 180 }}>
             <InputLabel>ประเภท</InputLabel>
             <Select value={type} label="ประเภท" onChange={(e) => { setType(e.target.value); setPage(0); }}>
@@ -560,6 +599,39 @@ export default function AssetListPage() {
           </FormControl>
           <Button variant="contained" startIcon={<SearchIcon />} onClick={handleSearch}>ค้นหา</Button>
         </Box>
+
+        {/* Status filter chips — only for admin view */}
+        {!isAvailableOnlyView && (
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1.5, pt: 1.5, borderTop: '0.5px solid', borderColor: 'divider', alignItems: 'center' }}>
+            <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ mr: 0.5 }}>สถานะ:</Typography>
+            {[
+              { value: '',            label: 'ทั้งหมด' },
+              { value: 'Available',   label: 'พร้อมใช้งาน' },
+              { value: 'InUse',       label: 'ใช้งานประจำ' },
+              { value: 'Borrowed',    label: 'กำลังยืม' },
+              { value: 'Maintenance', label: 'ซ่อมบำรุง' },
+              { value: 'Retired',     label: 'ปลดระวาง' },
+              { value: 'Lost',        label: 'สูญหาย' },
+            ].map((opt) => (
+              <Chip
+                key={opt.value}
+                label={opt.label}
+                size="small"
+                onClick={() => { setStatus(opt.value); setPage(0); }}
+                variant={status === opt.value ? 'filled' : 'outlined'}
+                color={
+                  status === opt.value
+                    ? (opt.value === 'Available' ? 'success'
+                      : opt.value === 'Maintenance' ? 'warning'
+                      : opt.value === 'Lost' ? 'error'
+                      : 'primary')
+                    : 'default'
+                }
+                sx={{ cursor: 'pointer', fontWeight: status === opt.value ? 600 : 400 }}
+              />
+            ))}
+          </Box>
+        )}
       </Card>
       
       {/* Category Filter Chips — for user available-view */}

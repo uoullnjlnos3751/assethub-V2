@@ -29,7 +29,7 @@ const upload = multer({
 
 const uploadExcel = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
 });
 
 const router = Router();
@@ -170,6 +170,13 @@ async function upsertAssetDetail(prisma: any, assetId: number, type: string, det
       snComputer: cleanDetail.snComputer,
     };
     const finalData = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));
+    
+    // Sync to parent Asset columns to prevent empty specs in main asset queries
+    await prisma.asset.update({
+      where: { id: assetId },
+      data: finalData,
+    });
+
     return prisma.computerDetail.upsert({
       where: { assetId },
       create: { assetId, ...finalData },
@@ -314,12 +321,12 @@ const ASSET_TYPE_GROUPS: Record<string, string[]> = {
   printers: ['Printer', 'Laser Printer', 'Inkjet Printer', 'Thermal Printer', 'Dot Matrix Printer'],
   phonesTablets: ['Phone', 'Tablet', 'Smartphone', 'Mobile Phone', 'Mobile Hotspot'],
   network: ['Network', 'Network Device', 'Switch', 'Router', 'Firewall', 'Access Point', 'AP', 'Modem'],
-  rack: ['Server Rack', 'PDU', 'UPS', 'Enclosure'],
+  rack: ['Server Rack', 'Server', 'PDU', 'UPS', 'Enclosure'],
 };
 
 router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { search, status, department, location, type, typeGroup, categoryId, cpu, ram, warrantyExpiringInDays, ownerName, page = '1', limit = '50' } = req.query;
+    const { search, status, department, location, type, typeGroup, categoryId, cpu, ram, warrantyStatus, warrantyExpiringInDays, ownerName, screenSize, resolution, panelType, printerType, isColor, ipAddress, storage, osType, page = '1', limit = '50' } = req.query;
     const pageNum = parseInt(page as string);
     const limitNum = Math.min(parseInt(limit as string), 100);
     const skip = (pageNum - 1) * limitNum;
@@ -338,28 +345,81 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
       where.ownerName = { contains: ownerName as string, mode: 'insensitive' };
     }
     if (cpu) {
-      where.cpu = { contains: cpu as string, mode: 'insensitive' };
+      const cpuList = (cpu as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (cpuList.length > 1) {
+        where.OR = [...(where.OR || []), ...cpuList.map(val => ({ cpu: { contains: val, mode: 'insensitive' as const } }))];
+      } else {
+        where.cpu = { contains: cpu as string, mode: 'insensitive' };
+      }
     }
     if (ram) {
-      where.OR = [...(where.OR || []), { ram: { contains: ram as string, mode: 'insensitive' } }];
+      const ramList = (ram as string).split(',').map(s => s.trim()).filter(Boolean);
+      const ramConds = ramList.map(val => ({ ram: { contains: val, mode: 'insensitive' as const } }));
+      where.OR = [...(where.OR || []), ...ramConds];
     }
     if (search) {
       where.OR = [
         ...(where.OR || []),
         { assetCode: { contains: search as string, mode: 'insensitive' } },
+        { assetName: { contains: search as string, mode: 'insensitive' } },
         { serialNo: { contains: search as string, mode: 'insensitive' } },
+        { brand: { contains: search as string, mode: 'insensitive' } },
         { model: { contains: search as string, mode: 'insensitive' } },
+        { type: { contains: search as string, mode: 'insensitive' } },
+        { location: { contains: search as string, mode: 'insensitive' } },
+        { departmentId: { contains: search as string, mode: 'insensitive' } },
         { ownerName: { contains: search as string, mode: 'insensitive' } },
       ];
     }
-    // warranty expiring within N days
-    if (warrantyExpiringInDays) {
-      const days = parseInt(warrantyExpiringInDays as string);
-      if (!isNaN(days)) {
-        const now = new Date();
+    // warranty filter: active / expired / none / expiringSoon
+    const now = new Date();
+    if (warrantyStatus) {
+      const ws = (warrantyStatus as string).toLowerCase();
+      if (ws === 'active') {
+        where.warrantyEndDate = { gte: now };
+      } else if (ws === 'expired') {
+        where.warrantyEndDate = { lt: now };
+      } else if (ws === 'none') {
+        where.warrantyEndDate = null;
+      } else if (ws === 'expiringsoon') {
+        const days = parseInt(warrantyExpiringInDays as string) || 30;
         const future = new Date(Date.now() + days * 86400000);
         where.warrantyEndDate = { gte: now, lte: future };
       }
+    } else if (warrantyExpiringInDays) {
+      const days = parseInt(warrantyExpiringInDays as string);
+      if (!isNaN(days)) {
+        const future = new Date(Date.now() + days * 86400000);
+        where.warrantyEndDate = { gte: now, lte: future };
+      }
+    }
+
+    // Type-specific detail filters
+    if (screenSize) {
+      where.monitorDetail = { ...(where.monitorDetail || {}), screenSize: { contains: screenSize as string, mode: 'insensitive' } };
+    }
+    if (resolution) {
+      where.monitorDetail = { ...(where.monitorDetail || {}), resolution: { contains: resolution as string, mode: 'insensitive' } };
+    }
+    if (panelType) {
+      where.monitorDetail = { ...(where.monitorDetail || {}), panelType: { contains: panelType as string, mode: 'insensitive' } };
+    }
+    if (printerType) {
+      where.printerDetail = { ...(where.printerDetail || {}), printerType: { contains: printerType as string, mode: 'insensitive' } };
+    }
+    if (isColor) {
+      where.printerDetail = { ...(where.printerDetail || {}), isColor: isColor === 'true' };
+    }
+    if (ipAddress) {
+      where.networkDeviceDetail = { ...(where.networkDeviceDetail || {}), ipAddress: { contains: ipAddress as string, mode: 'insensitive' } };
+    }
+    if (storage) {
+      const storageList = (storage as string).split(',').map(s => s.trim()).filter(Boolean);
+      const storageConds = storageList.map(val => ({ storage1: { contains: val, mode: 'insensitive' as const } }));
+      where.OR = [...(where.OR || []), ...storageConds];
+    }
+    if (osType) {
+      where.osType = { contains: osType as string, mode: 'insensitive' };
     }
 
     // Data scoping: USER can only see Available assets
@@ -390,6 +450,34 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
     res.json({ data: enriched, total, page: pageNum, totalPages: Math.ceil(total / limitNum) });
   } catch (err) { next(err); }
   });
+
+router.get('/filter-options', authenticate, async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const notNull = { not: null };
+    const [cpus, rams, osTypes, storages, screenSizes, resolutions, panelTypes, printerTypes, colors] = await Promise.all([
+      prisma.asset.findMany({ distinct: ['cpu'], where: { cpu: notNull }, select: { cpu: true }, orderBy: { cpu: 'asc' } }),
+      prisma.asset.findMany({ distinct: ['ram'], where: { ram: notNull }, select: { ram: true }, orderBy: { ram: 'asc' } }),
+      prisma.asset.findMany({ distinct: ['osType'], where: { osType: notNull }, select: { osType: true }, orderBy: { osType: 'asc' } }),
+      prisma.asset.findMany({ distinct: ['storage1'], where: { storage1: notNull }, select: { storage1: true }, orderBy: { storage1: 'asc' } }),
+      prisma.monitorDetail.findMany({ distinct: ['screenSize'], where: { screenSize: notNull }, select: { screenSize: true }, orderBy: { screenSize: 'asc' } }),
+      prisma.monitorDetail.findMany({ distinct: ['resolution'], where: { resolution: notNull }, select: { resolution: true }, orderBy: { resolution: 'asc' } }),
+      prisma.monitorDetail.findMany({ distinct: ['panelType'], where: { panelType: notNull }, select: { panelType: true }, orderBy: { panelType: 'asc' } }),
+      prisma.printerDetail.findMany({ distinct: ['printerType'], where: { printerType: notNull }, select: { printerType: true }, orderBy: { printerType: 'asc' } }),
+      prisma.printerDetail.findMany({ distinct: ['isColor'], where: { isColor: { not: null } }, select: { isColor: true } }),
+    ]);
+    res.json({
+      cpu: cpus.map(r => r.cpu).filter(c => c && c.trim()),
+      ram: rams.map(r => r.ram).filter(c => c && c.trim()),
+      osType: osTypes.map(r => r.osType).filter(c => c && c.trim()),
+      storage: storages.map(r => r.storage1).filter(c => c && c.trim()),
+      screenSize: screenSizes.map(r => r.screenSize).filter(c => c && c.trim()),
+      resolution: resolutions.map(r => r.resolution).filter(c => c && c.trim()),
+      panelType: panelTypes.map(r => r.panelType).filter(c => c && c.trim()),
+      printerType: printerTypes.map(r => r.printerType).filter(c => c && c.trim()),
+      isColor: colors.map(r => r.isColor).filter(c => c !== null),
+    });
+  } catch (err) { next(err); }
+});
 
 router.get('/check-duplicate', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -1104,6 +1192,8 @@ function getAssetDetail(prisma: any, assetId: number, type?: string | null) {
           'PO Date': asset.poDate ? asset.poDate.toISOString().split('T')[0] : '',
           'PR No.': asset.prNumber,
           'วันที่จัดซื้อ': asset.purchaseDate ? asset.purchaseDate.toISOString().split('T')[0] : '',
+          'วันหมดประกัน': asset.warrantyEndDate ? asset.warrantyEndDate.toISOString().split('T')[0] : '',
+          'ราคาจัดซื้อ': asset.purchasePrice ?? '',
           'Vendor': asset.vendor,
           'งบประมาณ': asset.budget,
           'หมายเหตุ': asset.remark,
@@ -1112,7 +1202,7 @@ function getAssetDetail(prisma: any, assetId: number, type?: string | null) {
           ...details
         };
       });
-    
+
       const emptyRow = {
         'ID': '',
         'เลขครุภัณฑ์': '',
@@ -1134,6 +1224,8 @@ function getAssetDetail(prisma: any, assetId: number, type?: string | null) {
         'PO Date': '',
         'PR No.': '',
         'วันที่จัดซื้อ': '',
+        'วันหมดประกัน': '',
+        'ราคาจัดซื้อ': '',
         'Vendor': '',
         'งบประมาณ': '',
         'หมายเหตุ': '',
@@ -1475,6 +1567,8 @@ function getAssetDetail(prisma: any, assetId: number, type?: string | null) {
           'PO Date': asset.poDate ? asset.poDate.toISOString().split('T')[0] : '',
           'PR No.': asset.prNumber,
           'วันที่จัดซื้อ': asset.purchaseDate ? asset.purchaseDate.toISOString().split('T')[0] : '',
+          'วันหมดประกัน': asset.warrantyEndDate ? asset.warrantyEndDate.toISOString().split('T')[0] : '',
+          'ราคาจัดซื้อ': asset.purchasePrice ?? '',
           'Vendor': asset.vendor,
           'งบประมาณ': asset.budget,
           'หมายเหตุ': asset.remark,
@@ -1495,6 +1589,33 @@ function getAssetDetail(prisma: any, assetId: number, type?: string | null) {
     }
   });
 
+  function getCategoryIdByAssetType(type: string): number | null {
+    const t = (type || '').toLowerCase().trim();
+    if (!t) return null;
+    if (t.includes('notebook') || t.includes('computer') || t.includes('macbook') || t === 'pc' || t.includes('laptop') || t.includes('workstation') || t.includes('mini pc')) {
+      return 1; // คอมพิวเตอร์
+    }
+    if (t.includes('ipad') || t.includes('phone') || t.includes('tablet') || t.includes('smartphone')) {
+      return 2; // อุปกรณ์สื่อสาร
+    }
+    if (t.includes('monitor') || t.includes('จอภาพ')) {
+      return 3; // จอภาพ
+    }
+    if (t.includes('printer') || t.includes('เครื่องพิมพ์')) {
+      return 5; // เครื่องพิมพ์
+    }
+    if (t.includes('switch') || t.includes('router') || t.includes('firewall') || t.includes('access point') || t.includes('ap') || t.includes('network')) {
+      return 6; // อุปกรณ์เครือข่าย
+    }
+    if (t.includes('server') || t.includes('rack') || t.includes('pdu') || t.includes('ups') || t.includes('enclosure')) {
+      return 7; // Rack & Infrastructure
+    }
+    if (t.includes('mouse') || t.includes('keyboard') || t.includes('webcam') || t.includes('projector') || t.includes('peripheral') || t.includes('device') || t.includes('dock') || t.includes('ต่อพ่วง')) {
+      return 4; // อุปกรณ์ต่อพ่วง
+    }
+    return null;
+  }
+
   async function importRows(rows: any[], userId: number, res: Response) {
     let success = 0, errors = 0;
     const errorDetails: { serialNo: string; reason: string }[] = [];
@@ -1511,6 +1632,7 @@ function getAssetDetail(prisma: any, assetId: number, type?: string | null) {
         }
 
         const categoryName = row['Category'] || row['หมวดหมู่'];
+        const assetType = String(row['type'] || row['ประเภท'] || row['Type'] || row['ประเภทอุปกรณ์'] || '');
         let categoryId = null;
         if (categoryName) {
           const cat = await prisma.category.upsert({
@@ -1519,6 +1641,8 @@ function getAssetDetail(prisma: any, assetId: number, type?: string | null) {
             update: {}
           });
           categoryId = cat.id;
+        } else if (assetType) {
+          categoryId = getCategoryIdByAssetType(assetType);
         }
 
         const rawPoDate = row['poDate'] || row['PO Date'];
@@ -1550,6 +1674,16 @@ function getAssetDetail(prisma: any, assetId: number, type?: string | null) {
           poDate: poDate && !isNaN(poDate.getTime()) ? poDate : null,
           prNumber: String(row['prNumber'] || row['PR No.'] || row['PR Number'] || row['เลขที่ PR'] || ''),
           purchaseDate: purchaseDate && !isNaN(purchaseDate.getTime()) ? purchaseDate : null,
+          warrantyEndDate: (() => {
+            const w = row['warrantyEndDate'] || row['Warranty End Date'] || row['วันหมดประกัน'];
+            if (!w) return null;
+            const d = new Date(w);
+            return !isNaN(d.getTime()) ? d : null;
+          })(),
+          purchasePrice: (() => {
+            const p = row['purchasePrice'] || row['Purchase Price'] || row['ราคาจัดซื้อ'];
+            return p ? parseFloat(p) || null : null;
+          })(),
           vendor: String(row['vendor'] || row['Vendor'] || ''),
           budget: budgetVal ? String(budgetVal) : null,
           remark: String(row['remark'] || row['Remark'] || row['หมายเหตุ'] || '')
@@ -1644,7 +1778,9 @@ function getAssetDetail(prisma: any, assetId: number, type?: string | null) {
         'Company', 'Owner', 'ผู้ถือครอง', 'Department', 'แผนก',
         'Location', 'ที่ตั้ง', 'Floor', 'ชั้น',
         'Status', 'สถานะ', 'Vendor', 'PO No.', 'PO Date', 'PR No.',
-        'Purchase Date', 'วันที่จัดซื้อ', 'Budget', 'งบประมาณ',
+        'Purchase Date', 'วันที่จัดซื้อ', 'Warranty End Date', 'วันหมดประกัน',
+        'Purchase Price', 'ราคาจัดซื้อ',
+        'Budget', 'งบประมาณ',
         'Domain Name', 'CPU', 'RAM', 'Storage 1', 'OS', 'Windows Version',
         'Remark', 'หมายเหตุ'
       ];
@@ -1880,8 +2016,12 @@ router.post('/bulk-delete', authenticate, authorize('SUPERADMIN'), async (req: R
     const { ids } = req.body;
     if (!Array.isArray(ids) || ids.length === 0) throw new AppError('No asset IDs provided', 400);
     const result = await prisma.$transaction(async (tx) => {
-      await tx.pMRunAnswer.deleteMany({ where: { run: { assetId: { in: ids } } } });
-      await tx.pMRun.deleteMany({ where: { assetId: { in: ids } } });
+      const pmRuns = await tx.pMRun.findMany({ where: { assetId: { in: ids } }, select: { id: true } });
+      const pmRunIds = pmRuns.map(r => r.id);
+      if (pmRunIds.length > 0) {
+        await tx.pMRunAnswer.deleteMany({ where: { runId: { in: pmRunIds } } });
+        await tx.pMRun.deleteMany({ where: { id: { in: pmRunIds } } });
+      }
       await tx.assetHistory.deleteMany({ where: { assetId: { in: ids } } });
       await tx.borrowRequestItem.updateMany({ where: { assetId: { in: ids } }, data: { assetId: null } });
       return tx.asset.deleteMany({ where: { id: { in: ids } } });
@@ -1894,7 +2034,17 @@ router.post('/bulk-delete-by-type', authenticate, authorize('SUPERADMIN'), async
   try {
     const { type } = req.body;
     if (!type || typeof type !== 'string') throw new AppError('กรุณาระบุประเภททรัพย์สิน', 400);
-    const result = await prisma.asset.deleteMany({ where: { type } });
+    const result = await prisma.$transaction(async (tx) => {
+      const pmRuns = await tx.pMRun.findMany({ where: { asset: { type } }, select: { id: true } });
+      const pmRunIds = pmRuns.map(r => r.id);
+      if (pmRunIds.length > 0) {
+        await tx.pMRunAnswer.deleteMany({ where: { runId: { in: pmRunIds } } });
+        await tx.pMRun.deleteMany({ where: { id: { in: pmRunIds } } });
+      }
+      await tx.assetHistory.deleteMany({ where: { asset: { type } } });
+      await tx.borrowRequestItem.updateMany({ where: { asset: { type } }, data: { assetId: null } });
+      return tx.asset.deleteMany({ where: { type } });
+    });
     res.json({ message: `ลบ ${result.count} รายการจากประเภท ${type} เรียบร้อย`, count: result.count });
   } catch (err) { next(err); }
 });

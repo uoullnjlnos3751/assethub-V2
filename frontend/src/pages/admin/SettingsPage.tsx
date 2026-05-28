@@ -636,6 +636,7 @@ export default function SettingsPage() {
       toast.success(res.data.message || `ลบ ${selectedIds.length} รายการเรียบร้อย`);
       setSelectedIds([]);
       fetchAssetList(assetSearch);
+      fetchTypeCounts();
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || 'เกิดข้อผิดพลาด');
     } finally {

@@ -28,6 +28,9 @@ import VendorsPage from './pages/assets/VendorsPage';
 import AssetStatusesPage from './pages/assets/AssetStatusesPage';
 import ImportExportPage from './pages/assets/ImportExportPage';
 import PrintQRPage from './pages/assets/PrintQRPage';
+import DonationListPage from './pages/donations/DonationListPage';
+import DonationFormPage from './pages/donations/DonationFormPage';
+import DonationDetailPage from './pages/donations/DonationDetailPage';
 import InventoryPage from './pages/inventory/InventoryPage';
 import CategoryPage from './pages/categories/CategoryPage';
 import BorrowOverduePage from './pages/borrow/BorrowOverduePage';
@@ -100,6 +103,10 @@ export default function App() {
         <Route path="admin/settings" element={<ProtectedRoute roles={['SUPERADMIN']}><SettingsPage /></ProtectedRoute>} />
         <Route path="admin/notification-logs" element={<ProtectedRoute roles={['SUPERADMIN']}><NotificationLogsPage /></ProtectedRoute>} />
         <Route path="admin/audit-log" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><AuditLogPage /></ProtectedRoute>} />
+        {/* Donations */}
+        <Route path="donations" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><DonationListPage /></ProtectedRoute>} />
+        <Route path="donations/new" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><DonationFormPage /></ProtectedRoute>} />
+        <Route path="donations/:id" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><DonationDetailPage /></ProtectedRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" />} />
     </Routes>

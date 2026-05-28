@@ -56,12 +56,11 @@ export default function BorrowRequestPage() {
       now.setHours(0, 0, 0, 0);
       const overdue = (itemsRes.data || []).filter((item: any) => item.dueDate && new Date(item.dueDate) < now);
       setOverdueItems(overdue);
-      const activeTypes = [...new Set(
-        (itemsRes.data || [])
-          .filter((item: any) => ['Pending', 'Approved', 'CheckedOut'].includes(item.itemStatus))
-          .map((item: any) => item.asset?.type)
-          .filter(Boolean)
-      )];
+      const activeItems = (itemsRes.data || [])
+        .filter((item: any) => ['Pending', 'Approved', 'CheckedOut'].includes(item.itemStatus))
+        .map((item: any) => item.asset?.type)
+        .filter(Boolean);
+      const activeTypes = [...new Set(activeItems)] as string[];
       setBlockedTypes(activeTypes);
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
