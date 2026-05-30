@@ -1,15 +1,17 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Box, Typography, Card, CardContent, Grid, CircularProgress, Chip, Button, TextField, MenuItem, Select, InputLabel, FormControl, alpha } from '@mui/material';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
 import { assetAPI, dashboardAPI } from '../../services/api';
-import { Boxes, CheckCircle2, AlertTriangle, Wrench, Download, Filter, PieChart } from 'lucide-react';
+import { Boxes, CheckCircle2, AlertTriangle, Wrench, Download, Filter, PieChart, Eye } from 'lucide-react';
 import ReportHeaderTabs from './ReportHeaderTabs';
+import { useNavigate } from 'react-router-dom';
 
 const statusColors: Record<string, string> = { Available: 'success', Borrowed: 'warning', InUse: 'info', Maintenance: 'error', Retired: 'default', Lost: 'error' };
 const statusLabels: Record<string, string> = { Available: 'พร้อมใช้งาน', Borrowed: 'กำลังยืม', InUse: 'ใช้งานประจำ', Maintenance: 'ซ่อมบำรุง', Retired: 'ปลดระวาง', Lost: 'สูญหาย' };
 const CAT_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16'];
 
 export default function ReportAssetsPage() {
+  const navigate = useNavigate();
   const [summary, setSummary] = useState<any>(null);
   const [assets, setAssets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,7 +42,12 @@ export default function ReportAssetsPage() {
   const byCategory = summary?.byCategory || [];
   const byStatus = summary?.byStatus || [];
   const byType = summary?.byType || [];
+  const byCompany = summary?.byCompany || [];
+  const byDepartment = summary?.byDepartment || [];
   const total = summary?.total || 0;
+
+  const sortedCompany = useMemo(() => [...byCompany].sort((a: any, b: any) => (b._count || 0) - (a._count || 0)), [byCompany]);
+  const sortedDepartment = useMemo(() => [...byDepartment].sort((a: any, b: any) => (b._count || 0) - (a._count || 0)), [byDepartment]);
 
   const typeOptions = useMemo(() => [...new Set(assets.map(a => a.type).filter(Boolean))] as string[], [assets]);
 
@@ -90,6 +97,20 @@ export default function ReportAssetsPage() {
       field: 'status', headerName: 'สถานะ', width: 130,
       renderCell: ({ value }) => <Chip label={statusLabels[value] || value} color={(statusColors[value] as any) || 'default'} size="small" />,
     },
+    {
+      field: 'actions',
+      type: 'actions',
+      headerName: 'ดูข้อมูล',
+      width: 100,
+      getActions: (params) => [
+        <GridActionsCellItem
+          icon={<Eye size={18} color="#475569" />}
+          label="ดูรายละเอียด (ซ่อมบำรุง)"
+          onClick={() => navigate(`/assets/${params.id}`)}
+          showInMenu={false}
+        />,
+      ],
+    },
   ];
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}><CircularProgress /></Box>;
@@ -122,28 +143,48 @@ export default function ReportAssetsPage() {
       {/* Summary cards */}
       <Grid container spacing={2.5} sx={{ mb: 4 }}>
         <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '4px solid #4f46e5', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}><CardContent sx={{ p: 2.5 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(99,102,241,0.1)', color: '#4f46e5', display: 'flex' }}><Boxes size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>ทรัพย์สินทั้งหมด</Typography></Box>
-            <Typography variant="h4" fontWeight={800}>{total}</Typography>
-          </CardContent></Card>
+          <Card 
+            onClick={() => setFilterStatus('')}
+            sx={{ borderLeft: '4px solid #4f46e5', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', cursor: 'pointer', transition: 'all 0.2s', '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 6px 12px rgba(0,0,0,0.08)' }, ...(filterStatus === '' ? { bgcolor: 'rgba(79,70,229,0.04)' } : {}) }}
+          >
+            <CardContent sx={{ p: 2.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(99,102,241,0.1)', color: '#4f46e5', display: 'flex' }}><Boxes size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>ทรัพย์สินทั้งหมด</Typography></Box>
+              <Typography variant="h4" fontWeight={800}>{total}</Typography>
+            </CardContent>
+          </Card>
         </Grid>
         <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '4px solid #10b981', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}><CardContent sx={{ p: 2.5 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(16,185,129,0.1)', color: '#059669', display: 'flex' }}><CheckCircle2 size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>พร้อมใช้งาน</Typography></Box>
-            <Typography variant="h4" fontWeight={800}>{byStatus.find((s: any) => s.status === 'Available')?._count || 0}</Typography>
-          </CardContent></Card>
+          <Card 
+            onClick={() => setFilterStatus('Available')}
+            sx={{ borderLeft: '4px solid #10b981', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', cursor: 'pointer', transition: 'all 0.2s', '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 6px 12px rgba(0,0,0,0.08)' }, ...(filterStatus === 'Available' ? { bgcolor: 'rgba(16,185,129,0.04)' } : {}) }}
+          >
+            <CardContent sx={{ p: 2.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(16,185,129,0.1)', color: '#059669', display: 'flex' }}><CheckCircle2 size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>พร้อมใช้งาน</Typography></Box>
+              <Typography variant="h4" fontWeight={800}>{byStatus.find((s: any) => s.status === 'Available')?._count || 0}</Typography>
+            </CardContent>
+          </Card>
         </Grid>
         <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '4px solid #f59e0b', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}><CardContent sx={{ p: 2.5 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(245,158,11,0.1)', color: '#d97706', display: 'flex' }}><AlertTriangle size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>กำลังยืม</Typography></Box>
-            <Typography variant="h4" fontWeight={800}>{byStatus.find((s: any) => s.status === 'Borrowed')?._count || 0}</Typography>
-          </CardContent></Card>
+          <Card 
+            onClick={() => setFilterStatus('Borrowed')}
+            sx={{ borderLeft: '4px solid #f59e0b', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', cursor: 'pointer', transition: 'all 0.2s', '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 6px 12px rgba(0,0,0,0.08)' }, ...(filterStatus === 'Borrowed' ? { bgcolor: 'rgba(245,158,11,0.04)' } : {}) }}
+          >
+            <CardContent sx={{ p: 2.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(245,158,11,0.1)', color: '#d97706', display: 'flex' }}><AlertTriangle size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>กำลังยืม</Typography></Box>
+              <Typography variant="h4" fontWeight={800}>{byStatus.find((s: any) => s.status === 'Borrowed')?._count || 0}</Typography>
+            </CardContent>
+          </Card>
         </Grid>
         <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '4px solid #ef4444', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}><CardContent sx={{ p: 2.5 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(239,68,68,0.08)', color: '#dc2626', display: 'flex' }}><Wrench size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>ซ่อมบำรุง</Typography></Box>
-            <Typography variant="h4" fontWeight={800}>{byStatus.find((s: any) => s.status === 'Maintenance')?._count || 0}</Typography>
-          </CardContent></Card>
+          <Card 
+            onClick={() => setFilterStatus('Maintenance')}
+            sx={{ borderLeft: '4px solid #ef4444', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', cursor: 'pointer', transition: 'all 0.2s', '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 6px 12px rgba(0,0,0,0.08)' }, ...(filterStatus === 'Maintenance' ? { bgcolor: 'rgba(239,68,68,0.04)' } : {}) }}
+          >
+            <CardContent sx={{ p: 2.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(239,68,68,0.08)', color: '#dc2626', display: 'flex' }}><Wrench size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>ซ่อมบำรุง</Typography></Box>
+              <Typography variant="h4" fontWeight={800}>{byStatus.find((s: any) => s.status === 'Maintenance')?._count || 0}</Typography>
+            </CardContent>
+          </Card>
         </Grid>
       </Grid>
 
@@ -240,18 +281,62 @@ export default function ReportAssetsPage() {
         </Grid>
       </Grid>
 
+      {/* Company and Department Breakdown */}
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid item xs={12} md={6}>
+          <Card sx={{ borderRadius: '12px', border: '1px solid rgba(229,231,235,0.7)', boxShadow: '0 4px 12px rgba(0,0,0,0.02)', height: '100%' }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>จำนวนทรัพย์สินแยกตามบริษัท (Company)</Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, maxHeight: 400, overflowY: 'auto', pr: 1 }}>
+                {sortedCompany.map((c: any, i: number) => (
+                  <Box key={i} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1.5, borderRadius: '8px', bgcolor: '#f8fafc', border: '1px solid #f1f5f9' }}>
+                    <Typography variant="body2" fontWeight={600} sx={{ color: '#334155' }}>{c.company || 'ไม่ระบุ'}</Typography>
+                    <Chip label={`${c._count} เครื่อง`} size="small" sx={{ bgcolor: alpha(CAT_COLORS[i % CAT_COLORS.length], 0.1), color: CAT_COLORS[i % CAT_COLORS.length], fontWeight: 700 }} />
+                  </Box>
+                ))}
+                {sortedCompany.length === 0 && <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>ไม่มีข้อมูล</Typography>}
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <Card sx={{ borderRadius: '12px', border: '1px solid rgba(229,231,235,0.7)', boxShadow: '0 4px 12px rgba(0,0,0,0.02)', height: '100%' }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>จำนวนทรัพย์สินแยกตามแผนก (Department)</Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, maxHeight: 400, overflowY: 'auto', pr: 1 }}>
+                {sortedDepartment.map((d: any, i: number) => (
+                  <Box key={i} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1.5, borderRadius: '8px', bgcolor: '#f8fafc', border: '1px solid #f1f5f9' }}>
+                    <Typography variant="body2" fontWeight={600} sx={{ color: '#334155' }}>{d.departmentId || 'ไม่ระบุ'}</Typography>
+                    <Chip label={`${d._count} เครื่อง`} size="small" sx={{ bgcolor: alpha(CAT_COLORS[(i+3) % CAT_COLORS.length], 0.1), color: CAT_COLORS[(i+3) % CAT_COLORS.length], fontWeight: 700 }} />
+                  </Box>
+                ))}
+                {sortedDepartment.length === 0 && <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>ไม่มีข้อมูล</Typography>}
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
       {/* Category breakdown cards */}
       <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>จำนวนทรัพย์สินแยกตามหมวดหมู่การใช้งาน</Typography>
       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 2, mb: 4 }}>
         {byCategory.map((cat: any, i: number) => (
           <Card 
             key={cat.id || i} 
+            onClick={() => {
+              if (search === cat.name) setSearch('');
+              else {
+                setSearch(cat.name); // Using search to filter loosely by name for category
+              }
+            }}
             sx={{ 
               borderRadius: '12px',
               borderTop: `4px solid ${CAT_COLORS[i % CAT_COLORS.length]}`, 
               boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
               background: `linear-gradient(to bottom, #ffffff, ${alpha(CAT_COLORS[i % CAT_COLORS.length], 0.01)})`,
+              cursor: 'pointer',
               transition: 'transform 0.2s, box-shadow 0.2s',
+              ...(search === cat.name ? { border: `2px solid ${CAT_COLORS[i % CAT_COLORS.length]}` } : {}),
               '&:hover': { 
                 boxShadow: '0 8px 16px rgba(0,0,0,0.06)',
                 transform: 'translateY(-2px)'
@@ -322,6 +407,7 @@ export default function ReportAssetsPage() {
             getRowId={(r) => r.id}
             autoHeight
             disableRowSelectionOnClick
+            onRowClick={(params) => navigate(`/assets/${params.id}`)}
             pageSizeOptions={[25, 50, 100]}
             initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
             sx={{ 

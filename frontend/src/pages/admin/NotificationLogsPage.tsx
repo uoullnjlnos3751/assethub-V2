@@ -48,6 +48,7 @@ export default function NotificationLogsPage() {
         getRowId={(r) => r.id}
         autoHeight
         disableRowSelectionOnClick
+        disableColumnFilter
       />
     </Box>
   );

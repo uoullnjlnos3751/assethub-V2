@@ -11,7 +11,10 @@ export interface LDAPUserInfo {
   displayName: string;
   email: string;
   department: string;
+  company?: string;
+  companyThai?: string;
   sAMAccountName?: string;
+  employeeImage?: string;
 }
 
 function createClient() {
@@ -77,64 +80,47 @@ async function bind(client: any, dn: string, password: string): Promise<void> {
 }
 
 export async function authenticateLDAP(username: string, password: string): Promise<LDAPUserInfo | null> {
-  const client = createClient();
-  const searchBindUser = buildBindUser(LDAP_SEARCH_USER);
-
   try {
-    try {
-      await bind(client, searchBindUser, LDAP_SEARCH_PASSWORD);
-    } catch {
-      // Search bind failed (e.g. password expired), fallback to direct bind
-      const directBindUser = buildBindUser(username);
-      await bind(client, directBindUser, password);
-      
-      // Search for user entry using the user's own bind
-      const safeUsername = escapeFilter(username);
-      const entries = await search(client, LDAP_BASE_DN, {
-        scope: 'sub',
-        filter: `(&(objectClass=user)(|(sAMAccountName=${safeUsername})(userPrincipalName=${safeUsername})(mail=${safeUsername})))`,
-        attributes: ['dn', 'displayName', 'mail', 'department', 'sAMAccountName'],
-      });
-
-      const entry = entries[0];
-      if (!entry) return null;
-
-      const userObj = entry.object;
-      return {
-        displayName: userObj.displayName || userObj.sAMAccountName || username,
-        email: userObj.mail || '',
-        department: userObj.department || '',
-        sAMAccountName: userObj.sAMAccountName
-      };
-    }
-
-    const safeUsername = escapeFilter(username);
-    const entries = await search(client, LDAP_BASE_DN, {
-      scope: 'sub',
-      filter: `(&(objectClass=user)(|(sAMAccountName=${safeUsername})(userPrincipalName=${safeUsername})(mail=${safeUsername})))`,
-      attributes: ['dn', 'displayName', 'mail', 'department', 'sAMAccountName'],
+    const response = await fetch('https://intra-tools.trrgroup.com/api_sys_auth/SysAuth/login_auth_emp_get', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        employee_username: username,
+        password: password,
+        application_code: 'INTRANET'
+      }).toString()
     });
 
-    const entry = entries[0];
-    if (!entry) return null;
+    if (!response.ok) {
+      console.error('API Error:', response.status);
+      return null;
+    }
 
-    const userDn = entry.dn || (entry.object ? entry.object.dn : undefined);
-    if (!userDn) return null;
+    const text = await response.text();
+    // API returns BOM, so remove it
+    const cleanText = text.replace(/^\uFEFF/, '');
+    const json = JSON.parse(cleanText);
 
-    await bind(client, userDn, password);
+    if (json.status !== 'Success' || !json.data || !json.data.auth_role_profile || json.data.auth_role_profile.length === 0) {
+      return null;
+    }
 
-    const userObj = entry.object;
+    const profile = json.data.auth_role_profile[0];
+
     return {
-      displayName: userObj.displayName || userObj.sAMAccountName || username,
-      email: userObj.mail || '',
-      department: userObj.department || '',
-      sAMAccountName: userObj.sAMAccountName
+      displayName: profile.employee_fname_en ? `${profile.employee_fname_en} ${profile.employee_lname_en || ''}`.trim() : username,
+      email: profile.employee_email || '',
+      department: profile.itasset_department_name || '',
+      company: profile.itasset_company_name_eng || '',
+      companyThai: profile.itasset_company_name || '',
+      sAMAccountName: profile.employee_username || username,
+      employeeImage: profile.employee_image || ''
     };
   } catch (err) {
-    console.error('LDAP Auth Error:', err);
+    console.error('API Auth Error:', err);
     return null;
-  } finally {
-    try { client.unbind(); } catch (_) {}
   }
 }
 
@@ -256,7 +242,7 @@ export async function searchADUsers(query: string): Promise<any[]> {
     const entries = await search(client, LDAP_BASE_DN, {
       scope: 'sub',
       filter: `(&(objectClass=user)(|(sAMAccountName=*${safeKeyword}*)(cn=*${safeKeyword}*)(displayName=*${safeKeyword}*)(mail=*${safeKeyword}*)))`,
-      attributes: ['sAMAccountName', 'displayName', 'mail', 'department'],
+      attributes: ['sAMAccountName', 'displayName', 'mail', 'department', 'company'],
       sizeLimit: 50,
     });
 
@@ -267,8 +253,46 @@ export async function searchADUsers(query: string): Promise<any[]> {
         displayName: obj.displayName || '',
         email: obj.mail || '',
         department: obj.department || '',
+        company: obj.company || '',
       };
     });
+  } finally {
+    try { client.unbind(); } catch (_) {}
+  }
+}
+
+export async function getAllADCompanies(): Promise<string[]> {
+  const client = createClient();
+  const searchBindUser = buildBindUser(LDAP_SEARCH_USER);
+  try {
+    await bind(client, searchBindUser, LDAP_SEARCH_PASSWORD);
+
+    const entries = await search(client, LDAP_BASE_DN, {
+      scope: 'sub',
+      filter: `(&(objectClass=user)(company=*))`,
+      attributes: ['company'],
+      sizeLimit: 5000,
+    });
+
+    const companySet = new Set<string>();
+    for (const entry of entries) {
+      if (entry.object && entry.object.company) {
+        let companies = entry.object.company;
+        if (!Array.isArray(companies)) {
+          companies = [companies];
+        }
+        for (const c of companies) {
+          if (c && typeof c === 'string' && c.trim()) {
+            companySet.add(c.trim());
+          }
+        }
+      }
+    }
+
+    return Array.from(companySet).sort();
+  } catch (err) {
+    console.error('LDAP Get Companies Error:', err);
+    return [];
   } finally {
     try { client.unbind(); } catch (_) {}
   }

@@ -6,16 +6,17 @@ import { createNotification } from '../services/notification';
 
 const router = Router();
 
-function buildPMAssetWhere(plan: { company?: string | null; site?: string | null; deptTask?: string | null }) {
+function buildPMAssetWhere(plan: { company?: string | null; site?: string | null; deptTask?: string | null; deviceType?: string | null }) {
   return {
     status: { not: 'Retired' as const },
     ...(plan.company ? { company: { contains: plan.company } } : {}),
     ...(plan.site ? { location: { contains: plan.site } } : {}),
     ...(plan.deptTask ? { departmentId: { contains: plan.deptTask } } : {}),
+    ...(plan.deviceType ? { type: plan.deviceType } : {}),
   };
 }
 
-async function getPMEligibility(client: any, plan: { year: number; company?: string | null; site?: string | null; deptTask?: string | null; plannedDeviceCount?: number | string | null }) {
+async function getPMEligibility(client: any, plan: { year: number; company?: string | null; site?: string | null; deptTask?: string | null; deviceType?: string | null; plannedDeviceCount?: number | string | null }) {
   const scopedAssets = await client.asset.findMany({
     where: buildPMAssetWhere(plan),
     select: { id: true },
@@ -184,13 +185,14 @@ router.get('/plans', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (r
 
 router.post('/plans', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { year, site, deptTask, company, lead, plannedDeviceCount, startDate, endDate, templateId } = req.body;
+    const { year, site, deptTask, company, lead, plannedDeviceCount, startDate, endDate, templateId, deviceType } = req.body;
     const plan = await prisma.pMPlan.create({
       data: {
         year: parseInt(year),
         site,
         deptTask,
         company,
+        deviceType,
         lead,
         plannedDeviceCount: parseInt(plannedDeviceCount),
         startDate: startDate ? new Date(startDate) : null,
@@ -210,6 +212,7 @@ router.get('/plans/eligibility', authenticate, authorize('IT_ADMIN', 'SUPERADMIN
       company: req.query.company ? String(req.query.company) : null,
       site: req.query.site ? String(req.query.site) : null,
       deptTask: req.query.deptTask ? String(req.query.deptTask) : null,
+      deviceType: req.query.deviceType ? String(req.query.deviceType) : null,
       plannedDeviceCount: req.query.plannedDeviceCount ? String(req.query.plannedDeviceCount) : null,
     });
     const { availableAssetIds, ...safeSummary } = summary;
@@ -220,7 +223,7 @@ router.get('/plans/eligibility', authenticate, authorize('IT_ADMIN', 'SUPERADMIN
 router.put('/plans/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
-    const { year, site, deptTask, company, lead, plannedDeviceCount, startDate, endDate, templateId } = req.body;
+    const { year, site, deptTask, company, lead, plannedDeviceCount, startDate, endDate, templateId, deviceType } = req.body;
 
     const plan = await prisma.pMPlan.findUnique({ where: { id } });
     if (!plan) throw new AppError('ไม่พบแผน PM', 404);
@@ -241,6 +244,7 @@ router.put('/plans/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), asyn
       if (site !== undefined) data.site = site;
       if (deptTask !== undefined) data.deptTask = deptTask;
       if (company !== undefined) data.company = company;
+      if (deviceType !== undefined) data.deviceType = deviceType;
       if (plannedDeviceCount !== undefined) data.plannedDeviceCount = parseInt(plannedDeviceCount);
       if (templateId !== undefined) data.templateId = parseInt(templateId);
 
@@ -250,6 +254,7 @@ router.put('/plans/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), asyn
         (site !== undefined && site !== plan.site) ||
         (deptTask !== undefined && deptTask !== plan.deptTask) ||
         (company !== undefined && company !== plan.company) ||
+        (deviceType !== undefined && deviceType !== plan.deviceType) ||
         (plannedDeviceCount !== undefined && parseInt(plannedDeviceCount) !== plan.plannedDeviceCount) ||
         (templateId !== undefined && parseInt(templateId) !== plan.templateId);
 
@@ -319,14 +324,7 @@ router.delete('/plans/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), a
     const plan = await prisma.pMPlan.findUnique({ where: { id } });
     if (!plan) throw new AppError('ไม่พบแผน PM', 404);
 
-    // Check if there are any completed runs
-    const completedCount = await prisma.pMRun.count({
-      where: { planId: id, status: 'COMPLETED' },
-    });
-
-    if (completedCount > 0) {
-      throw new AppError('ไม่สามารถลบแผน PM นี้ได้ เนื่องจากมีการดำเนินการตรวจเช็คเสร็จสิ้นแล้ว', 400);
-    }
+    // Safely delete associated runs and answers in a transaction
 
     // Safely delete associated draft runs and answers in a transaction
     await prisma.$transaction(async (tx) => {
@@ -427,7 +425,6 @@ router.post('/runs/:id/perform', authenticate, authorize('IT_ADMIN', 'SUPERADMIN
 
     const run = await prisma.pMRun.findUnique({ where: { id: runId }, include: { plan: { include: { template: { include: { templateItems: true } } } } } });
     if (!run) throw new AppError('ไม่พบงาน PM', 404);
-    if (run.status === 'COMPLETED') throw new AppError('งาน PM นี้ทำเสร็จแล้ว');
     if (!run.plan.template.templateItems.length) throw new AppError('แผน PM นี้ยังไม่มี Checklist Template', 400);
 
     const validItemIds = new Set(run.plan.template.templateItems.map((item) => item.id));
@@ -453,7 +450,7 @@ router.post('/runs/:id/perform', authenticate, authorize('IT_ADMIN', 'SUPERADMIN
           status: nextStatus,
           performedBy: req.user!.userId,
           performedAt: run.performedAt || new Date(),
-          completedAt: nextStatus === 'COMPLETED' ? new Date() : null,
+          completedAt: nextStatus === 'COMPLETED' ? (run.completedAt || new Date()) : null,
         },
       });
     });

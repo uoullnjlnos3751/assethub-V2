@@ -21,6 +21,7 @@ import {
   ListItem,
   ListItemText,
   MenuItem,
+  Pagination,
   Select,
   Stack,
   TextField,
@@ -29,6 +30,7 @@ import {
   Menu,
   alpha,
   useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
@@ -73,12 +75,10 @@ type ColumnConfig = {
   visible: boolean;
 };
 
-const COLUMN_PREF_KEY = 'assethub.assetList.columns.v2';
+const COLUMN_PREF_KEY = 'assethub.assetList.columns.v3';
 
 const defaultColumnConfig: ColumnConfig[] = [
-  { field: 'id', label: 'ID', visible: false },
   { field: 'hasImage', label: '📷', visible: true },
-  { field: 'assetCode', label: 'เลขครุภัณฑ์', visible: true },
   { field: 'assetName', label: 'ชื่อทรัพย์สิน', visible: true },
   { field: 'serialNo', label: 'Serial No.', visible: true },
   { field: 'type', label: 'ประเภท', visible: true },
@@ -87,9 +87,11 @@ const defaultColumnConfig: ColumnConfig[] = [
   { field: 'status', label: 'สถานะ', visible: true },
   { field: 'ownerName', label: 'ผู้ถือครอง', visible: true },
   { field: 'departmentId', label: 'แผนก', visible: true },
-  { field: 'company', label: 'Company', visible: false },
   { field: 'location', label: 'สถานที่ติดตั้ง/อาคาร', visible: true },
   { field: 'floor', label: 'ชั้น', visible: true },
+  { field: 'id', label: 'ID', visible: false },
+  { field: 'assetCode', label: 'เลขครุภัณฑ์', visible: false },
+  { field: 'company', label: 'Company', visible: false },
   { field: 'oldAssetCode', label: 'รหัสทรัพย์สินเดิม', visible: false },
   { field: 'domainName', label: 'Domain Name', visible: false },
   { field: 'osType', label: 'OS', visible: false },
@@ -195,6 +197,7 @@ export default function AssetListPage() {
   const { user } = useAuth();
   const toast = useToast();
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [searchParams] = useSearchParams();
   const [assets, setAssets] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
@@ -206,6 +209,8 @@ export default function AssetListPage() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [categories, setCategories] = useState<any[]>([]);
   const [typeOptions, setTypeOptions] = useState<string[]>([]);
+  const [companyOptions, setCompanyOptions] = useState<string[]>([]);
+  const [company, setCompany] = useState(searchParams.get('company') || '');
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(50);
   const [columnConfig, setColumnConfig] = useState<ColumnConfig[]>(loadColumnConfig);
@@ -222,6 +227,8 @@ export default function AssetListPage() {
 
   useEffect(() => {
     categoryAPI.all().then((res) => setCategories(res.data)).catch(() => setCategories([]));
+    assetAPI.typeOptions().then((res) => setTypeOptions(res.data)).catch(() => setTypeOptions([]));
+    assetAPI.companyOptions().then((res) => setCompanyOptions(res.data)).catch(() => setCompanyOptions([]));
   }, []);
 
   // Fetch overall status stats for the stat cards
@@ -245,6 +252,7 @@ export default function AssetListPage() {
         type: type || undefined,
         typeGroup: !type && typeGroup ? typeGroup : undefined,
         categoryId: selectedCategoryId || undefined,
+        company: company || undefined,
         page: page + 1,
         limit: pageSize,
       });
@@ -272,7 +280,7 @@ export default function AssetListPage() {
     return groups;
   }, [assets, selectedCategoryId]);
 
-  useEffect(() => { fetchAssets(); }, [page, pageSize, status, type, typeGroup, selectedCategoryId]);
+  useEffect(() => { fetchAssets(); }, [page, pageSize, status, type, typeGroup, selectedCategoryId, company]);
 
   const handleSearch = () => { setPage(0); fetchAssets(); };
 
@@ -520,11 +528,16 @@ export default function AssetListPage() {
             {isAvailableOnlyView ? 'เลือกอุปกรณ์ที่ต้องการยืม' : `ทั้งหมด ${total} รายการ`}
           </Typography>
         </Box>
-        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-          {isAdmin && <ImportAssetsButton />}
-          {isAdmin && <ExportAssetsButton />}
-          {isAdmin && <Button variant="outlined" startIcon={<TableViewIcon />} onClick={() => setColumnDialogOpen(true)}>จัดคอลัมน์</Button>}
-          {isAdmin && <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('/assets/new' + (typeGroup ? `?typeGroup=${typeGroup}` : ''))}>เพิ่มทรัพย์สิน</Button>}
+        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: isMobile ? 2 : 0, width: isMobile ? '100%' : 'auto' }}>
+          {isAdmin && (
+            <IconButton onClick={(e) => handleMenuOpen(e, { isHeaderMenu: true })} sx={{ display: { xs: 'flex', sm: 'none' }, ml: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+              <SettingsIcon />
+            </IconButton>
+          )}
+          {isAdmin && <Box sx={{ display: { xs: 'none', sm: 'block' } }}><ImportAssetsButton /></Box>}
+          {isAdmin && <Box sx={{ display: { xs: 'none', sm: 'block' } }}><ExportAssetsButton /></Box>}
+          {isAdmin && <Button variant="outlined" startIcon={<TableViewIcon />} sx={{ display: { xs: 'none', sm: 'flex' } }} onClick={() => setColumnDialogOpen(true)}>จัดคอลัมน์</Button>}
+          {isAdmin && <Button variant="contained" startIcon={<AddIcon />} sx={{ flex: isMobile ? 1 : 'none' }} onClick={() => navigate('/assets/new' + (typeGroup ? `?typeGroup=${typeGroup}` : ''))}>เพิ่มทรัพย์สิน</Button>}
         </Box>
       </Box>
 
@@ -572,14 +585,14 @@ export default function AssetListPage() {
       )}
 
       <Card sx={{ p: 2.5, mb: 3 }}>
-        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+        <Box sx={{ display: 'flex', gap: 2, flexDirection: isMobile ? 'column' : 'row', flexWrap: 'wrap', alignItems: 'center' }}>
           <TextField
             placeholder="ค้นหาเลขครุภัณฑ์ ชื่อ S/N ยี่ห้อ..."
             size="small"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            sx={{ minWidth: 280, flex: 1 }}
+            sx={{ minWidth: 280, width: isMobile ? '100%' : 'auto', flex: 1 }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -588,7 +601,7 @@ export default function AssetListPage() {
               ),
             }}
           />
-          <FormControl size="small" sx={{ minWidth: 180 }}>
+          <FormControl size="small" sx={{ minWidth: 180, width: isMobile ? '100%' : 'auto' }}>
             <InputLabel>ประเภท</InputLabel>
             <Select value={type} label="ประเภท" onChange={(e) => { setType(e.target.value); setPage(0); }}>
               <MenuItem value="">ทั้งหมด</MenuItem>
@@ -597,7 +610,16 @@ export default function AssetListPage() {
               ))}
             </Select>
           </FormControl>
-          <Button variant="contained" startIcon={<SearchIcon />} onClick={handleSearch}>ค้นหา</Button>
+          <FormControl size="small" sx={{ minWidth: 180, width: isMobile ? '100%' : 'auto' }}>
+            <InputLabel>บริษัท (Company)</InputLabel>
+            <Select value={company} label="บริษัท (Company)" onChange={(e) => { setCompany(e.target.value); setPage(0); }}>
+              <MenuItem value="">ทั้งหมด</MenuItem>
+              {companyOptions.map((option) => (
+                <MenuItem key={option} value={option}>{option}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Button variant="contained" startIcon={<SearchIcon />} sx={{ width: isMobile ? '100%' : 'auto' }} onClick={handleSearch}>ค้นหา</Button>
         </Box>
 
         {/* Status filter chips — only for admin view */}
@@ -949,7 +971,46 @@ export default function AssetListPage() {
         )
       ) : (
         assets.length === 0 ? (
-          <EmptyState title="ไม่พบข้อมูลทรัพย์สิน" description="ลองปรับเงื่อนไขการค้นหาหรือตัวกรอง" secondaryActionLabel="รีเซ็ตตัวกรอง" onSecondaryAction={() => { setSearch(''); setStatus(''); setType(''); setPage(0); }} />
+          <EmptyState title="ไม่พบข้อมูลทรัพย์สิน" description="ลองปรับเงื่อนไขการค้นหาหรือตัวกรอง" secondaryActionLabel="รีเซ็ตตัวกรอง" onSecondaryAction={() => { setSearch(''); setStatus(''); setType(''); setCompany(''); setPage(0); }} />
+        ) : isMobile ? (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Typography variant="body2" color="text.secondary" fontWeight={600} sx={{ mb: -1 }}>แสดงผลแบบการ์ด ({total} รายการ)</Typography>
+            {assets.map((asset) => (
+              <Card key={asset.id} sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5, position: 'relative', overflow: 'visible' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
+                  <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                     {asset.image ? (
+                        <Box component="img" src={asset.image} alt="" sx={{ width: 56, height: 56, borderRadius: 1.5, objectFit: 'cover' }} />
+                     ) : (
+                        <Box sx={{ width: 56, height: 56, borderRadius: 1.5, bgcolor: 'grey.100', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <ImageIcon sx={{ color: 'grey.400' }} />
+                        </Box>
+                     )}
+                     <Box sx={{ flex: 1, minWidth: 0 }}>
+                       <Typography fontWeight={700} noWrap sx={{ color: 'text.primary', fontSize: '1rem' }}>{asset.assetName || asset.assetCode || 'ไม่ระบุชื่อ'}</Typography>
+                       <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{asset.assetCode} • {asset.serialNo}</Typography>
+                     </Box>
+                  </Box>
+                  <StatusChip status={asset.status} />
+                </Box>
+                <Divider sx={{ my: 0.5 }} />
+                <Grid container spacing={1}>
+                  <Grid item xs={6}><Typography variant="caption" color="text.secondary" display="block">ประเภท</Typography><Typography variant="body2" fontWeight={500}>{asset.type || '-'}</Typography></Grid>
+                  <Grid item xs={6}><Typography variant="caption" color="text.secondary" display="block">ยี่ห้อ/รุ่น</Typography><Typography variant="body2" fontWeight={500} noWrap>{[asset.brand, asset.model].filter(Boolean).join(' ') || '-'}</Typography></Grid>
+                  <Grid item xs={6}><Typography variant="caption" color="text.secondary" display="block">ผู้ถือครอง</Typography><Typography variant="body2" fontWeight={500} noWrap>{asset.ownerName || '-'}</Typography></Grid>
+                  <Grid item xs={6}><Typography variant="caption" color="text.secondary" display="block">สถานที่/อาคาร</Typography><Typography variant="body2" fontWeight={500} noWrap>{asset.location || '-'}</Typography></Grid>
+                </Grid>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 1 }}>
+
+                  <Button size="small" variant="outlined" startIcon={<PageviewIcon />} onClick={() => navigate(`/assets/${asset.id}`)}>เปิดดู</Button>
+                  <Button size="small" variant="contained" onClick={(e) => handleMenuOpen(e, asset)}>จัดการ</Button>
+                </Box>
+              </Card>
+            ))}
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3, mb: 4 }}>
+              <Pagination count={Math.ceil(total / pageSize) || 1} page={page + 1} onChange={(_e, p) => setPage(p - 1)} color="primary" shape="rounded" />
+            </Box>
+          </Box>
         ) : (
           <DataGrid
             rows={assets}
@@ -963,6 +1024,7 @@ export default function AssetListPage() {
             getRowId={(r) => r.id}
             autoHeight
             disableRowSelectionOnClick
+            disableColumnFilter
           />
         )
       )}
@@ -1010,6 +1072,15 @@ export default function AssetListPage() {
         }}
       >
         {menuAnchor.row && (
+          menuAnchor.row.isHeaderMenu ? (
+            <Box>
+              <MenuItem key="import" sx={{ p: 0 }}><Box sx={{ width: '100%', px: 2, py: 1 }}><ImportAssetsButton /></Box></MenuItem>
+              <MenuItem key="export" sx={{ p: 0 }}><Box sx={{ width: '100%', px: 2, py: 1 }}><ExportAssetsButton /></Box></MenuItem>
+              <MenuItem key="columns" onClick={() => { handleMenuClose(); setColumnDialogOpen(true); }}>
+                <TableViewIcon sx={{ mr: 1, fontSize: 20, color: 'text.secondary' }} /> จัดคอลัมน์ตาราง
+              </MenuItem>
+            </Box>
+          ) : (
           <>
             {/* USER view on Available page — friendly actions */}
             {user?.role === 'USER' && isAvailableOnlyView && (
@@ -1046,6 +1117,7 @@ export default function AssetListPage() {
               </>
             )}
           </>
+          )
         )}
       </Menu>
     </Box>

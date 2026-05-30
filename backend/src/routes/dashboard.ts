@@ -6,9 +6,10 @@ const router = Router();
 
 router.get('/asset-summary', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const [byStatus, byDepartment, byType, total, byCategory] = await Promise.all([
+    const [byStatus, byDepartment, byCompany, byType, total, byCategory] = await Promise.all([
       prisma.asset.groupBy({ by: ['status'], _count: true }),
       prisma.asset.groupBy({ by: ['departmentId'], _count: true }),
+      prisma.asset.groupBy({ by: ['company'], _count: true }),
       prisma.asset.groupBy({ by: ['type'], _count: true }),
       prisma.asset.count(),
       prisma.category.findMany({
@@ -20,7 +21,7 @@ router.get('/asset-summary', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), 
     const byCategoryFlat = byCategory.map(c => ({
       id: c.id, name: c.name, icon: c.icon, assetCount: c._count.assets,
     }));
-    res.json({ total, byStatus, byDepartment, byType, byCategory: byCategoryFlat });
+    res.json({ total, byStatus, byDepartment, byCompany, byType, byCategory: byCategoryFlat });
   } catch (err) { next(err); }
 });
 

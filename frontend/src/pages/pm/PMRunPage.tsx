@@ -132,11 +132,23 @@ export default function PMRunPage() {
 
   /* ── Open PM Checklist ── */
   const openPM = (run: any) => {
+    if (!run.plan?.template?.templateItems?.length) {
+      showToast('❌ แผน PM นี้ยังไม่มี Checklist Template กรุณาไปเพิ่มในเมนู จัดการแผน');
+      return;
+    }
     // Pre-fill from existing answers if run is in progress
     const pre: Record<string, any> = {};
     (run.answers || []).forEach((a: any) => {
       const key = a.item?.key || a.key || a.itemKey;
-      if (key) pre[key] = a.value;
+      if (key) {
+        if (a.value && typeof a.value === 'string' && a.value.includes('::')) {
+          const [v, ...noteParts] = a.value.split('::');
+          pre[key] = v;
+          pre[`${key}_note`] = noteParts.join('::');
+        } else {
+          pre[key] = a.value;
+        }
+      }
     });
     setAnswers(pre);
     setPMModal({ open: true, run });
@@ -156,12 +168,14 @@ export default function PMRunPage() {
     setSaving(true);
     try {
       const items = getChecklistItems(run);
-      const answerList = items.filter((item: any) => item.id).map((item: any) => ({
-        itemId: item.id,
-        key: item.key,
-        value: answers[item.key] !== undefined ? String(answers[item.key]) : '',
-      }));
-      if (items.length === 0 || answerList.length !== items.length) {
+      const answerList = items.filter((item: any) => item.id).map((item: any) => {
+        let val = answers[item.key] !== undefined ? String(answers[item.key]) : '';
+        if ((val === 'no' || val === 'na') && answers[`${item.key}_note`]) {
+          val = `${val}::${answers[`${item.key}_note`]}`;
+        }
+        return { itemId: item.id, key: item.key, value: val };
+      });
+      if (items.length === 0 || answerList.length === 0) {
         showToast('❌ แผน PM นี้ยังไม่มี Checklist Template');
         return;
       }
@@ -256,16 +270,20 @@ export default function PMRunPage() {
         .pmr-row:hover { background: #f8fafc; }
         .pmr-check-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f8fafc; }
         .pmr-check-row:last-child { border-bottom: none; }
-        .pmr-radio { padding: 4px 10px; border-radius: 99px; font-size: 11px; font-weight: 600;
+        .pmr-radio { padding: 4px 12px; border-radius: 99px; font-size: 11px; font-weight: 600;
           cursor: pointer; border: 1.5px solid #e2e8f0; background: #fff; color: #64748b;
           transition: all .15s; font-family: 'Sarabun', sans-serif; }
-        .pmr-radio:hover { border-color: #0ea5e9; color: #0ea5e9; }
+        .pmr-radio:hover:not(:disabled) { border-color: #0ea5e9; color: #0ea5e9; }
+        .pmr-radio:disabled { opacity: 0.6; cursor: not-allowed; }
         .pmr-radio.sel-yes { background: #f0fdf4; border-color: #86efac; color: #16a34a; }
         .pmr-radio.sel-no  { background: #fff5f5; border-color: #fca5a5; color: #dc2626; }
         .pmr-radio.sel-na  { background: #f8fafc; border-color: #cbd5e1; color: #64748b; }
-        .pmr-group-hd { padding: 8px 0 4px; font-size: 10px; font-weight: 700; color: #64748b;
-          text-transform: uppercase; letter-spacing: .06em; display: flex; align-items: center; gap: 5px;
-          margin-top: 8px; border-top: 1px solid #f1f5f9; }
+        .checklist-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 16px; }
+        .check-group-title { padding: 8px 18px; background: #f8fafc; font-size: 10px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 6px; }
+        .check-item { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 18px; border-bottom: 1px solid #f8fafc; transition: background .1s; }
+        .check-item:last-child { border-bottom: none; }
+        .check-item:hover { background: #f8fafc; }
+        .check-no { width: 22px; height: 22px; border-radius: 50%; background: #f1f5f9; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #94a3b8; flex-shrink: 0; }
       `}</style>
 
       <div className="pmr-root">
@@ -409,12 +427,12 @@ export default function PMRunPage() {
                       </td>
                       <td style={{ padding: '10px 14px', textAlign: 'center' }}>
                         {!isDone ? (
-                          <button className="pmr-btn pmr-btn-success" style={{ padding: '5px 12px', fontSize: 11 }} onClick={() => openPM(r)}>
+                          <button type="button" className="pmr-btn pmr-btn-success" style={{ padding: '5px 12px', fontSize: 11, opacity: !r.plan?.template?.templateItems?.length ? 0.5 : 1 }} onClick={() => openPM(r)}>
                             🔧 ทำ PM
                           </button>
                         ) : (
-                          <button className="pmr-btn pmr-btn-outline" style={{ padding: '5px 12px', fontSize: 11 }} onClick={() => openPM(r)}>
-                            👁 ดูผล
+                          <button type="button" className="pmr-btn pmr-btn-outline" style={{ padding: '5px 12px', fontSize: 11 }} onClick={() => openPM(r)}>
+                            👁 ดูผล / ✏️ แก้ไข
                           </button>
                         )}
                       </td>
@@ -428,18 +446,28 @@ export default function PMRunPage() {
       </div>
 
       {/* ── PM Checklist Modal ── */}
-      <Modal open={pmModal.open} onClose={() => setPMModal({ open: false, run: null })} maxWidth={680}
-        title={`🔧 PM: ${pmModal.run?.asset?.assetCode || ''} — ${pmModal.run?.asset?.brand || ''} ${pmModal.run?.asset?.model || ''}`}
+      <Modal open={pmModal.open} onClose={() => setPMModal({ open: false, run: null })} maxWidth={760}
+        title={`🔧 ทำ PM: ${pmModal.run?.asset?.assetCode || ''} — ${pmModal.run?.asset?.brand || ''} ${pmModal.run?.asset?.model || ''}`}
       >
         {pmModal.run && (() => {
-          const items = getChecklistItems(pmModal.run);
+          const rawItems = getChecklistItems(pmModal.run);
+          const items = [...rawItems].sort((a: any, b: any) => {
+            if (a.group !== b.group) return (a.group || '').localeCompare(b.group || '');
+            return (a.order || 0) - (b.order || 0);
+          });
           const groups = Array.from(new Set(items.map((i: any) => i.group)));
           const isDoneRun = pmModal.run.status === 'COMPLETED';
 
+          const setAll = (val: string) => {
+            const newAns = { ...answers };
+            items.filter((i:any) => i.type?.toLowerCase() === 'boolean').forEach((i:any) => newAns[i.key] = val);
+            setAnswers(newAns);
+          };
+
           return (
-            <>
-              {/* Asset info bar */}
-              <div style={{ background: '#f8fafc', borderBottom: '1px solid #f1f5f9', padding: '10px 20px', display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '80vh' }}>
+              {/* Header Info */}
+              <div style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', padding: '12px 20px', display: 'flex', flexWrap: 'wrap', gap: '16px 24px', flexShrink: 0 }}>
                 {[
                   { lbl: 'ผู้ถือครอง', val: pmModal.run.asset?.ownerName || '—' },
                   { lbl: 'แผนก', val: pmModal.run.asset?.departmentId || pmModal.run.plan?.deptTask || '—' },
@@ -447,79 +475,99 @@ export default function PMRunPage() {
                   { lbl: 'Serial No.', val: pmModal.run.asset?.serialNo || '—' },
                 ].map(i => (
                   <div key={i.lbl}>
-                    <div style={{ fontSize: 9, color: '#94a3b8', marginBottom: 1 }}>{i.lbl}</div>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: '#334155' }}>{i.val}</div>
+                    <div style={{ fontSize: 10, color: '#64748b', marginBottom: 2, fontWeight: 600 }}>{i.lbl}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{i.val}</div>
                   </div>
                 ))}
               </div>
 
-              {/* Progress bar */}
-              <div style={{ padding: '10px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 11, color: '#475569', fontWeight: 600 }}>Checklist</span>
-                <div style={{ flex: 1, background: '#f1f5f9', borderRadius: 99, height: 6, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', borderRadius: 99, background: '#10b981', width: `${checkPct}%`, transition: 'width .3s' }} />
+              {/* Progress & Actions */}
+              <div style={{ padding: '12px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, flexWrap: 'wrap', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 200 }}>
+                  <span style={{ fontSize: 12, color: '#475569', fontWeight: 700 }}>ความคืบหน้า</span>
+                  <div style={{ flex: 1, background: '#e2e8f0', borderRadius: 99, height: 8, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', borderRadius: 99, background: '#10b981', width: `${checkPct}%`, transition: 'width .3s' }} />
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: '#10b981', minWidth: 40 }}>{checkPct}%</span>
                 </div>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#10b981', minWidth: 40 }}>{checkPct}%</span>
-                <span style={{ fontSize: 10, color: '#94a3b8' }}>{answeredBool}/{boolItems.length}</span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button type="button" className="pmr-btn pmr-btn-outline" onClick={() => setAll('yes')}>✓ ทำทั้งหมด (Yes)</button>
+                  <button type="button" className="pmr-btn pmr-btn-outline" onClick={() => setAnswers({})}>↺ ล้างข้อมูล</button>
+                </div>
               </div>
 
-              {/* Checklist items */}
-              <div style={{ padding: '0 20px 12px' }}>
-                {groups.map((group: any) => {
-                  const groupItems = items.filter((i: any) => i.group === group);
-                  const gi = GROUP_INFO[group] || { label: group, icon: '📌' };
-                  return (
-                    <div key={group}>
-                      <div className="pmr-group-hd">{gi.icon} {gi.label}</div>
-                      {groupItems.map((item: any, itemIdx: number) => (
-                        <div key={item.key} className="pmr-check-row">
-                          <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#f1f5f9', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: '#94a3b8', flexShrink: 0, marginTop: 2 }}>
-                            {items.indexOf(item) + 1}
-                          </div>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 12, color: '#334155', fontWeight: 500, marginBottom: item.type !== 'boolean' ? 6 : 0 }}>{item.label}</div>
-                            {item.type === 'boolean' && (
-                              <div style={{ display: 'flex', gap: 5, marginTop: 4 }}>
+              {/* Checklist Scrollable Body */}
+              <div style={{ padding: '20px', overflowY: 'auto', flex: 1, background: '#f1f5f9' }}>
+                <div className="checklist-card">
+                  {groups.map((group: any) => {
+                    const groupItems = items.filter((i: any) => i.group === group);
+                    const gi = GROUP_INFO[group] || { label: group, icon: '📌' };
+                    return (
+                      <div key={group}>
+                        <div className="check-group-title">{gi.icon} {gi.label}</div>
+                        {groupItems.map((item: any, itemIdx: number) => (
+                          <div key={item.key} className="check-item">
+                            <div className="check-no">{items.indexOf(item) + 1}</div>
+                            <div style={{ flex: 1, minWidth: 200 }}>
+                              <div style={{ fontSize: 12, color: '#0f172a', fontWeight: 600 }}>{item.label}</div>
+                              {item.type?.toLowerCase() === 'text' && (
+                                <textarea style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 12px', fontSize: 12, fontFamily: 'Sarabun,sans-serif', minHeight: 70, marginTop: 8, resize: 'vertical', outline: 'none' }}
+                                  placeholder={item.key === 'issue_note' ? 'ระบุปัญหาที่พบ หรือข้อเสนอแนะ...' : 'ระบุ...'}
+                                  value={answers[item.key] || ''}
+                                  onChange={e => setAnswers(p => ({ ...p, [item.key]: e.target.value }))}
+                                />
+                              )}
+                              {item.type?.toLowerCase() === 'rating' && (
+                                <div style={{ marginTop: 8 }}>
+                                  <StarRating value={parseInt(answers[item.key] || '0')} onChange={v => setAnswers(p => ({ ...p, [item.key]: String(v) }))} />
+                                </div>
+                              )}
+                            </div>
+                            {item.type?.toLowerCase() === 'boolean' && (
+                              <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                                 {[{ val: 'yes', lbl: '✓ ใช่' }, { val: 'no', lbl: '✗ ไม่' }, { val: 'na', lbl: '— N/A' }].map(opt => (
-                                  <button key={opt.val}
+                                  <button key={opt.val} type="button"
                                     className={`pmr-radio ${answers[item.key] === opt.val ? `sel-${opt.val}` : ''}`}
-                                    onClick={() => !isDoneRun && setAnswers(p => ({ ...p, [item.key]: opt.val }))}
-                                    disabled={isDoneRun}
+                                    onClick={() => setAnswers(p => ({ ...p, [item.key]: opt.val }))}
                                   >{opt.lbl}</button>
                                 ))}
                               </div>
                             )}
-                            {item.type === 'text' && (
-                              <textarea disabled={isDoneRun} style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 8, padding: '7px 10px', fontSize: 11, fontFamily: 'Sarabun,sans-serif', minHeight: 60, resize: 'vertical', boxSizing: 'border-box', outline: 'none', color: '#334155', background: isDoneRun ? '#f8fafc' : '#fff' }}
-                                placeholder={item.key === 'issue_note' ? 'บันทึกปัญหาที่พบ...' : 'ระบุ...'}
-                                value={answers[item.key] || ''}
-                                onChange={e => setAnswers(p => ({ ...p, [item.key]: e.target.value }))}
-                              />
-                            )}
-                            {item.type === 'rating' && (
-                              <StarRating value={parseInt(answers[item.key] || '0')} onChange={v => !isDoneRun && setAnswers(p => ({ ...p, [item.key]: String(v) }))} />
+                            
+                            {/* Inline Note for No/NA */}
+                            {item.type?.toLowerCase() === 'boolean' && (answers[item.key] === 'no' || answers[item.key] === 'na') && (
+                              <div style={{ width: '100%', paddingLeft: 34, marginTop: 6, animation: 'pmrFadeUp 0.2s ease' }}>
+                                <input type="text"
+                                  style={{ width: '100%', border: '1px solid #f59e0b', borderRadius: 6, padding: '6px 10px', fontSize: 11, background: '#fffbeb', outline: 'none', fontFamily: 'Sarabun,sans-serif' }}
+                                  placeholder="ระบุสาเหตุ / หมายเหตุ..."
+                                  value={answers[`${item.key}_note`] || ''}
+                                  onChange={e => setAnswers(p => ({ ...p, [`${item.key}_note`]: e.target.value }))}
+                                />
+                              </div>
                             )}
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })}
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
-              {/* Footer */}
-              <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end', gap: 8, flexShrink: 0 }}>
-                <button className="pmr-btn pmr-btn-outline" onClick={() => setPMModal({ open: false, run: null })}>ปิด</button>
+              {/* Footer Actions */}
+              <div style={{ padding: '14px 20px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: 10, background: '#fff', flexShrink: 0 }}>
+                <button type="button" className="pmr-btn pmr-btn-outline" onClick={() => setPMModal({ open: false, run: null })}>ปิด</button>
                 {!isDoneRun && (
                   <>
-                  <button className="pmr-btn pmr-btn-outline" onClick={() => handleSave('IN_PROGRESS')} disabled={saving}>บันทึกร่าง</button>
-                  <button className="pmr-btn pmr-btn-success" onClick={() => handleSave('COMPLETED')} disabled={saving}>
-                    {saving ? '⏳ กำลังบันทึก...' : '💾 บันทึกผล PM'}
+                  <button type="button" className="pmr-btn pmr-btn-outline" onClick={() => handleSave('IN_PROGRESS')} disabled={saving}>
+                    {saving ? '⏳...' : '💾 บันทึกร่าง'}
+                  </button>
+                  <button type="button" className="pmr-btn pmr-btn-success" onClick={() => handleSave('COMPLETED')} disabled={saving}>
+                    {saving ? '⏳ กำลังบันทึก...' : '✅ บันทึกผล PM'}
                   </button>
                   </>
                 )}
               </div>
-            </>
+            </div>
           );
         })()}
       </Modal>

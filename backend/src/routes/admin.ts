@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../index';
 import { authenticate, authorize } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
-import { searchADUsers } from '../services/ldap';
+import { searchADUsers, getAllADCompanies } from '../services/ldap';
 import { AuthService } from '../services/auth.service';
 import { invalidateSettingsCache } from '../services/notification';
 import multer from 'multer';
@@ -23,6 +23,36 @@ const DEFAULT_TEMPLATES: Record<string, { subjectTh: string, bodyTh: string }> =
 };
 
 // ── Users list / management ──
+
+// ── Company Sync from AD ──
+router.get('/ad-companies', authenticate, authorize('SUPERADMIN', 'IT_ADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const companies = await getAllADCompanies();
+    res.json(companies);
+  } catch (err) { next(err); }
+});
+
+router.post('/sync-companies', authenticate, authorize('SUPERADMIN', 'IT_ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { companies } = req.body;
+    if (!Array.isArray(companies)) throw new AppError('ข้อมูลไม่ถูกต้อง');
+
+    const results = [];
+    for (const name of companies) {
+      if (typeof name !== 'string' || !name.trim()) continue;
+      const cName = name.trim();
+      const existing = await prisma.company.findUnique({ where: { name: cName } });
+      if (!existing) {
+        const created = await prisma.company.create({ data: { name: cName, isActive: true } });
+        results.push(created);
+      } else if (!existing.isActive) {
+        const updated = await prisma.company.update({ where: { id: existing.id }, data: { isActive: true } });
+        results.push(updated);
+      }
+    }
+    res.json({ message: 'นำเข้าข้อมูลบริษัทเรียบร้อยแล้ว', syncedCount: results.length });
+  } catch (err) { next(err); }
+});
 router.get('/users/search-ad', authenticate, authorize('SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { q } = req.query;
@@ -69,7 +99,7 @@ router.get('/users', authenticate, authorize('SUPERADMIN'), async (req: Request,
         skip: (pageNum - 1) * limitNum,
         take: limitNum,
         orderBy: { createdAt: 'desc' },
-        select: { id: true, adUsername: true, displayName: true, email: true, department: true, role: true, isActive: true, authType: true, lastLoginAt: true, createdAt: true },
+        select: { id: true, adUsername: true, displayName: true, email: true, department: true, company: true, companyThai: true, avatarUrl: true, role: true, isActive: true, authType: true, lastLoginAt: true, createdAt: true },
       }),
       prisma.appUser.count({ where }),
     ]);
@@ -89,14 +119,7 @@ router.put('/users/:id/role', authenticate, authorize('SUPERADMIN'), async (req:
     const oldRole = user.role;
     await prisma.appUser.update({ where: { id }, data: { role } });
 
-    await prisma.assetHistory.create({
-      data: {
-        assetId: 1,
-        actionType: 'ROLE_CHANGE',
-        note: `Changed role of ${user.adUsername} from ${oldRole} to ${role}`,
-        actorUserId: req.user!.userId,
-      },
-    });
+    console.log(`Changed role of ${user.adUsername} from ${oldRole} to ${role} by user ${req.user!.userId}`);
 
     res.json({ message: 'อัปเดตบทบาทเรียบร้อย' });
   } catch (err) { next(err); }

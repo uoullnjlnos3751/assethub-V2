@@ -38,10 +38,12 @@ import PMTemplatePage from './pages/pm/PMTemplatePage';
 import ReportAssetsPage from './pages/reports/ReportAssetsPage';
 import ReportBorrowPage from './pages/reports/ReportBorrowPage';
 import ReportPMPage from './pages/reports/ReportPMPage';
+import ReportMaintenancePage from './pages/reports/ReportMaintenancePage';
 import AuditLogPage from './pages/admin/AuditLogPage';
 import UsersPage from './pages/admin/UsersPage';
 import SettingsPage from './pages/admin/SettingsPage';
 import NotificationLogsPage from './pages/admin/NotificationLogsPage';
+import CompaniesPage from './pages/admin/CompaniesPage';
 
 function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles?: string[] }) {
   const { user, loading } = useAuth();
@@ -98,9 +100,11 @@ export default function App() {
         <Route path="reports/assets" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><ReportAssetsPage /></ProtectedRoute>} />
         <Route path="reports/borrow" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><ReportBorrowPage /></ProtectedRoute>} />
         <Route path="reports/pm" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><ReportPMPage /></ProtectedRoute>} />
+        <Route path="reports/maintenance" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><ReportMaintenancePage /></ProtectedRoute>} />
         {/* Admin */}
         <Route path="admin/users" element={<ProtectedRoute roles={['SUPERADMIN']}><UsersPage /></ProtectedRoute>} />
         <Route path="admin/settings" element={<ProtectedRoute roles={['SUPERADMIN']}><SettingsPage /></ProtectedRoute>} />
+        <Route path="admin/companies" element={<ProtectedRoute roles={['SUPERADMIN', 'IT_ADMIN']}><CompaniesPage /></ProtectedRoute>} />
         <Route path="admin/notification-logs" element={<ProtectedRoute roles={['SUPERADMIN']}><NotificationLogsPage /></ProtectedRoute>} />
         <Route path="admin/audit-log" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><AuditLogPage /></ProtectedRoute>} />
         {/* Donations */}

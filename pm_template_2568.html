@@ -124,9 +124,14 @@ body { font-family: 'Sarabun', sans-serif; background: var(--bg); color: var(--t
   display: flex; align-items: center; gap: 6px;
 }
 .check-item {
-  display: flex; align-items: center; gap: 12px;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   padding: 10px 18px; border-bottom: 1px solid #f8fafc; transition: background .1s;
 }
+.inline-note-wrap { width: 100%; display: none; margin-top: 6px; padding-left: 34px; animation: fadeIn 0.2s ease-out; }
+.inline-note-wrap.show { display: block; }
+.inline-note-input { width: 100%; border: 1px solid var(--warning); border-radius: 6px; padding: 6px 10px; font-size: 11px; font-family: 'Sarabun', sans-serif; outline: none; background: #fffbeb; transition: all 0.2s; }
+.inline-note-input:focus { border-color: var(--warning); box-shadow: 0 0 0 3px rgba(245,158,11,.15); }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 .check-item:last-child { border-bottom: none; }
 .check-item:hover { background: #f8fafc; }
 .check-no { width: 22px; height: 22px; border-radius: 50%; background: #f1f5f9; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: var(--text-3); flex-shrink: 0; }
@@ -218,6 +223,17 @@ body { font-family: 'Sarabun', sans-serif; background: var(--bg); color: var(--t
 .modal-close { background: none; border: none; font-size: 18px; cursor: pointer; color: var(--text-3); padding: 2px 6px; }
 .modal-body { padding: 20px; }
 .modal-footer { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+
+/* ── Mobile Responsive ──────────────────────────────────────── */
+@media (max-width: 768px) {
+  .data-table thead { display: none; }
+  .data-table tbody tr { display: block; border: 1px solid var(--border); margin-bottom: 12px; border-radius: 8px; padding: 12px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+  .data-table td { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed #e2e8f0; }
+  .data-table td:last-child { border-bottom: none; }
+  .data-table td::before { content: attr(data-label); font-size: 10px; font-weight: 700; color: var(--text-2); text-transform: uppercase; margin-right: 12px; }
+  .topbar { padding: 0 16px; }
+  .btn { padding: 8px 16px; }
+}
 
 /* ── Print ──────────────────────────────────────────────────── */
 @media print {
@@ -1157,30 +1173,72 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 2500);
 }
 
+/* ── Auto-save & Init ── */
+document.addEventListener('DOMContentLoaded', () => {
+  // Inject data-label for mobile tables
+  document.querySelectorAll('.data-table, .gantt-table').forEach(table => {
+    const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.trim().split('\n')[0]);
+    table.querySelectorAll('tbody tr').forEach(tr => {
+      Array.from(tr.querySelectorAll('td')).forEach((td, i) => {
+        if(headers[i]) td.setAttribute('data-label', headers[i]);
+      });
+    });
+  });
+  loadDraft();
+  
+  // Attach input listeners for auto-save
+  document.querySelectorAll('input, textarea, select').forEach(el => {
+    el.addEventListener('input', saveDraft);
+    el.addEventListener('change', saveDraft);
+  });
+});
+
+function handleInlineNote(group, val) {
+  let noteWrap = group.querySelector('.inline-note-wrap');
+  if (val === 'no' || val === 'na') {
+    if (!noteWrap) {
+      noteWrap = document.createElement('div');
+      noteWrap.className = 'inline-note-wrap show';
+      noteWrap.innerHTML = `<input type="text" class="inline-note-input" placeholder="ระบุสาเหตุ / หมายเหตุ (ถ้ามี)..." oninput="saveDraft()">`;
+      group.appendChild(noteWrap);
+    } else {
+      noteWrap.classList.add('show');
+    }
+  } else {
+    if (noteWrap) noteWrap.classList.remove('show');
+  }
+}
+
 /* ── Checklist ── */
 let checkState = {};
 function toggleCheck(btn, val) {
   const group = btn.closest('[data-check]');
+  if(!group) return;
   const id = group.dataset.check;
   const prev = checkState[id];
   // toggle off if same
   if (prev === val) {
     checkState[id] = null;
     group.querySelectorAll('.radio-btn').forEach(b => b.className = 'radio-btn');
+    handleInlineNote(group, null);
   } else {
     checkState[id] = val;
     group.querySelectorAll('.radio-btn').forEach(b => b.className = 'radio-btn');
     btn.className = `radio-btn selected-${val}`;
+    handleInlineNote(group, val);
   }
   updateProgress();
+  saveDraft();
 }
 
 function updateProgress() {
   const total = document.querySelectorAll('[data-check]').length;
   const done  = Object.values(checkState).filter(Boolean).length;
   const pct   = total ? Math.round(done / total * 100) : 0;
-  document.getElementById('progress-bar').style.width = pct + '%';
-  document.getElementById('progress-txt').textContent = pct + '%';
+  const bar = document.getElementById('progress-bar');
+  const txt = document.getElementById('progress-txt');
+  if(bar) bar.style.width = pct + '%';
+  if(txt) txt.textContent = pct + '%';
 }
 
 function selectAll(val) {
@@ -1188,16 +1246,83 @@ function selectAll(val) {
     const id = group.dataset.check;
     checkState[id] = val;
     group.querySelectorAll('.radio-btn').forEach(b => b.className = 'radio-btn');
-    const yesBtn = [...group.querySelectorAll('.radio-btn')].find(b => b.textContent.includes('ใช่'));
-    if (yesBtn) yesBtn.className = `radio-btn selected-${val}`;
+    const targetBtn = [...group.querySelectorAll('.radio-btn')].find(b => {
+      return (val==='yes' && b.textContent.includes('ใช่')) || 
+             (val==='no' && b.textContent.includes('ไม่')) || 
+             (val==='na' && b.textContent.includes('N/A'));
+    });
+    if (targetBtn) targetBtn.className = `radio-btn selected-${val}`;
+    handleInlineNote(group, val);
   });
   updateProgress();
+  saveDraft();
 }
 
 function clearAll() {
   checkState = {};
-  document.querySelectorAll('[data-check] .radio-btn').forEach(b => b.className = 'radio-btn');
+  document.querySelectorAll('[data-check]').forEach(group => {
+    group.querySelectorAll('.radio-btn').forEach(b => b.className = 'radio-btn');
+    handleInlineNote(group, null);
+  });
   updateProgress();
+  saveDraft();
+}
+
+function saveDraft() {
+  const draft = { checkState, notes: {}, inputs: {} };
+  document.querySelectorAll('[data-check]').forEach(group => {
+    const id = group.dataset.check;
+    const input = group.querySelector('.inline-note-input');
+    if(input) draft.notes[id] = input.value;
+  });
+  
+  // Save all input fields
+  document.querySelectorAll('input:not(.inline-note-input), textarea, select').forEach((el, index) => {
+    if(el.type !== 'file') draft.inputs[index] = el.value;
+  });
+  
+  localStorage.setItem('pm_draft_2568', JSON.stringify(draft));
+}
+
+function loadDraft() {
+  try {
+    const data = JSON.parse(localStorage.getItem('pm_draft_2568'));
+    if(!data) return;
+    
+    // Restore inputs
+    if(data.inputs) {
+      document.querySelectorAll('input:not(.inline-note-input), textarea, select').forEach((el, index) => {
+        if(data.inputs[index] !== undefined && el.type !== 'file') {
+          el.value = data.inputs[index];
+        }
+      });
+    }
+
+    if(data.checkState) {
+      Object.entries(data.checkState).forEach(([id, val]) => {
+        if(val) {
+          const group = document.querySelector(`[data-check="${id}"]`);
+          if(group) {
+            checkState[id] = val;
+            let valClass = val === 'yes' ? 'ใช่' : (val === 'no' ? 'ไม่' : 'N/A');
+            const targetBtn = [...group.querySelectorAll('.radio-btn')].find(b => b.textContent.includes(valClass));
+            if(targetBtn) targetBtn.className = `radio-btn selected-${val}`;
+            handleInlineNote(group, val);
+          }
+        }
+      });
+    }
+    if(data.notes) {
+      Object.entries(data.notes).forEach(([id, text]) => {
+        const group = document.querySelector(`[data-check="${id}"]`);
+        if(group) {
+          const input = group.querySelector('.inline-note-input');
+          if(input) input.value = text;
+        }
+      });
+    }
+    updateProgress();
+  } catch(e) {}
 }
 
 /* ── Stars Checklist ── */

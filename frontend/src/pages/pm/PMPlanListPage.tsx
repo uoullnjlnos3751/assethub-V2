@@ -10,6 +10,7 @@ interface PlanForm {
   company: string;
   site: string;
   deptTask: string;
+  deviceType: string;
   lead: string;
   plannedDeviceCount: number;
   startDate: string;
@@ -67,6 +68,7 @@ export default function PMPlanListPage() {
   const [deptOptions, setDeptOptions] = useState<string[]>([]);
   const [locOptions, setLocOptions] = useState<string[]>([]);
   const [companyOptions, setCompanyOptions] = useState<string[]>([]);
+  const [typeOptions, setTypeOptions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [eligibility, setEligibility] = useState<any>(null);
@@ -84,6 +86,7 @@ export default function PMPlanListPage() {
     company: '',
     site: '',
     deptTask: '',
+    deviceType: '',
     lead: '',
     plannedDeviceCount: 10,
     startDate: '',
@@ -96,6 +99,7 @@ export default function PMPlanListPage() {
     company: '',
     site: '',
     deptTask: '',
+    deviceType: '',
     lead: '',
     plannedDeviceCount: 10,
     startDate: '',
@@ -113,12 +117,14 @@ export default function PMPlanListPage() {
       assetAPI.departmentOptions(),
       assetAPI.locationOptions(),
       assetAPI.companyOptions(),
-    ]).then(([p, t, d, l, c]) => {
+      assetAPI.typeOptions(),
+    ]).then(([p, t, d, l, c, ty]) => {
       setPlans(p.data || []);
       setTemplates(t.data || []);
       setDeptOptions((d.data || []).map((x: any) => typeof x === 'string' ? x : x.name || x));
       setLocOptions((l.data || []).map((x: any) => typeof x === 'string' ? x : x.name || x));
       setCompanyOptions((c.data || []).map((x: any) => typeof x === 'string' ? x : x.name || x));
+      setTypeOptions((ty.data || []).map((x: any) => typeof x === 'string' ? x : x.name || x));
     }).finally(() => setLoading(false));
   };
 
@@ -129,7 +135,8 @@ export default function PMPlanListPage() {
     const companyVal = (form.company === '__ALL__' || !form.company) ? '' : form.company;
     const siteVal = (form.site === '__ALL__' || !form.site) ? '' : form.site;
     const deptVal = (form.deptTask === '__ALL__' || !form.deptTask) ? '' : form.deptTask;
-    if (!companyVal && !siteVal && !deptVal) {
+    const typeVal = (form.deviceType === '__ALL__' || !form.deviceType) ? '' : form.deviceType;
+    if (!companyVal && !siteVal && !deptVal && !typeVal) {
       setEligibility(null);
       return;
     }
@@ -141,6 +148,7 @@ export default function PMPlanListPage() {
         company: companyVal || undefined,
         site: siteVal || undefined,
         deptTask: deptVal || undefined,
+        deviceType: typeVal || undefined,
         plannedDeviceCount: form.plannedDeviceCount,
       })
         .then((res) => {
@@ -157,7 +165,7 @@ export default function PMPlanListPage() {
     }, 250);
 
     return () => window.clearTimeout(timer);
-  }, [modalOpen, form.year, form.company, form.site, form.deptTask, form.plannedDeviceCount]);
+  }, [modalOpen, form.year, form.company, form.site, form.deptTask, form.deviceType, form.plannedDeviceCount]);
 
   useEffect(() => {
     const plan = generateModal.plan;
@@ -170,6 +178,7 @@ export default function PMPlanListPage() {
       company: plan.company || undefined,
       site: plan.site || undefined,
       deptTask: plan.deptTask || undefined,
+      deviceType: plan.deviceType || undefined,
       plannedDeviceCount: plan.plannedDeviceCount,
     })
       .then((res) => setGenerateEligibility(res.data))
@@ -183,9 +192,10 @@ export default function PMPlanListPage() {
     const companyVal = (form.company === '__ALL__' || !form.company) ? '' : form.company;
     const siteVal = (form.site === '__ALL__' || !form.site) ? '' : form.site;
     const deptVal = (form.deptTask === '__ALL__' || !form.deptTask) ? '' : form.deptTask;
+    const typeVal = (form.deviceType === '__ALL__' || !form.deviceType) ? '' : form.deviceType;
 
-    if (!companyVal && !siteVal && !deptVal) {
-      showToast('⚠️ กรุณาระบุ บริษัท, สถานที่ หรือ แผนก อย่างใดอย่างหนึ่ง (ไม่สามารถเลือกเป็นทั้งหมดพร้อมกันได้)');
+    if (!companyVal && !siteVal && !deptVal && !typeVal) {
+      showToast('⚠️ กรุณาระบุ บริษัท, สถานที่, แผนก หรือ ประเภทอุปกรณ์ อย่างใดอย่างหนึ่ง');
       return;
     }
 
@@ -196,6 +206,7 @@ export default function PMPlanListPage() {
         company: companyVal,
         site: siteVal,
         deptTask: deptVal,
+        deviceType: typeVal,
         lead: form.lead,
         plannedDeviceCount: form.plannedDeviceCount,
         startDate: form.startDate,
@@ -209,6 +220,7 @@ export default function PMPlanListPage() {
         company: '',
         site: '',
         deptTask: '',
+        deviceType: '',
         lead: '',
         plannedDeviceCount: 10,
         startDate: '',
@@ -228,6 +240,7 @@ export default function PMPlanListPage() {
       company: plan.company || '',
       site: plan.site || '',
       deptTask: plan.deptTask || '',
+      deviceType: plan.deviceType || '',
       lead: plan.lead || '',
       plannedDeviceCount: plan.plannedDeviceCount || 0,
       startDate: plan.startDate ? plan.startDate.substring(0, 10) : '',
@@ -244,9 +257,10 @@ export default function PMPlanListPage() {
     const companyVal = (editForm.company === '__ALL__' || !editForm.company) ? '' : editForm.company;
     const siteVal = (editForm.site === '__ALL__' || !editForm.site) ? '' : editForm.site;
     const deptVal = (editForm.deptTask === '__ALL__' || !editForm.deptTask) ? '' : editForm.deptTask;
+    const typeVal = (editForm.deviceType === '__ALL__' || !editForm.deviceType) ? '' : editForm.deviceType;
 
-    if (!companyVal && !siteVal && !deptVal) {
-      showToast('⚠️ กรุณาระบุ บริษัท, สถานที่ หรือ แผนก อย่างใดอย่างหนึ่ง (ไม่สามารถเลือกเป็นทั้งหมดพร้อมกันได้)');
+    if (!companyVal && !siteVal && !deptVal && !typeVal) {
+      showToast('⚠️ กรุณาระบุ บริษัท, สถานที่, แผนก หรือ ประเภทอุปกรณ์ อย่างใดอย่างหนึ่ง');
       return;
     }
 
@@ -257,6 +271,7 @@ export default function PMPlanListPage() {
         company: companyVal,
         site: siteVal,
         deptTask: deptVal,
+        deviceType: typeVal,
         lead: editForm.lead,
         plannedDeviceCount: editForm.plannedDeviceCount,
         startDate: editForm.startDate,
@@ -272,7 +287,7 @@ export default function PMPlanListPage() {
   };
 
   const handleDelete = async (planId: number) => {
-    if (!window.confirm('⚠️ คุณแน่ใจหรือไม่ว่าต้องการลบแผน PM นี้?\nการลบจะลบงานร่าง (Draft runs) ทั้งหมดในแผนงานนี้ด้วย และไม่สามารถกู้คืนได้')) {
+    if (!window.confirm('⚠️ คุณแน่ใจหรือไม่ว่าต้องการลบแผน PM นี้?\nการลบจะลบข้อมูลงาน PM ทั้งหมด (รวมถึงงานที่เสร็จสิ้นแล้ว) ในแผนงานนี้ด้วย และไม่สามารถกู้คืนได้')) {
       return;
     }
 
@@ -432,6 +447,7 @@ export default function PMPlanListPage() {
                         <div>
                           <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{deptLabel}</div>
                           <div style={{ fontSize: 10, color: '#64748b', fontWeight: 500, marginTop: 1 }}>🏢 {siteLabel || 'ทุกบริษัท/ทุกสถานที่'}</div>
+                          {plan.deviceType && <div style={{ fontSize: 10, color: '#0ea5e9', fontWeight: 600, marginTop: 2 }}>💻 {plan.deviceType}</div>}
                         </div>
                       </div>
                       <span className="pmp-badge" style={{
@@ -504,13 +520,12 @@ export default function PMPlanListPage() {
                       <button
                         className="pmp-btn pmp-btn-outline"
                         style={{
-                          borderColor: done > 0 ? '#e2e8f0' : '#fecaca',
-                          color: done > 0 ? '#cbd5e1' : '#ef4444',
-                          cursor: done > 0 ? 'not-allowed' : 'pointer'
+                          borderColor: '#fecaca',
+                          color: '#ef4444',
+                          cursor: 'pointer'
                         }}
-                        disabled={done > 0}
                         onClick={() => handleDelete(plan.id)}
-                        title={done > 0 ? "ไม่สามารถลบแผนได้เนื่องจากมีงานที่เสร็จสิ้นแล้ว" : "ลบแผน PM"}
+                        title="ลบแผน PM (ระวัง: ลบข้อมูลที่ตรวจแล้วด้วย)"
                       >🗑️</button>
                     </div>
                   </div>
@@ -557,6 +572,15 @@ export default function PMPlanListPage() {
             <select className="pmp-input pmp-select" value={form.deptTask} onChange={e => setForm(p => ({ ...p, deptTask: e.target.value }))}>
               <option value="">📌 ทุกแผนก (All Departments)</option>
               {deptOptions.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+
+          {/* Device Type selector */}
+          <div>
+            <label className="pmp-label">ประเภทอุปกรณ์ (Device Type)</label>
+            <select className="pmp-input pmp-select" value={form.deviceType} onChange={e => setForm(p => ({ ...p, deviceType: e.target.value }))}>
+              <option value="">📌 ทุกประเภท (All Types)</option>
+              {typeOptions.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
 
@@ -725,6 +749,20 @@ export default function PMPlanListPage() {
                   >
                     <option value="">📌 ทุกแผนก (All Departments)</option>
                     {deptOptions.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+
+                {/* Device Type selector */}
+                <div>
+                  <label className="pmp-label">ประเภทอุปกรณ์ (Device Type)</label>
+                  <select 
+                    className="pmp-input pmp-select" 
+                    value={editForm.deviceType} 
+                    disabled={hasCompletedRuns}
+                    onChange={e => setEditForm(p => ({ ...p, deviceType: e.target.value }))}
+                  >
+                    <option value="">📌 ทุกประเภท (All Types)</option>
+                    {typeOptions.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
 

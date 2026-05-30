@@ -291,8 +291,10 @@ export default function MyRequestsPage() {
                             </div>
                           ) : (
                             <div>
-                              <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0f172a' }}>{item.asset?.assetCode || 'N/A'}</div>
-                              <div style={{ fontSize: '0.78rem', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.asset?.serialNo} · {item.asset?.brand} {item.asset?.model}</div>
+                              <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0f172a' }}>{item.asset?.assetCode || 'N/A'} {item.asset?.assetName ? `| ${item.asset.assetName}` : ''}</div>
+                              <div style={{ fontSize: '0.78rem', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                ประเภท: {item.asset?.type || '-'} · S/N: {item.asset?.serialNo || '-'} · {item.asset?.brand} {item.asset?.model}
+                              </div>
                             </div>
                           )}
                           <div style={{ fontSize: '0.73rem', color: '#94a3b8', marginTop: 4 }}>

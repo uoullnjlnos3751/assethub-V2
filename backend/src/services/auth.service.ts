@@ -30,6 +30,9 @@ export class AuthService {
           displayName: existingUser.displayName,
           email: existingUser.email,
           department: existingUser.department,
+          company: existingUser.company,
+          companyThai: existingUser.companyThai,
+          employeeImage: existingUser.avatarUrl,
         };
       } else {
         throw new AppError('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง', 401);
@@ -65,8 +68,11 @@ export class AuthService {
           displayName: ldapInfo?.displayName || username,
           email: ldapInfo?.email || '',
           department: ldapInfo?.department || '',
+          company: ldapInfo?.company || '',
+          companyThai: ldapInfo?.companyThai || '',
+          avatarUrl: ldapInfo?.employeeImage || '',
           role: 'USER',
-          authType: 'LOCAL',
+          authType: authType,
           passwordHash: null,
         },
       });
@@ -76,6 +82,12 @@ export class AuthService {
         updateData.displayName = ldapInfo.displayName || user.displayName;
         updateData.email = ldapInfo.email || user.email;
         updateData.department = ldapInfo.department || user.department;
+        updateData.company = ldapInfo.company || user.company;
+        updateData.companyThai = ldapInfo.companyThai || user.companyThai;
+        updateData.avatarUrl = ldapInfo.employeeImage || user.avatarUrl;
+        if (user.authType !== 'AD') {
+          updateData.authType = 'AD';
+        }
       }
       if (authType === 'LOCAL' && user.authType !== 'LOCAL') {
         updateData.authType = 'LOCAL';
@@ -97,6 +109,7 @@ export class AuthService {
       displayName: user.displayName,
       email: user.email,
       department: user.department,
+      avatarUrl: user.avatarUrl,
     });
 
     return {
@@ -107,6 +120,9 @@ export class AuthService {
         displayName: user.displayName,
         email: user.email,
         department: user.department,
+        company: user.company,
+        companyThai: user.companyThai,
+        avatarUrl: user.avatarUrl,
         role: user.role,
       },
     };
@@ -153,6 +169,9 @@ export class AuthService {
         displayName: true,
         email: true,
         department: true,
+        company: true,
+        companyThai: true,
+        avatarUrl: true,
         role: true,
         isActive: true,
         authType: true,

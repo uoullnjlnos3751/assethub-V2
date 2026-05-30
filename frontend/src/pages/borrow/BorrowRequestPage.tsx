@@ -256,19 +256,22 @@ export default function BorrowRequestPage() {
 
             {activeTab === 0 ? (
               <>
-                {/* Filters */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 10, marginBottom: 14 }}>
+                {/* Quick Filters */}
+                <div style={{ display: 'flex', gap: 6, marginBottom: 14, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
+                  <button onClick={() => setFilterType('')} style={{ padding: '6px 14px', borderRadius: 20, border: '1px solid', borderColor: filterType === '' ? '#0ea5e9' : '#e2e8f0', background: filterType === '' ? '#f0f9ff' : '#fff', color: filterType === '' ? '#0284c7' : '#64748b', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s' }}>ทั้งหมด</button>
+                  {allTypes.map(t => (
+                    <button key={t} onClick={() => setFilterType(t)} style={{ padding: '6px 14px', borderRadius: 20, border: '1px solid', borderColor: filterType === t ? '#0ea5e9' : '#e2e8f0', background: filterType === t ? '#f0f9ff' : '#fff', color: filterType === t ? '#0284c7' : '#64748b', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s' }}>{t}</button>
+                  ))}
+                </div>
+
+                {/* Search & Location Filter */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, marginBottom: 14 }}>
                   <div style={{ position: 'relative' }}>
                     <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}>🔍</span>
                     <input value={assetSearch} onChange={e => setAssetSearch(e.target.value)}
-                      placeholder="ค้นหา รหัส / Serial / ยี่ห้อ / รุ่น"
+                      placeholder="ค้นหา รหัส / ชื่อ / Serial / ยี่ห้อ / รุ่น"
                       style={{ width: '100%', padding: '9px 12px 9px 32px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: '0.85rem', boxSizing: 'border-box' }} />
                   </div>
-                  <select value={filterType} onChange={e => setFilterType(e.target.value)}
-                    style={{ padding: '9px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: '0.85rem', color: filterType ? '#0284c7' : '#6b7280', background: filterType ? '#f0f9ff' : '#fff', minWidth: 130 }}>
-                    <option value="">ทุกประเภท</option>
-                    {allTypes.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
                   <select value={filterLocation} onChange={e => setFilterLocation(e.target.value)}
                     style={{ padding: '9px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: '0.85rem', color: filterLocation ? '#0284c7' : '#6b7280', background: filterLocation ? '#f0f9ff' : '#fff', minWidth: 130 }}>
                     <option value="">ทุกสถานที่</option>
@@ -295,15 +298,17 @@ export default function BorrowRequestPage() {
                     <thead>
                       <tr style={{ background: '#f8fafc', position: 'sticky', top: 0 }}>
                         <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8', width: 36 }}></th>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>รหัส</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>ชื่อทรัพย์สิน</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>Serial No.</th>
                         <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>ยี่ห้อ/รุ่น</th>
                         <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>ประเภท</th>
                         <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>สถานที่</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>บริษัท</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredAssets.length === 0 ? (
-                        <tr><td colSpan={5} style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>ไม่พบรายการ</td></tr>
+                        <tr><td colSpan={7} style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>ไม่พบรายการ</td></tr>
                       ) : filteredAssets.map((a, idx) => {
                         const isSelected = selected.includes(a.id);
                         const isTypeBlocked = a.type && blockedTypes.includes(a.type);
@@ -330,14 +335,16 @@ export default function BorrowRequestPage() {
                               )}
                             </td>
                             <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0f172a' }}>
-                              <div>{a.assetCode}</div>
-                              <div style={{ fontSize: '0.73rem', color: '#94a3b8', fontWeight: 400 }}>{a.serialNo || '-'}</div>
+                              <div>{a.assetName || a.assetCode}</div>
+                              {a.assetName ? <div style={{ fontSize: '0.73rem', color: '#94a3b8', fontWeight: 400 }}>{a.assetCode}</div> : null}
                             </td>
+                            <td style={{ padding: '10px 12px', color: '#374151' }}>{a.serialNo || '-'}</td>
                             <td style={{ padding: '10px 12px', color: '#374151' }}>{`${a.brand || ''} ${a.model || ''}`.trim() || '-'}</td>
                             <td style={{ padding: '10px 12px' }}>
                               {(a.deviceType || a.category?.name) ? <span style={{ background: '#f1f5f9', color: '#475569', borderRadius: 20, padding: '2px 8px', fontSize: '0.72rem', fontWeight: 600 }}>{a.deviceType || a.category?.name}</span> : <span style={{ color: '#cbd5e1' }}>-</span>}
                             </td>
                             <td style={{ padding: '10px 12px', color: '#64748b', fontSize: '0.8rem' }}>{a.location || '-'}</td>
+                            <td style={{ padding: '10px 12px', color: '#64748b', fontSize: '0.8rem' }}>{a.company || '-'}</td>
                           </tr>
                         );
                       })}

@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import BuildCircleIcon from '@mui/icons-material/BuildCircle';
+import HandymanIcon from '@mui/icons-material/Handyman';
 
 export default function ReportHeaderTabs() {
   const navigate = useNavigate();
@@ -14,6 +15,7 @@ export default function ReportHeaderTabs() {
     if (path.startsWith('/reports/assets')) return 0;
     if (path.startsWith('/reports/borrow')) return 1;
     if (path.startsWith('/reports/pm')) return 2;
+    if (path.startsWith('/reports/maintenance')) return 3;
     return 0;
   };
 
@@ -27,6 +29,9 @@ export default function ReportHeaderTabs() {
         break;
       case 2:
         navigate('/reports/pm');
+        break;
+      case 3:
+        navigate('/reports/maintenance');
         break;
       default:
         break;
@@ -109,6 +114,27 @@ export default function ReportHeaderTabs() {
             id="report-tab-pm"
             sx={{
               fontWeight: getActiveTab() === 2 ? 700 : 500,
+              fontSize: '0.85rem',
+              minHeight: 48,
+              py: 1.5,
+              color: '#4b5563',
+              '&.Mui-selected': {
+                color: '#b45309',
+              },
+              '&:hover': {
+                color: '#b45309',
+                bgcolor: alpha('#f59e0b', 0.04),
+              },
+              transition: 'all 0.2s',
+            }}
+          />
+          <Tab
+            icon={<HandymanIcon sx={{ fontSize: '18px' }} />}
+            iconPosition="start"
+            label="รายงานประวัติการซ่อมบำรุง"
+            id="report-tab-maintenance"
+            sx={{
+              fontWeight: getActiveTab() === 3 ? 700 : 500,
               fontSize: '0.85rem',
               minHeight: 48,
               py: 1.5,

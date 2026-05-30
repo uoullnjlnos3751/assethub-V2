@@ -14,10 +14,16 @@ import { borrowAPI } from '../../services/api';
 interface Request {
   id: number;
   requestNo: string;
-  requester: { displayName: string; adUsername: string };
+  requester: { displayName: string; adUsername: string; department?: string; company?: string };
   department: string;
+  departmentId?: string;
   purpose: string;
-  items: Array<{ id: number; asset: { assetCode: string; brand: string; model: string; serialNo: string } }>;
+  items: Array<{
+    id: number;
+    asset?: { assetCode: string; assetName: string; type: string; deviceType?: string; brand: string; model: string; serialNo: string; company?: string; cpuGeneration?: string; ramDetail?: string; gpu?: string };
+    inventoryItem?: { name: string };
+    quantity?: number;
+  }>;
   createdAt: string;
 }
 
@@ -173,6 +179,7 @@ export default function ApprovalQueuePage() {
                 <TableCell>เลขที่คำขอ</TableCell>
                 <TableCell>ผู้ขอ</TableCell>
                 <TableCell>แผนก</TableCell>
+                <TableCell>บริษัท</TableCell>
                 <TableCell>วัตถุประสงค์</TableCell>
                 <TableCell>จำนวนรายการ</TableCell>
                 <TableCell>วันที่ขอ</TableCell>
@@ -193,7 +200,8 @@ export default function ApprovalQueuePage() {
                   <TableRow key={request.id} hover>
                     <TableCell sx={{ fontWeight: 600 }}>{request.requestNo}</TableCell>
                     <TableCell>{request.requester?.displayName || request.requester?.adUsername}</TableCell>
-                    <TableCell>{request.department || '-'}</TableCell>
+                    <TableCell>{(request.requester as any)?.department || request.departmentId || '-'}</TableCell>
+                    <TableCell>{(request.requester as any)?.company || '-'}</TableCell>
                     <TableCell>{request.purpose}</TableCell>
                     <TableCell>{request.items.length} รายการ</TableCell>
                     <TableCell>{new Date(request.createdAt).toLocaleDateString('th-TH')}</TableCell>
@@ -262,15 +270,23 @@ export default function ApprovalQueuePage() {
                 <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                   ผู้ขอ
                 </Typography>
-                <Typography>{detailDialog.request.requester?.displayName}</Typography>
+                <Typography>{detailDialog.request.requester?.displayName || detailDialog.request.requester?.adUsername}</Typography>
               </Box>
 
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                  แผนก
-                </Typography>
-                <Typography>{detailDialog.request.department || '-'}</Typography>
-              </Box>
+              <Grid container spacing={2} sx={{ mb: 2 }}>
+                <Grid item xs={6}>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    แผนก
+                  </Typography>
+                  <Typography>{(detailDialog.request.requester as any)?.department || detailDialog.request.departmentId || '-'}</Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    บริษัท
+                  </Typography>
+                  <Typography>{(detailDialog.request.requester as any)?.company || '-'}</Typography>
+                </Grid>
+              </Grid>
 
               <Box sx={{ mb: 2 }}>
                 <Typography variant="subtitle2" color="text.secondary" gutterBottom>
@@ -288,16 +304,57 @@ export default function ApprovalQueuePage() {
                 <Box
                   key={item.id}
                   sx={{
-                    p: 1,
-                    mb: 1,
+                    p: 1.5,
+                    mb: 1.5,
                     backgroundColor: 'rgba(37, 99, 235, 0.05)',
-                    borderRadius: 1,
+                    borderRadius: 2,
+                    border: '1px solid rgba(37, 99, 235, 0.1)'
                   }}
                 >
-                  <Typography fontWeight={600}>{item.asset?.assetCode}</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {item.asset?.serialNo} | {item.asset?.brand} {item.asset?.model}
+                  <Typography fontWeight={600} color="primary.main" gutterBottom sx={{ fontSize: '0.95rem' }}>
+                    {item.asset 
+                      ? item.asset.assetName || item.asset.assetCode || '-'
+                      : item.inventoryItem 
+                        ? `${item.inventoryItem.name} (จำนวน ${item.quantity})`
+                        : '-'
+                    }
                   </Typography>
+                  <Grid container spacing={1}>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        <strong>ประเภท (Type):</strong> {item.asset?.deviceType || item.asset?.type || '-'}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        <strong>ยี่ห้อ/รุ่น (Brand/Model):</strong> {`${item.asset?.brand || ''} ${item.asset?.model || ''}`.trim() || '-'}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        <strong>เลขเครื่อง (Serial No):</strong> {item.asset?.serialNo || '-'}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        <strong>บริษัท (Company):</strong> {item.asset?.company || '-'}
+                      </Typography>
+                    </Grid>
+                    {item.asset?.cpuGeneration && (
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="caption" color="text.secondary" display="block">
+                          <strong>CPU:</strong> {item.asset?.cpuGeneration}
+                        </Typography>
+                      </Grid>
+                    )}
+                    {item.asset?.ramDetail && (
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="caption" color="text.secondary" display="block">
+                          <strong>RAM:</strong> {item.asset?.ramDetail}
+                        </Typography>
+                      </Grid>
+                    )}
+                  </Grid>
                 </Box>
               ))}
 

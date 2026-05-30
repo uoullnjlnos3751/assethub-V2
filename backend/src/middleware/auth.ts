@@ -12,6 +12,9 @@ export interface AuthUser {
   displayName: string | null;
   email: string | null;
   department: string | null;
+  company?: string | null;
+  companyThai?: string | null;
+  avatarUrl?: string | null;
 }
 
 declare global {

@@ -266,7 +266,7 @@ export default function PMSchedulePage() {
       dataRows.push([]); // blank line spacer
       
       // Table Header Row
-      const tableHeaders = ['WBS', 'บริษัท / แผนกงาน', 'จำนวนเครื่องทั้งหมด', 'เสร็จแล้ว', 'ความสำเร็จ (%)', 'สถานะ'];
+      const tableHeaders = ['WBS', 'TASK (บริษัท / แผนกงาน)', 'LEAD', 'Device (แผน)', 'Completed (เสร็จ)', 'Remaining (เหลือ)', 'START', 'END', 'DAYS', '% DONE', 'สถานะ'];
       weeks.forEach(w => {
         tableHeaders.push(`${w.label} (${w.subLabel})`);
       });
@@ -276,8 +276,13 @@ export default function PMSchedulePage() {
       const summaryRow = [
         '1',
         'TRR GROUP (ทั้งหมด)',
+        '-',
         totalPlanned,
         totalCompleted,
+        totalPlanned - totalCompleted,
+        '-',
+        '-',
+        '-',
         `${overallPct}%`,
         overallPct >= 100 ? 'เสร็จสิ้นแล้ว' : 'กำลังดำเนินการ'
       ];
@@ -292,11 +297,17 @@ export default function PMSchedulePage() {
         
         // 1. Write Company summary row (WBS 1.1, 1.2, ...)
         const siteWbs = `1.${groupIdx + 1}`;
+        const days = (group.startDate && group.endDate) ? Math.max(1, Math.ceil((group.endDate.getTime() - group.startDate.getTime()) / 86400000)) : '-';
         const siteRow = [
           siteWbs,
           `🏢 ${group.site}`,
+          group.lead || 'ไม่ระบุ',
           group.totalPlanned,
           group.totalCompleted,
+          group.totalPlanned - group.totalCompleted,
+          group.startDate ? fmtDate(group.startDate) : '-',
+          group.endDate ? fmtDate(group.endDate) : '-',
+          days,
           `${sitePct}%`,
           sitePct >= 100 ? 'เสร็จสิ้น' : sitePct > 0 ? 'กำลังดำเนินการ' : 'รอตรวจนับ'
         ];
@@ -317,20 +328,27 @@ export default function PMSchedulePage() {
           const planPct = plan.plannedDeviceCount > 0 ? Math.round((plan.completedCount || 0) / plan.plannedDeviceCount * 100) : 0;
           const planWbs = `${siteWbs}.${planIdx + 1}`;
           
+          const pStartVal = plan.startDate ? new Date(plan.startDate) : null;
+          const pEndVal = plan.endDate ? new Date(plan.endDate) : null;
+          const pDays = (pStartVal && pEndVal) ? Math.max(1, Math.ceil((pEndVal.getTime() - pStartVal.getTime()) / 86400000)) : '-';
+          
           const planRow = [
             planWbs,
             `   ↳ 📁 ${plan.deptTask || 'ทั่วไป'}`,
+            plan.lead || group.lead || 'ไม่ระบุ',
             plan.plannedDeviceCount,
             plan.completedCount || 0,
+            plan.plannedDeviceCount - (plan.completedCount || 0),
+            pStartVal ? fmtDate(pStartVal) : '-',
+            pEndVal ? fmtDate(pEndVal) : '-',
+            pDays,
             `${planPct}%`,
             planPct >= 100 ? 'เสร็จสิ้น' : planPct > 0 ? 'กำลังดำเนินการ' : 'รอตรวจนับ'
           ];
 
           // Fill Gantt columns for Dept Row
           weeks.forEach(w => {
-            const startVal = plan.startDate ? new Date(plan.startDate) : null;
-            const endVal = plan.endDate ? new Date(plan.endDate) : null;
-            const covers = startVal && endVal && startVal <= w.end && endVal >= w.start;
+            const covers = pStartVal && pEndVal && pStartVal <= w.end && pEndVal >= w.start;
             if (covers) {
               planRow.push(planPct >= 100 ? 'เสร็จสิ้น (✓)' : planPct > 0 ? 'กำลังดำเนินการ (⏳)' : 'ตามแผน (📅)');
             } else {
@@ -561,11 +579,16 @@ export default function PMSchedulePage() {
             <table className="gantt-table">
               <thead>
                 <tr>
-                  <th style={{ width: 60, textAlign: 'center' }}>WBS</th>
-                  <th style={{ minWidth: 220, textAlign: 'left' }}>บริษัท / แผนกงาน</th>
-                  <th style={{ width: 60, textAlign: 'center' }}>แผน (เครื่อง)</th>
-                  <th style={{ width: 60, textAlign: 'center' }}>เสร็จ (เครื่อง)</th>
-                  <th style={{ width: 130, textAlign: 'center' }}>ความคืบหน้า (%)</th>
+                  <th style={{ width: 50, textAlign: 'center' }}>WBS</th>
+                  <th style={{ minWidth: 180, textAlign: 'left' }}>TASK (บริษัท / แผนกงาน)</th>
+                  <th style={{ width: 100, textAlign: 'center' }}>LEAD</th>
+                  <th style={{ width: 60, textAlign: 'center' }}>Device<br /><span style={{ fontSize: 9, fontWeight: 400, color: '#cbd5e1' }}>แผน</span></th>
+                  <th style={{ width: 60, textAlign: 'center' }}>Completed<br /><span style={{ fontSize: 9, fontWeight: 400, color: '#cbd5e1' }}>เสร็จ</span></th>
+                  <th style={{ width: 60, textAlign: 'center' }}>Remaining<br /><span style={{ fontSize: 9, fontWeight: 400, color: '#cbd5e1' }}>เหลือ</span></th>
+                  <th style={{ width: 70, textAlign: 'center' }}>START</th>
+                  <th style={{ width: 70, textAlign: 'center' }}>END</th>
+                  <th style={{ width: 50, textAlign: 'center' }}>DAYS</th>
+                  <th style={{ width: 70, textAlign: 'center' }}>% DONE</th>
                   {weeks.map(w => (
                     <th key={w.label} style={{ width: 85, textAlign: 'center' }}>
                       {w.label}<br />
@@ -579,13 +602,15 @@ export default function PMSchedulePage() {
                 <tr style={{ background: '#f8fafc', fontWeight: 800 }}>
                   <td style={{ textAlign: 'center', color: '#64748b' }}>1</td>
                   <td>💼 TRR GROUP (ทั้งหมดในระบบ)</td>
+                  <td style={{ textAlign: 'center' }}>-</td>
                   <td style={{ textAlign: 'center' }}>{totalPlanned}</td>
                   <td style={{ textAlign: 'center' }}>{totalCompleted}</td>
+                  <td style={{ textAlign: 'center', color: '#ef4444' }}>{totalPlanned - totalCompleted}</td>
+                  <td style={{ textAlign: 'center' }}>-</td>
+                  <td style={{ textAlign: 'center' }}>-</td>
+                  <td style={{ textAlign: 'center' }}>-</td>
                   <td style={{ textAlign: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                      <div className="gantt-progress-wrap">
-                        <div className="gantt-progress-bar" style={{ width: `${overallPct}%`, background: getProgressColor(overallPct) }} />
-                      </div>
                       <span style={{ color: getProgressColor(overallPct), minWidth: 32, textAlign: 'right' }}>{overallPct}%</span>
                     </div>
                   </td>
@@ -597,7 +622,7 @@ export default function PMSchedulePage() {
                 {/* ── Grouped Sites Rows ── */}
                 {groupedPlans.length === 0 ? (
                   <tr>
-                    <td colSpan={5 + weeks.length} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>
+                    <td colSpan={10 + weeks.length} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>
                       ไม่มีข้อมูลกำหนดการตามคำค้นหา
                     </td>
                   </tr>
@@ -606,6 +631,7 @@ export default function PMSchedulePage() {
                     const sitePct = group.totalPlanned > 0 ? Math.round(group.totalCompleted / group.totalPlanned * 100) : 0;
                     const isExpanded = expandedSites[group.site] !== false;
                     const siteWbs = `1.${groupIdx + 1}`;
+                    const siteDays = (group.startDate && group.endDate) ? Math.max(1, Math.ceil((group.endDate.getTime() - group.startDate.getTime()) / 86400000)) : '-';
 
                     // Create dummy plan for site overview chart drawing
                     const siteDummyPlan = {
@@ -624,13 +650,15 @@ export default function PMSchedulePage() {
                             <span className="collapsible-icon">{isExpanded ? '▼' : '▶'}</span>
                             🏢 {group.site}
                           </td>
+                          <td style={{ textAlign: 'center' }}>{group.lead || '-'}</td>
                           <td style={{ textAlign: 'center' }}>{group.totalPlanned}</td>
                           <td style={{ textAlign: 'center' }}>{group.totalCompleted}</td>
+                          <td style={{ textAlign: 'center', color: '#ef4444' }}>{group.totalPlanned - group.totalCompleted}</td>
+                          <td style={{ textAlign: 'center', fontSize: 10 }}>{group.startDate ? fmtDate(group.startDate) : '-'}</td>
+                          <td style={{ textAlign: 'center', fontSize: 10 }}>{group.endDate ? fmtDate(group.endDate) : '-'}</td>
+                          <td style={{ textAlign: 'center' }}>{siteDays}</td>
                           <td style={{ textAlign: 'center' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                              <div className="gantt-progress-wrap" style={{ background: '#d1fae5' }}>
-                                <div className="gantt-progress-bar" style={{ width: `${sitePct}%`, background: '#10b981' }} />
-                              </div>
                               <span style={{ color: '#047857', minWidth: 32, textAlign: 'right' }}>{sitePct}%</span>
                             </div>
                           </td>
@@ -641,6 +669,10 @@ export default function PMSchedulePage() {
                         {isExpanded && group.plans.map((plan, planIdx) => {
                           const planPct = plan.plannedDeviceCount > 0 ? Math.round((plan.completedCount || 0) / plan.plannedDeviceCount * 100) : 0;
                           const planWbs = `${siteWbs}.${planIdx + 1}`;
+                          
+                          const pStartVal = plan.startDate ? new Date(plan.startDate) : null;
+                          const pEndVal = plan.endDate ? new Date(plan.endDate) : null;
+                          const pDays = (pStartVal && pEndVal) ? Math.max(1, Math.ceil((pEndVal.getTime() - pStartVal.getTime()) / 86400000)) : '-';
 
                           return (
                             <tr 
@@ -653,13 +685,15 @@ export default function PMSchedulePage() {
                               <td style={{ paddingLeft: '28px', color: '#334155' }}>
                                 ↳ 📁 {plan.deptTask || 'ทั่วไป'}
                               </td>
+                              <td style={{ textAlign: 'center' }}>{plan.lead || group.lead || '-'}</td>
                               <td style={{ textAlign: 'center' }}>{plan.plannedDeviceCount}</td>
                               <td style={{ textAlign: 'center' }}>{plan.completedCount || 0}</td>
+                              <td style={{ textAlign: 'center', color: '#ef4444' }}>{plan.plannedDeviceCount - (plan.completedCount || 0)}</td>
+                              <td style={{ textAlign: 'center', fontSize: 10 }}>{pStartVal ? fmtDate(pStartVal) : '-'}</td>
+                              <td style={{ textAlign: 'center', fontSize: 10 }}>{pEndVal ? fmtDate(pEndVal) : '-'}</td>
+                              <td style={{ textAlign: 'center' }}>{pDays}</td>
                               <td style={{ textAlign: 'center' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                                  <div className="gantt-progress-wrap">
-                                    <div className="gantt-progress-bar" style={{ width: `${planPct}%`, background: getProgressColor(planPct) }} />
-                                  </div>
                                   <span style={{ color: getProgressColor(planPct), minWidth: 32, textAlign: 'right' }}>{planPct}%</span>
                                 </div>
                               </td>

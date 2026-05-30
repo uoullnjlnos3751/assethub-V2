@@ -68,6 +68,18 @@ export const assetAPI = {
     });
   },
   deleteImage: (id: number) => api.delete(`/assets/${id}/image`),
+  // Documents
+  listDocuments: (assetId: number) => api.get(`/assets/${assetId}/documents`),
+  uploadDocument: (assetId: number, formData: FormData) => {
+    const token = localStorage.getItem('token');
+    return axios.post(`/api/assets/${assetId}/documents`, formData, {
+      headers: { Authorization: token ? `Bearer ${token}` : undefined },
+    });
+  },
+  downloadDocument: (assetId: number, docId: number) => {
+    window.open(`/api/assets/${assetId}/documents/${docId}/download`, '_blank');
+  },
+  deleteDocument: (assetId: number, docId: number) => api.delete(`/assets/${assetId}/documents/${docId}`),
   searchOwners: (q: string) => api.get('/assets/owners/search-ad', { params: { q } }),
   typeOptions: () => api.get('/assets/options/types'),
   locationOptions: () => api.get('/assets/options/locations'),
@@ -154,6 +166,11 @@ export const adminAPI = {
   updateRole: (id: number, role: string) => api.put(`/admin/users/${id}/role`, { role }),
   toggleActive: (id: number) => api.put(`/admin/users/${id}/toggle-active`),
   deleteUser: (id: number) => api.delete(`/admin/users/${id}`),
+
+  // Companies
+  syncADCompanies: () => api.get('/admin/ad-companies'),
+  saveADCompanies: (companies: string[]) => api.post('/admin/sync-companies', { companies }),
+
   settings: () => api.get('/admin/settings'),
   updateSettings: (data: any) => api.put('/admin/settings', data),
   testEmail: (data: any) => api.post('/admin/test-email', data),
@@ -238,4 +255,22 @@ export const categoryAPI = {
   updateType: (typeId: number, data: any) => api.put(`/categories/types/${typeId}`, data),
   deleteType: (typeId: number) => api.delete(`/categories/types/${typeId}`),
   reorderTypes: (categoryId: number, typeIds: number[]) => api.post(`/categories/${categoryId}/types/reorder`, { typeIds }),
+};
+
+// Maintenance
+export const maintenanceAPI = {
+  create: (data: any) => api.post('/maintenance', data),
+  update: (id: number, data: any) => api.put(`/maintenance/${id}`, data),
+  uploadImage: (id: number, file: File, type: 'BEFORE' | 'AFTER' | 'RECEIPT', description?: string) => {
+    const fd = new FormData();
+    fd.append('image', file);
+    fd.append('imageType', type);
+    if (description) fd.append('description', description);
+    return api.post(`/maintenance/${id}/images`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  getByAsset: (assetId: number) => api.get(`/maintenance/asset/${assetId}`),
+  getById: (id: number) => api.get(`/maintenance/${id}`),
+  reportAll: (params?: any) => api.get('/maintenance/report/all', { params }),
 };

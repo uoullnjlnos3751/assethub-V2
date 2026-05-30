@@ -6,6 +6,9 @@ import { Prisma } from '@prisma/client';
 import { searchADUsers } from '../services/ldap';
 import multer from 'multer';
 import * as xlsx from 'xlsx';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as crypto from 'crypto';
 
 declare global {
   namespace Express {
@@ -30,6 +33,27 @@ const upload = multer({
 const uploadExcel = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+});
+
+const UPLOAD_DIR = path.join(__dirname, '..', '..', 'uploads', 'documents');
+fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+const docUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req: any, _file: any, cb: any) => cb(null, UPLOAD_DIR),
+    filename: (_req: any, file: any, cb: any) => {
+      const ext = path.extname(file.originalname);
+      cb(null, `${crypto.randomUUID()}${ext}`);
+    },
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req: any, file: any, cb: any) => {
+    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+      'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error('ประเภทไฟล์ไม่รองรับ (รองรับ: PDF, รูปภาพ, Word, Excel)'));
+  },
 });
 
 const router = Router();
@@ -375,7 +399,7 @@ const ASSET_TYPE_GROUPS: Record<string, string[]> = {
 
 router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { search, status, department, location, type, typeGroup, categoryId, cpu, ram, warrantyStatus, warrantyExpiringInDays, ownerName, screenSize, resolution, panelType, printerType, isColor, ipAddress, storage, osType, page = '1', limit = '50' } = req.query;
+    const { search, status, department, location, type, typeGroup, categoryId, cpu, ram, warrantyStatus, warrantyExpiringInDays, ownerName, screenSize, resolution, panelType, printerType, isColor, ipAddress, storage, osType, company, page = '1', limit = '50' } = req.query;
     const pageNum = parseInt(page as string);
     const limitNum = Math.min(parseInt(limit as string), 100);
     const skip = (pageNum - 1) * limitNum;
@@ -385,6 +409,29 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
     if (department) where.departmentId = department as string;
     if (location) where.location = location as string;
     if (categoryId) where.categoryId = parseInt(categoryId as string);
+    if (company) where.company = company as string;
+
+    // Apply company visibility mapping for non-admins
+    if (req.user && !['SUPERADMIN', 'IT_ADMIN'].includes(req.user.role)) {
+      const appUser = await prisma.appUser.findUnique({ where: { id: req.user.userId } });
+      if (appUser && appUser.company) {
+        const adCompany = await prisma.company.findUnique({ where: { name: appUser.company } });
+        if (adCompany && adCompany.assetCompanyCodes) {
+          const allowedCompanies = adCompany.assetCompanyCodes.split(',').map(s => s.trim()).filter(Boolean);
+          if (allowedCompanies.length > 0) {
+            where.company = { in: allowedCompanies };
+          } else {
+            // If mapping exists but is empty, fallback to not seeing anything or just global
+            where.company = { in: ['__NONE__'] };
+          }
+        } else {
+          // If no mapping defined, fallback to their exact company name or nothing
+          where.company = { in: ['__NONE__'] };
+        }
+      } else {
+        where.company = { in: ['__NONE__'] };
+      }
+    }
     if (type) {
       where.type = type as string;
     } else if (typeGroup && ASSET_TYPE_GROUPS[String(typeGroup)]) {
@@ -876,8 +923,9 @@ router.post('/companies', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), asy
   try {
     const name = String(req.body.name || '').trim();
     const description = req.body.description ? String(req.body.description).trim() : null;
+    const assetCompanyCodes = req.body.assetCompanyCodes !== undefined ? String(req.body.assetCompanyCodes).trim() : null;
     if (!name) throw new AppError('กรุณาระบุ Company');
-    const created = await prisma.company.create({ data: { name, description, isActive: req.body.isActive ?? true } });
+    const created = await prisma.company.create({ data: { name, description, assetCompanyCodes, isActive: req.body.isActive ?? true } });
     res.status(201).json(created);
   } catch (err: any) {
     if (err?.code === 'P2002') return next(new AppError('Company นี้มีอยู่แล้ว'));
@@ -890,8 +938,9 @@ router.put('/companies/:companyId', authenticate, authorize('IT_ADMIN', 'SUPERAD
     const id = parseInt(req.params.companyId);
     const name = String(req.body.name || '').trim();
     const description = req.body.description ? String(req.body.description).trim() : null;
+    const assetCompanyCodes = req.body.assetCompanyCodes !== undefined ? String(req.body.assetCompanyCodes).trim() : null;
     if (!name) throw new AppError('กรุณาระบุ Company');
-    const updated = await prisma.company.update({ where: { id }, data: { name, description, isActive: req.body.isActive ?? true } });
+    const updated = await prisma.company.update({ where: { id }, data: { name, description, assetCompanyCodes, isActive: req.body.isActive ?? true } });
     res.json(updated);
   } catch (err: any) {
     if (err?.code === 'P2002') return next(new AppError('Company นี้มีอยู่แล้ว'));
@@ -1941,6 +1990,7 @@ router.get('/:id', authenticate, async (req: Request, res: Response, next: NextF
         assetHistory: { orderBy: { createdAt: 'desc' }, take: 50 },
         pmRuns: { orderBy: { completedAt: 'desc' }, take: 20, include: { plan: true, performer: true } },
         category: true,
+        documents: { orderBy: { createdAt: 'desc' } },
       },
     });
     if (!asset) throw new AppError('ไม่พบทรัพย์สิน', 404);
@@ -2195,6 +2245,65 @@ router.delete('/:id/image', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), a
     });
 
     res.json({ message: 'ลบรูปภาพเรียบร้อย' });
+  } catch (err) { next(err); }
+});
+
+router.get('/:id/documents', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const docs = await prisma.assetDocument.findMany({
+      where: { assetId: id },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json(docs);
+  } catch (err) { next(err); }
+});
+
+router.post('/:id/documents', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), docUpload.single('file'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const asset = await prisma.asset.findUnique({ where: { id } });
+    if (!asset) throw new AppError('ไม่พบทรัพย์สิน', 404);
+    if (!req.file) throw new AppError('ไม่พบไฟล์', 400);
+
+    const doc = await prisma.assetDocument.create({
+      data: {
+        assetId: id,
+        fileName: req.file.originalname,
+        storedName: req.file.filename,
+        fileSize: req.file.size,
+        mimeType: req.file.mimetype,
+        docType: (req.body.docType as string) || 'OTHER',
+        note: (req.body.note as string) || null,
+        uploadedBy: req.user?.userId ? String(req.user.userId) : null,
+      },
+    });
+    res.status(201).json(doc);
+  } catch (err) { next(err); }
+});
+
+router.get('/:id/documents/:docId/download', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const docId = parseInt(req.params.docId);
+    const doc = await prisma.assetDocument.findUnique({ where: { id: docId } });
+    if (!doc) throw new AppError('ไม่พบเอกสาร', 404);
+    const filePath = path.join(UPLOAD_DIR, doc.storedName);
+    if (!fs.existsSync(filePath)) throw new AppError('ไม่พบไฟล์ในระบบ', 404);
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(doc.fileName)}"`);
+    res.setHeader('Content-Type', doc.mimeType);
+    fs.createReadStream(filePath).pipe(res);
+  } catch (err) { next(err); }
+});
+
+router.delete('/:id/documents/:docId', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const docId = parseInt(req.params.docId);
+    const doc = await prisma.assetDocument.findUnique({ where: { id: docId } });
+    if (!doc) throw new AppError('ไม่พบเอกสาร', 404);
+    const filePath = path.join(UPLOAD_DIR, doc.storedName);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    await prisma.assetDocument.delete({ where: { id: docId } });
+    res.json({ message: 'ลบเอกสารเรียบร้อย' });
   } catch (err) { next(err); }
 });
 

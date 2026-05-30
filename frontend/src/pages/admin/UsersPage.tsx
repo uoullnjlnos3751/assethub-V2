@@ -2,10 +2,15 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   Box, Typography, Button, Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, Select, MenuItem, FormControl, InputLabel, Chip, CircularProgress,
-  List, ListItem, ListItemText, Divider, InputAdornment, IconButton, ListItemButton, Alert
+  List, ListItem, ListItemText, Divider, IconButton, ListItemButton, Alert,
+  Avatar, Card, CardContent, Grid, Tooltip
 } from '@mui/material';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
-import { Search as SearchIcon, Add as AddIcon, PersonAdd as PersonAddIcon, Delete as DeleteIcon, Lock as LockIcon } from '@mui/icons-material';
+import {
+  Search as SearchIcon, Add as AddIcon, PersonAdd as PersonAddIcon,
+  Delete as DeleteIcon, People as PeopleIcon, Shield as ShieldIcon,
+  Block as BlockIcon, AdminPanelSettings as AdminIcon
+} from '@mui/icons-material';
 import { adminAPI } from '../../services/api';
 import debounce from 'lodash/debounce';
 
@@ -18,7 +23,7 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
-  
+
   // Dialog for role update
   const [roleDialog, setRoleDialog] = useState<{ open: boolean; user: any }>({ open: false, user: null });
   const [newRole, setNewRole] = useState('');
@@ -175,79 +180,269 @@ export default function UsersPage() {
     }
   };
 
+  // Summary counts
+  const totalUsers = total;
+  const activeUsers = users.filter(u => u.isActive).length;
+  const adminUsers = users.filter(u => u.role === 'IT_ADMIN' || u.role === 'SUPERADMIN').length;
+  const inactiveUsers = users.filter(u => !u.isActive).length;
+
   const columns: GridColDef[] = [
-    { field: 'adUsername', headerName: 'Username', width: 140 },
-    { field: 'displayName', headerName: 'ชื่อ', width: 150 },
-    { field: 'email', headerName: 'อีเมล', width: 200 },
-    { field: 'department', headerName: 'แผนก', width: 130 },
-    { field: 'authType', headerName: 'ประเภท', width: 80, renderCell: ({ value }) => <Chip label={value || 'AD'} color={value === 'LOCAL' ? 'info' : 'default'} size="small" variant={value === 'LOCAL' ? 'filled' : 'outlined'} /> },
-    { field: 'role', headerName: 'บทบาท', width: 120, renderCell: ({ value }) => <Chip label={roleLabels[value] || value} color={(roleColors[value] as any) || 'default'} size="small" /> },
-    { field: 'isActive', headerName: 'สถานะ', width: 100, renderCell: ({ value }) => <Chip label={value ? 'ใช้งาน' : 'ปิด'} color={value ? 'success' : 'error'} size="small" /> },
-    { field: 'lastLoginAt', headerName: 'ล็อกอินล่าสุด', width: 180, valueFormatter: (v) => v ? new Date(v).toLocaleString('th-TH') : '-' },
     {
-      field: 'actions', headerName: 'จัดการ', width: 300, sortable: false,
+      field: 'avatar', headerName: '', width: 50, sortable: false, filterable: false,
       renderCell: ({ row }) => (
-        <Box>
-          <Button size="small" variant="outlined" sx={{ mr: 1 }} onClick={() => { setRoleDialog({ open: true, user: row }); setNewRole(row.role); }}>บทบาท</Button>
-          {row.authType !== 'LOCAL' ? (
-            <Button size="small" variant="outlined" sx={{ mr: 1 }} onClick={() => { setPasswordDialog({ open: true, user: row }); setNewPassword(''); }}>
-              ตั้งรหัส
+        <Avatar
+          src={row.avatarUrl || undefined}
+          sx={{ width: 32, height: 32, fontSize: '13px', bgcolor: row.isActive ? '#4f46e5' : '#9ca3af' }}
+        >
+          {!row.avatarUrl && (row.displayName?.charAt(0) || 'U')}
+        </Avatar>
+      ),
+    },
+    { field: 'adUsername', headerName: 'Username', width: 130 },
+    { field: 'displayName', headerName: 'ชื่อ - นามสกุล', width: 170 },
+    { field: 'email', headerName: 'อีเมล', width: 200 },
+    { field: 'department', headerName: 'แผนก', width: 140 },
+    { field: 'companyThai', headerName: 'บริษัท', width: 200 },
+    {
+      field: 'authType', headerName: 'ประเภท', width: 80,
+      renderCell: ({ value }) => (
+        <Chip
+          label={value || 'AD'}
+          color={value === 'LOCAL' ? 'info' : 'default'}
+          size="small"
+          variant={value === 'LOCAL' ? 'filled' : 'outlined'}
+          sx={{ fontSize: '11px' }}
+        />
+      ),
+    },
+    {
+      field: 'role', headerName: 'บทบาท', width: 120,
+      renderCell: ({ value }) => (
+        <Chip
+          label={roleLabels[value] || value}
+          color={(roleColors[value] as any) || 'default'}
+          size="small"
+          sx={{ fontWeight: 600, fontSize: '11px' }}
+        />
+      ),
+    },
+    {
+      field: 'isActive', headerName: 'สถานะ', width: 90,
+      renderCell: ({ value }) => (
+        <Chip
+          label={value ? 'ใช้งาน' : 'ปิด'}
+          color={value ? 'success' : 'error'}
+          size="small"
+          variant="outlined"
+          sx={{ fontSize: '11px' }}
+        />
+      ),
+    },
+    {
+      field: 'lastLoginAt', headerName: 'ล็อกอินล่าสุด', width: 160,
+      valueFormatter: (v) => v ? new Date(v).toLocaleString('th-TH') : '-'
+    },
+    {
+      field: 'actions', headerName: 'จัดการ', width: 220, sortable: false,
+      renderCell: ({ row }) => (
+        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+          <Tooltip title="เปลี่ยนบทบาท">
+            <Button
+              size="small" variant="outlined"
+              sx={{ minWidth: 0, px: 1, fontSize: '11px', borderColor: '#e2e8f0', color: '#475569' }}
+              onClick={() => { setRoleDialog({ open: true, user: row }); setNewRole(row.role); }}
+            >
+              บทบาท
             </Button>
-          ) : (
-            <Button size="small" variant="outlined" sx={{ mr: 1 }} onClick={() => { setPasswordDialog({ open: true, user: row }); setNewPassword(''); }}>
-              เปลี่ยนรหัส
+          </Tooltip>
+          <Tooltip title={row.authType === 'LOCAL' ? 'เปลี่ยนรหัสผ่าน' : 'ตั้งรหัสผ่าน Local'}>
+            <Button
+              size="small" variant="outlined"
+              sx={{ minWidth: 0, px: 1, fontSize: '11px', borderColor: '#e2e8f0', color: '#475569' }}
+              onClick={() => { setPasswordDialog({ open: true, user: row }); setNewPassword(''); }}
+            >
+              {row.authType === 'LOCAL' ? 'รหัส' : 'ตั้งรหัส'}
             </Button>
-          )}
-          <Button size="small" color={row.isActive ? 'error' : 'success'} variant="outlined" sx={{ mr: 1 }} onClick={() => handleToggleActive(row.id)}>
-            {row.isActive ? 'ปิด' : 'เปิด'}
-          </Button>
-          <IconButton color="error" size="small" onClick={() => handleDeleteUser(row)}>
-            <DeleteIcon />
-          </IconButton>
+          </Tooltip>
+          <Tooltip title={row.isActive ? 'ปิดการใช้งาน' : 'เปิดการใช้งาน'}>
+            <Button
+              size="small" variant="outlined"
+              sx={{
+                minWidth: 0, px: 1, fontSize: '11px',
+                borderColor: row.isActive ? '#fecaca' : '#bbf7d0',
+                color: row.isActive ? '#dc2626' : '#16a34a',
+              }}
+              onClick={() => handleToggleActive(row.id)}
+            >
+              {row.isActive ? 'ปิด' : 'เปิด'}
+            </Button>
+          </Tooltip>
+          <Tooltip title="ลบผู้ใช้">
+            <IconButton color="error" size="small" onClick={() => handleDeleteUser(row)} sx={{ ml: 0.5 }}>
+              <DeleteIcon sx={{ fontSize: 16 }} />
+            </IconButton>
+          </Tooltip>
         </Box>
       ),
     },
   ];
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" fontWeight={600}>จัดการผู้ใช้</Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => { handleCloseAddDialog(); setAddDialog(true); }}>เพิ่มผู้ใช้งานใหม่</Button>
+    <Box sx={{ maxWidth: 1500, mx: 'auto', p: { xs: 2, md: 3 } }}>
+      {/* Header */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', mb: 3 }}>
+        <Box>
+          <Typography variant="h4" fontWeight={800} sx={{ color: '#1e293b', mb: 0.5 }}>
+            จัดการผู้ใช้งาน
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            ดูแลจัดการบัญชีผู้ใช้งานทั้งหมดในระบบ
+          </Typography>
+        </Box>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => { handleCloseAddDialog(); setAddDialog(true); }}
+          sx={{
+            bgcolor: '#4f46e5', '&:hover': { bgcolor: '#4338ca' },
+            borderRadius: '8px', textTransform: 'none', fontWeight: 600, px: 3,
+          }}
+        >
+          เพิ่มผู้ใช้งานใหม่
+        </Button>
       </Box>
 
-      <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-        <TextField 
-          placeholder="ค้นหาในระบบ (ชื่อ, Username, อีเมล)" 
-          size="small" 
-          value={search} 
-          onChange={(e) => setSearch(e.target.value)} 
-          onKeyDown={(e) => e.key === 'Enter' && handleSearch()} 
-          sx={{ minWidth: 400 }}
+      {/* Summary Cards */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        <Grid item xs={6} md={3}>
+          <Card sx={{ borderLeft: '4px solid #4f46e5', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+            <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(79,70,229,0.08)', display: 'flex' }}>
+                  <PeopleIcon sx={{ color: '#4f46e5', fontSize: 20 }} />
+                </Box>
+                <Box>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    ผู้ใช้ทั้งหมด
+                  </Typography>
+                  <Typography variant="h5" fontWeight={800}>{totalUsers}</Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={6} md={3}>
+          <Card sx={{ borderLeft: '4px solid #16a34a', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+            <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(22,163,74,0.08)', display: 'flex' }}>
+                  <ShieldIcon sx={{ color: '#16a34a', fontSize: 20 }} />
+                </Box>
+                <Box>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    ใช้งานอยู่
+                  </Typography>
+                  <Typography variant="h5" fontWeight={800}>{activeUsers}</Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={6} md={3}>
+          <Card sx={{ borderLeft: '4px solid #f59e0b', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+            <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(245,158,11,0.08)', display: 'flex' }}>
+                  <AdminIcon sx={{ color: '#f59e0b', fontSize: 20 }} />
+                </Box>
+                <Box>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    แอดมิน
+                  </Typography>
+                  <Typography variant="h5" fontWeight={800}>{adminUsers}</Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={6} md={3}>
+          <Card sx={{ borderLeft: '4px solid #ef4444', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+            <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(239,68,68,0.08)', display: 'flex' }}>
+                  <BlockIcon sx={{ color: '#ef4444', fontSize: 20 }} />
+                </Box>
+                <Box>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    ปิดการใช้งาน
+                  </Typography>
+                  <Typography variant="h5" fontWeight={800}>{inactiveUsers}</Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* Search */}
+      <Box sx={{ display: 'flex', gap: 1.5, mb: 2 }}>
+        <TextField
+          placeholder="ค้นหาในระบบ (ชื่อ, Username, อีเมล)"
+          size="small"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+          sx={{
+            minWidth: 400,
+            '& .MuiOutlinedInput-root': {
+              borderRadius: '8px', bgcolor: '#fff',
+            },
+          }}
           InputProps={{
-            startAdornment: <SearchIcon color="action" sx={{ mr: 1 }} />
+            startAdornment: <SearchIcon color="action" sx={{ mr: 1, fontSize: 18 }} />
           }}
         />
-        <Button variant="outlined" onClick={handleSearch}>ค้นหา</Button>
+        <Button
+          variant="outlined"
+          onClick={handleSearch}
+          sx={{ borderRadius: '8px', textTransform: 'none', borderColor: '#e2e8f0', color: '#475569' }}
+        >
+          ค้นหา
+        </Button>
       </Box>
 
-      <DataGrid
-        rows={users}
-        columns={columns}
-        loading={loading}
-        rowCount={total}
-        pageSizeOptions={[10, 20, 50]}
-        paginationMode="server"
-        paginationModel={{ page, pageSize: 20 }}
-        onPaginationModelChange={(m) => setPage(m.page)}
-        getRowId={(r) => r.id}
-        autoHeight
-        disableRowSelectionOnClick
-      />
+      {/* Data Grid */}
+      <Box sx={{
+        bgcolor: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0',
+        overflow: 'hidden',
+        '& .MuiDataGrid-root': { border: 'none' },
+        '& .MuiDataGrid-columnHeaders': { bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0' },
+        '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 700, fontSize: '12px', color: '#475569' },
+        '& .MuiDataGrid-cell': { fontSize: '13px', color: '#334155' },
+        '& .MuiDataGrid-row:hover': { bgcolor: '#f8fafc' },
+      }}>
+        <DataGrid
+          rows={users}
+          columns={columns}
+          loading={loading}
+          rowCount={total}
+          pageSizeOptions={[10, 20, 50]}
+          paginationMode="server"
+          paginationModel={{ page, pageSize: 20 }}
+          onPaginationModelChange={(m) => setPage(m.page)}
+          getRowId={(r) => r.id}
+          autoHeight
+          disableRowSelectionOnClick
+          disableColumnFilter
+          rowHeight={48}
+        />
+      </Box>
 
       {/* Dialog: Update Role */}
-      <Dialog open={roleDialog.open} onClose={() => setRoleDialog({ open: false, user: null })} maxWidth="xs" fullWidth>
-        <DialogTitle>เปลี่ยนบทบาท: {roleDialog.user?.displayName}</DialogTitle>
+      <Dialog open={roleDialog.open} onClose={() => setRoleDialog({ open: false, user: null })} maxWidth="xs" fullWidth
+        PaperProps={{ sx: { borderRadius: '12px' } }}
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>เปลี่ยนบทบาท: {roleDialog.user?.displayName}</DialogTitle>
         <DialogContent>
           <FormControl fullWidth sx={{ mt: 2 }}>
             <InputLabel>บทบาท</InputLabel>
@@ -258,22 +453,29 @@ export default function UsersPage() {
             </Select>
           </FormControl>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setRoleDialog({ open: false, user: null })}>ยกเลิก</Button>
-          <Button variant="contained" onClick={handleUpdateRole} disabled={saving}>บันทึก</Button>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setRoleDialog({ open: false, user: null })} sx={{ borderRadius: '8px' }}>ยกเลิก</Button>
+          <Button variant="contained" onClick={handleUpdateRole} disabled={saving}
+            sx={{ borderRadius: '8px', bgcolor: '#4f46e5', '&:hover': { bgcolor: '#4338ca' } }}
+          >บันทึก</Button>
         </DialogActions>
       </Dialog>
 
       {/* Dialog: Add User (AD & Manual) */}
-      <Dialog open={addDialog} onClose={handleCloseAddDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>เพิ่มผู้ใช้งานใหม่</DialogTitle>
+      <Dialog open={addDialog} onClose={handleCloseAddDialog} maxWidth="sm" fullWidth
+        PaperProps={{ sx: { borderRadius: '12px' } }}
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>เพิ่มผู้ใช้งานใหม่</DialogTitle>
         <DialogContent sx={{ minHeight: 400, display: 'flex', flexDirection: 'column' }}>
           <Box sx={{ display: 'flex', gap: 1, my: 2 }}>
             <Button
               fullWidth
               variant={tabValue === 0 ? 'contained' : 'outlined'}
               onClick={() => setTabValue(0)}
-              sx={{ py: 1 }}
+              sx={{
+                py: 1, borderRadius: '8px', textTransform: 'none',
+                ...(tabValue === 0 ? { bgcolor: '#4f46e5', '&:hover': { bgcolor: '#4338ca' } } : { borderColor: '#e2e8f0', color: '#475569' }),
+              }}
             >
               ค้นหาจาก AD
             </Button>
@@ -281,9 +483,12 @@ export default function UsersPage() {
               fullWidth
               variant={tabValue === 1 ? 'contained' : 'outlined'}
               onClick={() => setTabValue(1)}
-              sx={{ py: 1 }}
+              sx={{
+                py: 1, borderRadius: '8px', textTransform: 'none',
+                ...(tabValue === 1 ? { bgcolor: '#4f46e5', '&:hover': { bgcolor: '#4338ca' } } : { borderColor: '#e2e8f0', color: '#475569' }),
+              }}
             >
-              สร้างผู้ใช้ทดสอบด้วยตนเอง (Manual)
+              สร้างผู้ใช้ทดสอบ (Manual)
             </Button>
           </Box>
 
@@ -296,6 +501,7 @@ export default function UsersPage() {
                 variant="outlined"
                 value={adQuery}
                 onChange={onADQueryChange}
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
                 InputProps={{
                   endAdornment: searchingAD ? <CircularProgress size={20} /> : <SearchIcon />
                 }}
@@ -306,14 +512,14 @@ export default function UsersPage() {
                   {adResults.length > 0 ? (
                     adResults.map((user, idx) => (
                       <React.Fragment key={user.adUsername}>
-                        <ListItem 
+                        <ListItem
                           disablePadding
                           sx={{ borderRadius: 1, '&:hover': { bgcolor: 'action.hover' } }}
                         >
                           <ListItemButton onClick={() => setSelectedADUser(user)}>
-                            <ListItemText 
-                              primary={user.displayName} 
-                              secondary={`${user.adUsername} | ${user.email} | ${user.department}`} 
+                            <ListItemText
+                              primary={user.displayName}
+                              secondary={`${user.adUsername} | ${user.email} | ${user.department}${user.company ? ` | ${user.company}` : ''}`}
                             />
                             <PersonAddIcon color="primary" />
                           </ListItemButton>
@@ -328,19 +534,23 @@ export default function UsersPage() {
                   )}
                 </List>
               ) : (
-                <Box sx={{ mt: 3, p: 2, border: '1px solid #e0e0e0', borderRadius: 2, bgcolor: '#f8f9fa' }}>
-                  <Typography variant="subtitle2" color="primary" gutterBottom>ผู้ใช้ที่เลือก:</Typography>
-                  <Typography variant="h6">{selectedADUser.displayName}</Typography>
-                  <Typography variant="body2">{selectedADUser.adUsername} ({selectedADUser.email})</Typography>
-                  <Typography variant="body2" color="text.secondary">{selectedADUser.department}</Typography>
-                  
+                <Box sx={{ mt: 3, p: 2.5, border: '1px solid #e2e8f0', borderRadius: '10px', bgcolor: '#f8fafc' }}>
+                  <Typography variant="subtitle2" color="primary" gutterBottom sx={{ fontWeight: 700 }}>ผู้ใช้ที่เลือก:</Typography>
+                  <Typography variant="h6" fontWeight={700}>{selectedADUser.displayName}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {selectedADUser.adUsername} ({selectedADUser.email})
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {selectedADUser.department} {selectedADUser.company ? `(${selectedADUser.company})` : ''}
+                  </Typography>
+
                   <FormControl fullWidth sx={{ mt: 3 }}>
                     <InputLabel id="ad-role-label">กำหนดบทบาทให้ผู้ใช้</InputLabel>
-                    <Select 
+                    <Select
                       labelId="ad-role-label"
                       id="ad-role-select"
-                      value={assignedRole} 
-                      label="กำหนดบทบาทให้ผู้ใช้" 
+                      value={assignedRole}
+                      label="กำหนดบทบาทให้ผู้ใช้"
                       onChange={(e) => setAssignedRole(e.target.value)}
                     >
                       <MenuItem value="USER">ผู้ใช้ (User)</MenuItem>
@@ -348,8 +558,8 @@ export default function UsersPage() {
                       <MenuItem value="SUPERADMIN">SuperAdmin</MenuItem>
                     </Select>
                   </FormControl>
-                  
-                  <Button sx={{ mt: 1 }} onClick={() => setSelectedADUser(null)}>เปลี่ยนคน</Button>
+
+                  <Button sx={{ mt: 1, borderRadius: '8px', textTransform: 'none' }} onClick={() => setSelectedADUser(null)}>เปลี่ยนคน</Button>
                 </Box>
               )}
             </Box>
@@ -363,6 +573,7 @@ export default function UsersPage() {
                 variant="outlined"
                 value={manualUsername}
                 onChange={(e) => setManualUsername(e.target.value)}
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
               />
               <TextField
                 fullWidth
@@ -372,6 +583,7 @@ export default function UsersPage() {
                 variant="outlined"
                 value={manualPassword}
                 onChange={(e) => setManualPassword(e.target.value)}
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
               />
               <TextField
                 fullWidth
@@ -380,6 +592,7 @@ export default function UsersPage() {
                 variant="outlined"
                 value={manualDisplayName}
                 onChange={(e) => setManualDisplayName(e.target.value)}
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
               />
               <TextField
                 fullWidth
@@ -388,6 +601,7 @@ export default function UsersPage() {
                 variant="outlined"
                 value={manualEmail}
                 onChange={(e) => setManualEmail(e.target.value)}
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
               />
               <TextField
                 fullWidth
@@ -396,6 +610,7 @@ export default function UsersPage() {
                 variant="outlined"
                 value={manualDepartment}
                 onChange={(e) => setManualDepartment(e.target.value)}
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
               />
               <FormControl fullWidth variant="outlined">
                 <InputLabel id="manual-role-label">กำหนดบทบาทให้ผู้ใช้ *</InputLabel>
@@ -414,13 +629,14 @@ export default function UsersPage() {
             </Box>
           )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseAddDialog}>ยกเลิก</Button>
-          <Button 
-            variant="contained" 
-            onClick={handleCreateUser} 
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={handleCloseAddDialog} sx={{ borderRadius: '8px', textTransform: 'none' }}>ยกเลิก</Button>
+          <Button
+            variant="contained"
+            onClick={handleCreateUser}
             disabled={saving || (tabValue === 0 ? !selectedADUser : (!manualUsername.trim() || !manualDisplayName.trim() || !manualPassword.trim()))}
             startIcon={saving && <CircularProgress size={16} color="inherit" />}
+            sx={{ borderRadius: '8px', bgcolor: '#4f46e5', '&:hover': { bgcolor: '#4338ca' }, textTransform: 'none', fontWeight: 600 }}
           >
             เพิ่มเข้าระบบ
           </Button>
@@ -428,8 +644,10 @@ export default function UsersPage() {
       </Dialog>
 
       {/* Dialog: Set/Reset Password */}
-      <Dialog open={passwordDialog.open} onClose={() => { setPasswordDialog({ open: false, user: null }); setNewPassword(''); }} maxWidth="xs" fullWidth>
-        <DialogTitle>
+      <Dialog open={passwordDialog.open} onClose={() => { setPasswordDialog({ open: false, user: null }); setNewPassword(''); }} maxWidth="xs" fullWidth
+        PaperProps={{ sx: { borderRadius: '12px' } }}
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>
           {passwordDialog.user?.authType === 'LOCAL' ? 'เปลี่ยนรหัสผ่าน' : 'ตั้งรหัสผ่าน (Local Login)'}
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
             ผู้ใช้: {passwordDialog.user?.displayName} ({passwordDialog.user?.adUsername})
@@ -437,7 +655,7 @@ export default function UsersPage() {
         </DialogTitle>
         <DialogContent>
           {passwordDialog.user?.authType !== 'LOCAL' && (
-            <Alert severity="info" sx={{ mt: 2, mb: 1 }}>
+            <Alert severity="info" sx={{ mt: 2, mb: 1, borderRadius: '8px' }}>
               ผู้ใช้นี้เดิมเป็น AD user — การตั้งรหัสผ่านจะเปิดให้ login แบบ Local ได้ด้วย
             </Alert>
           )}
@@ -447,14 +665,18 @@ export default function UsersPage() {
             label="รหัสผ่านใหม่"
             placeholder="อย่างน้อย 4 ตัวอักษร"
             variant="outlined"
-            sx={{ mt: 2 }}
+            sx={{ mt: 2, '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
           />
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => { setPasswordDialog({ open: false, user: null }); setNewPassword(''); }}>ยกเลิก</Button>
-          <Button variant="contained" onClick={handleSetPassword} disabled={saving}>บันทึก</Button>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => { setPasswordDialog({ open: false, user: null }); setNewPassword(''); }}
+            sx={{ borderRadius: '8px', textTransform: 'none' }}
+          >ยกเลิก</Button>
+          <Button variant="contained" onClick={handleSetPassword} disabled={saving}
+            sx={{ borderRadius: '8px', bgcolor: '#4f46e5', '&:hover': { bgcolor: '#4338ca' }, textTransform: 'none', fontWeight: 600 }}
+          >บันทึก</Button>
         </DialogActions>
       </Dialog>
     </Box>

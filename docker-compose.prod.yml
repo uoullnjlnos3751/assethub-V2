@@ -31,6 +31,8 @@ services:
     environment:
       DATABASE_URL: "postgresql://assethub:${POSTGRES_PASSWORD:-assethub123}@postgres:5432/assethub?schema=public"
       NODE_ENV: production
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -55,3 +57,4 @@ services:
 
 volumes:
   pgdata:
+  uploads_data:

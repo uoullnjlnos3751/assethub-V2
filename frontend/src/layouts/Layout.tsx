@@ -46,6 +46,7 @@ import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import DomainIcon from '@mui/icons-material/Domain';
 import { useAuth } from '../contexts/AuthContext';
 import Breadcrumbs from '../components/Breadcrumbs';
 import PageTransition from '../components/PageTransition';
@@ -145,9 +146,11 @@ const adminNav: NavEntry[] = [
       { label: 'รายงานทรัพย์สิน', path: '/reports/assets', icon: <InventoryIcon fontSize="small" /> },
       { label: 'รายงานยืม-คืน', path: '/reports/borrow', icon: <ReceiptLongIcon fontSize="small" /> },
       { label: 'รายงาน PM', path: '/reports/pm', icon: <AssessmentIcon fontSize="small" /> },
+      { label: 'รายงานประวัติซ่อมบำรุง', path: '/reports/maintenance', icon: <BuildCircleIcon fontSize="small" /> },
     ],
   },
   { label: 'จัดการผู้ใช้', path: '/admin/users', icon: <PeopleIcon fontSize="small" />, roles: ['SUPERADMIN'] },
+  { label: 'จัดการบริษัท', path: '/admin/companies', icon: <DomainIcon fontSize="small" />, roles: ['SUPERADMIN', 'IT_ADMIN'] },
   { label: 'ตั้งค่า', path: '/admin/settings', icon: <SettingsIcon fontSize="small" />, roles: ['SUPERADMIN'] },
   {
     label: 'ตั้งค่าข้อมูลพื้นฐาน',
@@ -589,17 +592,19 @@ export default function Layout() {
               onClick={(e) => setAnchorEl(e.currentTarget)}
               startIcon={
                 <Avatar
+                  src={user?.avatarUrl || undefined}
                   sx={{
-                    width: 28,
-                    height: 28,
-                    background: 'linear-gradient(135deg, #f59e0b, #8b5cf6)',
-                    fontSize: '11px',
+                    width: 22,
+                    height: 22,
+                    fontSize: '10px',
+                    bgcolor: '#4f46e5',
+                    color: '#fff',
                     fontWeight: 500,
                     border: 'none',
                     boxShadow: 'none',
                   }}
                 >
-                  {user?.displayName?.charAt(0) || 'U'}
+                  {!user?.avatarUrl && (user?.displayName?.charAt(0) || 'U')}
                 </Avatar>
               }
               sx={{

@@ -13,6 +13,9 @@ model AppUser {
   displayName       String?
   email             String?
   department        String?
+  company           String?
+  companyThai       String?
+  avatarUrl         String?
   role              UserRole          @default(USER)
   isActive          Boolean           @default(true)
   authType          AuthType          @default(AD)
@@ -29,6 +32,7 @@ model AppUser {
   pmRunsPerformed   PMRun[]           @relation("PMRunPerformedBy")
   returns           Return[]
   donations         Donation[]
+  maintenanceRecords MaintenanceRecord[]
 
   @@index([role, isActive])
   @@index([department])
@@ -94,6 +98,8 @@ model Asset {
   consumableDetail   ConsumableDetail?
   category           Category?               @relation(fields: [categoryId], references: [id])
   donationItem       DonationItem?
+  documents          AssetDocument[]
+  maintenanceRecords MaintenanceRecord[]
 
   @@index([status, departmentId, location])
   @@index([type, brand])
@@ -235,6 +241,23 @@ model ConsumableDetail {
   @@map("consumable_details")
 }
 
+model AssetDocument {
+  id           Int      @id @default(autoincrement())
+  assetId      Int
+  fileName     String
+  storedName   String
+  fileSize     Int
+  mimeType     String
+  docType      String   @default("OTHER")
+  note         String?
+  uploadedBy   String?
+  createdAt    DateTime @default(now())
+  asset        Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId])
+  @@map("asset_documents")
+}
+
 model InventoryItem {
   id              Int                    @id @default(autoincrement())
   name            String
@@ -288,12 +311,13 @@ model DeviceType {
 }
 
 model Company {
-  id          Int      @id @default(autoincrement())
-  name        String   @unique
-  description String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                Int      @id @default(autoincrement())
+  name              String   @unique
+  description       String?
+  assetCompanyCodes String?
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@map("companies")
 }
@@ -542,6 +566,7 @@ model PMPlan {
   deptTask           String?
   company            String?
   lead               String?
+  deviceType         String?
   plannedDeviceCount Int
   startDate          DateTime?
   endDate            DateTime?
@@ -741,8 +766,53 @@ enum AssetStatus {
   Borrowed
   InUse
   Maintenance
+  Damaged
   Retired
   Lost
+}
+
+model MaintenanceRecord {
+  id              Int               @id @default(autoincrement())
+  ticketNo        String            @unique
+  assetId         Int
+  asset           Asset             @relation(fields: [assetId], references: [id])
+  reportedProblem String
+  repairType      String
+  vendorName      String?
+  resolutionNote  String?
+  totalCost       Float             @default(0)
+  status          String            @default("IN_PROGRESS")
+  startedAt       DateTime          @default(now())
+  completedAt     DateTime?
+  technicianId    Int
+  technician      AppUser           @relation(fields: [technicianId], references: [id])
+  replacedParts   MaintenancePart[]
+  images          MaintenanceImage[]
+
+  @@map("maintenance_records")
+}
+
+model MaintenancePart {
+  id              Int               @id @default(autoincrement())
+  recordId        Int
+  record          MaintenanceRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  partName        String
+  quantity        Int               @default(1)
+  price           Float             @default(0)
+
+  @@map("maintenance_parts")
+}
+
+model MaintenanceImage {
+  id              Int               @id @default(autoincrement())
+  recordId        Int
+  record          MaintenanceRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  imageType       String
+  imageUrl        String
+  description     String?
+  createdAt       DateTime          @default(now())
+
+  @@map("maintenance_images")
 }
 
 enum BorrowItemStatus {

@@ -25,4 +25,6 @@ EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:4000/api/health || exit 1
 
+RUN mkdir -p /app/uploads/documents
+
 CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node dist/index.js"]

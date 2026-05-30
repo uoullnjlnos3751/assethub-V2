@@ -311,7 +311,7 @@ router.get('/all-requests', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), a
         skip: (pageNum - 1) * limitNum,
         take: limitNum,
         orderBy: { createdAt: 'desc' },
-        include: { items: { include: { asset: true, inventoryItem: true, returns: true } }, approvals: true, requester: { select: { id: true, displayName: true, adUsername: true, department: true } } },
+        include: { items: { include: { asset: true, inventoryItem: true, returns: true } }, approvals: true, requester: { select: { id: true, displayName: true, adUsername: true, department: true, company: true } } },
       }),
       prisma.borrowRequest.count({ where }),
     ]);
