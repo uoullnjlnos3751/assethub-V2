@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { borrowAPI } from '../../services/api';
+import { useTheme, useMediaQuery } from '@mui/material';
 
 const statusMeta: Record<string, { label: string; color: string; bg: string; border: string }> = {
   Pending:          { label: 'รออนุมัติ',    color: '#d97706', bg: '#fffbeb', border: '#fcd34d' },
@@ -23,6 +24,8 @@ const TABS = [
 
 export default function MyRequestsPage() {
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(0);
@@ -151,7 +154,42 @@ export default function MyRequestsPage() {
         </div>
       ) : (
         <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-          <div style={{ overflowX: 'auto' }}>
+          {isMobile ? (
+            /* Mobile: Card Layout */
+            <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {filtered.map((r) => {
+                const sm = statusMeta[r.status] || statusMeta.Pending;
+                return (
+                  <div key={r.id} style={{ padding: 14, border: '1px solid #e2e8f0', borderRadius: 12, background: '#fafbfc' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0f172a' }}>{r.requestNo}</span>
+                      <span style={{ background: sm.bg, color: sm.color, border: `1px solid ${sm.border}`, borderRadius: 20, padding: '2px 10px', fontSize: '0.72rem', fontWeight: 700 }}>{sm.label}</span>
+                    </div>
+                    {r.purpose && <div style={{ fontSize: '0.82rem', color: '#475569', marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.purpose}</div>}
+                    <div style={{ display: 'flex', gap: 12, fontSize: '0.78rem', color: '#64748b', marginBottom: 8, flexWrap: 'wrap' }}>
+                      <span>📦 {r.items?.length || 0} รายการ</span>
+                      <span>📅 {new Date(r.createdAt).toLocaleDateString('th-TH')}</span>
+                      {r.items?.[0]?.dueDate && <span>⏰ คืน {new Date(r.items[0].dueDate).toLocaleDateString('th-TH')}</span>}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={() => setDetailReq(r)}
+                        style={{ flex: 1, background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0', borderRadius: 7, padding: '7px 12px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>
+                        👁 ดูรายละเอียด
+                      </button>
+                      {r.status === 'Pending' && (
+                        <button onClick={() => setCancelDialog({ open: true, id: r.id })}
+                          style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 7, padding: '7px 12px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}>
+                          ✕ ยกเลิก
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* Desktop: Table Layout */
+            <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
@@ -203,6 +241,7 @@ export default function MyRequestsPage() {
               </tbody>
             </table>
           </div>
+          )}
         </div>
       )}
 

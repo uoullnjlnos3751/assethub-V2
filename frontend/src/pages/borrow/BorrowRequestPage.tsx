@@ -2,9 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { assetAPI, borrowAPI, inventoryAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme, useMediaQuery } from '@mui/material';
 
 export default function BorrowRequestPage() {
   const { user, systemSettings } = useAuth();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const effectiveBorrowDays = systemSettings?.borrowDays ?? parseInt(import.meta.env.VITE_BORROW_DUE_DAYS || '3');
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -164,7 +167,7 @@ export default function BorrowRequestPage() {
   );
 
   return (
-    <div style={{ paddingBottom: 48, maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ paddingBottom: 48, maxWidth: 1200, margin: '0 auto', padding: isMobile ? '0 8px' : undefined }}>
       {toast && (
         <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 9999, background: toastType === 'ok' ? '#1e293b' : '#dc2626', color: '#fff', padding: '12px 20px', borderRadius: 10, fontWeight: 600, boxShadow: '0 4px 20px rgba(0,0,0,0.3)', fontSize: '0.9rem', maxWidth: 360 }}>
           {toast}
@@ -201,7 +204,7 @@ export default function BorrowRequestPage() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 24, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 340px', gap: isMobile ? 16 : 24, alignItems: 'start' }}>
         {/* Left: Form + Selection */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
@@ -210,7 +213,7 @@ export default function BorrowRequestPage() {
             <h3 style={{ margin: '0 0 16px', fontSize: '1rem', fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
               <span>📋</span> ข้อมูลการยืม
             </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 14 }}>
               <div style={{ gridColumn: '1 / -1' }}>
                 <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#374151', marginBottom: 6 }}>วัตถุประสงค์การยืม <span style={{ color: '#dc2626' }}>*</span></label>
                 <textarea value={purpose} onChange={e => setPurpose(e.target.value)} rows={2}
@@ -265,7 +268,7 @@ export default function BorrowRequestPage() {
                 </div>
 
                 {/* Search & Location Filter */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, marginBottom: 14 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr auto', gap: 10, marginBottom: 14 }}>
                   <div style={{ position: 'relative' }}>
                     <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}>🔍</span>
                     <input value={assetSearch} onChange={e => setAssetSearch(e.target.value)}
@@ -293,7 +296,7 @@ export default function BorrowRequestPage() {
                 </div>
 
                 {/* Asset Table */}
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden', maxHeight: 350, overflowY: 'auto' }}>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden', maxHeight: isMobile ? 300 : 350, overflowY: 'auto', overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
                     <thead>
                       <tr style={{ background: '#f8fafc', position: 'sticky', top: 0 }}>
@@ -408,7 +411,7 @@ export default function BorrowRequestPage() {
         </div>
 
         {/* Right: Summary Card (sticky) */}
-        <div style={{ position: 'sticky', top: 20 }}>
+        <div style={{ position: isMobile ? 'relative' : 'sticky', top: isMobile ? undefined : 20 }}>
           <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '20px 22px', boxShadow: '0 4px 20px rgba(0,0,0,0.07)' }}>
             <h3 style={{ margin: '0 0 4px', fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>สรุปการยืม</h3>
             <div style={{ borderTop: '1px solid #f1f5f9', marginTop: 12, paddingTop: 14 }}>

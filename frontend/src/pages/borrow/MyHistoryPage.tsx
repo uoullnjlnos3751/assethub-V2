@@ -3,6 +3,7 @@ import {
   Box, Typography, Chip, CircularProgress, Card, CardContent, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, Button, Grid, InputAdornment, TextField,
   Dialog, DialogTitle, DialogContent, DialogActions, Divider,
+  useMediaQuery, useTheme,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
@@ -25,6 +26,9 @@ interface HistoryItem {
 }
 
 export default function MyHistoryPage() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
   const [items, setItems] = useState<HistoryItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -179,86 +183,177 @@ export default function MyHistoryPage() {
         />
       </Box>
 
-      {/* History Table */}
-      <Card>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow sx={{ backgroundColor: 'rgba(37, 99, 235, 0.05)' }}>
-                <TableCell>รหัส</TableCell>
-                <TableCell>Serial</TableCell>
-                <TableCell>ยี่ห้อ/รุ่น</TableCell>
-                <TableCell>วันที่ยืม</TableCell>
-                <TableCell>วันที่คืน</TableCell>
-                <TableCell align="center">จำนวนวัน</TableCell>
-                <TableCell>สภาพตอนคืน</TableCell>
-                <TableCell align="right">การกระทำ</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredItems.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
-                    <Typography color="text.secondary">
-                      {items.length === 0 ? 'ยังไม่มีประวัติการยืม' : 'ไม่พบผลการค้นหา'}
+      {/* History Table (Desktop) / Cards (Mobile) */}
+      {isMobile ? (
+        <Box>
+          {filteredItems.length === 0 ? (
+            <Box sx={{ py: 4, textAlign: 'center' }}>
+              <Typography color="text.secondary">
+                {items.length === 0 ? 'ยังไม่มีประวัติการยืม' : 'ไม่พบผลการค้นหา'}
+              </Typography>
+            </Box>
+          ) : (
+            filteredItems.map((item) => (
+              <Box
+                key={item.id}
+                sx={{
+                  backgroundColor: '#fff',
+                  borderRadius: '12px',
+                  border: '1px solid #e2e8f0',
+                  p: '14px',
+                  mb: '10px',
+                }}
+              >
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                  <Typography fontWeight={700} variant="body1">
+                    {item.assetCode}
+                  </Typography>
+                  <Chip
+                    label={
+                      item.condition === 'Damaged'
+                        ? 'เสียหาย'
+                        : item.condition === 'Repairing'
+                        ? 'ส่งซ่อม'
+                        : item.condition === 'AccessoryIncomplete'
+                        ? 'อุปกรณ์ไม่ครบ'
+                        : 'ปกติ'
+                    }
+                    color={
+                      item.condition === 'Normal' || !item.condition
+                        ? 'success'
+                        : 'warning'
+                    }
+                    size="small"
+                  />
+                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  {item.brand} {item.model}
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 2, mb: 1 }}>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">
+                      วันที่ยืม
                     </Typography>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredItems.map((item) => (
-                  <TableRow key={item.id} hover>
-                    <TableCell sx={{ fontWeight: 600 }}>{item.assetCode}</TableCell>
-                    <TableCell>{item.serialNo}</TableCell>
-                    <TableCell>
-                      {item.brand} {item.model}
-                    </TableCell>
-                    <TableCell>{new Date(item.borrowDate).toLocaleDateString('th-TH')}</TableCell>
-                    <TableCell>
+                    <Typography variant="body2">
+                      {new Date(item.borrowDate).toLocaleDateString('th-TH')}
+                    </Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">
+                      วันที่คืน
+                    </Typography>
+                    <Typography variant="body2">
                       {item.returnDate
                         ? new Date(item.returnDate).toLocaleDateString('th-TH')
                         : '-'}
-                    </TableCell>
-                    <TableCell align="center">
-                      <Chip label={`${item.daysKept} วัน`} size="small" variant="outlined" />
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={
-                          item.condition === 'Damaged'
-                            ? 'เสียหาย'
-                            : item.condition === 'Repairing'
-                            ? 'ส่งซ่อม'
-                            : item.condition === 'AccessoryIncomplete'
-                            ? 'อุปกรณ์ไม่ครบ'
-                            : 'ปกติ'
-                        }
-                        color={
-                          item.condition === 'Normal' || !item.condition
-                            ? 'success'
-                            : 'warning'
-                        }
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell align="right">
-                      <Button
-                        size="small"
-                        startIcon={<VisibilityIcon />}
-                        onClick={() => {
-                          setSelectedItem(item);
-                          setDetailDialog(true);
-                        }}
-                      >
-                        ดู
-                      </Button>
+                    </Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">
+                      ระยะเวลา
+                    </Typography>
+                    <Typography variant="body2">
+                      {item.daysKept} วัน
+                    </Typography>
+                  </Box>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <Button
+                    size="small"
+                    startIcon={<VisibilityIcon />}
+                    onClick={() => {
+                      setSelectedItem(item);
+                      setDetailDialog(true);
+                    }}
+                  >
+                    ดู
+                  </Button>
+                </Box>
+              </Box>
+            ))
+          )}
+        </Box>
+      ) : (
+        <Card>
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow sx={{ backgroundColor: 'rgba(37, 99, 235, 0.05)' }}>
+                  <TableCell>รหัส</TableCell>
+                  <TableCell>Serial</TableCell>
+                  <TableCell>ยี่ห้อ/รุ่น</TableCell>
+                  <TableCell>วันที่ยืม</TableCell>
+                  <TableCell>วันที่คืน</TableCell>
+                  <TableCell align="center">จำนวนวัน</TableCell>
+                  <TableCell>สภาพตอนคืน</TableCell>
+                  <TableCell align="right">การกระทำ</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {filteredItems.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                      <Typography color="text.secondary">
+                        {items.length === 0 ? 'ยังไม่มีประวัติการยืม' : 'ไม่พบผลการค้นหา'}
+                      </Typography>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Card>
+                ) : (
+                  filteredItems.map((item) => (
+                    <TableRow key={item.id} hover>
+                      <TableCell sx={{ fontWeight: 600 }}>{item.assetCode}</TableCell>
+                      <TableCell>{item.serialNo}</TableCell>
+                      <TableCell>
+                        {item.brand} {item.model}
+                      </TableCell>
+                      <TableCell>{new Date(item.borrowDate).toLocaleDateString('th-TH')}</TableCell>
+                      <TableCell>
+                        {item.returnDate
+                          ? new Date(item.returnDate).toLocaleDateString('th-TH')
+                          : '-'}
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip label={`${item.daysKept} วัน`} size="small" variant="outlined" />
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={
+                            item.condition === 'Damaged'
+                              ? 'เสียหาย'
+                              : item.condition === 'Repairing'
+                              ? 'ส่งซ่อม'
+                              : item.condition === 'AccessoryIncomplete'
+                              ? 'อุปกรณ์ไม่ครบ'
+                              : 'ปกติ'
+                          }
+                          color={
+                            item.condition === 'Normal' || !item.condition
+                              ? 'success'
+                              : 'warning'
+                          }
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell align="right">
+                        <Button
+                          size="small"
+                          startIcon={<VisibilityIcon />}
+                          onClick={() => {
+                            setSelectedItem(item);
+                            setDetailDialog(true);
+                          }}
+                        >
+                          ดู
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Card>
+      )}
 
       {/* Detail Dialog */}
       <Dialog open={detailDialog} onClose={() => setDetailDialog(false)} maxWidth="sm" fullWidth>
