@@ -196,25 +196,39 @@ router.post('/requests', authenticate, validate(borrowRequestSchema), async (req
 
     // Notify IT Admins
     const admins = await prisma.appUser.findMany({ where: { role: { in: ['IT_ADMIN', 'SUPERADMIN'] } } });
+    
+    await prisma.appNotification.createMany({
+      data: admins.map(admin => ({
+        userId: admin.id,
+        title: 'คำขอยืมใหม่',
+        message: `คุณ ${user?.displayName || req.user!.adUsername} ได้ส่งคำขอยืมเลขที่ ${request.requestNo}`,
+        type: 'BORROW',
+        link: '/borrow/approval-queue',
+      })),
+    });
+    const payload = {
+      requestNo: request.requestNo,
+      requester: user?.displayName || req.user!.adUsername,
+      department: user?.department || '-',
+      email: user?.email || '-',
+      purpose: purpose || '-',
+      location: location || '-',
+      notes: notes || '-',
+      borrowDate: borrowDateStr,
+      dueDate: dueDateStr,
+      borrowDays: String(borrowDays),
+      itemsCount: String(request.items.length),
+      itemsTable: '',
+      items: itemsPayload,
+    };
     for (const admin of admins) {
       if (admin.email) {
-        await createNotification('borrow_request_pending', 'EMAIL', admin.email, {
-          requestNo: request.requestNo,
-          requester: user?.displayName || req.user!.adUsername,
-          department: user?.department || '-',
-          email: user?.email || '-',
-          purpose: purpose || '-',
-          location: location || '-',
-          notes: notes || '-',
-          borrowDate: borrowDateStr,
-          dueDate: dueDateStr,
-          borrowDays: String(borrowDays),
-          itemsCount: String(request.items.length),
-          itemsTable: '',
-          items: itemsPayload,
-        });
+        await createNotification('borrow_request_pending', 'EMAIL', admin.email, payload);
       }
     }
+    
+    // Notify via LINE Broadcast/Multicast (only once)
+    await createNotification('borrow_request_pending', 'LINE', 'broadcast', payload);
 
     res.status(201).json(request);
   } catch (err) { next(err); }
@@ -364,6 +378,16 @@ router.post('/requests/:id/approve', authenticate, authorize('IT_ADMIN', 'SUPERA
       }
     });
 
+    await prisma.appNotification.create({
+      data: {
+        userId: request.requesterUserId,
+        title: action === 'Approved' ? 'คำขอยืมได้รับการอนุมัติ' : 'คำขอยืมถูกปฏิเสธ',
+        message: `คำขอยืมเลขที่ ${request.requestNo} ได้รับการ${action === 'Approved' ? 'อนุมัติ' : 'ปฏิเสธ'}แล้วโดยฝ่าย IT${note ? `\nหมายเหตุ: ${note}` : ''}`,
+        type: 'BORROW',
+        link: '/borrow/my-requests',
+      }
+    });
+
     if (request.requester.email) {
       const itemsPayload = request.items.map(item => buildBorrowItemPayload(
         item,
@@ -484,11 +508,11 @@ router.post('/requests/:id/checkout', authenticate, authorize('IT_ADMIN', 'SUPER
       }
     });
 
-    if (request.requester?.email) {
+    if (request.requester) {
       const itemsPayload = request.items.map(item => buildBorrowItemPayload(item, 'ส่งมอบแล้ว'));
       const borrowDateStr = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
       const dueDateStr = request.items[0]?.dueDate ? new Date(request.items[0].dueDate).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }) : '-';
-      await createNotification('checkout_completed', 'EMAIL', request.requester.email, {
+      const payload = {
         requestNo: request.requestNo,
         requester: request.requester.displayName || request.requester.adUsername,
         department: request.requester.department || '-',
@@ -500,7 +524,13 @@ router.post('/requests/:id/checkout', authenticate, authorize('IT_ADMIN', 'SUPER
         handoverNote: handoverNote || '-',
         itemsCount: String(request.items.length),
         items: itemsPayload,
-      });
+      };
+
+      if (request.requester.email) {
+        await createNotification('checkout_completed', 'EMAIL', request.requester.email, payload);
+      }
+      // Line notification
+      await createNotification('checkout_completed', 'LINE', 'broadcast', payload);
     }
 
     res.json({ message: 'Check-out สำเร็จ' });
@@ -580,10 +610,10 @@ router.post('/items/:itemId/return', authenticate, authorize('IT_ADMIN', 'SUPERA
       }
     });
 
-    if (item.request.requester?.email) {
+    if (item.request.requester) {
       const conditionLabel = condition === 'Normal' ? 'ปกติ' : condition === 'Damaged' ? 'ชำรุด' : condition === 'Repairing' ? 'ต้องซ่อม' : 'อุปกรณ์ไม่ครบ';
       const returnDateStr = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
-      await createNotification('return_recorded', 'EMAIL', item.request.requester.email, {
+      const payload = {
         requestNo: item.request.requestNo,
         requester: item.request.requester.displayName || item.request.requester.adUsername,
         department: item.request.requester.department || '-',
@@ -596,7 +626,14 @@ router.post('/items/:itemId/return', authenticate, authorize('IT_ADMIN', 'SUPERA
         damageNote: damageNote || '-',
         accessoriesNote: accessoriesNote || '-',
         returnDate: returnDateStr,
-      });
+      };
+
+      if (item.request.requester.email) {
+        await createNotification('return_recorded', 'EMAIL', item.request.requester.email, payload);
+      }
+      
+      // Line notification
+      await createNotification('return_recorded', 'LINE', 'broadcast', payload);
     }
 
     res.json({ message: 'คืนทรัพย์สินเรียบร้อย' });
@@ -651,6 +688,16 @@ router.post('/extensions', authenticate, validate(extensionSchema), async (req: 
 
     // Notify IT admins
     const admins = await prisma.appUser.findMany({ where: { role: { in: ['IT_ADMIN', 'SUPERADMIN'] } } });
+    
+    await prisma.appNotification.createMany({
+      data: admins.map(admin => ({
+        userId: admin.id,
+        title: 'คำขอขยายเวลาใหม่',
+        message: `คุณ ${user?.displayName || req.user!.adUsername} ขอขยายเวลายืม ${borrowRequest.requestNo}`,
+        type: 'BORROW',
+        link: '/borrow/extension-queue',
+      })),
+    });
     for (const admin of admins) {
       if (admin.email) {
         await createNotification('extension_pending', 'EMAIL', admin.email, {
@@ -699,6 +746,16 @@ router.put('/extensions/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'),
             data: { dueDate: item.requestedDueDate },
           });
         }
+      }
+    });
+
+    await prisma.appNotification.create({
+      data: {
+        userId: extension.request.requesterUserId,
+        title: action === 'Approved' ? 'อนุมัติการขยายเวลายืม' : 'ไม่อนุมัติการขยายเวลายืม',
+        message: `คำขอขยายเวลายืมสำหรับ ${extension.request.requestNo} ได้รับการ${action === 'Approved' ? 'อนุมัติ' : 'ปฏิเสธ'}${note ? `\nหมายเหตุ: ${note}` : ''}`,
+        type: 'BORROW',
+        link: '/borrow/my-extensions',
       }
     });
 

@@ -2,9 +2,11 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { Box, Typography, Card, CardContent, Grid, CircularProgress, Chip, Button, TextField, MenuItem, Select, InputLabel, FormControl, alpha } from '@mui/material';
 import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
 import { assetAPI, dashboardAPI } from '../../services/api';
-import { Boxes, CheckCircle2, AlertTriangle, Wrench, Download, Filter, PieChart, Eye } from 'lucide-react';
+import { Boxes, CheckCircle2, AlertTriangle, Wrench, Download, Filter, PieChart, Eye, FileText } from 'lucide-react';
 import ReportHeaderTabs from './ReportHeaderTabs';
 import { useNavigate } from 'react-router-dom';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 const statusColors: Record<string, string> = { Available: 'success', Borrowed: 'warning', InUse: 'info', Maintenance: 'error', Retired: 'default', Lost: 'error' };
 const statusLabels: Record<string, string> = { Available: 'พร้อมใช้งาน', Borrowed: 'กำลังยืม', InUse: 'ใช้งานประจำ', Maintenance: 'ซ่อมบำรุง', Retired: 'ปลดระวาง', Lost: 'สูญหาย' };
@@ -18,6 +20,43 @@ export default function ReportAssetsPage() {
   const [filterType, setFilterType] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [search, setSearch] = useState('');
+  const [exportingPDF, setExportingPDF] = useState(false);
+
+  const handleExportPDF = async () => {
+    try {
+      setExportingPDF(true);
+      const element = document.getElementById('report-content');
+      if (!element) return;
+      
+      const canvas = await html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+      const imgData = canvas.toDataURL('image/png');
+      
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      
+      pdf.setFontSize(18);
+      pdf.setTextColor(15, 23, 42); // slate-900
+      pdf.text('Asset Executive Summary', 14, 20);
+      
+      pdf.setFontSize(10);
+      pdf.setTextColor(100, 116, 139); // slate-500
+      pdf.text(`Exported Date: ${new Date().toLocaleString('th-TH')}`, 14, 28);
+      
+      pdf.addImage(imgData, 'PNG', 10, 35, pdfWidth - 20, Math.min(pdfHeight, pdf.internal.pageSize.getHeight() - 40));
+      
+      // Add new page if content is very long (optional, but for summary one page is usually enough for the top charts)
+      if (pdfHeight > pdf.internal.pageSize.getHeight() - 40) {
+         // Simple cut off for now, as it's an executive summary dashboard view
+      }
+
+      pdf.save(`Asset_Executive_Report_${new Date().getTime()}.pdf`);
+    } catch (err) {
+      console.error('Failed to export PDF', err);
+    } finally {
+      setExportingPDF(false);
+    }
+  };
 
   useEffect(() => {
     Promise.all([
@@ -125,22 +164,40 @@ export default function ReportAssetsPage() {
           <Typography variant="h4" fontWeight={700}>รายงานทรัพย์สิน</Typography>
           <Typography variant="body2" color="text.secondary">สรุปจำนวนและสถานะทรัพย์สิน IT ทั้งหมดในระบบ</Typography>
         </Box>
-        <Button 
-          variant="contained" 
-          startIcon={<Download size={16} />} 
-          onClick={() => assetAPI.exportAssets().then(r => { const url = URL.createObjectURL(r.data); const a = document.createElement('a'); a.href = url; a.download = 'assets.xlsx'; a.click(); })}
-          sx={{ 
-            bgcolor: '#b45309', 
-            '&:hover': { bgcolor: '#92400e' },
-            boxShadow: '0 4px 10px rgba(180, 83, 9, 0.15)',
-            textTransform: 'none'
-          }}
-        >
-          Export Excel
-        </Button>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button 
+            variant="contained" 
+            startIcon={exportingPDF ? <CircularProgress size={16} color="inherit" /> : <FileText size={16} />} 
+            onClick={handleExportPDF}
+            disabled={exportingPDF}
+            sx={{ 
+              bgcolor: '#dc2626', 
+              '&:hover': { bgcolor: '#b91c1c' },
+              boxShadow: '0 4px 10px rgba(220, 38, 38, 0.15)',
+              textTransform: 'none'
+            }}
+          >
+            {exportingPDF ? 'Generating...' : 'Export PDF'}
+          </Button>
+          <Button 
+            variant="contained" 
+            startIcon={<Download size={16} />} 
+            onClick={() => assetAPI.exportAssets().then(r => { const url = URL.createObjectURL(r.data); const a = document.createElement('a'); a.href = url; a.download = 'assets.xlsx'; a.click(); })}
+            sx={{ 
+              bgcolor: '#059669', // Changed to green for Excel
+              '&:hover': { bgcolor: '#047857' },
+              boxShadow: '0 4px 10px rgba(5, 150, 105, 0.15)',
+              textTransform: 'none'
+            }}
+          >
+            Export Excel
+          </Button>
+        </Box>
       </Box>
 
-      {/* Summary cards */}
+      {/* Wrapper for PDF Export - We capture this section */}
+      <Box id="report-content" sx={{ p: 1, bgcolor: '#ffffff' }}>
+        {/* Summary cards */}
       <Grid container spacing={2.5} sx={{ mb: 4 }}>
         <Grid item xs={6} md={3}>
           <Card 
@@ -363,6 +420,7 @@ export default function ReportAssetsPage() {
           </Card>
         ))}
       </Box>
+      </Box> {/* End of report-content wrapper */}
 
       {/* Filter toolbar */}
       <Card sx={{ mb: 3, borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)', border: '1px solid rgba(229,231,235,0.6)' }}>

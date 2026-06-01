@@ -5,6 +5,7 @@ import {
   Select, MenuItem, InputLabel, FormControl, IconButton, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, Checkbox,
   Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
+  List, ListItemButton, ListSubheader, ListItemIcon, ListItemText, InputAdornment, useMediaQuery, useTheme
 } from '@mui/material';
 import {
   Settings as SettingsIcon,
@@ -436,6 +437,15 @@ export default function SettingsPage() {
   const [assetListLoading, setAssetListLoading] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+  const [advancedClearDialogOpen, setAdvancedClearDialogOpen] = useState(false);
+  const [clearOptions, setClearOptions] = useState({
+    clearAssets: true,
+    clearBorrow: false,
+    clearDonations: false,
+    clearMasterData: false,
+    clearUsers: false,
+  });
+  const [confirmText, setConfirmText] = useState('');
 
   // Delete by type states
   const [deviceTypes, setDeviceTypes] = useState<any[]>([]);
@@ -494,8 +504,8 @@ export default function SettingsPage() {
     setSaving(true);
     try {
       const dataToSave = {
-        systemName: settings?.systemName || 'AssetHub',
-        organizationName: settings?.organizationName || 'TRR Group',
+        systemName: settings?.systemName ?? 'AssetHub',
+        organizationName: settings?.organizationName ?? 'TRR Group',
         logoUrl: settings?.logoUrl || '',
         timezone: settings?.timezone || 'Asia/Bangkok',
         darkMode: settings?.darkMode || false,
@@ -555,6 +565,10 @@ export default function SettingsPage() {
   const handleTestEmail = async () => {
     if (!testEmailRecipient) {
       toast.error('กรุณากรอกอีเมลปลายทางสำหรับการทดสอบ');
+      return;
+    }
+    if (!settings?.smtpHost) {
+      toast.error('กรุณาระบุ Host ของ SMTP Server ก่อนทำการทดสอบ');
       return;
     }
     setTestingEmail(true);
@@ -658,6 +672,40 @@ export default function SettingsPage() {
     }
   };
 
+  const [searchTerm, setSearchTerm] = useState('');
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
+  const menuGroups = [
+    {
+      title: 'ระบบและทั่วไป',
+      items: [
+        { index: 0, label: 'ทั่วไป', icon: <GlobeIcon size={18} /> },
+        { index: 4, label: 'ความปลอดภัย', icon: <ShieldIcon size={18} /> },
+        { index: 5, label: 'ระบบ', icon: <ServerIcon size={18} /> },
+      ]
+    },
+    {
+      title: 'การดำเนินงาน',
+      items: [
+        { index: 1, label: 'กฎการยืม', icon: <ClockIcon size={18} /> },
+        { index: 6, label: 'จัดการข้อมูล', icon: <DatabaseIcon size={18} /> },
+      ]
+    },
+    {
+      title: 'การติดต่อสื่อสาร',
+      items: [
+        { index: 2, label: 'การแจ้งเตือน', icon: <NotificationsIcon size={18} /> },
+        { index: 3, label: 'Templates', icon: <MailIcon size={18} /> },
+      ]
+    }
+  ];
+
+  const filteredMenuGroups = menuGroups.map(group => ({
+    ...group,
+    items: group.items.filter(item => item.label.toLowerCase().includes(searchTerm.toLowerCase()))
+  })).filter(group => group.items.length > 0);
+
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}><CircularProgress /></Box>;
 
   return (
@@ -669,17 +717,150 @@ export default function SettingsPage() {
         <Typography variant="body1" color="text.secondary">จัดการการตั้งค่าทั้งหมดของระบบ AssetHub</Typography>
       </Box>
 
-      <Paper sx={{ mb: 3, borderRadius: 3, overflow: 'hidden' }}>
-        <Tabs value={tabValue} onChange={(e, v) => setTabValue(v)} variant="scrollable" scrollButtons="auto">
-          <Tab icon={<GlobeIcon size={18} />} iconPosition="start" label="ทั่วไป" />
-          <Tab icon={<ClockIcon size={18} />} iconPosition="start" label="กฎการยืม" />
-          <Tab icon={<NotificationsIcon size={18} />} iconPosition="start" label="การแจ้งเตือน" />
-          <Tab icon={<MailIcon size={18} />} iconPosition="start" label="Templates" />
-          <Tab icon={<ShieldIcon size={18} />} iconPosition="start" label="ความปลอดภัย" />
-          <Tab icon={<ServerIcon size={18} />} iconPosition="start" label="ระบบ" />
-          <Tab icon={<DatabaseIcon size={18} />} iconPosition="start" label="จัดการข้อมูล" />
-        </Tabs>
-      </Paper>
+      {/* ── Top Grouped Navigation Bar ── */}
+      {(() => {
+        const groups = [
+          {
+            id: 'general',
+            label: 'ระบบและทั่วไป',
+            icon: <GlobeIcon size={20} />,
+            subItems: [
+              { index: 0, label: 'ทั่วไป', icon: <GlobeIcon size={16} /> },
+              { index: 4, label: 'ความปลอดภัย', icon: <ShieldIcon size={16} /> },
+              { index: 5, label: 'ระบบ', icon: <ServerIcon size={16} /> },
+            ]
+          },
+          {
+            id: 'operation',
+            label: 'การดำเนินงาน',
+            icon: <ClockIcon size={20} />,
+            subItems: [
+              { index: 1, label: 'กฎการยืม', icon: <ClockIcon size={16} /> },
+              { index: 6, label: 'จัดการข้อมูล', icon: <DatabaseIcon size={16} /> },
+            ]
+          },
+          {
+            id: 'communication',
+            label: 'การติดต่อสื่อสาร',
+            icon: <NotificationsIcon size={20} />,
+            subItems: [
+              { index: 2, label: 'การแจ้งเตือน LINE', icon: <SmartphoneIcon size={16} /> },
+              { index: 3, label: 'Templates อีเมล', icon: <MailIcon size={16} /> },
+            ]
+          }
+        ];
+
+        const currentGroupIndex = groups.findIndex(g => g.subItems.some(item => item.index === tabValue));
+        const activeGroup = groups[currentGroupIndex >= 0 ? currentGroupIndex : 0];
+
+        return (
+          <Card 
+            sx={{ 
+              borderRadius: 3, 
+              mb: 4, 
+              p: 2, 
+              bgcolor: '#fff', 
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)'
+            }}
+          >
+            <Grid container spacing={2}>
+              {groups.map((group) => {
+                const isActive = activeGroup.id === group.id;
+                return (
+                  <Grid item xs={12} md={4} key={group.id}>
+                    <Paper
+                      elevation={0}
+                      onClick={() => {
+                        setTabValue(group.subItems[0].index);
+                      }}
+                      sx={{
+                        p: 2,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 2,
+                        cursor: 'pointer',
+                        borderRadius: 2.5,
+                        border: '2px solid',
+                        borderColor: isActive ? 'primary.main' : '#f1f5f9',
+                        bgcolor: isActive ? '#f8fafc' : '#fff',
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                          borderColor: isActive ? 'primary.main' : 'primary.light',
+                          bgcolor: isActive ? '#f8fafc' : '#fafafa',
+                          transform: 'translateY(-1px)',
+                        }
+                      }}
+                    >
+                      <Box sx={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 2,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        bgcolor: isActive ? 'primary.main' : '#f1f5f9',
+                        color: isActive ? '#fff' : 'text.secondary',
+                        transition: 'all 0.2s ease',
+                      }}>
+                        {group.icon}
+                      </Box>
+                      <Box>
+                        <Typography 
+                          variant="subtitle2" 
+                          fontWeight={700} 
+                          color={isActive ? 'primary.main' : 'text.primary'}
+                        >
+                          {group.label}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {group.subItems.map(s => s.label).join(' • ')}
+                        </Typography>
+                      </Box>
+                    </Paper>
+                  </Grid>
+                );
+              })}
+            </Grid>
+
+            <Divider sx={{ my: 2 }} />
+
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, justifyContent: 'center' }}>
+              {activeGroup.subItems.map((subItem) => {
+                const isSubActive = tabValue === subItem.index;
+                return (
+                  <Button
+                    key={subItem.index}
+                    variant={isSubActive ? 'contained' : 'outlined'}
+                    color={isSubActive ? 'primary' : 'inherit'}
+                    onClick={() => setTabValue(subItem.index)}
+                    startIcon={subItem.icon}
+                    sx={{
+                      borderRadius: 5,
+                      px: 3,
+                      py: 0.75,
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                      textTransform: 'none',
+                      boxShadow: isSubActive ? '0 4px 12px rgba(99, 102, 241, 0.2)' : 'none',
+                      '&:hover': {
+                        borderColor: 'primary.main',
+                        bgcolor: isSubActive ? 'primary.main' : 'rgba(99, 102, 241, 0.04)',
+                        color: isSubActive ? 'primary.contrastText' : 'primary.main',
+                      }
+                    }}
+                  >
+                    {subItem.label}
+                  </Button>
+                );
+              })}
+            </Box>
+          </Card>
+        );
+      })()}
+
+      {/* Content Area */}
+      <Box sx={{ width: '100%' }}>
 
       {/* ── Tab 0: General ── */}
       <TabPanel value={tabValue} index={0}>
@@ -723,8 +904,7 @@ export default function SettingsPage() {
             <Card sx={{ borderRadius: 2.5 }}>
               <CardContent>
                 <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>การแสดงผล</Typography>
-                <FormControlLabel control={<Switch checked={settings?.darkMode || false} onChange={(e) => setSettings({ ...settings, darkMode: e.target.checked })} />} label="โหมดมืด (Coming Soon)" disabled />
-                <Box sx={{ display: 'block', mt: 1 }}>
+                <Box sx={{ display: 'block' }}>
                   <FormControlLabel control={<Switch checked={settings?.showWelcomeBanner ?? true} onChange={(e) => setSettings({ ...settings, showWelcomeBanner: e.target.checked })} />} label="แสดงแบนเนอร์ต้อนรับ" />
                 </Box>
               </CardContent>
@@ -1356,8 +1536,7 @@ export default function SettingsPage() {
                   <Typography variant="h6" fontWeight={700} color="error">ล้างข้อมูลทะเบียนทรัพย์สิน</Typography>
                 </Box>
                 <Alert severity="error" sx={{ mb: 2 }}>
-                  <strong>คำเตือน:</strong> การดำเนินการนี้จะลบข้อมูลทรัพย์สินทั้งหมดออกจากระบบ รวมถึงประวัติการซ่อมบำรุง (PM) และประวัติการเปลี่ยนแปลง (Asset History) 
-                  แต่จะยังคงข้อมูลคำขอยืมไว้ (โดยไม่เชื่อมโยงกับทรัพย์สิน) <strong>การดำเนินการนี้ไม่สามารถย้อนกลับได้</strong>
+                  <strong>คำเตือน:</strong> ฟีเจอร์นี้อนุญาตให้เลือกลบข้อมูลต่างๆ ในระบบได้อย่างอิสระ <strong>การดำเนินการนี้ไม่สามารถย้อนกลับได้</strong>
                 </Alert>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                   แนะนำให้ดาวน์โหลด Backup ก่อนดำเนินการทุกครั้ง
@@ -1366,10 +1545,14 @@ export default function SettingsPage() {
                   variant="contained"
                   color="error"
                   startIcon={clearing ? <CircularProgress size={18} /> : <TrashIcon size={18} />}
-                  onClick={() => setClearDialogOpen(true)}
+                  onClick={() => {
+                    setAdvancedClearDialogOpen(true);
+                    setConfirmText('');
+                    setClearOptions({ clearAssets: true, clearBorrow: false, clearDonations: false, clearMasterData: false, clearUsers: false });
+                  }}
                   disabled={clearing}
                 >
-                  {clearing ? 'กำลังลบข้อมูล...' : 'ล้างข้อมูลทะเบียนทรัพย์สินทั้งหมด'}
+                  {clearing ? 'กำลังลบข้อมูล...' : 'ลบข้อมูลขั้นสูง (Advanced Clear)'}
                 </Button>
               </CardContent>
             </Card>
@@ -1540,31 +1723,67 @@ export default function SettingsPage() {
         </Grid>
       </TabPanel>
 
-      {/* ── Confirmation Dialog for Clear Assets ── */}
-      <Dialog open={clearDialogOpen} onClose={() => setClearDialogOpen(false)}>
-        <DialogTitle>ยืนยันการล้างข้อมูลทะเบียนทรัพย์สิน</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            คุณแน่ใจหรือไม่ที่จะลบข้อมูลทะเบียนทรัพย์สินทั้งหมด? การกระทำนี้จะ:
+      {/* ── Confirmation Dialog for Advanced Clear Data ── */}
+      <Dialog open={advancedClearDialogOpen} onClose={() => setAdvancedClearDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ color: 'error.main', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <AlertTriangleIcon size={24} /> ลบข้อมูลขั้นสูง (Advanced Clear Data)
+        </DialogTitle>
+        <DialogContent dividers>
+          <DialogContentText sx={{ mb: 2, fontWeight: 500 }}>
+            ฟีเจอร์นี้อนุญาตให้เลือกลบข้อมูลต่างๆ ในระบบได้อย่างอิสระ โปรดเลือกส่วนที่ต้องการลบ:
           </DialogContentText>
-          <Box component="ul" sx={{ mt: 1, pl: 2, color: 'text.secondary', fontSize: '0.875rem' }}>
-            <li>ลบข้อมูลทรัพย์สินทั้งหมด</li>
-            <li>ลบประวัติ PM (ซ่อมบำรุง)</li>
-            <li>ลบประวัติการเปลี่ยนแปลง (Asset History)</li>
-            <li>ยกเลิกการเชื่อมโยงทรัพย์สินกับคำขอยืม (แต่คงคำขอยืมไว้)</li>
+          
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 3 }}>
+            <FormControlLabel 
+              control={<Checkbox checked={clearOptions.clearAssets} onChange={(e) => setClearOptions({ ...clearOptions, clearAssets: e.target.checked })} />} 
+              label="1. ลบข้อมูลทรัพย์สิน และประวัติการซ่อมบำรุง / PM" 
+            />
+            <FormControlLabel 
+              control={<Checkbox checked={clearOptions.clearBorrow} onChange={(e) => setClearOptions({ ...clearOptions, clearBorrow: e.target.checked })} />} 
+              label="2. ลบประวัติการยืม-คืนทั้งหมด" 
+            />
+            <FormControlLabel 
+              control={<Checkbox checked={clearOptions.clearDonations} onChange={(e) => setClearOptions({ ...clearOptions, clearDonations: e.target.checked })} />} 
+              label="3. ลบประวัติและใบงานการบริจาคทั้งหมด" 
+            />
+            <FormControlLabel 
+              control={<Checkbox checked={clearOptions.clearMasterData} onChange={(e) => setClearOptions({ ...clearOptions, clearMasterData: e.target.checked })} />} 
+              label="4. ลบข้อมูลพื้นฐานของบริษัท (Master Data เช่น สาขา แผนก ผู้จำหน่าย หมวดหมู่)" 
+            />
+            <FormControlLabel 
+              control={<Checkbox checked={clearOptions.clearUsers} onChange={(e) => setClearOptions({ ...clearOptions, clearUsers: e.target.checked })} color="error" />} 
+              label="5. ลบผู้ใช้งานทั้งหมด (ยกเว้นบัญชีที่คุณใช้อยู่)" 
+              sx={{ color: 'error.main' }}
+            />
           </Box>
-          <Alert severity="warning" sx={{ mt: 2 }}>
-            <strong>ไม่สามารถกู้คืนข้อมูลได้</strong> หากไม่มีไฟล์ Backup
+
+          <Alert severity="error" sx={{ mb: 2 }}>
+            <strong>การแจ้งเตือน:</strong> ข้อมูลที่ถูกลบไปแล้วจะไม่สามารถกู้คืนได้ หากไม่มีไฟล์ Backup
           </Alert>
+
+          <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
+            หากท่านแน่ใจ กรุณาพิมพ์คำว่า <strong>CONFIRM</strong> ในช่องด้านล่างเพื่อยืนยัน:
+          </Typography>
+          <TextField 
+            fullWidth 
+            size="small" 
+            placeholder="พิมพ์ CONFIRM" 
+            value={confirmText} 
+            onChange={(e) => setConfirmText(e.target.value)} 
+          />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setClearDialogOpen(false)} color="inherit">ยกเลิก</Button>
+          <Button onClick={() => setAdvancedClearDialogOpen(false)} color="inherit">ยกเลิก</Button>
           <Button
             onClick={async () => {
-              setClearDialogOpen(false);
+              if (confirmText !== 'CONFIRM') {
+                toast.error('กรุณาพิมพ์ CONFIRM ให้ถูกต้อง');
+                return;
+              }
+              setAdvancedClearDialogOpen(false);
               setClearing(true);
               try {
-                const res = await adminAPI.clearAllAssets();
+                const res = await adminAPI.advancedClearData(clearOptions);
                 toast.success(res.data.message || 'ล้างข้อมูลเรียบร้อย');
               } catch (err: any) {
                 toast.error(err.response?.data?.message || err.message || 'เกิดข้อผิดพลาด');
@@ -1574,9 +1793,9 @@ export default function SettingsPage() {
             }}
             color="error"
             variant="contained"
-            disabled={clearing}
+            disabled={clearing || confirmText !== 'CONFIRM' || (!clearOptions.clearAssets && !clearOptions.clearBorrow && !clearOptions.clearDonations && !clearOptions.clearMasterData && !clearOptions.clearUsers)}
           >
-            ยืนยัน ลบข้อมูลทั้งหมด
+            ยืนยัน ลบข้อมูลที่เลือก
           </Button>
         </DialogActions>
       </Dialog>
@@ -1627,6 +1846,8 @@ export default function SettingsPage() {
           </Button>
         </Box>
       )}
+
+      </Box>
 
       {/* ── Modern Premium Floating Sticky Save Bar (Triggered when dirty) ── */}
       {isDirty() && (

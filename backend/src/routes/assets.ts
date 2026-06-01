@@ -6,6 +6,7 @@ import { Prisma } from '@prisma/client';
 import { searchADUsers } from '../services/ldap';
 import multer from 'multer';
 import * as xlsx from 'xlsx';
+import ExcelJS from 'exceljs';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -1347,11 +1348,44 @@ function getAssetDetail(prisma: any, assetId: number, type?: string | null) {
         'วันที่แก้ไขล่าสุด': '',
       };
 
-      const ws = xlsx.utils.json_to_sheet(rows.length > 0 ? rows : [emptyRow]);
-      const workbook = xlsx.utils.book_new();
-      xlsx.utils.book_append_sheet(workbook, ws, 'Assets');
-
-      const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+      const dataRows = rows.length > 0 ? rows : [emptyRow];
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Assets', { views: [{ state: 'frozen', xSplit: 0, ySplit: 1 }] });
+      
+      const headers = Object.keys(dataRows[0]);
+      worksheet.columns = headers.map(h => ({ header: h, key: h, width: 20 }));
+      
+      dataRows.forEach(row => {
+        worksheet.addRow(row);
+      });
+      
+      // Style Header
+      worksheet.getRow(1).eachCell((cell) => {
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0f172a' } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      });
+      
+      // Style Data
+      worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber > 1) {
+          row.eachCell((cell, colNumber) => {
+            cell.border = { top: { style: 'thin', color: { argb: 'FFe2e8f0' } }, left: { style: 'thin', color: { argb: 'FFe2e8f0' } }, bottom: { style: 'thin', color: { argb: 'FFe2e8f0' } }, right: { style: 'thin', color: { argb: 'FFe2e8f0' } } };
+            cell.alignment = { vertical: 'middle', horizontal: 'left' };
+            
+            // Color code Status column
+            if (headers[colNumber - 1] === 'สถานะ') {
+              const statusVal = cell.value?.toString();
+              if (statusVal === 'Available') { cell.font = { color: { argb: 'FF10b981' }, bold: true }; }
+              else if (statusVal === 'Maintenance') { cell.font = { color: { argb: 'FFef4444' }, bold: true }; }
+              else if (statusVal === 'Borrowed') { cell.font = { color: { argb: 'FFf59e0b' }, bold: true }; }
+            }
+          });
+        }
+      });
+      
+      const buffer = await workbook.xlsx.writeBuffer();
       res.setHeader('Content-Disposition', 'attachment; filename="assets_export.xlsx"');
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.send(buffer);

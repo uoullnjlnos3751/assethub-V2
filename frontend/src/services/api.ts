@@ -23,6 +23,12 @@ api.interceptors.response.use(
   }
 );
 
+export const notificationAPI = {
+  getAll: () => api.get('/notifications'),
+  markAsRead: (id: number) => api.put(`/notifications/${id}/read`),
+  markAllAsRead: () => api.put('/notifications/read-all'),
+};
+
 export default api;
 
 // Auth
@@ -189,6 +195,7 @@ export const adminAPI = {
     });
   },
   clearAllAssets: () => api.post('/admin/clear-all-assets'),
+  advancedClearData: (options: { clearAssets: boolean; clearBorrow: boolean; clearDonations: boolean; clearMasterData: boolean; clearUsers: boolean }) => api.post('/admin/advanced-clear-data', options),
 };
 
 // Dashboard

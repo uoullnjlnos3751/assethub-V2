@@ -1,0 +1,16 @@
+{
+  "short_name": "AssetHub",
+  "name": "AssetHub V2 - IT Asset Management",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#f8fafc",
+  "display": "standalone",
+  "scope": "/",
+  "theme_color": "#2563eb"
+}

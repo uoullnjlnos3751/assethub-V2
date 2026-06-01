@@ -12,10 +12,12 @@ import inventoryRoutes from './routes/inventory';
 import categoryRoutes from './routes/categories';
 import donationRoutes from './routes/donation';
 import maintenanceRoutes from './routes/maintenance';
+import notificationsRoutes from './routes/notifications';
 import { errorHandler } from './middleware/errorHandler';
 import { startNotificationWorker } from './services/notification';
 import { startOverdueChecker } from './jobs/overdueChecker';
 import { apiLimiter } from './middleware/rateLimiter';
+import { startAutoBackup } from './services/backup';
 
 export const prisma = new PrismaClient();
 
@@ -44,6 +46,7 @@ app.use('/api/inventory', inventoryRoutes);
   app.use('/api/categories', categoryRoutes);
 app.use('/api/donations', donationRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
+app.use('/api/notifications', notificationsRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -55,4 +58,5 @@ app.listen(Number(PORT), '0.0.0.0', () => {
   console.log(`Server running on http://localhost:${PORT}`);
   startNotificationWorker();
   startOverdueChecker();
+  startAutoBackup();
 });

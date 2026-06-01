@@ -29,6 +29,15 @@ import {
   Snackbar,
   Alert,
 } from '@mui/material';
+import {
+  Timeline,
+  TimelineItem,
+  TimelineSeparator,
+  TimelineConnector,
+  TimelineContent,
+  TimelineDot,
+  TimelineOppositeContent
+} from '@mui/lab';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import EditIcon from '@mui/icons-material/Edit';
 import StarIcon from '@mui/icons-material/Star';
@@ -435,7 +444,7 @@ function SpecTab({ asset }: { asset: any }) {
   );
 }
 
-/* ─── History tab ─────────────────────────────────────────────── */
+/* ─── History tab (MUI Lab Timeline) ──────────────────────────── */
 function HistoryTab({ asset }: { asset: any }) {
   const history = asset.assetHistory || [];
   if (history.length === 0) return (
@@ -461,89 +470,70 @@ function HistoryTab({ asset }: { asset: any }) {
       boxShadow: '0 4px 24px rgba(99, 102, 241, 0.07), 0 1px 3px rgba(0, 0, 0, 0.04)',
       p: 2.5
     }}>
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+      <Timeline sx={{ p: 0, m: 0 }}>
         {history.map((h: any, i: number) => {
           const icon = HISTORY_ICON[h.actionType] || '📋';
           const label = HISTORY_LABEL[h.actionType] || h.actionType;
           const detail = [h.fromStatus, h.toStatus, h.fromOwner, h.toOwner, h.fromLoc, h.toLoc, h.note].filter(Boolean).join(' → ');
           
-          let dotColor = alpha('#9ca3af', 0.1);
-          let borderColor = alpha('#9ca3af', 0.3);
-          if (h.actionType === 'CREATE') { dotColor = alpha('#6366f1', 0.1); borderColor = alpha('#6366f1', 0.3); }
-          else if (h.actionType === 'STATUS_CHANGE') { dotColor = alpha('#3b82f6', 0.1); borderColor = alpha('#3b82f6', 0.25); }
-          else if (h.actionType === 'CHECKOUT') { dotColor = alpha('#f59e0b', 0.1); borderColor = alpha('#f59e0b', 0.28); }
-          else if (h.actionType === 'RETURN') { dotColor = alpha('#10b981', 0.1); borderColor = alpha('#10b981', 0.25); }
+          let dotColor: any = 'grey';
+          if (h.actionType === 'CREATE') dotColor = 'primary';
+          else if (h.actionType === 'STATUS_CHANGE') dotColor = 'info';
+          else if (h.actionType === 'CHECKOUT') dotColor = 'warning';
+          else if (h.actionType === 'RETURN') dotColor = 'success';
 
           return (
-            <Box key={h.id ?? i} sx={{ display: 'flex', gap: 2, position: 'relative' }}>
-              {/* Timeline Connector Line */}
-              {i < history.length - 1 && (
-                <Box sx={{
-                  position: 'absolute',
-                  left: 15,
-                  top: 32,
-                  bottom: -16,
-                  width: 1,
-                  bgcolor: 'rgba(99, 102, 241, 0.12)'
-                }} />
-              )}
-              
-              {/* Icon Dot */}
-              <Box sx={{
-                width: 32,
-                height: 32,
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '13px',
-                flexShrink: 0,
-                mt: 0.25,
-                border: '2px solid',
-                borderColor,
-                bgcolor: dotColor,
-                zIndex: 1
-              }}>
-                {icon}
-              </Box>
-
-              {/* Timeline Content */}
-              <Box sx={{ flex: 1, pb: i < history.length - 1 ? 2.5 : 1 }}>
+            <TimelineItem key={h.id ?? i}>
+              <TimelineOppositeContent sx={{ flex: 0.2, pl: 0, minWidth: '100px', display: { xs: 'none', sm: 'block' } }}>
+                <Typography variant="caption" color="text.secondary">
+                  {new Date(h.createdAt).toLocaleDateString('th-TH')}
+                </Typography>
+                <Typography variant="caption" display="block" color="text.disabled">
+                  {new Date(h.createdAt).toLocaleTimeString('th-TH')}
+                </Typography>
+              </TimelineOppositeContent>
+              <TimelineSeparator>
+                <TimelineDot color={dotColor} variant="outlined" sx={{ p: '6px' }}>
+                  <span style={{ fontSize: '14px' }}>{icon}</span>
+                </TimelineDot>
+                {i < history.length - 1 && <TimelineConnector sx={{ bgcolor: alpha('#9ca3af', 0.2) }} />}
+              </TimelineSeparator>
+              <TimelineContent sx={{ pb: 3, pr: 0 }}>
                 <Typography variant="body2" fontWeight={700} color="text.primary">
                   {label}
                 </Typography>
                 {detail && (
-                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.25, lineHeight: 1.5 }}>
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.25, lineHeight: 1.5, bgcolor: alpha('#9ca3af', 0.05), p: 1, borderRadius: 1 }}>
                     {detail}
                   </Typography>
                 )}
-                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 0.5, flexWrap: 'wrap' }}>
+                <Box sx={{ display: { xs: 'flex', sm: 'none' }, gap: 1, alignItems: 'center', mt: 0.5, flexWrap: 'wrap' }}>
                   <Typography variant="caption" color="text.disabled">
                     {new Date(h.createdAt).toLocaleString('th-TH')}
                   </Typography>
-                  {h.changedBy && (
-                    <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
-                      <Avatar sx={{
-                        width: 18,
-                        height: 18,
-                        fontSize: '8px',
-                        fontWeight: 700,
-                        background: 'linear-gradient(135deg,#3b82f6,#6366f1)',
-                        color: '#fff'
-                      }}>
-                        {String(h.changedBy).substring(0, 2).toUpperCase()}
-                      </Avatar>
-                      <Typography variant="caption" color="text.secondary">
-                        {h.changedBy}
-                      </Typography>
-                    </Box>
-                  )}
                 </Box>
-              </Box>
-            </Box>
+                {h.changedBy && (
+                  <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, mt: 1 }}>
+                    <Avatar sx={{
+                      width: 18,
+                      height: 18,
+                      fontSize: '8px',
+                      fontWeight: 700,
+                      background: 'linear-gradient(135deg,#3b82f6,#6366f1)',
+                      color: '#fff'
+                    }}>
+                      {String(h.changedBy).substring(0, 2).toUpperCase()}
+                    </Avatar>
+                    <Typography variant="caption" color="text.secondary">
+                      {h.changedBy}
+                    </Typography>
+                  </Box>
+                )}
+              </TimelineContent>
+            </TimelineItem>
           );
         })}
-      </Box>
+      </Timeline>
     </Box>
   );
 }

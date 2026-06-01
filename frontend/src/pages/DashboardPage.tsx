@@ -2,8 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Grid, Box, Typography, LinearProgress, CircularProgress,
-  Divider, alpha,
+  Divider, alpha, useTheme
 } from '@mui/material';
+import {
+  BarChart, Bar, Cell, ResponsiveContainer, PieChart, Pie, Tooltip as RechartsTooltip
+} from 'recharts';
 import { useAuth } from '../contexts/AuthContext';
 import { dashboardAPI } from '../services/api';
 
@@ -19,50 +22,55 @@ function pct(a: number, b: number) {
 
 // ── Sub-components ─────────────────────────────────────────────────────────
 
-// Mini donut SVG (pure SVG, no charting lib)
-function DonutChart({ segments, total }: { segments: { value: number; color: string }[]; total: number }) {
-  const R = 36;
-  const C = 2 * Math.PI * R;
-  let offset = 0;
-  const arcs = segments.map(seg => {
-    const dash = total > 0 ? (seg.value / total) * C : 0;
-    const arc = { dash, gap: C - dash, offset, color: seg.color };
-    offset += dash;
-    return arc;
-  });
+// Mini donut SVG using Recharts
+function DonutChart({ segments, total }: { segments: { value: number; color: string; name?: string }[]; total: number }) {
+  const theme = useTheme();
   return (
-    <svg width="90" height="90" viewBox="0 0 90 90">
-      {/* Background ring */}
-      <circle cx="45" cy="45" r={R} fill="none" stroke="#f3f4f6" strokeWidth="14" />
-      {arcs.map((arc, i) => (
-        <circle key={i} cx="45" cy="45" r={R} fill="none"
-          stroke={arc.color} strokeWidth="14"
-          strokeDasharray={`${arc.dash} ${arc.gap}`}
-          strokeDashoffset={-arc.offset}
-          transform="rotate(-90 45 45)"
-          style={{ transition: 'stroke-dasharray 0.5s ease' }}
-        />
-      ))}
-      <text x="45" y="49" textAnchor="middle" fontSize="14" fontWeight="600" fill="#111827">{total}</text>
-    </svg>
+    <Box sx={{ width: 100, height: 100, position: 'relative' }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart>
+          <Pie
+            data={segments}
+            cx="50%"
+            cy="50%"
+            innerRadius={32}
+            outerRadius={45}
+            paddingAngle={2}
+            dataKey="value"
+            stroke="none"
+          >
+            {segments.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={entry.color} />
+            ))}
+          </Pie>
+          <RechartsTooltip 
+            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px' }}
+            itemStyle={{ color: '#111827', fontWeight: 500 }}
+            formatter={(value: any) => [value, 'รายการ']}
+          />
+        </PieChart>
+      </ResponsiveContainer>
+      <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+        <Typography sx={{ fontSize: '16px', fontWeight: 700, color: theme.palette.text.primary }}>{total}</Typography>
+      </Box>
+    </Box>
   );
 }
 
-// Mini bar chart (sparkline style)
+// Mini bar chart (sparkline style) using Recharts
 function MiniBarChart({ values, color }: { values: number[]; color: string }) {
-  const max = Math.max(...values, 1);
+  const data = values.map((v, i) => ({ name: `Day ${i+1}`, value: v }));
   return (
-    <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: '56px' }}>
-      {values.map((v, i) => (
-        <Box key={i} sx={{
-          flex: 1,
-          borderRadius: '3px 3px 0 0',
-          minHeight: '4px',
-          height: `${Math.max((v / max) * 100, 6)}%`,
-          background: i === values.length - 1 ? color : alpha(color, 0.4),
-          transition: 'height 0.4s ease',
-        }} />
-      ))}
+    <Box sx={{ height: '56px', width: '100%' }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data}>
+          <Bar dataKey="value" radius={[3, 3, 0, 0]}>
+            {data.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={index === data.length - 1 ? color : alpha(color, 0.4)} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
     </Box>
   );
 }

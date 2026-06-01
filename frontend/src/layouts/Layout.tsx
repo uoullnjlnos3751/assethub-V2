@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   AppBar, Box, CssBaseline, Drawer, IconButton, List, ListItem, ListItemButton,
   ListItemIcon, ListItemText, Toolbar, Typography, Button, Avatar, Menu, MenuItem,
-  Divider, Collapse, alpha, useTheme, Badge, TextField, InputAdornment
+  Divider, Collapse, alpha, useTheme, Badge, TextField, InputAdornment, Tooltip
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import SearchIcon from '@mui/icons-material/Search';
@@ -47,9 +47,15 @@ import ExpandMore from '@mui/icons-material/ExpandMore';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import DomainIcon from '@mui/icons-material/Domain';
+import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
+import DarkModeIcon from '@mui/icons-material/DarkMode';
+import LightModeIcon from '@mui/icons-material/LightMode';
 import { useAuth } from '../contexts/AuthContext';
+import { useAppTheme } from '../contexts/ThemeContext';
 import Breadcrumbs from '../components/Breadcrumbs';
 import PageTransition from '../components/PageTransition';
+import QRScannerModal from '../components/QRScannerModal';
+import { notificationAPI } from '../services/api';
 
 // ── Sidebar width matching ITSM HTML (210px) ───────────────────────────────
 const drawerWidth = 220;
@@ -57,9 +63,10 @@ const appBarHeight = 50;
 
 interface NavItem {
   label: string;
-  path: string;
-  icon: React.ReactNode;
+  path?: string;
+  icon?: React.ReactNode;
   roles?: string[];
+  isHeader?: boolean;
 }
 
 interface NavGroup {
@@ -149,27 +156,26 @@ const adminNav: NavEntry[] = [
       { label: 'รายงานประวัติซ่อมบำรุง', path: '/reports/maintenance', icon: <BuildCircleIcon fontSize="small" /> },
     ],
   },
-  { label: 'จัดการผู้ใช้', path: '/admin/users', icon: <PeopleIcon fontSize="small" />, roles: ['SUPERADMIN'] },
-  { label: 'จัดการบริษัท', path: '/admin/companies', icon: <DomainIcon fontSize="small" />, roles: ['SUPERADMIN', 'IT_ADMIN'] },
-  { label: 'ตั้งค่า', path: '/admin/settings', icon: <SettingsIcon fontSize="small" />, roles: ['SUPERADMIN'] },
   {
-    label: 'ตั้งค่าข้อมูลพื้นฐาน',
-    icon: <CategoryIcon fontSize="small" />,
+    label: 'ตั้งค่าระบบ',
+    icon: <SettingsIcon fontSize="small" />,
     roles: ['SUPERADMIN', 'IT_ADMIN'],
     children: [
+      { label: 'ข้อมูลตั้งต้นทรัพย์สิน', isHeader: true },
       { label: 'ประเภทอุปกรณ์ (Device Types)', path: '/assets/device-types', icon: <CategoryIcon fontSize="small" /> },
-      { label: 'สถานที่ตั้ง/ไซต์ (Location & Company)', path: '/assets/locations', icon: <LocationOnIcon fontSize="small" /> },
+      { label: 'สถานที่ตั้ง (Location & Company)', path: '/assets/locations', icon: <LocationOnIcon fontSize="small" /> },
       { label: 'ผู้จำหน่าย (Vendor)', path: '/assets/vendors', icon: <StoreIcon fontSize="small" /> },
       { label: 'สถานะอุปกรณ์ (Asset Status)', path: '/assets/statuses', icon: <CheckCircleOutlineIcon fontSize="small" /> },
       { label: 'จัดการหมวดหมู่ (Categories)', path: '/categories', icon: <CategoryManagementIcon fontSize="small" /> },
-    ],
-  },
-  {
-    label: 'ประวัติ',
-    icon: <HistoryIcon fontSize="small" />,
-    children: [
-      { label: 'ประวัติแจ้งเตือน (Notification Log)', path: '/admin/notification-logs', icon: <NotificationsIcon fontSize="small" /> },
-      { label: 'Audit Log', path: '/admin/audit-log', icon: <ReceiptLongIcon fontSize="small" /> },
+      
+      { label: 'การตั้งค่า & ความปลอดภัย', isHeader: true, roles: ['SUPERADMIN', 'IT_ADMIN'] },
+      { label: 'ตั้งค่าระบบหลัก', path: '/admin/settings', icon: <SettingsIcon fontSize="small" />, roles: ['SUPERADMIN'] },
+      { label: 'จัดการผู้ใช้', path: '/admin/users', icon: <PeopleIcon fontSize="small" />, roles: ['SUPERADMIN'] },
+      { label: 'จัดการบริษัท', path: '/admin/companies', icon: <DomainIcon fontSize="small" />, roles: ['SUPERADMIN', 'IT_ADMIN'] },
+      
+      { label: 'ระบบ Log การทำงาน', isHeader: true, roles: ['SUPERADMIN', 'IT_ADMIN'] },
+      { label: 'ประวัติแจ้งเตือน', path: '/admin/notification-logs', icon: <NotificationsIcon fontSize="small" />, roles: ['SUPERADMIN'] },
+      { label: 'Audit Log', path: '/admin/audit-log', icon: <ReceiptLongIcon fontSize="small" />, roles: ['IT_ADMIN', 'SUPERADMIN'] },
     ],
   },
 ];
@@ -199,10 +205,14 @@ function SidebarSection({ children }: { children: React.ReactNode }) {
 
 export default function Layout() {
   const theme = useTheme();
+  const { mode, toggleColorMode } = useAppTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState('');
+  const [qrOpen, setQrOpen] = useState(false);
+  const [anchorElNotif, setAnchorElNotif] = useState<null | HTMLElement>(null);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const { user, logout, systemSettings } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -247,6 +257,45 @@ export default function Layout() {
     }
   }, [location.pathname, location.search]);
 
+  const fetchNotifications = async () => {
+    try {
+      const res = await notificationAPI.getAll();
+      setNotifications(res.data);
+    } catch (err) {
+      console.error('Failed to fetch notifications', err);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchNotifications();
+      const interval = setInterval(fetchNotifications, 60000); // Check every minute
+      return () => clearInterval(interval);
+    }
+  }, [user]);
+
+  const handleNotificationClick = async (notif: any) => {
+    try {
+      if (!notif.isRead) {
+        await notificationAPI.markAsRead(notif.id);
+        setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
+      }
+      setAnchorElNotif(null);
+      if (notif.link) {
+        navigate(notif.link);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      await notificationAPI.markAllAsRead();
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    } catch (err) {}
+  };
+
   // ── Section grouping for sidebar visual clarity ─────────────────────
   const getSectionLabel = (label: string): string | null => {
     if (label === 'แดชบอร์ด') return 'ภาพรวม';
@@ -256,10 +305,7 @@ export default function Layout() {
     if (label === 'ยืม-คืน') return 'Service Desk';
     if (label === 'PM ตรวจนับ') return null;
     if (label === 'รายงาน') return 'รายงาน';
-    if (label === 'จัดการผู้ใช้') return 'ผู้ดูแลระบบ';
-    if (label === 'ตั้งค่า') return null;
-    if (label === 'ตั้งค่าข้อมูลพื้นฐาน') return null;
-    if (label === 'ประวัติ') return null;
+    if (label === 'ตั้งค่าระบบ') return 'ผู้ดูแลระบบ';
     return null;
   };
 
@@ -313,58 +359,95 @@ export default function Layout() {
 
             <Collapse in={isOpen} timeout="auto" unmountOnExit>
               <List component="div" disablePadding sx={{ mb: 0.5 }}>
-                {group.children.map((child) => {
-                  const active = location.pathname + location.search === child.path;
-                  return (
-                    <ListItem key={child.path} disablePadding>
-                      <ListItemButton
-                        selected={active}
-                        onClick={() => { navigate(child.path); setMobileOpen(false); }}
-                        sx={{
-                          pl: '44px',
-                          pr: '12px',
-                          py: '6px',
-                          mx: '8px',
-                          my: '1px',
-                          borderRadius: '7px',
-                          '&.Mui-selected': {
-                            bgcolor: '#fef3c7',
-                            color: '#b45309',
-                            '&:hover': { bgcolor: '#fde68a' },
-                          },
-                          '&:hover': { bgcolor: '#f9fafb' },
-                        }}
-                      >
-                        <ListItemIcon sx={{ minWidth: 26, color: active ? '#b45309' : '#9ca3af' }}>
-                          {React.cloneElement(child.icon as React.ReactElement, { sx: { fontSize: 14 } })}
-                        </ListItemIcon>
-                        <ListItemText
-                          primary={child.label}
-                          primaryTypographyProps={{
-                            fontSize: '0.78rem',
-                            fontWeight: active ? 600 : 400,
-                            color: active ? '#b45309' : '#4b5563',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                          }}
-                        />
-                      </ListItemButton>
-                    </ListItem>
-                  );
-                })}
+                {(() => {
+                  let headerCount = 0;
+                  return group.children
+                    .filter((child) => {
+                      if (child.roles) return child.roles.includes(user?.role || '');
+                      return true;
+                    })
+                    .map((child, idx) => {
+                      if (child.isHeader) {
+                        headerCount++;
+                        return (
+                          <Box key={`header-${child.label}`} sx={{ width: '100%' }}>
+                            {headerCount > 1 && (
+                              <Divider sx={{ mx: '16px', my: '6px', borderColor: '#f3f4f6' }} />
+                            )}
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                display: 'block',
+                                pl: '24px',
+                                pt: '8px',
+                                pb: '3px',
+                                fontSize: '9px',
+                                fontWeight: 700,
+                                color: '#9ca3af',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.08em',
+                                lineHeight: 1,
+                              }}
+                            >
+                              {child.label}
+                            </Typography>
+                          </Box>
+                        );
+                      }
+
+                      const active = location.pathname + location.search === child.path;
+                      const pathKey = child.path || `item-${child.label}`;
+                      return (
+                        <ListItem key={pathKey} disablePadding>
+                          <ListItemButton
+                            selected={active}
+                            onClick={() => { navigate(child.path || '/'); setMobileOpen(false); }}
+                            sx={{
+                              pl: '24px',
+                              pr: '12px',
+                              py: '6.5px',
+                              mx: '8px',
+                              my: '1px',
+                              borderRadius: '7px',
+                              '&.Mui-selected': {
+                                bgcolor: '#fef3c7',
+                                color: '#b45309',
+                                '&:hover': { bgcolor: '#fde68a' },
+                              },
+                              '&:hover': { bgcolor: '#f9fafb' },
+                            }}
+                          >
+                            <ListItemIcon sx={{ minWidth: 24, color: active ? '#b45309' : '#9ca3af' }}>
+                              {child.icon ? React.cloneElement(child.icon as React.ReactElement, { sx: { fontSize: 13 } }) : null}
+                            </ListItemIcon>
+                            <ListItemText
+                              primary={child.label}
+                              primaryTypographyProps={{
+                                fontSize: '0.76rem',
+                                fontWeight: active ? 600 : 400,
+                                color: active ? '#b45309' : '#4b5563',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                              }}
+                            />
+                          </ListItemButton>
+                        </ListItem>
+                      );
+                    });
+                })()}
               </List>
             </Collapse>
           </React.Fragment>
         );
       } else {
         const item = entry as NavItem;
-        const active = isActive(item.path);
+        const active = isActive(item.path || '');
         items.push(
-          <ListItem key={item.path} disablePadding>
+          <ListItem key={item.path || item.label} disablePadding>
             <ListItemButton
               selected={active}
-              onClick={() => { navigate(item.path); setMobileOpen(false); }}
+              onClick={() => { navigate(item.path || ''); setMobileOpen(false); }}
               sx={{
                 borderRadius: '7px',
                 mx: '8px',
@@ -571,9 +654,45 @@ export default function Layout() {
            {/* Right side: notification + user */}
            <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
 
+            {/* QR Scanner Button (Mobile Friendly) */}
+            <IconButton
+              size="small"
+              onClick={() => setQrOpen(true)}
+              sx={{
+                width: 32,
+                height: 32,
+                borderRadius: '7px',
+                border: '0.5px solid #e5e7eb',
+                color: '#6b7280',
+                display: { xs: 'flex', md: 'flex' }, // Show on all sizes or just mobile
+                '&:hover': { bgcolor: '#f9fafb', color: '#2563eb', borderColor: '#bfdbfe' },
+              }}
+            >
+              <QrCodeScannerIcon sx={{ fontSize: 18 }} />
+            </IconButton>
+
+            {/* Dark Mode Toggle */}
+            <Tooltip title={mode === 'dark' ? 'โหมดสว่าง' : 'โหมดมืด'}>
+              <IconButton
+                size="small"
+                onClick={toggleColorMode}
+                sx={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: '7px',
+                  border: '0.5px solid #e5e7eb',
+                  color: '#6b7280',
+                  '&:hover': { bgcolor: '#f9fafb', color: '#f59e0b', borderColor: '#fde68a' },
+                }}
+              >
+                {mode === 'dark' ? <LightModeIcon sx={{ fontSize: 18 }} /> : <DarkModeIcon sx={{ fontSize: 18 }} />}
+              </IconButton>
+            </Tooltip>
+
             {/* Notification bell */}
             <IconButton
               size="small"
+              onClick={(e) => setAnchorElNotif(e.currentTarget)}
               sx={{
                 width: 32,
                 height: 32,
@@ -583,8 +702,76 @@ export default function Layout() {
                 '&:hover': { bgcolor: '#f9fafb' },
               }}
             >
-              <NotificationsIcon sx={{ fontSize: 16 }} />
+              <Badge badgeContent={notifications.filter(n => !n.isRead).length} color="error" sx={{ '& .MuiBadge-badge': { fontSize: '10px', height: 16, minWidth: 16 } }}>
+                <NotificationsIcon sx={{ fontSize: 16 }} />
+              </Badge>
             </IconButton>
+
+            {/* Notification Menu */}
+            <Menu
+              anchorEl={anchorElNotif}
+              open={Boolean(anchorElNotif)}
+              onClose={() => setAnchorElNotif(null)}
+              PaperProps={{
+                elevation: 3,
+                sx: { 
+                  width: 350, 
+                  maxHeight: 450,
+                  mt: 1, 
+                  borderRadius: '12px',
+                  boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)'
+                }
+              }}
+              transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+              anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+            >
+              <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f3f4f6' }}>
+                <Typography variant="subtitle1" fontWeight={700}>การแจ้งเตือน</Typography>
+                {notifications.some(n => !n.isRead) && (
+                  <Button size="small" onClick={handleMarkAllRead} sx={{ fontSize: '0.75rem' }}>
+                    อ่านทั้งหมด
+                  </Button>
+                )}
+              </Box>
+              <List sx={{ p: 0 }}>
+                {notifications.length === 0 ? (
+                  <ListItem>
+                    <ListItemText primary="ไม่มีการแจ้งเตือน" sx={{ textAlign: 'center', color: 'text.secondary', py: 3 }} />
+                  </ListItem>
+                ) : (
+                  notifications.map(notif => (
+                    <ListItemButton 
+                      key={notif.id} 
+                      onClick={() => handleNotificationClick(notif)}
+                      sx={{ 
+                        borderBottom: '1px solid #f3f4f6',
+                        bgcolor: notif.isRead ? 'transparent' : '#f0f9ff',
+                        '&:hover': { bgcolor: '#f9fafb' }
+                      }}
+                    >
+                      <ListItemText 
+                        primary={notif.title}
+                        secondary={
+                          <React.Fragment>
+                            <Typography variant="caption" sx={{ display: 'block', whiteSpace: 'pre-line', mb: 0.5 }}>
+                              {notif.message}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {new Date(notif.createdAt).toLocaleString('th-TH')}
+                            </Typography>
+                          </React.Fragment>
+                        }
+                        primaryTypographyProps={{ 
+                          variant: 'subtitle2', 
+                          fontWeight: notif.isRead ? 500 : 700,
+                          color: notif.isRead ? 'text.primary' : '#0369a1'
+                        }}
+                      />
+                    </ListItemButton>
+                  ))
+                )}
+              </List>
+            </Menu>
 
             {/* User button */}
             <Button
@@ -708,6 +895,9 @@ export default function Layout() {
           <Outlet />
         </PageTransition>
       </Box>
+
+      {/* QR Scanner Modal */}
+      <QRScannerModal open={qrOpen} onClose={() => setQrOpen(false)} />
     </Box>
   );
 }

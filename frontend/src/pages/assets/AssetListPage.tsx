@@ -43,6 +43,8 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import TableViewIcon from '@mui/icons-material/TableView';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import ReturnIcon from '@mui/icons-material/AssignmentReturn';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import ViewListIcon from '@mui/icons-material/ViewList';
 import ExtensionIcon from '@mui/icons-material/Extension';
 import SearchIcon from '@mui/icons-material/Search';
 import FilterListIcon from '@mui/icons-material/FilterList';
@@ -472,13 +474,19 @@ export default function AssetListPage() {
               )}
 
               {/* Secondary Actions (More Menu) */}
-              <IconButton 
-                size="small" 
-                onClick={(e) => handleMenuOpen(e, row)}
-                sx={{ color: 'text.secondary' }}
-              >
-                <Typography variant="caption" sx={{ fontWeight: 'bold' }}>More</Typography>
-              </IconButton>
+              <Tooltip title="จัดการเพิ่มเติม">
+                <IconButton 
+                  size="small" 
+                  onClick={(e) => handleMenuOpen(e, row)}
+                  sx={{ 
+                    color: 'text.secondary',
+                    bgcolor: alpha(theme.palette.primary.main, 0.05),
+                    '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.15) }
+                  }}
+                >
+                  <MoreVertIcon fontSize="small" color="primary" />
+                </IconButton>
+              </Tooltip>
             </Box>
           );
         },
@@ -1003,7 +1011,15 @@ export default function AssetListPage() {
                 <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 1 }}>
 
                   <Button size="small" variant="outlined" startIcon={<PageviewIcon />} onClick={() => navigate(`/assets/${asset.id}`)}>เปิดดู</Button>
-                  <Button size="small" variant="contained" onClick={(e) => handleMenuOpen(e, asset)}>จัดการ</Button>
+                  <Button 
+                    size="small" 
+                    variant="outlined" 
+                    onClick={(e) => handleMenuOpen(e, asset)}
+                    startIcon={<MoreVertIcon />}
+                    sx={{ borderRadius: '8px' }}
+                  >
+                    จัดการ
+                  </Button>
                 </Box>
               </Card>
             ))}

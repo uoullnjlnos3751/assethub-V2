@@ -84,6 +84,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
+  // Auto Logout after 30 minutes of inactivity
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+
+    const resetTimer = () => {
+      clearTimeout(timeoutId);
+      if (token) {
+        timeoutId = setTimeout(() => {
+          logout();
+          alert('หมดเวลาการใช้งานในระบบ (Session Expired) กรุณาเข้าสู่ระบบใหม่');
+        }, 30 * 60 * 1000); // 30 minutes
+      }
+    };
+
+    if (token) {
+      window.addEventListener('mousemove', resetTimer);
+      window.addEventListener('keydown', resetTimer);
+      window.addEventListener('scroll', resetTimer);
+      window.addEventListener('click', resetTimer);
+      resetTimer();
+    }
+
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('mousemove', resetTimer);
+      window.removeEventListener('keydown', resetTimer);
+      window.removeEventListener('scroll', resetTimer);
+      window.removeEventListener('click', resetTimer);
+    };
+  }, [token]);
+
   return (
     <AuthContext.Provider value={{ user, token, loading, systemSettings, login, logout, refreshSettings }}>
       {children}

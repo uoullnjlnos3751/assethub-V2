@@ -590,13 +590,87 @@ router.post('/clear-all-assets', authenticate, authorize('SUPERADMIN'), async (_
       // 3. Nullify assetId in BorrowRequestItem (optional FK)
       await tx.borrowRequestItem.updateMany({ data: { assetId: null } });
 
-      // 4. Delete all assets (cascades to computerDetail, phoneDetail, etc.)
+      // 4. Clean up related records without cascade constraints
+      await tx.maintenancePart.deleteMany();
+      await tx.maintenanceImage.deleteMany();
+      await tx.maintenanceRecord.deleteMany();
+      await tx.donationItem.deleteMany();
+
+      // 5. Delete all assets (cascades to computerDetail, phoneDetail, etc.)
       const count = await tx.asset.deleteMany();
 
       return count;
     });
 
     res.json({ message: `ล้างข้อมูลทะเบียนทรัพย์สินทั้งหมด ${result.count} รายการเรียบร้อย` });
+  } catch (err) { next(err); }
+});
+// ── Advanced Clear Data ──
+router.post('/advanced-clear-data', authenticate, authorize('SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { clearAssets, clearBorrow, clearDonations, clearMasterData, clearUsers } = req.body;
+    
+    await prisma.$transaction(async (tx) => {
+      // 1. Borrow Records (Dependent on Assets, Users)
+      if (clearBorrow) {
+        await tx.borrowRequestItem.deleteMany();
+        await tx.checkout.deleteMany();
+        await tx.return.deleteMany();
+        await tx.borrowApproval.deleteMany();
+        await tx.borrowExtension.deleteMany();
+        await tx.borrowRequest.deleteMany();
+      } else if (clearAssets) {
+        // If we clear assets but keep borrows, we must nullify the assetId
+        await tx.borrowRequestItem.updateMany({ data: { assetId: null } });
+      }
+
+      // 2. Donations
+      if (clearDonations) {
+        await tx.donationItem.deleteMany();
+        await tx.donationImage.deleteMany();
+        await tx.donation.deleteMany();
+      } else if (clearAssets) {
+        await tx.donationItem.deleteMany();
+      }
+
+      // 3. Assets & Maintenance
+      if (clearAssets) {
+        await tx.pMRunAnswer.deleteMany();
+        await tx.pMRun.deleteMany();
+        await tx.assetHistory.deleteMany();
+        await tx.maintenancePart.deleteMany();
+        await tx.maintenanceImage.deleteMany();
+        await tx.maintenanceRecord.deleteMany();
+        await tx.asset.deleteMany();
+      }
+
+      // 4. Master Data
+      if (clearMasterData) {
+        // Clear relations first
+        await tx.assetStatusMaster.deleteMany();
+        await tx.inventoryTransaction.deleteMany();
+        await tx.inventoryItem.deleteMany();
+        
+        await tx.assetLocation.deleteMany();
+        await tx.company.deleteMany();
+        await tx.vendor.deleteMany();
+        await tx.deviceType.deleteMany();
+        
+        // Category relations
+        await tx.categoryType.deleteMany();
+        await tx.category.deleteMany();
+      }
+
+      // 5. Users
+      if (clearUsers) {
+        const currentUserId = req.user!.userId;
+        await tx.appUser.deleteMany({
+          where: { id: { not: currentUserId } }
+        });
+      }
+    });
+
+    res.json({ message: 'ล้างข้อมูลที่เลือกเรียบร้อยแล้ว' });
   } catch (err) { next(err); }
 });
 

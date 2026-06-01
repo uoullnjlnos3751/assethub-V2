@@ -12,7 +12,7 @@ RUN npm run build
 
 # Production stage
 FROM node:20-alpine AS production
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl postgresql-client
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --only=production

@@ -19,7 +19,7 @@ async function getSettings() {
 
 export async function createNotification(
   eventType: string,
-  channel: 'EMAIL' | 'TEAMS',
+  channel: 'EMAIL' | 'TEAMS' | 'LINE',
   recipient: string,
   payload: Record<string, any>
 ) {
@@ -33,6 +33,11 @@ export async function createNotification(
 
     if (channel === 'TEAMS' && settings?.enableTeams === false) {
       console.log(`Teams notifications disabled. Skipping: ${eventType} -> ${recipient}`);
+      return;
+    }
+
+    if (channel === 'LINE' && settings?.enableLine === false) {
+      console.log(`LINE notifications disabled. Skipping: ${eventType} -> ${recipient}`);
       return;
     }
 
@@ -75,10 +80,11 @@ export async function processNotificationQueue() {
     try {
       const emailDisabled = notif.channel === 'EMAIL' && settings?.enableEmail === false;
       const teamsDisabled = notif.channel === 'TEAMS' && settings?.enableTeams === false;
+      const lineDisabled = notif.channel === 'LINE' && settings?.enableLine === false;
       const eventDisabled = enabledKeys.length > 0 && !enabledKeys.includes(notif.eventType);
 
-      if (emailDisabled || teamsDisabled || eventDisabled) {
-        const reason = emailDisabled ? 'email notifications disabled' : teamsDisabled ? 'teams notifications disabled' : `event ${notif.eventType} not in enabledEventKeys`;
+      if (emailDisabled || teamsDisabled || lineDisabled || eventDisabled) {
+        const reason = emailDisabled ? 'email disabled' : teamsDisabled ? 'teams disabled' : lineDisabled ? 'line disabled' : `event ${notif.eventType} disabled`;
         await prisma.notificationOutbox.update({
           where: { id: notif.id },
           data: { status: 'FAILED', retryCount: notif.retryCount + 1, lastError: `Skipped: ${reason}` },
@@ -90,6 +96,8 @@ export async function processNotificationQueue() {
         await sendEmail(notif.recipient, notif.eventType, JSON.parse(notif.payloadJson));
       } else if (notif.channel === 'TEAMS') {
         await sendTeams(notif.eventType, JSON.parse(notif.payloadJson));
+      } else if (notif.channel === 'LINE') {
+        await sendLine(notif.eventType, JSON.parse(notif.payloadJson));
       }
       await prisma.notificationOutbox.update({
         where: { id: notif.id },
@@ -242,6 +250,77 @@ async function sendTeams(eventType: string, payload: Record<string, any>) {
     }, (res) => {
       if (res.statusCode === 200) resolve(undefined);
       else reject(new Error(`Teams webhook returned ${res.statusCode}`));
+    });
+    req.on('error', reject);
+    req.write(payloadJson);
+    req.end();
+  });
+}
+
+async function sendLine(eventType: string, payload: Record<string, any>) {
+  const settings = await getSettings();
+  const token = settings?.lineChannelAccessToken;
+  if (!token) return; // Ignore if no token
+
+  // We fallback to a generic message if no template is found, but preferably create one.
+  const template = await prisma.notificationTemplate.findFirst({
+    where: { key: eventType, channel: 'LINE' }, // Assuming LINE is added to channel enum or we fallback
+  });
+
+  let message = template?.bodyTh || `📢 **การแจ้งเตือนระบบ AssetHub**\nหัวข้อ: ${eventType}\n`;
+  if (!template) {
+    if (eventType === 'borrow_request_pending') {
+      message = `📝 มีคำขอยืมทรัพย์สินใหม่ (รออนุมัติ)\nผู้ขอ: ${payload.requester}\nแผนก: ${payload.department}\nใบเบิก: ${payload.requestNo}\nจำนวน: ${payload.itemsCount} รายการ`;
+    } else if (eventType === 'checkout_completed') {
+      message = `📦 มีการส่งมอบทรัพย์สิน\nใบเบิก: ${payload.requestNo}\nผู้ขอ: ${payload.requester}\nจำนวน: ${payload.itemsCount} รายการ`;
+    } else if (eventType === 'return_recorded') {
+      message = `🔄 มีการคืนทรัพย์สิน\nใบเบิก: ${payload.requestNo}\nผู้คืน: ${payload.requester}\nรหัสทรัพย์สิน: ${payload.assetCode}\nสภาพ: ${payload.condition}`;
+    } else {
+      message += `\nรายละเอียด: ${JSON.stringify(payload, null, 2)}`;
+    }
+  } else {
+    for (const [key, val] of Object.entries(payload)) {
+      message = message.replace(`{{${key}}}`, String(val));
+    }
+  }
+
+  const https = await import('https');
+  const sendMode = settings.lineSendMode || 'broadcast';
+  let endpoint = '/v2/bot/message/broadcast';
+  const body: any = {
+    messages: [
+      {
+        type: "text",
+        text: message
+      }
+    ]
+  };
+
+  if (sendMode === 'multicast' && settings.lineUserIds) {
+    endpoint = '/v2/bot/message/multicast';
+    body.to = settings.lineUserIds.split(',').map((id: string) => id.trim()).filter((id: string) => id.length > 0);
+  }
+
+  const payloadJson = JSON.stringify(body);
+
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: 'api.line.me',
+      path: endpoint,
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json', 
+        'Authorization': `Bearer ${token}`,
+        'Content-Length': Buffer.byteLength(payloadJson) 
+      },
+    }, (res) => {
+      // Consume response data to free up memory
+      let responseBody = '';
+      res.on('data', chunk => responseBody += chunk);
+      res.on('end', () => {
+        if (res.statusCode === 200) resolve(undefined);
+        else reject(new Error(`LINE API returned ${res.statusCode}: ${responseBody}`));
+      });
     });
     req.on('error', reject);
     req.write(payloadJson);

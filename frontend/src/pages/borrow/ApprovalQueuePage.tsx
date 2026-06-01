@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Box, Typography, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   Chip, CircularProgress, Alert, Card, CardContent, Grid, Divider, Table, TableBody,
-  TableCell, TableContainer, TableHead, TableRow, InputAdornment,
+  TableCell, TableContainer, TableHead, TableRow, InputAdornment, useMediaQuery, useTheme
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
@@ -42,6 +42,9 @@ export default function ApprovalQueuePage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const fetchData = async () => {
     setLoading(true);
@@ -170,83 +173,161 @@ export default function ApprovalQueuePage() {
         />
       </Box>
 
-      {/* Requests Table */}
-      <Card>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow sx={{ backgroundColor: 'rgba(37, 99, 235, 0.05)' }}>
-                <TableCell>เลขที่คำขอ</TableCell>
-                <TableCell>ผู้ขอ</TableCell>
-                <TableCell>แผนก</TableCell>
-                <TableCell>บริษัท</TableCell>
-                <TableCell>วัตถุประสงค์</TableCell>
-                <TableCell>จำนวนรายการ</TableCell>
-                <TableCell>วันที่ขอ</TableCell>
-                <TableCell align="right">การกระทำ</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredRequests.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
-                    <Typography color="text.secondary">
-                      {requests.length === 0 ? 'ไม่มีคำขอรอการอนุมัติ' : 'ไม่พบผลการค้นหา'}
+      {/* Requests List/Table */}
+      {isMobile ? (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {filteredRequests.length === 0 ? (
+            <Typography color="text.secondary" align="center" sx={{ py: 4 }}>
+              {requests.length === 0 ? 'ไม่มีคำขอรอการอนุมัติ' : 'ไม่พบผลการค้นหา'}
+            </Typography>
+          ) : (
+            filteredRequests.map((request) => (
+              <Card key={request.id} sx={{ borderRadius: 3, border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+                <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                    <Typography variant="body2" fontWeight={700} color="primary.main">
+                      {request.requestNo}
                     </Typography>
-                  </TableCell>
+                    <Typography variant="caption" color="text.secondary">
+                      {new Date(request.createdAt).toLocaleDateString('th-TH')}
+                    </Typography>
+                  </Box>
+                  
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mb: 2 }}>
+                    <Typography variant="body2">
+                      <strong>ผู้ขอ:</strong> {request.requester?.displayName || request.requester?.adUsername}
+                    </Typography>
+                    <Typography variant="body2">
+                      <strong>แผนก:</strong> {(request.requester as any)?.department || request.departmentId || '-'}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                      <strong>วัตถุประสงค์:</strong> {request.purpose}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      <strong>จำนวน:</strong> {request.items.length} รายการ
+                    </Typography>
+                  </Box>
+
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    <Button
+                      size="small"
+                      startIcon={<VisibilityIcon />}
+                      onClick={() => setDetailDialog({ open: true, request })}
+                      variant="outlined"
+                      sx={{ flex: 1, borderRadius: 2 }}
+                    >
+                      ดู
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      color="success"
+                      startIcon={<CheckCircleIcon />}
+                      onClick={() => {
+                        setDialog({ open: true, request, action: 'approve' });
+                        setNote('');
+                      }}
+                      sx={{ flex: 1, borderRadius: 2 }}
+                    >
+                      อนุมัติ
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="error"
+                      startIcon={<CancelIcon />}
+                      onClick={() => {
+                        setDialog({ open: true, request, action: 'reject' });
+                        setNote('');
+                      }}
+                      sx={{ flex: 1, borderRadius: 2 }}
+                    >
+                      ปฏิเสธ
+                    </Button>
+                  </Box>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </Box>
+      ) : (
+        <Card>
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow sx={{ backgroundColor: 'rgba(37, 99, 235, 0.05)' }}>
+                  <TableCell>เลขที่คำขอ</TableCell>
+                  <TableCell>ผู้ขอ</TableCell>
+                  <TableCell>แผนก</TableCell>
+                  <TableCell>บริษัท</TableCell>
+                  <TableCell>วัตถุประสงค์</TableCell>
+                  <TableCell>จำนวนรายการ</TableCell>
+                  <TableCell>วันที่ขอ</TableCell>
+                  <TableCell align="right">การกระทำ</TableCell>
                 </TableRow>
-              ) : (
-                filteredRequests.map((request) => (
-                  <TableRow key={request.id} hover>
-                    <TableCell sx={{ fontWeight: 600 }}>{request.requestNo}</TableCell>
-                    <TableCell>{request.requester?.displayName || request.requester?.adUsername}</TableCell>
-                    <TableCell>{(request.requester as any)?.department || request.departmentId || '-'}</TableCell>
-                    <TableCell>{(request.requester as any)?.company || '-'}</TableCell>
-                    <TableCell>{request.purpose}</TableCell>
-                    <TableCell>{request.items.length} รายการ</TableCell>
-                    <TableCell>{new Date(request.createdAt).toLocaleDateString('th-TH')}</TableCell>
-                    <TableCell align="right">
-                      <Button
-                        size="small"
-                        startIcon={<VisibilityIcon />}
-                        onClick={() => setDetailDialog({ open: true, request })}
-                        sx={{ mr: 0.5 }}
-                      >
-                        ดู
-                      </Button>
-                      <Button
-                        size="small"
-                        variant="contained"
-                        color="success"
-                        startIcon={<CheckCircleIcon />}
-                        onClick={() => {
-                          setDialog({ open: true, request, action: 'approve' });
-                          setNote('');
-                        }}
-                        sx={{ mr: 0.5 }}
-                      >
-                        อนุมัติ
-                      </Button>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        color="error"
-                        startIcon={<CancelIcon />}
-                        onClick={() => {
-                          setDialog({ open: true, request, action: 'reject' });
-                          setNote('');
-                        }}
-                      >
-                        ปฏิเสธ
-                      </Button>
+              </TableHead>
+              <TableBody>
+                {filteredRequests.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                      <Typography color="text.secondary">
+                        {requests.length === 0 ? 'ไม่มีคำขอรอการอนุมัติ' : 'ไม่พบผลการค้นหา'}
+                      </Typography>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Card>
+                ) : (
+                  filteredRequests.map((request) => (
+                    <TableRow key={request.id} hover>
+                      <TableCell sx={{ fontWeight: 600 }}>{request.requestNo}</TableCell>
+                      <TableCell>{request.requester?.displayName || request.requester?.adUsername}</TableCell>
+                      <TableCell>{(request.requester as any)?.department || request.departmentId || '-'}</TableCell>
+                      <TableCell>{(request.requester as any)?.company || '-'}</TableCell>
+                      <TableCell>{request.purpose}</TableCell>
+                      <TableCell>{request.items.length} รายการ</TableCell>
+                      <TableCell>{new Date(request.createdAt).toLocaleDateString('th-TH')}</TableCell>
+                      <TableCell align="right">
+                        <Button
+                          size="small"
+                          startIcon={<VisibilityIcon />}
+                          onClick={() => setDetailDialog({ open: true, request })}
+                          sx={{ mr: 0.5 }}
+                        >
+                          ดู
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          color="success"
+                          startIcon={<CheckCircleIcon />}
+                          onClick={() => {
+                            setDialog({ open: true, request, action: 'approve' });
+                            setNote('');
+                          }}
+                          sx={{ mr: 0.5 }}
+                        >
+                          อนุมัติ
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="error"
+                          startIcon={<CancelIcon />}
+                          onClick={() => {
+                            setDialog({ open: true, request, action: 'reject' });
+                            setNote('');
+                          }}
+                        >
+                          ปฏิเสธ
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Card>
+      )}
 
       {/* Detail Dialog */}
       <Dialog

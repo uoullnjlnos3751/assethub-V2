@@ -33,6 +33,7 @@ model AppUser {
   returns           Return[]
   donations         Donation[]
   maintenanceRecords MaintenanceRecord[]
+  notifications     AppNotification[]
 
   @@index([role, isActive])
   @@index([department])
@@ -637,6 +638,21 @@ model NotificationOutbox {
   @@map("notification_outbox")
 }
 
+model AppNotification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  type      String   @default("SYSTEM")
+  link      String?
+  createdAt DateTime @default(now())
+  user      AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId, isRead])
+  @@map("app_notifications")
+}
+
 model NotificationSetting {
   id               Int     @id @default(autoincrement())
 
@@ -857,6 +873,7 @@ enum ReturnCondition {
 enum NotificationChannel {
   EMAIL
   TEAMS
+  LINE
 }
 
 enum NotificationStatus {

@@ -28,6 +28,7 @@ services:
       NODE_ENV: production
     volumes:
       - uploads_data:/app/uploads
+      - backups_data:/app/backups
     depends_on:
       postgres:
         condition: service_healthy
@@ -50,6 +51,7 @@ services:
 volumes:
   pgdata:
   uploads_data:
+  backups_data:
   backend_node:
     external: true
   frontend_node:
