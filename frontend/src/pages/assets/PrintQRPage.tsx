@@ -255,14 +255,25 @@ function Sticker({ asset, settings, size }: { asset: any; settings: Settings; si
   const name = [asset.brand, asset.model].filter(Boolean).join(' ') || asset.assetName || '—';
   const isDark = settings.labelStyle === 'dark';
   const isMinimal = settings.labelStyle === 'minimal';
+  const isLarge = settings.sticker === 'L';
 
-  const px = size === 'print' ? {
-    root: { width: '38mm', height: '19mm', fontSize: '7px' },
-    qr: 42,
-  } : {
-    root: { width: '160px', height: '80px', fontSize: '7.5px' },
-    qr: 54,
-  };
+  const px = size === 'print' ? (
+    isLarge ? {
+      root: { width: '60mm', height: '30mm', fontSize: '9px' },
+      qr: 68,
+    } : {
+      root: { width: '50mm', height: '19mm', fontSize: '7px' },
+      qr: 42,
+    }
+  ) : (
+    isLarge ? {
+      root: { width: '240px', height: '120px', fontSize: '9.5px' },
+      qr: 80,
+    } : {
+      root: { width: '160px', height: '80px', fontSize: '7.5px' },
+      qr: 54,
+    }
+  );
 
   // Resolve extra fields for this asset
   const extraFieldDefs = (settings.extraFields || []).map(k => AVAILABLE_FIELDS.find(f => f.key === k)).filter(Boolean) as FieldDef[];
@@ -289,45 +300,45 @@ function Sticker({ asset, settings, size }: { asset: any; settings: Settings; si
       <div style={{
         background: isDark ? '#0f172a' : '#0ea5e9',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '1.5px 5px', flexShrink: 0,
+        padding: isLarge ? '3px 8px' : '1.5px 5px', flexShrink: 0,
       }}>
-        <span style={{ fontSize: '7px', fontWeight: 900, color: isDark ? '#38bdf8' : '#fff', letterSpacing: '0.05em' }}>IT</span>
-        <span style={{ fontSize: '6px', color: isDark ? '#94a3b8' : 'rgba(255,255,255,.85)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '90px' }}>
+        <span style={{ fontSize: isLarge ? '9.5px' : '7px', fontWeight: 900, color: isDark ? '#38bdf8' : '#fff', letterSpacing: '0.05em' }}>IT</span>
+        <span style={{ fontSize: isLarge ? '8px' : '6px', color: isDark ? '#94a3b8' : 'rgba(255,255,255,.85)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: isLarge ? '150px' : '90px' }}>
           {asset.company || 'TRR Group'}
         </span>
         {!isMinimal && (
-          <span style={{ fontSize: '5.5px', padding: '0.5px 4px', borderRadius: '99px', background: isDark ? '#1e40af' : 'rgba(255,255,255,.25)', color: isDark ? '#93c5fd' : '#fff', fontWeight: 700 }}>
+          <span style={{ fontSize: isLarge ? '7.5px' : '5.5px', padding: isLarge ? '1px 6px' : '0.5px 4px', borderRadius: '99px', background: isDark ? '#1e40af' : 'rgba(255,255,255,.25)', color: isDark ? '#93c5fd' : '#fff', fontWeight: 700 }}>
             IT
           </span>
         )}
       </div>
 
       {/* Body */}
-      <div style={{ display: 'flex', flex: 1, padding: '3px 4px', gap: '4px', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', flex: 1, padding: isLarge ? '6px 8px' : '3px 4px', gap: isLarge ? '8px' : '4px', overflow: 'hidden' }}>
         {/* QR */}
         <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <QRCode value={qrVal} size={px.qr} level="M" fgColor={isDark ? '#e2e8f0' : '#000'} bgColor={isDark ? '#1e293b' : '#fff'} />
         </div>
         {/* Info */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '1.5px', overflow: 'hidden', minWidth: 0 }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: isLarge ? '3px' : '1.5px', overflow: 'hidden', minWidth: 0 }}>
           {/* ── Default fields ── */}
           {settings.showCode && (
-            <div style={{ fontFamily: 'Courier New, monospace', fontSize: '8.5px', fontWeight: 900, color: codeColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <div style={{ fontFamily: 'Courier New, monospace', fontSize: isLarge ? '11px' : '8.5px', fontWeight: 900, color: codeColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {asset.assetCode || '—'}
             </div>
           )}
           {settings.showName && (
-            <div style={{ fontSize: '7px', color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <div style={{ fontSize: isLarge ? '9px' : '7px', color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {name.length > 24 ? name.slice(0, 23) + '…' : name}
             </div>
           )}
           {settings.showOwner && asset.ownerName && (
-            <div style={{ fontSize: '6px', color: dimColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <div style={{ fontSize: isLarge ? '8px' : '6px', color: dimColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {asset.ownerName}
             </div>
           )}
           {settings.showDept && asset.departmentId && (
-            <div style={{ fontSize: '6px', color: dimColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <div style={{ fontSize: isLarge ? '8px' : '6px', color: dimColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               🏢 {asset.departmentId}
             </div>
           )}
@@ -336,7 +347,7 @@ function Sticker({ asset, settings, size }: { asset: any; settings: Settings; si
             const val = f.getter(asset);
             if (!val) return null;
             return (
-              <div key={f.key} style={{ fontSize: '6px', color: dimColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', gap: '2px' }}>
+              <div key={f.key} style={{ fontSize: isLarge ? '8px' : '6px', color: dimColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', gap: '2px' }}>
                 <span style={{ color: isDark ? '#64748b' : '#9ca3af', flexShrink: 0 }}>{f.label}:</span>
                 <span>{String(val).length > 18 ? String(val).slice(0, 17) + '…' : val}</span>
               </div>
@@ -350,10 +361,10 @@ function Sticker({ asset, settings, size }: { asset: any; settings: Settings; si
         background: isDark ? '#0f172a' : '#f8fafc',
         borderTop: isDark ? '0.5px solid #334155' : '0.5px solid #e5e7eb',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '1px 5px', flexShrink: 0,
+        padding: isLarge ? '3px 8px' : '1px 5px', flexShrink: 0,
       }}>
-        <span style={{ fontSize: '5.5px', color: isDark ? '#475569' : '#9ca3af' }}>IT Asset Mgmt</span>
-        <span style={{ fontSize: '5.5px', color: isDark ? '#475569' : '#9ca3af' }}>
+        <span style={{ fontSize: isLarge ? '7.5px' : '5.5px', color: isDark ? '#475569' : '#9ca3af' }}>IT Asset Mgmt</span>
+        <span style={{ fontSize: isLarge ? '7.5px' : '5.5px', color: isDark ? '#475569' : '#9ca3af' }}>
           {settings.showStatus ? (asset.status || '') : ''}
         </span>
       </div>
@@ -416,6 +427,8 @@ export default function PrintQRPage() {
   const [loadingAssets, setLoadingAssets] = useState(false);
   const [assetPage, setAssetPage] = useState(1);
   const [assetTotal, setAssetTotal] = useState(0);
+  const [deviceTypes, setDeviceTypes] = useState<any[]>([]);
+  const [selectedType, setSelectedType] = useState<string>('');
   const PAGE_SIZE = 30;
 
   // Settings
@@ -426,9 +439,11 @@ export default function PrintQRPage() {
   const sheetsNeeded = Math.ceil(selectedAssets.length / (settings.cols * (settings.paper === 'A4' ? 3 : 2)));
 
   /* Load assets */
-  const loadAssets = useCallback((search: string, page: number) => {
+  const loadAssets = useCallback((search: string, type: string, page: number) => {
     setLoadingAssets(true);
-    assetAPI.list({ search, limit: PAGE_SIZE, page })
+    const params: any = { search, limit: PAGE_SIZE, page };
+    if (type) params.type = type;
+    assetAPI.list(params)
       .then(res => {
         const items = res.data?.data || res.data?.items || [];
         const total = res.data?.total || res.data?.count || 0;
@@ -439,7 +454,12 @@ export default function PrintQRPage() {
       .finally(() => setLoadingAssets(false));
   }, []);
 
-  useEffect(() => { loadAssets('', 1); }, [loadAssets]);
+  useEffect(() => {
+    assetAPI.deviceTypes()
+      .then(res => setDeviceTypes(res.data || []))
+      .catch(() => {});
+    loadAssets('', '', 1);
+  }, [loadAssets]);
 
   // Pre-select from query params
   useEffect(() => {
@@ -455,7 +475,13 @@ export default function PrintQRPage() {
     setAssetSearch(val);
     setAssetPage(1);
     clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => loadAssets(val, 1), 400);
+    debounceRef.current = setTimeout(() => loadAssets(val, selectedType, 1), 400);
+  };
+
+  const handleTypeChange = (type: string) => {
+    setSelectedType(type);
+    setAssetPage(1);
+    loadAssets(assetSearch, type, 1);
   };
 
   const toggleSelect = (id: number) => {
@@ -594,6 +620,8 @@ export default function PrintQRPage() {
         .load-more { text-align: center; padding: 8px; font-size: 11px; color: #0ea5e9; cursor: pointer; border-top: 1px solid #f1f5f9; }
         .load-more:hover { background: #f0f9ff; }
 
+        .print-only-grid { display: none !important; }
+
         /* ─ PRINT ─ */
         @media print {
           /* ① Force color output */
@@ -608,6 +636,10 @@ export default function PrintQRPage() {
 
           /* ④ Place the zone at top-left filling the page */
           #print-zone {
+            visibility: visible !important;
+            display: grid !important;
+            grid-template-columns: repeat(${gridCols}, 1fr) !important;
+            gap: 4mm !important;
             position: fixed !important;
             top: 0 !important;
             left: 0 !important;
@@ -615,8 +647,6 @@ export default function PrintQRPage() {
             background: #fff !important;
             padding: 8mm !important;
             box-sizing: border-box !important;
-            display: grid !important;
-            gap: 4mm !important;
           }
 
           @page { size: A4 portrait; margin: 0; }
@@ -684,6 +714,23 @@ export default function PrintQRPage() {
             <div className="pqr-section">
               <div className="pqr-section-title">📦 เลือกรายการอุปกรณ์</div>
 
+              {/* เลือกตามประเภทอุปกรณ์ */}
+              <div style={{ marginBottom: '8px' }}>
+                <select
+                  className="pqr-select"
+                  value={selectedType}
+                  onChange={e => handleTypeChange(e.target.value)}
+                  style={{ fontWeight: 600, borderColor: '#cbd5e1' }}
+                >
+                  <option value="">📁 ทุกประเภทอุปกรณ์ (All Types)</option>
+                  {deviceTypes.map(t => (
+                    <option key={t.id} value={t.name}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <input
                 className="asset-search"
                 placeholder="🔍 ค้นหาจากรหัส, ชื่อ, S/N..."
@@ -735,7 +782,7 @@ export default function PrintQRPage() {
                         onClick={() => {
                           const next = assetPage + 1;
                           setAssetPage(next);
-                          loadAssets(assetSearch, next);
+                          loadAssets(assetSearch, selectedType, next);
                         }}
                       >
                         {loadingAssets ? 'กำลังโหลด...' : `โหลดเพิ่ม (${assetTotal - allAssets.length} รายการ)`}
@@ -927,15 +974,27 @@ export default function PrintQRPage() {
                     <div style={{ fontSize: '11px', color: '#94a3b8' }}>เลือกอุปกรณ์จากแผงด้านซ้ายเพื่อดูตัวอย่าง</div>
                   </div>
                 ) : (
-                  <div
-                    id="print-zone"
-                    className="sticker-grid-preview"
-                    style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }}
-                  >
-                    {selectedAssets.map(asset => (
-                      <Sticker key={asset.id} asset={asset} settings={settings} size="preview" />
-                    ))}
-                  </div>
+                  <>
+                    {/* Screen-only Preview grid */}
+                    <div
+                      className="sticker-grid-preview"
+                      style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }}
+                    >
+                      {selectedAssets.map(asset => (
+                        <Sticker key={`prev-${asset.id}`} asset={asset} settings={settings} size="preview" />
+                      ))}
+                    </div>
+
+                    {/* Hidden print-only grid (uses exact mm sizes) */}
+                    <div
+                      id="print-zone"
+                      className="print-only-grid"
+                    >
+                      {selectedAssets.map(asset => (
+                        <Sticker key={`print-${asset.id}`} asset={asset} settings={settings} size="print" />
+                      ))}
+                    </div>
+                  </>
                 )}
               </div>
             </div>
