@@ -16,7 +16,25 @@ interface Request {
   requestNo: string;
   requester: { displayName: string; adUsername: string };
   purpose: string;
-  items: Array<{ id: number; quantity: number; isQuantityBased: boolean; asset?: { assetCode: string; brand: string; model: string }; inventoryItem?: { id: number; name: string; unit: string } }>;
+  items: Array<{ 
+    id: number; 
+    quantity: number; 
+    isQuantityBased: boolean; 
+    asset?: { 
+      id: number;
+      assetCode: string | null; 
+      assetName: string | null;
+      serialNo: string | null;
+      brand: string | null; 
+      model: string | null; 
+      type: string | null;
+    }; 
+    inventoryItem?: { 
+      id: number; 
+      name: string; 
+      unit: string;
+    } 
+  }>;
   createdAt: string;
 }
 
@@ -192,7 +210,12 @@ export default function CheckoutPage() {
                     <TableCell sx={{ fontWeight: 600 }}>{request.requestNo}</TableCell>
                     <TableCell>{request.requester?.displayName || request.requester?.adUsername}</TableCell>
                     <TableCell>{request.purpose}</TableCell>
-                    <TableCell>{request.items.length} รายการ</TableCell>
+                    <TableCell>
+                      <Typography variant="body2" fontWeight={600}>{request.items.length} รายการ</Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', maxWidth: 220, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={request.items.map(item => item.isQuantityBased ? item.inventoryItem?.name : `${item.asset?.brand || ''} ${item.asset?.model || ''}`.trim()).filter(Boolean).join(', ')}>
+                        {request.items.map(item => item.isQuantityBased ? item.inventoryItem?.name : `${item.asset?.brand || ''} ${item.asset?.model || ''}`.trim()).filter(Boolean).join(', ')}
+                      </Typography>
+                    </TableCell>
                     <TableCell>{new Date(request.createdAt).toLocaleDateString('th-TH')}</TableCell>
                     <TableCell align="right">
                       <Button
@@ -261,26 +284,79 @@ export default function CheckoutPage() {
                 <Box
                   key={item.id}
                   sx={{
-                    p: 1,
-                    mb: 1,
-                    backgroundColor: 'rgba(37, 99, 235, 0.05)',
-                    borderRadius: 1,
+                    p: 2,
+                    mb: 1.5,
+                    background: 'rgba(255, 255, 255, 0.9)',
+                    border: '1px solid rgba(226, 232, 240, 0.8)',
+                    borderRadius: '12px',
+                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)',
+                    transition: 'transform 0.2s, box-shadow 0.2s',
+                    '&:hover': {
+                      transform: 'translateY(-1px)',
+                      boxShadow: '0 4px 12px rgba(0, 113, 227, 0.05)'
+                    }
                   }}
                 >
                   {item.isQuantityBased && item.inventoryItem ? (
-                    <>
-                      <Typography fontWeight={600}>{item.inventoryItem.name}</Typography>
+                    <Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                        <Typography variant="body2" fontWeight={700} color="text.primary">
+                          {item.inventoryItem.name}
+                        </Typography>
+                        <Chip 
+                          label="วัสดุสิ้นเปลือง" 
+                          size="small" 
+                          sx={{ 
+                            height: 18, 
+                            fontSize: '0.65rem', 
+                            fontWeight: 600, 
+                            bgcolor: 'rgba(234, 88, 12, 0.08)', 
+                            color: 'rgb(234, 88, 12)', 
+                            border: '1px solid rgba(234, 88, 12, 0.15)' 
+                          }} 
+                        />
+                      </Box>
                       <Typography variant="caption" color="text.secondary">
-                        จำนวน: {item.quantity} {item.inventoryItem.unit}
+                        จำนวนที่ขอ: <strong>{item.quantity} {item.inventoryItem.unit}</strong>
                       </Typography>
-                    </>
+                    </Box>
                   ) : (
-                    <>
-                      <Typography fontWeight={600}>{item.asset?.assetCode}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {item.asset?.brand} {item.asset?.model}
-                      </Typography>
-                    </>
+                    <Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                        <Typography variant="body2" fontWeight={700} color="primary.main" sx={{ fontSize: '0.85rem' }}>
+                          {item.asset?.assetCode || item.asset?.assetName || 'ไม่มีรหัสทรัพย์สิน'}
+                        </Typography>
+                        {item.asset?.type && (
+                          <Chip 
+                            label={item.asset.type} 
+                            size="small" 
+                            sx={{ 
+                              height: 18, 
+                              fontSize: '0.65rem', 
+                              fontWeight: 600, 
+                              bgcolor: 'rgba(0, 113, 227, 0.06)', 
+                              color: '#0071e3', 
+                              border: '1px solid rgba(0, 113, 227, 0.12)' 
+                            }} 
+                          />
+                        )}
+                      </Box>
+                      
+                      <Grid container spacing={1}>
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant="caption" color="text.secondary" display="block">ยี่ห้อ / รุ่น</Typography>
+                          <Typography variant="body2" fontWeight={600} color="text.primary">
+                            {item.asset?.brand || '—'} {item.asset?.model || '—'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant="caption" color="text.secondary" display="block">หมายเลขซีเรียล (S/N)</Typography>
+                          <Typography variant="body2" fontWeight={600} color="text.primary" sx={{ fontFamily: 'monospace', letterSpacing: '0.02em' }}>
+                            {item.asset?.serialNo || '—'}
+                          </Typography>
+                        </Grid>
+                      </Grid>
+                    </Box>
                   )}
                 </Box>
               ))}
@@ -298,9 +374,105 @@ export default function CheckoutPage() {
         <DialogContent dividers>
           {dialog.request && (
             <Box sx={{ pt: 1 }}>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                คำขอ: <strong>{dialog.request.requestNo}</strong> | ผู้ขอ: <strong>{dialog.request.requester?.displayName}</strong>
-              </Typography>
+              <Box sx={{ p: 2, mb: 3, backgroundColor: 'rgba(0, 113, 227, 0.03)', border: '1px solid rgba(0, 113, 227, 0.1)', borderRadius: '10px' }}>
+                <Typography variant="subtitle2" color="primary.main" fontWeight={700} sx={{ mb: 1.5, fontSize: '0.85rem' }}>
+                  📄 รายละเอียดคำขอยืม {dialog.request.requestNo}
+                </Typography>
+                
+                <Grid container spacing={1.5} sx={{ mb: 1.5 }}>
+                  <Grid item xs={6}>
+                    <Typography variant="caption" color="text.secondary" display="block">ผู้ขอ</Typography>
+                    <Typography variant="body2" fontWeight={600}>{dialog.request.requester?.displayName || dialog.request.requester?.adUsername}</Typography>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography variant="caption" color="text.secondary" display="block">วันที่ขอ</Typography>
+                    <Typography variant="body2" fontWeight={600}>{new Date(dialog.request.createdAt).toLocaleDateString('th-TH')}</Typography>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Typography variant="caption" color="text.secondary" display="block">วัตถุประสงค์</Typography>
+                    <Typography variant="body2">{dialog.request.purpose || '—'}</Typography>
+                  </Grid>
+                </Grid>
+
+                <Divider sx={{ my: 1.5, borderColor: 'rgba(0, 113, 227, 0.08)' }} />
+
+                <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>รายการที่ต้องส่งมอบ</Typography>
+                {dialog.request.items.map((item) => (
+                  <Box
+                    key={item.id}
+                    sx={{
+                      p: 2,
+                      mb: 1.5,
+                      background: 'rgba(255, 255, 255, 0.9)',
+                      border: '1px solid rgba(226, 232, 240, 0.8)',
+                      borderRadius: '12px',
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)'
+                    }}
+                  >
+                    {item.isQuantityBased && item.inventoryItem ? (
+                      <Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                          <Typography variant="body2" fontWeight={700} color="text.primary">
+                            {item.inventoryItem.name}
+                          </Typography>
+                          <Chip 
+                            label="วัสดุสิ้นเปลือง" 
+                            size="small" 
+                            sx={{ 
+                              height: 18, 
+                              fontSize: '0.65rem', 
+                              fontWeight: 600, 
+                              bgcolor: 'rgba(234, 88, 12, 0.08)', 
+                              color: 'rgb(234, 88, 12)', 
+                              border: '1px solid rgba(234, 88, 12, 0.15)' 
+                            }} 
+                          />
+                        </Box>
+                        <Typography variant="caption" color="text.secondary">
+                          จำนวน: <strong>{item.quantity} {item.inventoryItem.unit}</strong>
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                          <Typography variant="body2" fontWeight={700} color="primary.main" sx={{ fontSize: '0.85rem' }}>
+                            {item.asset?.assetCode || item.asset?.assetName || 'ไม่มีรหัสทรัพย์สิน'}
+                          </Typography>
+                          {item.asset?.type && (
+                            <Chip 
+                              label={item.asset.type} 
+                              size="small" 
+                              sx={{ 
+                                height: 18, 
+                                fontSize: '0.65rem', 
+                                fontWeight: 600, 
+                                bgcolor: 'rgba(0, 113, 227, 0.06)', 
+                                color: '#0071e3', 
+                                border: '1px solid rgba(0, 113, 227, 0.12)' 
+                              }} 
+                            />
+                          )}
+                        </Box>
+                        
+                        <Grid container spacing={1}>
+                          <Grid item xs={12} sm={6}>
+                            <Typography variant="caption" color="text.secondary" display="block">ยี่ห้อ / รุ่น</Typography>
+                            <Typography variant="body2" fontWeight={600} color="text.primary">
+                              {item.asset?.brand || '—'} {item.asset?.model || '—'}
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <Typography variant="caption" color="text.secondary" display="block">หมายเลขซีเรียล (S/N)</Typography>
+                            <Typography variant="body2" fontWeight={600} color="text.primary" sx={{ fontFamily: 'monospace', letterSpacing: '0.02em' }}>
+                              {item.asset?.serialNo || '—'}
+                            </Typography>
+                          </Grid>
+                        </Grid>
+                      </Box>
+                    )}
+                  </Box>
+                ))}
+              </Box>
 
               <TextField
                 label="ชื่อผู้รับมอบ *"

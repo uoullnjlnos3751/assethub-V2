@@ -86,6 +86,10 @@ export const assetAPI = {
     window.open(`/api/assets/${assetId}/documents/${docId}/download`, '_blank');
   },
   deleteDocument: (assetId: number, docId: number) => api.delete(`/assets/${assetId}/documents/${docId}`),
+  getGLPISpec: (id: number) => api.get(`/assets/${id}/glpi-spec`),
+  queryGLPISpec: (serial: string) => api.get(`/assets/glpi-spec`, { params: { serial } }),
+  syncGLPI: (id: number, field?: string) => api.post(`/assets/${id}/glpi-sync`, { field }),
+  getAssetHistory: (id: number, params?: any) => api.get(`/assets/${id}/history`, { params }),
   searchOwners: (q: string) => api.get('/assets/owners/search-ad', { params: { q } }),
   typeOptions: () => api.get('/assets/options/types'),
   locationOptions: () => api.get('/assets/options/locations'),
@@ -159,6 +163,14 @@ export const pmAPI = {
   runs: (params?: any) => api.get('/pm/runs', { params }),
   performRun: (runId: number, data: any) => api.post(`/pm/runs/${runId}/perform`, data),
   dashboard: (params?: any) => api.get('/pm/dashboard', { params }),
+  uploadPMPhoto: (runId: number, formData: FormData) => {
+    const token = localStorage.getItem('token');
+    return axios.post(`/api/pm/runs/${runId}/upload`, formData, {
+      headers: { Authorization: token ? `Bearer ${token}` : undefined },
+    });
+  },
+  bulkPerformRun: (data: { runIds: number[]; answers: any[] }) => api.post('/pm/runs/bulk-perform', data),
+  getGLPISpec: (runId: number) => api.get(`/pm/runs/${runId}/glpi-spec`),
 };
 
 // Admin
@@ -184,6 +196,7 @@ export const adminAPI = {
   notificationTemplates: () => api.get('/admin/notification-templates'),
   updateNotificationTemplate: (id: number, data: any) => api.put(`/admin/notification-templates/${id}`, data),
   resetNotificationTemplate: (id: number) => api.post(`/admin/notification-templates/${id}/reset`),
+  testNotificationTemplate: (id: number, to: string) => api.post(`/admin/notification-templates/${id}/test`, { to }),
   notificationLogs: (params?: any) => api.get('/admin/notification-logs', { params }),
   forceLogoutAll: () => api.post('/admin/force-logout-all'),
   backup: () => api.get('/admin/backup', { responseType: 'blob' }),
@@ -196,6 +209,15 @@ export const adminAPI = {
   },
   clearAllAssets: () => api.post('/admin/clear-all-assets'),
   advancedClearData: (options: { clearAssets: boolean; clearBorrow: boolean; clearDonations: boolean; clearMasterData: boolean; clearUsers: boolean }) => api.post('/admin/advanced-clear-data', options),
+};
+
+// Department Management
+export const departmentAPI = {
+  list: (params?: any) => api.get('/departments', { params }),
+  get: (id: number) => api.get(`/departments/${id}`),
+  create: (data: any) => api.post('/departments', data),
+  update: (id: number, data: any) => api.put(`/departments/${id}`, data),
+  delete: (id: number) => api.delete(`/departments/${id}`),
 };
 
 // Dashboard

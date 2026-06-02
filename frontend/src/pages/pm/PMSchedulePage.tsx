@@ -213,43 +213,31 @@ export default function PMSchedulePage() {
     const covers = startVal <= w.end && endVal >= w.start;
     if (!covers) return <td key={w.label} className="gantt-cell-empty"></td>;
 
-    // Check if start/end of the plan is within this week to set border-radius
-    const isStart = startVal >= w.start && startVal <= w.end;
-    const isEnd = endVal >= w.start && endVal <= w.end;
-
     let barClass = 'gantt-bar-block';
-    let statusIcon = '📅';
 
     if (pct >= 100) {
       barClass += isHeaderRow ? ' gantt-bar-done-light' : ' gantt-bar-done';
-      statusIcon = '✓';
     } else if (pct > 0) {
       barClass += isHeaderRow ? ' gantt-bar-pending-light' : ' gantt-bar-pending';
-      statusIcon = '⏳';
     } else {
       barClass += isHeaderRow ? ' gantt-bar-scheduled-light' : ' gantt-bar-scheduled';
-      statusIcon = '📅';
     }
 
     const radiusStyle: React.CSSProperties = {
-      borderTopLeftRadius: isStart ? '6px' : '0px',
-      borderBottomLeftRadius: isStart ? '6px' : '0px',
-      borderTopRightRadius: isEnd ? '6px' : '0px',
-      borderBottomRightRadius: isEnd ? '6px' : '0px',
-      marginLeft: isStart ? '4px' : '0px',
-      marginRight: isEnd ? '4px' : '0px',
-      opacity: isHeaderRow ? 0.75 : 1
+      borderRadius: '6px',
+      opacity: isHeaderRow ? 0.75 : 1,
+      height: '10px',
+      margin: '0 auto',
+      width: '90%',
     };
 
     return (
       <td 
         key={w.label} 
-        style={{ padding: '6px 0px', borderLeft: isStart ? '1px solid #cbd5e1' : 'none', borderRight: isEnd ? '1px solid #cbd5e1' : 'none' }}
+        style={{ padding: '8px 0px', verticalAlign: 'middle', position: 'relative' }}
         title={`${plan.deptTask || plan.site || 'แผนงาน'}: ${pct}% (${fmtDate(plan.startDate)} - ${fmtDate(plan.endDate)})`}
       >
-        <div className={barClass} style={radiusStyle}>
-          {isStart || isEnd || pct >= 100 ? statusIcon : ''}
-        </div>
+        <div className={barClass} style={radiusStyle} />
       </td>
     );
   };
@@ -392,55 +380,54 @@ export default function PMSchedulePage() {
   return (
     <>
       <style>{`
-        .pms-root { font-family: 'Sarabun', sans-serif; color: #0f172a; }
-        .pms-card { background: #fff; border: 1px solid #cbd5e1; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.05); margin-bottom: 16px; }
-        .pms-header { padding: 14px 18px; border-bottom: 1px solid #cbd5e1; display: flex; align-items: center; gap: 10px; background: linear-gradient(135deg, #f8fafc 0%, #fff 100%); }
-        .pms-input { width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 10px; font-size: 12px; font-family: 'Sarabun', sans-serif; outline: none; background: #fff; box-sizing: border-box; }
-        .pms-input:focus { border-color: #16a34a; box-shadow: 0 0 0 3px rgba(22, 163, 74, .1); }
-        .pms-select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px; cursor: pointer; }
-        .pms-label { font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 4px; display: block; }
+        .pms-root { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1d1d1f; }
+        .pms-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.02); margin-bottom: 20px; }
+        .pms-header { padding: 16px 20px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; gap: 10px; background: #ffffff; }
+        .pms-input { width: 100%; border: 1px solid #d2d2d7; border-radius: 8px; padding: 10px 12px; font-size: 13px; font-family: inherit; outline: none; background: #f5f5f7; box-sizing: border-box; transition: all 0.15s ease; color: #1d1d1f; }
+        .pms-input:focus { border-color: #0071e3; background: #ffffff; box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.15); }
+        .pms-select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2386868b' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; cursor: pointer; }
+        .pms-label { font-size: 11px; font-weight: 500; color: #86868b; margin-bottom: 6px; display: block; text-transform: uppercase; letter-spacing: 0.05em; }
         
-        .pms-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 16px; }
-        .pms-stat-card { background: #fff; border: 1px solid #cbd5e1; border-radius: 12px; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
-        .pms-stat-icon { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
-        .pms-toast { position: fixed; bottom: 24px; right: 24px; background: #0f172a; color: #fff; padding: 12px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,.15); z-index: 9999; animation: slideIn 0.2s ease-out; }
+        .pms-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px; }
+        .pms-stat-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 18px 22px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 20px rgba(0,0,0,0.02); border-left-width: 4px !important; }
+        .pms-stat-icon { width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+        .pms-toast { position: fixed; bottom: 24px; right: 24px; background: #1d1d1f; color: #fff; padding: 12px 20px; border-radius: 8px; font-size: 13px; font-weight: 500; box-shadow: 0 8px 24px rgba(0,0,0,0.15); z-index: 9999; animation: slideIn 0.2s ease-out; }
 
-        /* Excel Planner Table Styles */
-        .gantt-table { border-collapse: collapse; font-size: 11px; width: 100%; border: 2px solid #cbd5e1; }
-        .gantt-table th, .gantt-table td { border: 1px solid #cbd5e1; padding: 8px 12px; white-space: nowrap; vertical-align: middle; }
-        .gantt-table thead th { background: #1e293b; font-weight: 700; color: #ffffff; text-align: center; font-size: 11px; }
+        /* Modern Gantt Table */
+        .gantt-table { border-collapse: collapse; font-size: 12px; width: 100%; border: 1px solid #e5e7eb; background: #ffffff; }
+        .gantt-table th, .gantt-table td { border: 1px solid #f3f4f6; padding: 12px 14px; white-space: nowrap; vertical-align: middle; }
+        .gantt-table thead th { background: #f5f5f7; font-weight: 600; color: #1d1d1f; text-align: center; font-size: 11px; border-bottom: 2px solid #e5e7eb; }
         
-        .gantt-progress-wrap { background: #e2e8f0; border-radius: 99px; height: 7px; overflow: hidden; width: 70px; display: inline-block; }
+        .gantt-progress-wrap { background: #e5e7eb; border-radius: 99px; height: 6px; overflow: hidden; width: 60px; display: inline-block; }
         .gantt-progress-bar { height: 100%; border-radius: 99px; transition: width .3s; }
         
-        /* Gantt Blocks */
-        .gantt-bar-block { height: 20px; display: flex; align-items: center; justify-content: center; color: #ffffff; font-weight: bold; font-size: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: all 0.2s; }
-        .gantt-bar-block:hover { transform: scaleY(1.1); filter: brightness(1.05); cursor: pointer; }
+        /* Gantt Bars - Modern Rounded Pill */
+        .gantt-bar-block { height: 10px; border-radius: 5px; box-shadow: none; transition: all 0.2s ease; }
+        .gantt-bar-block:hover { transform: scaleY(1.3); cursor: pointer; }
         
-        .gantt-bar-done { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
-        .gantt-bar-pending { background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); }
-        .gantt-bar-scheduled { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+        .gantt-bar-done { background: #34c759; } /* Emerald */
+        .gantt-bar-pending { background: #0071e3; } /* Apple Blue */
+        .gantt-bar-scheduled { background: #ff9500; } /* Apple Orange */
         
-        .gantt-bar-done-light { background: linear-gradient(135deg, #a7f3d0 0%, #6ee7b7 100%); color: #065f46; }
-        .gantt-bar-pending-light { background: linear-gradient(135deg, #bae6fd 0%, #7dd3fc 100%); color: #075985; }
-        .gantt-bar-scheduled-light { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); color: #92400e; }
+        .gantt-bar-done-light { background: rgba(52, 199, 89, 0.2); }
+        .gantt-bar-pending-light { background: rgba(0, 113, 227, 0.2); }
+        .gantt-bar-scheduled-light { background: rgba(255, 149, 0, 0.2); }
 
         .gantt-cell-empty { background: transparent; }
         
-        /* Hierarchical Rows styling */
-        .gantt-site-row { background: #f0fdf4 !important; font-weight: 700; color: #15803d; border-bottom: 2px solid #cbd5e1; cursor: pointer; }
-        .gantt-site-row:hover { background: #dcfce7 !important; }
-        .gantt-dept-row { background: #ffffff; }
-        .gantt-dept-row:hover { background: #f8fafc; }
+        /* WBS Rows styling */
+        .gantt-site-row { background: #f5f5f7 !important; font-weight: 600; color: #1d1d1f; border-bottom: 1px solid #e5e7eb; cursor: pointer; transition: background 0.15s; }
+        .gantt-site-row:hover { background: #e8e8ed !important; }
+        .gantt-dept-row { background: #ffffff; transition: background 0.15s; }
+        .gantt-dept-row:hover { background: #f5f5f7; }
         
-        .pms-btn { display: inline-flex; align-items: center; gap: 5px; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'Sarabun', sans-serif; transition: all .15s; border: 1px solid transparent; white-space: nowrap; }
-        .pms-btn-outline { background: #fff; border-color: #cbd5e1; color: #475569; }
-        .pms-btn-outline:hover { border-color: #16a34a; color: #16a34a; }
+        .pms-btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; border-radius: 8px; font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit; transition: all .15s; border: 1px solid transparent; white-space: nowrap; }
+        .pms-btn-outline { background: #fff; border-color: #d2d2d7; color: #1d1d1f; }
+        .pms-btn-outline:hover { background-color: #f5f5f7; border-color: #86868b; }
         
-        .gantt-row-interactive { cursor: pointer; transition: background .15s; }
-        .gantt-row-interactive:hover { background: #f8fafc !important; }
+        .gantt-row-interactive { cursor: pointer; }
 
-        .collapsible-icon { display: inline-block; width: 14px; font-size: 10px; margin-right: 6px; color: #16a34a; transition: transform 0.2s; }
+        .collapsible-icon { display: inline-block; width: 14px; font-size: 10px; margin-right: 6px; color: #0071e3; transition: transform 0.2s; }
 
         @keyframes slideIn {
           from { transform: translateY(10px); opacity: 0; }
@@ -465,10 +452,10 @@ export default function PMSchedulePage() {
         {/* ── Page Header ── */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 18 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 10, background: '#f0fdf4', border: '1.5px solid #bbf7d0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>📅</div>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(0, 113, 227, 0.08)', border: '1.5px solid rgba(0, 113, 227, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>📅</div>
             <div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a' }}>กำหนดการ PM (PM Schedule Planner)</div>
-              <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>แผนจัดโครงการ PM รายสัปดาห์ จำแนกรายบริษัทและแผนกย่อย — ปี {selectedYear + 543}</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#1d1d1f' }}>กำหนดการ PM (PM Schedule Planner)</div>
+              <div style={{ fontSize: 11, color: '#86868b', marginTop: 2 }}>แผนจัดโครงการ PM รายสัปดาห์ จำแนกรายบริษัทและแผนกย่อย — ปี {selectedYear + 543}</div>
             </div>
           </div>
           <div className="no-print" style={{ display: 'flex', gap: 8 }}>
@@ -477,9 +464,8 @@ export default function PMSchedulePage() {
               onClick={handleExportExcel} 
               disabled={exporting}
               style={{
-                background: '#16a34a',
+                background: '#0071e3',
                 color: '#ffffff',
-                boxShadow: '0 2px 6px rgba(22, 163, 74, 0.15)'
               }}
             >
               📥 {exporting ? 'กำลังส่งออก...' : 'ส่งออก Excel Planner'}
@@ -487,7 +473,7 @@ export default function PMSchedulePage() {
             <button className="pms-btn pms-btn-outline" onClick={() => window.print()}>
               🖨️ พิมพ์แผนงาน
             </button>
-            <button className="pms-btn pms-btn-outline" onClick={() => navigate('/pm')} style={{ background: '#f1f5f9' }}>
+            <button className="pms-btn pms-btn-outline" onClick={() => navigate('/pm')} style={{ background: '#f5f5f7' }}>
               📊 Dashboard
             </button>
           </div>
@@ -495,26 +481,26 @@ export default function PMSchedulePage() {
 
         {/* ── Status Cards Grid ── */}
         <div className="pms-stat-grid no-print">
-          <div className="pms-stat-card" style={{ borderLeft: '4px solid #10b981' }}>
+          <div className="pms-stat-card" style={{ borderLeft: '2px solid #34c759', background: 'rgba(52, 199, 89, 0.02)' }}>
             <div>
-              <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>🟢 เสร็จสิ้นแผนงาน</div>
-              <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4, color: '#16a34a' }}>{completedPlansCount} แผนก</div>
+              <div style={{ fontSize: 11, color: '#86868b', fontWeight: 600 }}>🟢 เสร็จสิ้นแผนงาน</div>
+              <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4, color: '#34c759' }}>{completedPlansCount} แผนก</div>
             </div>
-            <div className="pms-stat-icon" style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', color: '#16a34a' }}>✓</div>
+            <div className="pms-stat-icon" style={{ background: 'rgba(52, 199, 89, 0.08)', color: '#34c759' }}>✓</div>
           </div>
-          <div className="pms-stat-card" style={{ borderLeft: '4px solid #0ea5e9' }}>
+          <div className="pms-stat-card" style={{ borderLeft: '2px solid #0071e3', background: 'rgba(0, 113, 227, 0.02)' }}>
             <div>
-              <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>🔵 กำลังดำเนินการตรวจ</div>
-              <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4, color: '#0ea5e9' }}>{activePlansCount} แผนก</div>
+              <div style={{ fontSize: 11, color: '#86868b', fontWeight: 600 }}>🔵 กำลังดำเนินการตรวจ</div>
+              <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4, color: '#0071e3' }}>{activePlansCount} แผนก</div>
             </div>
-            <div className="pms-stat-icon" style={{ background: '#f0f9ff', border: '1.5px solid #e0f2fe', color: '#0ea5e9' }}>⏳</div>
+            <div className="pms-stat-icon" style={{ background: 'rgba(0, 113, 227, 0.08)', color: '#0071e3' }}>⏳</div>
           </div>
-          <div className="pms-stat-card" style={{ borderLeft: '4px solid #f59e0b' }}>
+          <div className="pms-stat-card" style={{ borderLeft: '2px solid #ff9500', background: 'rgba(255, 149, 0, 0.02)' }}>
             <div>
-              <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>🟡 รอดำเนินการตามแผน</div>
-              <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4, color: '#d97706' }}>{pendingPlansCount} แผนก</div>
+              <div style={{ fontSize: 11, color: '#86868b', fontWeight: 600 }}>🟡 รอดำเนินการตามแผน</div>
+              <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4, color: '#ff9500' }}>{pendingPlansCount} แผนก</div>
             </div>
-            <div className="pms-stat-icon" style={{ background: '#fffbeb', border: '1.5px solid #fef3c7', color: '#d97706' }}>📅</div>
+            <div className="pms-stat-icon" style={{ background: 'rgba(255, 149, 0, 0.08)', color: '#ff9500' }}>📅</div>
           </div>
         </div>
 
@@ -544,7 +530,7 @@ export default function PMSchedulePage() {
             </div>
             <div>
               <label className="pms-label">จำนวนเครื่อง PM ทั้งหมด</label>
-              <input type="text" className="pms-input" style={{ background: '#f8fafc', color: '#64748b', fontWeight: 700 }} value={totalPlanned} readOnly />
+              <input type="text" className="pms-input" style={{ background: '#f5f5f7', color: '#1d1d1f', fontWeight: 600 }} value={totalPlanned} readOnly />
             </div>
           </div>
         </div>
@@ -555,8 +541,8 @@ export default function PMSchedulePage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontSize: 18 }}>📊</span>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>Gantt Chart แผนการตรวจ PM รายสัปดาห์</div>
-                <div style={{ fontSize: 10, color: '#64748b', marginTop: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#1d1d1f' }}>Gantt Chart แผนการตรวจ PM รายสัปดาห์</div>
+                <div style={{ fontSize: 10, color: '#86868b', marginTop: 1 }}>
                   สัปดาห์ {weeks[0]?.label.replace('W','')} ถึง {weeks[weeks.length-1]?.label.replace('W','')} ({weeks[0]?.subLabel} – {weeks[weeks.length-1]?.subLabel} {selectedYear + 543})
                 </div>
               </div>
@@ -582,9 +568,9 @@ export default function PMSchedulePage() {
                   <th style={{ width: 50, textAlign: 'center' }}>WBS</th>
                   <th style={{ minWidth: 180, textAlign: 'left' }}>TASK (บริษัท / แผนกงาน)</th>
                   <th style={{ width: 100, textAlign: 'center' }}>LEAD</th>
-                  <th style={{ width: 60, textAlign: 'center' }}>Device<br /><span style={{ fontSize: 9, fontWeight: 400, color: '#cbd5e1' }}>แผน</span></th>
-                  <th style={{ width: 60, textAlign: 'center' }}>Completed<br /><span style={{ fontSize: 9, fontWeight: 400, color: '#cbd5e1' }}>เสร็จ</span></th>
-                  <th style={{ width: 60, textAlign: 'center' }}>Remaining<br /><span style={{ fontSize: 9, fontWeight: 400, color: '#cbd5e1' }}>เหลือ</span></th>
+                  <th style={{ width: 60, textAlign: 'center' }}>Device<br /><span style={{ fontSize: 9, fontWeight: 400, color: '#86868b' }}>แผน</span></th>
+                  <th style={{ width: 60, textAlign: 'center' }}>Completed<br /><span style={{ fontSize: 9, fontWeight: 400, color: '#86868b' }}>เสร็จ</span></th>
+                  <th style={{ width: 60, textAlign: 'center' }}>Remaining<br /><span style={{ fontSize: 9, fontWeight: 400, color: '#86868b' }}>เหลือ</span></th>
                   <th style={{ width: 70, textAlign: 'center' }}>START</th>
                   <th style={{ width: 70, textAlign: 'center' }}>END</th>
                   <th style={{ width: 50, textAlign: 'center' }}>DAYS</th>
@@ -592,29 +578,29 @@ export default function PMSchedulePage() {
                   {weeks.map(w => (
                     <th key={w.label} style={{ width: 85, textAlign: 'center' }}>
                       {w.label}<br />
-                      <span style={{ fontSize: 9, fontWeight: 400, color: '#cbd5e1' }}>{w.subLabel}</span>
+                      <span style={{ fontSize: 9, fontWeight: 400, color: '#86868b' }}>{w.subLabel}</span>
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {/* ── Level 0: Total Summary Row ── */}
-                <tr style={{ background: '#f8fafc', fontWeight: 800 }}>
-                  <td style={{ textAlign: 'center', color: '#64748b' }}>1</td>
+                <tr style={{ background: '#f5f5f7', fontWeight: 600 }}>
+                  <td style={{ textAlign: 'center', color: '#86868b' }}>1</td>
                   <td>💼 TRR GROUP (ทั้งหมดในระบบ)</td>
                   <td style={{ textAlign: 'center' }}>-</td>
                   <td style={{ textAlign: 'center' }}>{totalPlanned}</td>
                   <td style={{ textAlign: 'center' }}>{totalCompleted}</td>
-                  <td style={{ textAlign: 'center', color: '#ef4444' }}>{totalPlanned - totalCompleted}</td>
+                  <td style={{ textAlign: 'center', color: '#ff3b30' }}>{totalPlanned - totalCompleted}</td>
                   <td style={{ textAlign: 'center' }}>-</td>
                   <td style={{ textAlign: 'center' }}>-</td>
                   <td style={{ textAlign: 'center' }}>-</td>
                   <td style={{ textAlign: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                      <span style={{ color: getProgressColor(overallPct), minWidth: 32, textAlign: 'right' }}>{overallPct}%</span>
+                      <span style={{ color: getProgressColor(overallPct), fontWeight: 600 }}>{overallPct}%</span>
                     </div>
                   </td>
-                  <td colSpan={weeks.length} style={{ background: 'rgba(22, 163, 74, 0.05)', textAlign: 'center', fontSize: 10, color: '#15803d', fontWeight: 700 }}>
+                  <td colSpan={weeks.length} style={{ background: 'rgba(52, 199, 89, 0.05)', textAlign: 'center', fontSize: 11, color: '#248a3d', fontWeight: 600 }}>
                     {overallPct >= 100 ? '✅ เสร็จสิ้นโครงการ PM แล้ว' : '🔄 กำลังขับเคลื่อนงานตามแผน'}
                   </td>
                 </tr>
@@ -622,7 +608,7 @@ export default function PMSchedulePage() {
                 {/* ── Grouped Sites Rows ── */}
                 {groupedPlans.length === 0 ? (
                   <tr>
-                    <td colSpan={10 + weeks.length} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>
+                    <td colSpan={10 + weeks.length} style={{ textAlign: 'center', padding: 24, color: '#86868b' }}>
                       ไม่มีข้อมูลกำหนดการตามคำค้นหา
                     </td>
                   </tr>
@@ -647,19 +633,19 @@ export default function PMSchedulePage() {
                         <tr className="gantt-site-row" onClick={() => toggleSite(group.site)}>
                           <td style={{ textAlign: 'center' }}>{siteWbs}</td>
                           <td>
-                            <span className="collapsible-icon">{isExpanded ? '▼' : '▶'}</span>
+                            <span className="collapsible-icon" style={{ transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
                             🏢 {group.site}
                           </td>
                           <td style={{ textAlign: 'center' }}>{group.lead || '-'}</td>
                           <td style={{ textAlign: 'center' }}>{group.totalPlanned}</td>
                           <td style={{ textAlign: 'center' }}>{group.totalCompleted}</td>
-                          <td style={{ textAlign: 'center', color: '#ef4444' }}>{group.totalPlanned - group.totalCompleted}</td>
+                          <td style={{ textAlign: 'center', color: '#ff3b30' }}>{group.totalPlanned - group.totalCompleted}</td>
                           <td style={{ textAlign: 'center', fontSize: 10 }}>{group.startDate ? fmtDate(group.startDate) : '-'}</td>
                           <td style={{ textAlign: 'center', fontSize: 10 }}>{group.endDate ? fmtDate(group.endDate) : '-'}</td>
                           <td style={{ textAlign: 'center' }}>{siteDays}</td>
                           <td style={{ textAlign: 'center' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                              <span style={{ color: '#047857', minWidth: 32, textAlign: 'right' }}>{sitePct}%</span>
+                              <span style={{ color: '#248a3d', fontWeight: 600 }}>{sitePct}%</span>
                             </div>
                           </td>
                           {weeks.map(w => renderGanttCell(siteDummyPlan, w, sitePct, true))}
@@ -681,20 +667,20 @@ export default function PMSchedulePage() {
                               onClick={() => navigate(`/pm/runs?planId=${plan.id}`)}
                               title="คลิกเพื่อเข้าไปทำ PM Checklist"
                             >
-                              <td style={{ textAlign: 'center', color: '#94a3b8' }}>{planWbs}</td>
-                              <td style={{ paddingLeft: '28px', color: '#334155' }}>
+                              <td style={{ textAlign: 'center', color: '#86868b' }}>{planWbs}</td>
+                              <td style={{ paddingLeft: '28px', color: '#1d1d1f' }}>
                                 ↳ 📁 {plan.deptTask || 'ทั่วไป'}
                               </td>
                               <td style={{ textAlign: 'center' }}>{plan.lead || group.lead || '-'}</td>
                               <td style={{ textAlign: 'center' }}>{plan.plannedDeviceCount}</td>
                               <td style={{ textAlign: 'center' }}>{plan.completedCount || 0}</td>
-                              <td style={{ textAlign: 'center', color: '#ef4444' }}>{plan.plannedDeviceCount - (plan.completedCount || 0)}</td>
+                              <td style={{ textAlign: 'center', color: '#ff3b30' }}>{plan.plannedDeviceCount - (plan.completedCount || 0)}</td>
                               <td style={{ textAlign: 'center', fontSize: 10 }}>{pStartVal ? fmtDate(pStartVal) : '-'}</td>
                               <td style={{ textAlign: 'center', fontSize: 10 }}>{pEndVal ? fmtDate(pEndVal) : '-'}</td>
                               <td style={{ textAlign: 'center' }}>{pDays}</td>
                               <td style={{ textAlign: 'center' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                                  <span style={{ color: getProgressColor(planPct), minWidth: 32, textAlign: 'right' }}>{planPct}%</span>
+                                  <span style={{ color: getProgressColor(planPct), fontWeight: 600 }}>{planPct}%</span>
                                 </div>
                               </td>
                               {weeks.map(w => renderGanttCell(plan, w, planPct))}

@@ -414,6 +414,141 @@ router.put('/notification-templates/:id', authenticate, authorize('SUPERADMIN'),
   } catch (err) { next(err); }
 });
 
+router.post('/notification-templates/:id/test', authenticate, authorize('SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { to } = req.body;
+    if (!to) throw new AppError('กรุณาระบุอีเมลปลายทาง');
+
+    const template = await prisma.notificationTemplate.findUnique({ where: { id } });
+    if (!template) throw new AppError('ไม่พบเทมเพลต', 404);
+
+    const settings = await prisma.notificationSetting.findFirst();
+    const host = settings?.smtpHost || process.env.SMTP_HOST || 'smtp.office365.com';
+    const port = parseInt(settings?.smtpPort || process.env.SMTP_PORT || '587');
+    const user = settings?.smtpUser || process.env.SMTP_USER;
+    const pass = settings?.smtpPass || process.env.SMTP_PASS;
+    const fromEmail = settings?.smtpFromEmail || process.env.SMTP_FROM || user;
+    const fromName = settings?.smtpFromName || 'AssetHub';
+
+    const SAMPLE_DATA: Record<string, string> = {
+      requestNo: 'BR-2026051501',
+      requester: 'สมชาย ใจดี',
+      department: 'ฝ่ายวิศวกรรม',
+      email: 'somchai.jai@trrgroup.com',
+      purpose: 'ใช้สำหรับประชุม Project XYZ กับลูกค้า',
+      location: 'สำนักงานใหญ่ ชั้น 5 ห้องประชุม A',
+      note: 'ขอยืม 3 วัน จะคืนวันศุกร์',
+      notes: 'ขอยืม 3 วัน จะคืนวันศุกร์',
+      borrowDate: '15 พฤษภาคม 2569',
+      dueDate: '18 พฤษภาคม 2569',
+      borrowDays: '3',
+      itemsCount: '2',
+      handoverNote: 'นำเครื่องมารับที่แผนก IT ชั้น 2',
+      condition: 'ปกติ',
+      assetCode: 'TRRHQ-NB-1011',
+      serialNo: 'HRVYBB4',
+      brand: 'Dell',
+      model: 'Pro 16 PC16250',
+      damageNote: '-',
+      accessoriesNote: 'ครบทุกชิ้น',
+      returnDate: '18 พฤษภาคม 2569',
+      daysOverdue: '2',
+      extraDays: '5',
+      reason: 'ต้องใช้งานต่อสำหรับทำรายงานสรุปโครงการ',
+      oldDueDate: '18 พฤษภาคม 2569',
+      newDueDate: '23 พฤษภาคม 2569',
+    };
+
+    const statusColors: Record<string, { bg: string; text: string }> = {
+      'รอการอนุมัติ': { bg: '#fef3c7', text: '#92400e' },
+      'อนุมัติ': { bg: '#d1fae5', text: '#065f46' },
+      'ไม่อนุมัติ': { bg: '#fee2e2', text: '#991b1b' },
+      'ส่งมอบแล้ว': { bg: '#dbeafe', text: '#1e40af' },
+      'คืนแล้ว': { bg: '#dcfce7', text: '#166534' },
+    };
+
+    const mockItems = [
+      { assetCode: 'TRRHQ-NB-1011', serialNo: 'HRVYBB4', brand: 'Dell', model: 'Pro 16 PC16250', category: 'Notebook', status: 'อนุมัติ' },
+      { assetCode: 'TRRHQ-NB-1024', serialNo: '3RFGPC4', brand: 'Dell', model: 'Pro 14 PC14250', category: 'Notebook', status: 'รอการอนุมัติ' }
+    ];
+
+    const itemsHtml = mockItems.map((item) => {
+      let bgColor = '#f1f5f9';
+      let textColor = '#475569';
+      if (statusColors[item.status]) {
+        bgColor = statusColors[item.status].bg;
+        textColor = statusColors[item.status].text;
+      }
+      return `
+        <tr>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; font-size: 13px;">
+            <div style="color: #475569; font-size: 12px; line-height: 1.5;">
+              <div><span style="font-weight: 600; color: #1e293b;">ชื่อทรัพย์สิน :</span> ${item.assetCode || 'N/A'}</div>
+              <div><span style="font-weight: 600; color: #1e293b;">Serial No :</span> ${item.serialNo || '-'}</div>
+              <div><span style="font-weight: 600; color: #1e293b;">ประเภท :</span> ${item.category || '-'}</div>
+              <div><span style="font-weight: 600; color: #1e293b;">รุ่น :</span> ${item.model ? item.model + (item.brand ? ' ' + item.brand : '') : (item.brand || '-')}</div>
+            </div>
+          </td>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; font-size: 13px; text-align: center;">
+            <span style="background: ${bgColor}; color: ${textColor}; padding: 3px 10px; border-radius: 12px; font-weight: 600; font-size: 11px;">${item.status || '-'}</span>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    const itemsTableHtml = `
+      <table class="items-table" style="width: 100%; border-collapse: collapse; margin-top: 8px;">
+        <thead>
+          <tr>
+            <th style="background: #f1f5f9; padding: 10px 12px; text-align: left; font-size: 12px; color: #475569; font-weight: 600; border-bottom: 2px solid #e2e8f0;">ทรัพย์สิน</th>
+            <th style="background: #f1f5f9; padding: 10px 12px; text-align: center; font-size: 12px; color: #475569; font-weight: 600; border-bottom: 2px solid #e2e8f0;">สถานะ</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemsHtml}
+        </tbody>
+      </table>
+    `;
+
+    let body = template.bodyTh;
+    let subject = template.subjectTh;
+
+    body = body.replace('{{itemsTable}}', itemsTableHtml);
+
+    const noteHtml = `<div class="note-box" style="background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 14px; margin-top: 16px;"><p style="margin: 0; color: #92400e; font-size: 13px;"><b>หมายเหตุ:</b> ขอยืม 3 วัน จะคืนวันศุกร์</p></div>`;
+    body = body.replace('{{note}}', noteHtml);
+    subject = subject.replace('{{note}}', 'ขอยืม 3 วัน จะคืนวันศุกร์');
+
+    for (const [key, val] of Object.entries(SAMPLE_DATA)) {
+      const regex = new RegExp(`{{${key}}}`, 'g');
+      body = body.replace(regex, val);
+      subject = subject.replace(regex, val);
+    }
+
+    body = body.replace(/{{\w+}}/g, '-');
+    subject = subject.replace(/{{\w+}}/g, '-');
+
+    const nodemailer = await import('nodemailer');
+    const transporter = nodemailer.default.createTransport({
+      host, port, secure: false,
+      auth: user && pass ? { user, pass } : undefined,
+    });
+
+    await transporter.sendMail({
+      from: `"${fromName}" <${fromEmail}>`,
+      to,
+      subject: `[ทดสอบส่งเทมเพลต] ${subject}`,
+      html: body,
+      text: body.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/\n{3,}/g, '\n\n'),
+    });
+
+    res.json({ success: true, message: `ส่งอีเมลทดสอบสำหรับเทมเพลต ${template.key} ไปที่ ${to} สำเร็จ` });
+  } catch (err: any) {
+    res.status(400).json({ success: false, message: err.message || 'ส่งอีเมลทดสอบไม่สำเร็จ' });
+  }
+});
+
 // ── Notification Logs ──
 router.get('/notification-logs', authenticate, authorize('SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {

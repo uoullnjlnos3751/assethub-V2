@@ -207,6 +207,77 @@ export default function AssetFormPage() {
   const [duplicates, setDuplicates] = useState<Record<string, boolean>>({});
   const checkTimer = useRef<any>(null);
 
+  // GLPI Spec
+  const [glpiSpec, setGlpiSpec] = useState<any>(null);
+  const [fetchingGLPI, setFetchingGLPI] = useState(false);
+  const [glpiError, setGlpiError] = useState('');
+
+  // Brand suggestions
+  const [brandSuggestions, setBrandSuggestions] = useState<string[]>([]);
+  const getBrandSuggestionsForType = (type: string): string[] => {
+    const suggestions: Record<string, string[]> = {
+      'notebook': ['Apple', 'ASUS', 'Dell', 'HP', 'Lenovo'],
+      'laptop': ['Apple', 'ASUS', 'Dell', 'HP', 'Lenovo'],
+      'macbook': ['Apple'],
+      'pc desktop': ['ASUS', 'Dell', 'HP', 'Lenovo'],
+      'desktop': ['ASUS', 'Dell', 'HP', 'Lenovo'],
+      'workstation': ['ASUS', 'Dell', 'HP', 'Lenovo'],
+      'monitor': ['ASUS', 'BenQ', 'Dell', 'HP', 'LG'],
+      'printer': ['Brother', 'Canon', 'HP', 'Xerox'],
+      'router': ['Cisco', 'D-Link', 'Fortinet', 'TP-Link', 'Ubiquiti'],
+      'switch': ['Cisco', 'D-Link', 'Fortinet', 'TP-Link', 'Ubiquiti'],
+      'access point': ['Cisco', 'D-Link', 'Ubiquiti'],
+      'keyboard': ['ASUS', 'Cherry', 'Corsair', 'Logitech', 'Razer'],
+      'mouse': ['ASUS', 'Corsair', 'Logitech', 'Razer', 'SteelSeries'],
+      'headset': ['ASUS', 'Corsair', 'Logitech', 'Plantronics', 'Razer'],
+      'webcam': ['Corsair', 'Logitech', 'Microsoft', 'Razer'],
+    };
+    const t = type?.toLowerCase() || '';
+    for (const [key, brands] of Object.entries(suggestions)) {
+      if (t.includes(key)) return brands;
+    }
+    return [];
+  };
+
+  const handleFetchGLPISpec = async () => {
+    const serial = form.serialNo?.trim();
+    if (!serial) {
+      showToast('กรุณากรอก Serial Number ก่อนดึงสเปค', '#e11d48');
+      return;
+    }
+    setFetchingGLPI(true);
+    setGlpiError('');
+    setGlpiSpec(null);
+    try {
+      const res = await assetAPI.queryGLPISpec(serial);
+      setGlpiSpec(res.data);
+      showToast('ดึงข้อมูลสเปคจาก GLPI สำเร็จ', '#10b981');
+    } catch (err: any) {
+      const errMsg = err.response?.data?.message || 'ไม่พบข้อมูลในระบบ GLPI';
+      setGlpiError(errMsg);
+      showToast(errMsg, '#e11d48');
+    } finally {
+      setFetchingGLPI(false);
+    }
+  };
+
+  const handleAutoFillGLPI = () => {
+    if (!glpiSpec) return;
+    
+    // Auto-fill form fields
+    if (glpiSpec.cpu) setFormField('cpu', 'CPU', glpiSpec.cpu);
+    if (glpiSpec.ram) setFormField('ram', 'RAM', glpiSpec.ram);
+    if (glpiSpec.os) setFormField('osVersion', 'OS Version', glpiSpec.os);
+    if (glpiSpec.license) setFormField('windowsLicense', 'Windows License', glpiSpec.license);
+    if (glpiSpec.name) setFormField('assetName', 'ชื่อทรัพย์สิน / รหัสทรัพย์สิน', glpiSpec.name);
+    if (glpiSpec.serial) setFormField('snComputer', 'S/N Computer', glpiSpec.serial);
+    if (glpiSpec.user) setFormField('ownerName', 'ผู้ใช้งานหลัก (End User)', glpiSpec.user);
+    if (glpiSpec.msOffice) setFormField('officeLicense', 'MS Office', glpiSpec.msOffice);
+    if (glpiSpec.antivirus) setFormField('antivirusStatus', 'Antivirus', glpiSpec.antivirus);
+    
+    showToast('กรอกข้อมูลสเปคลงฟอร์มเรียบร้อยแล้ว', '#10b981');
+  };
+
   const checkDuplicate = useCallback(async (assetCode?: string, serialNo?: string, assetName?: string) => {
     if (!assetCode && !serialNo && !assetName) { setDuplicates({}); return; }
     try {
@@ -321,6 +392,16 @@ export default function AssetFormPage() {
     }
   }, [categories, initialCategoryId]);
 
+  // Update brand suggestions when type changes
+  useEffect(() => {
+    if (form.type) {
+      const suggestions = getBrandSuggestionsForType(form.type);
+      setBrandSuggestions(suggestions);
+    } else {
+      setBrandSuggestions([]);
+    }
+  }, [form.type]);
+
   /* ─── Field change tracking ─── */
   function trackChange(field: string, label: string, newVal: string) {
     const orig = originalSnapshot[field] ?? '';
@@ -354,13 +435,55 @@ export default function AssetFormPage() {
   }
 
   /* ─── Submit ─── */
+  const validateForm = (): string => {
+    // Required fields validation
+    if (!form.serialNo?.trim()) {
+      return 'Serial Number ต้องไม่ว่างเปล่า';
+    }
+    if (!/^[A-Z0-9\-_\.]+$/i.test(form.serialNo)) {
+      return 'Serial Number ต้องเป็นตัวอักษร ตัวเลข หรือ ขีดกลาง';
+    }
+    if (!form.assetName?.trim()) {
+      return 'ชื่อทรัพย์สิน ต้องไม่ว่างเปล่า';
+    }
+    if (!form.type?.trim()) {
+      return 'ประเภท ต้องไม่ว่างเปล่า';
+    }
+    if (!form.brand?.trim()) {
+      return 'ยี่ห้อ ต้องไม่ว่างเปล่า';
+    }
+    if (!form.departmentId?.trim()) {
+      return 'แผนก ต้องไม่ว่างเปล่า';
+    }
+    if (!form.ownerName?.trim()) {
+      return 'ผู้ถือครอง ต้องไม่ว่างเปล่า';
+    }
+
+    // Warranty date validation
+    if (form.purchaseDate && form.warrantyEndDate) {
+      const purchaseDate = new Date(form.purchaseDate);
+      const warrantyDate = new Date(form.warrantyEndDate);
+      if (!isNaN(purchaseDate.getTime()) && !isNaN(warrantyDate.getTime())) {
+        if (warrantyDate < purchaseDate) {
+          return 'วันหมดประกัน ต้องหลังจาก วันที่จัดซื้อ';
+        }
+      }
+    }
+
+    return '';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.serialNo.trim()) {
-      setError('กรุณากรอก Serial Number');
-      showToast('⚠️ กรุณากรอก Serial Number', '#b45309');
+    
+    // Validate all required fields
+    const validError = validateForm();
+    if (validError) {
+      setError(validError);
+      showToast('⚠️ ' + validError, '#b45309');
       return;
     }
+
     setLoading(true); setError('');
     const payload = { ...form, detail, categoryId: selectedCategory || undefined };
     try {
@@ -470,12 +593,26 @@ export default function AssetFormPage() {
                 )}
               </Box>
             </Box>
-            {id && (
-              <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
-                <Typography variant="caption" color="text.disabled" display="block">กำลังแก้ไข</Typography>
-                <Typography variant="body2" fontWeight={600} color="text.secondary">{form.assetCode}</Typography>
-              </Box>
-            )}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+              {id && (
+                <Box sx={{ textAlign: 'right', display: { xs: 'none', sm: 'block' } }}>
+                  <Typography variant="caption" color="text.disabled" display="block">กำลังแก้ไข</Typography>
+                  <Typography variant="body2" fontWeight={600} color="text.secondary">{form.assetCode}</Typography>
+                </Box>
+              )}
+              <Button
+                variant="outlined"
+                color="inherit"
+                size="small"
+                onClick={() => {
+                  if (hasChanges) { if (window.confirm('ยืนยันยกเลิกการแก้ไข? การเปลี่ยนแปลงทั้งหมดจะหายไป')) navigate(-1); }
+                  else navigate(-1);
+                }}
+                sx={{ borderRadius: '10px', color: 'text.secondary', borderColor: 'divider', fontWeight: 600 }}
+              >
+                ย้อนกลับ
+              </Button>
+            </Box>
           </CardContent>
         </Card>
 
@@ -555,19 +692,22 @@ export default function AssetFormPage() {
                   placeholder="ชื่อสำหรับเรียกทรัพย์สิน หรือ รหัสพัสดุภายในองค์กร"
                   fullWidth
                   size="small"
-                  error={!!duplicates.assetName}
+                  required
+                  error={!form.assetName?.trim() && form.assetName !== ''}
                   helperText={duplicates.assetName ? '⚠️ ชื่อทรัพย์สินนี้มีอยู่ในระบบแล้ว' : ''}
                 />
               </Grid>
               <Grid item xs={12} sm={4}>
                 <TextField
-                  label="ยี่ห้อ (Brand)"
+                  label="ยี่ห้อ (Brand) *"
                   value={form.brand}
                   onChange={e => setFormField('brand', 'ยี่ห้อ', e.target.value)}
                   placeholder="เช่น Dell, HP, Lenovo"
                   fullWidth
                   size="small"
                   required
+                  error={!form.brand?.trim() && form.brand !== ''}
+                  helperText={brandSuggestions.length > 0 && !form.brand ? `💡 แนะนำ: ${brandSuggestions.join(', ')}` : ''}
                 />
               </Grid>
               <Grid item xs={12} sm={4}>
@@ -581,16 +721,97 @@ export default function AssetFormPage() {
                 />
               </Grid>
               <Grid item xs={12} sm={4}>
-                <TextField
-                  label="หมายเลขซีเรียล (S/N)"
-                  value={form.serialNo}
-                  onChange={e => setFormField('serialNo', 'Serial No.', e.target.value)}
-                  placeholder="Serial No."
-                  fullWidth
-                  size="small"
-                  error={!!duplicates.serialNo}
-                  helperText={duplicates.serialNo ? '⚠️ Serial number นี้มีอยู่ในระบบแล้ว' : ''}
-                />
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  <TextField
+                    label="หมายเลขซีเรียล (S/N) *"
+                    value={form.serialNo}
+                    onChange={e => setFormField('serialNo', 'Serial No.', e.target.value)}
+                    placeholder="Serial No."
+                    fullWidth
+                    size="small"
+                    required
+                    error={!form.serialNo?.trim() && form.serialNo !== ''}
+                    helperText={duplicates.serialNo ? '⚠️ Serial number นี้มีอยู่ในระบบแล้ว' : ''}
+                  />
+                  {isComputer && (
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      disabled={fetchingGLPI}
+                      onClick={handleFetchGLPISpec}
+                      startIcon={fetchingGLPI ? <CircularProgress size={12} /> : <span>🔌</span>}
+                      sx={{
+                        textTransform: 'none',
+                        fontWeight: 600,
+                        fontSize: '0.75rem',
+                        py: 0.5,
+                        borderRadius: '8px',
+                        borderColor: '#0071e3',
+                        color: '#0071e3',
+                        '&:hover': {
+                          borderColor: '#0077ed',
+                          bgcolor: 'rgba(0, 113, 227, 0.04)'
+                        }
+                      }}
+                    >
+                      {fetchingGLPI ? 'กำลังดึงสเปค...' : 'ดึงสเปคจาก GLPI'}
+                    </Button>
+                  )}
+                  {glpiSpec && (
+                    <Card sx={{
+                      mt: 1,
+                      border: '1px solid rgba(0, 113, 227, 0.15)',
+                      borderRadius: '10px',
+                      bgcolor: 'rgba(0, 113, 227, 0.02)',
+                      boxShadow: 'none',
+                      overflow: 'hidden'
+                    }}>
+                      <Box sx={{ bgcolor: 'rgba(0, 113, 227, 0.05)', p: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="caption" fontWeight={700} color="primary.main">
+                          พบข้อมูลสเปคใน GLPI
+                        </Typography>
+                        <Button
+                          variant="contained"
+                          size="small"
+                          onClick={handleAutoFillGLPI}
+                          sx={{
+                            fontSize: '0.65rem',
+                            fontWeight: 700,
+                            py: 0.25,
+                            px: 1,
+                            borderRadius: '5px',
+                            bgcolor: '#0071e3',
+                            '&:hover': { bgcolor: '#0077ed' },
+                            textTransform: 'none'
+                          }}
+                        >
+                          กรอกอัตโนมัติ
+                        </Button>
+                      </Box>
+                      <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                          <Typography variant="caption" sx={{ fontSize: '0.75rem', color: 'text.secondary', display: 'flex', justifyContent: 'space-between' }}>
+                            <strong>ชื่อ:</strong> <span>{glpiSpec.name || '—'}</span>
+                          </Typography>
+                          <Typography variant="caption" sx={{ fontSize: '0.75rem', color: 'text.secondary', display: 'flex', justifyContent: 'space-between' }}>
+                            <strong>CPU:</strong> <span style={{ textAlign: 'right', maxWidth: '70%', wordBreak: 'break-all' }}>{glpiSpec.cpu || '—'}</span>
+                          </Typography>
+                          <Typography variant="caption" sx={{ fontSize: '0.75rem', color: 'text.secondary', display: 'flex', justifyContent: 'space-between' }}>
+                            <strong>RAM:</strong> <span>{glpiSpec.ram || '—'}</span>
+                          </Typography>
+                          <Typography variant="caption" sx={{ fontSize: '0.75rem', color: 'text.secondary', display: 'flex', justifyContent: 'space-between' }}>
+                            <strong>OS:</strong> <span style={{ textAlign: 'right', maxWidth: '70%', wordBreak: 'break-all' }}>{glpiSpec.os || '—'}</span>
+                          </Typography>
+                          {glpiSpec.license && (
+                            <Typography variant="caption" sx={{ fontSize: '0.75rem', color: 'text.secondary', display: 'flex', justifyContent: 'space-between' }}>
+                              <strong>License:</strong> <span style={{ textAlign: 'right', maxWidth: '70%', wordBreak: 'break-all' }}>{glpiSpec.license || '—'}</span>
+                            </Typography>
+                          )}
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  )}
+                </Box>
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField
@@ -615,11 +836,13 @@ export default function AssetFormPage() {
               <Grid item xs={12} sm={6}>
                 <TextField
                   select
-                  label="ประเภทอุปกรณ์"
+                  label="ประเภทอุปกรณ์ *"
                   value={form.type}
                   onChange={e => setFormField('type', 'ประเภท', e.target.value)}
                   fullWidth
                   size="small"
+                  required
+                  error={!form.type?.trim() && form.type !== ''}
                 >
                   <MenuItem value="">ไม่ระบุ</MenuItem>
                   {(selectedCategory ? availableTypes : typeOptions.map(t => ({ name: t }))).map((opt: any) => (
@@ -635,22 +858,26 @@ export default function AssetFormPage() {
             <Grid container spacing={2}>
               <Grid item xs={12} sm={4}>
                 <TextField
-                  label="ผู้ใช้งานหลัก (End User)"
+                  label="ผู้ใช้งานหลัก (End User) *"
                   value={form.ownerName}
                   onChange={e => setFormField('ownerName', 'ผู้รับผิดชอบหลัก', e.target.value)}
                   placeholder="ชื่อ-นามสกุล ผู้ใช้งานหลัก"
                   fullWidth
                   size="small"
+                  required
+                  error={!form.ownerName?.trim() && form.ownerName !== ''}
                 />
               </Grid>
               <Grid item xs={12} sm={4}>
                 <TextField
                   select
-                  label="แผนกที่ใช้งาน"
+                  label="แผนกที่ใช้งาน *"
                   value={form.departmentId}
                   onChange={e => setFormField('departmentId', 'แผนก', e.target.value)}
                   fullWidth
                   size="small"
+                  required
+                  error={!form.departmentId?.trim() && form.departmentId !== ''}
                 >
                   <MenuItem value="">ไม่ระบุ</MenuItem>
                   {departmentOptions.map(d => <MenuItem key={d} value={d}>{d}</MenuItem>)}
@@ -1560,6 +1787,16 @@ export default function AssetFormPage() {
                   fullWidth
                   size="small"
                   InputLabelProps={{ shrink: true }}
+                  helperText={(() => {
+                    if (!form.warrantyEndDate) return '';
+                    const today = new Date();
+                    const warrantyDate = new Date(form.warrantyEndDate);
+                    const daysLeft = Math.ceil((warrantyDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                    
+                    if (daysLeft < 0) return `⚠️ หมดประกันแล้ว ${Math.abs(daysLeft)} วัน`;
+                    if (daysLeft < 30) return `⚠️ เตือน: ประกันจะหมดใน ${daysLeft} วัน`;
+                    return `✅ ประกันคงเหลือ ${daysLeft} วัน`;
+                  })()}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>

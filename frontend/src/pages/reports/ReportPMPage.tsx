@@ -149,25 +149,25 @@ export default function ReportPMPage() {
       {/* Summary cards */}
       <Grid container spacing={2.5} sx={{ mb: 4 }}>
         <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '4px solid #4f46e5', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}><CardContent sx={{ p: 2.5 }}>
+          <Card sx={{ borderLeft: '2px solid #4f46e5', bgcolor: 'rgba(79,70,229,0.02)' }}><CardContent sx={{ p: 2.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(99,102,241,0.1)', color: '#4f46e5', display: 'flex' }}><Wrench size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>แผนงานทั้งหมด</Typography></Box>
             <Typography variant="h4" fontWeight={800}>{summary?.total || 0}</Typography>
           </CardContent></Card>
         </Grid>
         <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '4px solid #10b981', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}><CardContent sx={{ p: 2.5 }}>
+          <Card sx={{ borderLeft: '2px solid #10b981', bgcolor: 'rgba(16,185,129,0.02)' }}><CardContent sx={{ p: 2.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(16,185,129,0.1)', color: '#059669', display: 'flex' }}><CheckCircle2 size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>ดำเนินการเสร็จ</Typography></Box>
             <Typography variant="h4" fontWeight={800}>{summary?.completed || 0}</Typography>
           </CardContent></Card>
         </Grid>
         <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '4px solid #f59e0b', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}><CardContent sx={{ p: 2.5 }}>
+          <Card sx={{ borderLeft: '2px solid #f59e0b', bgcolor: 'rgba(245,158,11,0.02)' }}><CardContent sx={{ p: 2.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(245,158,11,0.1)', color: '#d97706', display: 'flex' }}><Clock size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>คงเหลือ</Typography></Box>
             <Typography variant="h4" fontWeight={800}>{summary?.remaining || 0}</Typography>
           </CardContent></Card>
         </Grid>
         <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '4px solid #7c3aed', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}><CardContent sx={{ p: 2.5 }}>
+          <Card sx={{ borderLeft: '2px solid #7c3aed', bgcolor: 'rgba(124,58,237,0.02)' }}><CardContent sx={{ p: 2.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(139,92,246,0.1)', color: '#7c3aed', display: 'flex' }}><ArrowRight size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>ความคืบหน้า</Typography></Box>
             <Typography variant="h4" fontWeight={800}>{completionRate}%</Typography>
           </CardContent></Card>

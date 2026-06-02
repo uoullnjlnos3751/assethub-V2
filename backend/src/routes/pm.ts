@@ -3,8 +3,32 @@ import { prisma } from '../index';
 import { authenticate, authorize } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { createNotification } from '../services/notification';
+import { fetchGLPISpecBySerial } from '../services/glpi';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as crypto from 'crypto';
+import multer from 'multer';
 
 const router = Router();
+
+const PM_UPLOAD_DIR = path.join(__dirname, '..', '..', 'uploads', 'pm');
+fs.mkdirSync(PM_UPLOAD_DIR, { recursive: true });
+
+const pmPhotoUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req: any, _file: any, cb: any) => cb(null, PM_UPLOAD_DIR),
+    filename: (_req: any, file: any, cb: any) => {
+      const ext = path.extname(file.originalname);
+      cb(null, `${crypto.randomUUID()}${ext}`);
+    },
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req: any, file: any, cb: any) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error('ประเภทไฟล์ไม่รองรับ (รองรับเฉพาะไฟล์รูปภาพ)'));
+  },
+});
 
 function buildPMAssetWhere(plan: { company?: string | null; site?: string | null; deptTask?: string | null; deviceType?: string | null }) {
   return {
@@ -492,6 +516,105 @@ router.get('/dashboard', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), asyn
         };
       }),
     });
+  } catch (err) { next(err); }
+});
+
+// ── PM Run Photo Upload ──
+router.post('/runs/:id/upload', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), pmPhotoUpload.single('file'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const run = await prisma.pMRun.findUnique({ where: { id } });
+    if (!run) throw new AppError('ไม่พบงาน PM', 404);
+    if (!req.file) throw new AppError('ไม่พบไฟล์รูปภาพ', 400);
+
+    // Delete old file if exists
+    if (run.photoUrl) {
+      const oldPath = path.join(PM_UPLOAD_DIR, run.photoUrl);
+      if (fs.existsSync(oldPath)) {
+        try { fs.unlinkSync(oldPath); } catch (e) { console.error('Error deleting old photo:', e); }
+      }
+    }
+
+    const updated = await prisma.pMRun.update({
+      where: { id },
+      data: { photoUrl: req.file.filename },
+    });
+
+    res.json(updated);
+  } catch (err) { next(err); }
+});
+
+// ── Bulk Perform PM ──
+router.post('/runs/bulk-perform', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { runIds, answers } = req.body;
+    if (!Array.isArray(runIds) || runIds.length === 0) {
+      throw new AppError('ต้องเลือกรายการ PM อย่างน้อย 1 รายการ', 400);
+    }
+
+    const validRuns = await prisma.pMRun.findMany({
+      where: { id: { in: runIds } },
+      include: { plan: { include: { template: { include: { templateItems: true } } } } }
+    });
+
+    if (validRuns.length === 0) throw new AppError('ไม่พบรายการ PM ที่ระบุ', 404);
+
+    await prisma.$transaction(async (tx) => {
+      // For each run, delete old answers and create new ones
+      for (const run of validRuns) {
+        await tx.pMRunAnswer.deleteMany({ where: { runId: run.id } });
+
+        const validItemIds = new Set(run.plan.template.templateItems.map(item => item.id));
+        const cleanAnswers = Array.isArray(answers)
+          ? answers.filter((ans: any) => validItemIds.has(Number(ans.itemId)))
+          : [];
+
+        if (cleanAnswers.length > 0) {
+          await tx.pMRunAnswer.createMany({
+            data: cleanAnswers.map((ans: any) => ({
+              runId: run.id,
+              itemId: Number(ans.itemId),
+              value: String(ans.value ?? ''),
+            })),
+          });
+        }
+
+        // Update PMRun status
+        await tx.pMRun.update({
+          where: { id: run.id },
+          data: {
+            status: 'COMPLETED',
+            performedBy: req.user!.userId,
+            performedAt: new Date(),
+            completedAt: new Date(),
+          },
+        });
+      }
+    });
+
+    res.json({ message: `บันทึกผล PM แบบกลุ่มสำเร็จทั้งหมด ${validRuns.length} รายการ` });
+  } catch (err) { next(err); }
+});
+
+// ── Fetch GLPI Spec for PM Run ──
+router.get('/runs/:id/glpi-spec', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const run = await prisma.pMRun.findUnique({
+      where: { id },
+      include: { asset: true },
+    });
+    if (!run) throw new AppError('ไม่พบงาน PM', 404);
+    if (!run.asset?.serialNo) {
+      throw new AppError('ทรัพย์สินนี้ไม่มี Serial Number สำหรับดึงข้อมูลจาก GLPI', 400);
+    }
+
+    const spec = await fetchGLPISpecBySerial(run.asset.serialNo);
+    if (!spec) {
+      throw new AppError('ไม่พบข้อมูลฮาร์ดแวร์ในระบบ GLPI สำหรับ Serial Number นี้', 404);
+    }
+
+    res.json(spec);
   } catch (err) { next(err); }
 });
 

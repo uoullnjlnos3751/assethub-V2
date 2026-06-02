@@ -175,7 +175,7 @@ export default function CategoryPage() {
       <Grid container spacing={3}>
         {categories.map((cat) => (
           <Grid item xs={12} key={cat.id}>
-            <Card sx={{ borderLeft: `4px solid ${alpha(theme.palette.primary.main, 0.3)}` }}>
+            <Card sx={{ borderLeft: `2px solid ${theme.palette.primary.main}`, bgcolor: alpha(theme.palette.primary.main, 0.015) }}>
               <CardContent sx={{ p: 3 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>

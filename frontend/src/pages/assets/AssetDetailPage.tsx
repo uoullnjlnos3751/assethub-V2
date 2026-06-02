@@ -50,6 +50,7 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import DownloadIcon from '@mui/icons-material/Download';
+import SyncIcon from '@mui/icons-material/Sync';
 import QRCode from 'react-qr-code';
 import { assetAPI } from '../../services/api';
 import MaintenanceTab from './MaintenanceTab';
@@ -189,7 +190,13 @@ function WarrantyBar({ purchaseDate, warrantyEndDate }: { purchaseDate?: string;
 }
 
 /* ─── Spec sections by type ───────────────────────────────────── */
-function SpecTab({ asset }: { asset: any }) {
+function SpecTab({ asset, glpiSpec, loadingGLPI, syncingGLPI, onSync }: {
+  asset: any;
+  glpiSpec?: any;
+  loadingGLPI?: boolean;
+  syncingGLPI?: boolean;
+  onSync?: (field?: string, label?: string) => void;
+}) {
   const t = (asset.type || '').toLowerCase();
   const cat = (asset.category?.name || '').toLowerCase();
   const detail = asset.detail || {};
@@ -209,15 +216,113 @@ function SpecTab({ asset }: { asset: any }) {
     </Box>
   );
 
+  const renderComparisonRow = (fieldLabel: string, assetValue: string, glpiValue: string, fieldKey?: string) => {
+    const isMatch = (assetValue || '').trim().toLowerCase() === (glpiValue || '').trim().toLowerCase();
+    return (
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1, borderBottom: '1px solid rgba(229, 229, 234, 0.5)' }}>
+        <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.secondary', width: '25%', fontSize: '0.8rem' }}>{fieldLabel}</Typography>
+        <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', width: '35%', wordBreak: 'break-all', fontSize: '0.8rem' }}>{assetValue || '—'}</Typography>
+        <Box sx={{ width: '40%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+          {isMatch ? (
+            <Chip label="ตรงกัน" color="success" size="small" variant="outlined" sx={{ height: 18, fontSize: '0.7rem', fontWeight: 600 }} />
+          ) : (
+            <>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+                <Chip label="ไม่ตรงกัน" color="warning" size="small" variant="outlined" sx={{ height: 18, fontSize: '0.7rem', fontWeight: 600, width: 'fit-content' }} />
+                <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 600, fontSize: '0.7rem' }}>ค่าจริง: {glpiValue || '—'}</Typography>
+              </Box>
+              {fieldKey && onSync && (
+                <IconButton 
+                  size="small" 
+                  onClick={() => onSync(fieldKey, fieldLabel)} 
+                  disabled={syncingGLPI}
+                  sx={{ 
+                    color: 'primary.main',
+                    padding: '4px',
+                    '&:hover': {
+                      background: 'rgba(0, 113, 227, 0.08)',
+                      transform: 'scale(1.1)'
+                    },
+                    transition: 'all 0.2s'
+                  }}
+                  title={`ปรับปรุงเฉพาะ ${fieldLabel}`}
+                >
+                  <SyncIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              )}
+            </>
+          )}
+        </Box>
+      </Box>
+    );
+  };
+
   return (
-    <Box sx={{
-      background: 'rgba(255, 255, 255, 0.65)',
-      border: '1px solid rgba(255, 255, 255, 0.85)',
-      backdropFilter: 'blur(20px)',
-      borderRadius: '14px',
-      boxShadow: '0 4px 24px rgba(99, 102, 241, 0.07), 0 1px 3px rgba(0, 0, 0, 0.04)',
-      p: 1.5
-    }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {isComputer && (glpiSpec || loadingGLPI) && (
+        <Card sx={{
+          background: 'rgba(255, 255, 255, 0.75)',
+          border: '1px solid rgba(0, 113, 227, 0.15)',
+          borderRadius: '14px',
+          boxShadow: '0 8px 30px rgba(0, 113, 227, 0.04)',
+          overflow: 'hidden'
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: '12px 18px', borderBottom: '1px solid rgba(0, 113, 227, 0.1)', bgcolor: 'rgba(0, 113, 227, 0.03)' }}>
+            <Typography variant="subtitle2" fontWeight={700} color="primary.main" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: '0.85rem' }}>
+              📡 ตรวจสอบสเปคจริงจาก GLPI
+            </Typography>
+            {glpiSpec && onSync && (
+              <Button
+                variant="contained"
+                onClick={() => onSync()}
+                disabled={syncingGLPI}
+                size="small"
+                startIcon={syncingGLPI ? <CircularProgress size={10} color="inherit" /> : <span>⚡️</span>}
+                sx={{
+                  bgcolor: '#0071e3',
+                  '&:hover': { bgcolor: '#0077ed' },
+                  borderRadius: '6px',
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  fontSize: '0.7rem',
+                  py: 0.5,
+                  px: 1.5
+                }}
+              >
+                {syncingGLPI ? 'กำลังปรับปรุง...' : 'ปรับปรุงตาม GLPI'}
+              </Button>
+            )}
+          </Box>
+          <CardContent sx={{ p: '12px 18px !important' }}>
+            {loadingGLPI ? (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 1, justifyContent: 'center' }}>
+                <CircularProgress size={16} />
+                <Typography variant="caption" color="text.secondary">กำลังดึงข้อมูลสเปคฮาร์ดแวร์จริงกับ GLPI...</Typography>
+              </Box>
+            ) : (
+              <Box>
+                {renderComparisonRow('ชื่อคอมพิวเตอร์', asset.assetName, glpiSpec.name, 'name')}
+                {renderComparisonRow('ผู้ใช้งานหลัก (End User)', asset.ownerName, glpiSpec.user, 'user')}
+                {renderComparisonRow('CPU', asset.cpu, glpiSpec.cpu, 'cpu')}
+                {renderComparisonRow('RAM', asset.ram, glpiSpec.ram, 'ram')}
+                {renderComparisonRow('OS System', asset.osVersion, glpiSpec.os, 'os')}
+                {renderComparisonRow('Windows License', asset.windowsLicense, glpiSpec.license, 'license')}
+                {renderComparisonRow('MS Office', asset.officeLicense, glpiSpec.msOffice, 'msOffice')}
+                {renderComparisonRow('Antivirus', asset.antivirusStatus, glpiSpec.antivirus, 'antivirus')}
+              </Box>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <Box sx={{
+        background: 'rgba(255, 255, 255, 0.65)',
+        border: '1px solid rgba(255, 255, 255, 0.85)',
+        backdropFilter: 'blur(20px)',
+        borderRadius: '14px',
+        boxShadow: '0 4px 24px rgba(99, 102, 241, 0.07), 0 1px 3px rgba(0, 0, 0, 0.04)',
+        p: 1.5
+      }}>
       {/* General */}
       <Accordion defaultExpanded disableGutters elevation={0} sx={{ bgcolor: 'transparent', '&:before': { display: 'none' }, mb: 1 }}>
         <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ fontSize: 18 }} />} sx={{ minHeight: 0, py: 0.5, px: 0, '& .MuiAccordionSummary-content': { m: 0 } }}>
@@ -405,6 +510,22 @@ function SpecTab({ asset }: { asset: any }) {
         </AccordionDetails>
       </Accordion>
 
+      {/* Metadata */}
+      <Accordion disableGutters elevation={0} sx={{ bgcolor: 'transparent', '&:before': { display: 'none' }, mb: 1 }}>
+        <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ fontSize: 18 }} />} sx={{ minHeight: 0, py: 0.5, px: 0, '& .MuiAccordionSummary-content': { m: 0 } }}>
+          {makeHeader('ข้อมูลระบบ', 'linear-gradient(180deg,#6b7280,#9ca3af)')}
+        </AccordionSummary>
+        <AccordionDetails sx={{ pt: 1.5, pb: 0.5, px: 0 }}>
+          <Grid container spacing={1}>
+            <SpecItem label="📂 หมวดหมู่" value={asset.category?.name} />
+            <SpecItem label="📅 สร้างเมื่อ" value={asset.createdAt ? new Date(asset.createdAt).toLocaleString('th-TH') : null} />
+            <SpecItem label="✏️ แก้ไขล่าสุด" value={asset.updatedAt ? new Date(asset.updatedAt).toLocaleString('th-TH') : null} />
+            <SpecItem label="🆔 ID" value={asset.id} mono />
+            <SpecItem label="📊 สถานะ" value={STATUS_LABEL[asset.status] || asset.status} />
+          </Grid>
+        </AccordionDetails>
+      </Accordion>
+
       {/* Remark */}
       {asset.remark && (
         <Accordion disableGutters elevation={0} sx={{ bgcolor: 'transparent', '&:before': { display: 'none' }, mb: 1 }}>
@@ -440,6 +561,7 @@ function SpecTab({ asset }: { asset: any }) {
           </AccordionDetails>
         </Accordion>
       )}
+    </Box>
     </Box>
   );
 }
@@ -798,6 +920,15 @@ export default function AssetDetailPage() {
   const [isFavorite, setIsFavorite] = useState(false);
   const [similarAssets, setSimilarAssets] = useState<any[]>([]);
 
+  const [glpiSpec, setGlpiSpec] = useState<any>(null);
+  const [loadingGLPI, setLoadingGLPI] = useState(false);
+  const [syncingGLPI, setSyncingGLPI] = useState(false);
+  const [toast, setToast] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'warning' | 'info' }>({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
+
   useEffect(() => {
     if (id) {
       assetAPI.get(parseInt(id))
@@ -805,6 +936,60 @@ export default function AssetDetailPage() {
         .finally(() => setLoading(false));
     }
   }, [id]);
+
+  useEffect(() => {
+    if (!asset || !id) return;
+    const t = (asset.type || '').toLowerCase();
+    const cat = (asset.category?.name || '').toLowerCase();
+    const isComputer = ['notebook', 'laptop', 'macbook', 'pc desktop', 'desktop', 'workstation', 'all-in-one', 'mini pc', 'thin client', 'computer'].some(k => t.includes(k)) || cat === 'คอมพิวเตอร์' || t === 'pc';
+    
+    if (isComputer && asset.serialNo) {
+      setLoadingGLPI(true);
+      assetAPI.getGLPISpec(parseInt(id))
+        .then((res) => {
+          setGlpiSpec(res.data);
+        })
+        .catch((err) => {
+          console.warn('Failed to fetch GLPI spec:', err);
+        })
+        .finally(() => {
+          setLoadingGLPI(false);
+        });
+    }
+  }, [asset?.id, asset?.serialNo, id]);
+
+  const handleGLPISync = async (field?: string, label?: string) => {
+    if (!id || !asset) return;
+    
+    const confirmMsg = field 
+      ? `คุณต้องการอัปเดต "${label}" ของทรัพย์สินนี้ตามข้อมูลใน GLPI หรือไม่?`
+      : 'คุณต้องการอัปเดตรายละเอียดฮาร์ดแวร์ทั้งหมดของทรัพย์สินนี้ตามข้อมูลใน GLPI หรือไม่? (ค่าเดิมในระบบจะถูกเขียนทับ)';
+      
+    if (!window.confirm(confirmMsg)) return;
+    
+    setSyncingGLPI(true);
+    try {
+      await assetAPI.syncGLPI(parseInt(id), field);
+      setToast({
+        open: true,
+        message: field ? `อัปเดต "${label}" ตาม GLPI เรียบร้อยแล้ว` : 'อัปเดตรายละเอียดฮาร์ดแวร์ตาม GLPI เรียบร้อยแล้ว',
+        severity: 'success'
+      });
+      // Reload asset and refetch spec
+      const res = await assetAPI.get(parseInt(id));
+      setAsset(res.data);
+      const specRes = await assetAPI.getGLPISpec(parseInt(id));
+      setGlpiSpec(specRes.data);
+    } catch (err: any) {
+      setToast({
+        open: true,
+        message: err.response?.data?.message || 'ไม่สามารถอัปเดตข้อมูลจาก GLPI ได้',
+        severity: 'error'
+      });
+    } finally {
+      setSyncingGLPI(false);
+    }
+  };
 
   // recent view tracking
   useEffect(() => {
@@ -946,6 +1131,11 @@ export default function AssetDetailPage() {
                       )}
                       {asset.serialNo && (
                         <Typography variant="caption" color="text.disabled">S/N: {asset.serialNo}</Typography>
+                      )}
+                      {asset.ownerName && (
+                        <Typography variant="caption" color="primary.main" sx={{ ml: 1, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <span style={{ fontSize: '14px' }}>👤</span> {asset.ownerName}
+                        </Typography>
                       )}
                     </Box>
                   </Box>
@@ -1107,7 +1297,15 @@ export default function AssetDetailPage() {
         </Tabs>
 
         {/* Tab panels */}
-        {activeTab === 'spec' && <SpecTab asset={asset} />}
+        {activeTab === 'spec' && (
+          <SpecTab
+            asset={asset}
+            glpiSpec={glpiSpec}
+            loadingGLPI={loadingGLPI}
+            syncingGLPI={syncingGLPI}
+            onSync={handleGLPISync}
+          />
+        )}
         {activeTab === 'history' && <HistoryTab asset={asset} />}
         {activeTab === 'pm' && <PMTab asset={asset} />}
         {activeTab === 'documents' && (
@@ -1217,6 +1415,21 @@ export default function AssetDetailPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={6000}
+        onClose={() => setToast(prev => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setToast(prev => ({ ...prev, open: false }))}
+          severity={toast.severity}
+          sx={{ width: '100%', borderRadius: '10px', fontWeight: 600 }}
+        >
+          {toast.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

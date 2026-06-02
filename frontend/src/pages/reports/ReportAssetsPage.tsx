@@ -74,7 +74,7 @@ export default function ReportAssetsPage() {
     let list = assets;
     if (filterType) list = list.filter(a => a.type === filterType);
     if (filterStatus) list = list.filter(a => a.status === filterStatus);
-    if (search) { const q = search.toLowerCase(); list = list.filter(a => (a.assetCode || '').toLowerCase().includes(q) || (a.serialNo || '').toLowerCase().includes(q) || (a.assetName || '').toLowerCase().includes(q)); }
+    if (search) { const q = search.toLowerCase(); list = list.filter(a => (a.assetCode || '').toLowerCase().includes(q) || (a.serialNo || '').toLowerCase().includes(q) || (a.assetName || '').toLowerCase().includes(q) || (a.category?.name || '').toLowerCase().includes(q)); }
     return list;
   }, [assets, filterType, filterStatus, search]);
 
@@ -200,10 +200,7 @@ export default function ReportAssetsPage() {
         {/* Summary cards */}
       <Grid container spacing={2.5} sx={{ mb: 4 }}>
         <Grid item xs={6} md={3}>
-          <Card 
-            onClick={() => setFilterStatus('')}
-            sx={{ borderLeft: '4px solid #4f46e5', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', cursor: 'pointer', transition: 'all 0.2s', '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 6px 12px rgba(0,0,0,0.08)' }, ...(filterStatus === '' ? { bgcolor: 'rgba(79,70,229,0.04)' } : {}) }}
-          >
+          <Card onClick={() => setFilterStatus('')} sx={{ borderLeft: '2px solid #4f46e5', cursor: 'pointer', bgcolor: filterStatus === '' ? 'rgba(79,70,229,0.06)' : 'rgba(79,70,229,0.02)' }}>
             <CardContent sx={{ p: 2.5 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(99,102,241,0.1)', color: '#4f46e5', display: 'flex' }}><Boxes size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>ทรัพย์สินทั้งหมด</Typography></Box>
               <Typography variant="h4" fontWeight={800}>{total}</Typography>
@@ -211,10 +208,7 @@ export default function ReportAssetsPage() {
           </Card>
         </Grid>
         <Grid item xs={6} md={3}>
-          <Card 
-            onClick={() => setFilterStatus('Available')}
-            sx={{ borderLeft: '4px solid #10b981', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', cursor: 'pointer', transition: 'all 0.2s', '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 6px 12px rgba(0,0,0,0.08)' }, ...(filterStatus === 'Available' ? { bgcolor: 'rgba(16,185,129,0.04)' } : {}) }}
-          >
+          <Card onClick={() => setFilterStatus('Available')} sx={{ borderLeft: '2px solid #10b981', cursor: 'pointer', bgcolor: filterStatus === 'Available' ? 'rgba(16,185,129,0.06)' : 'rgba(16,185,129,0.02)' }}>
             <CardContent sx={{ p: 2.5 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(16,185,129,0.1)', color: '#059669', display: 'flex' }}><CheckCircle2 size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>พร้อมใช้งาน</Typography></Box>
               <Typography variant="h4" fontWeight={800}>{byStatus.find((s: any) => s.status === 'Available')?._count || 0}</Typography>
@@ -222,24 +216,44 @@ export default function ReportAssetsPage() {
           </Card>
         </Grid>
         <Grid item xs={6} md={3}>
-          <Card 
-            onClick={() => setFilterStatus('Borrowed')}
-            sx={{ borderLeft: '4px solid #f59e0b', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', cursor: 'pointer', transition: 'all 0.2s', '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 6px 12px rgba(0,0,0,0.08)' }, ...(filterStatus === 'Borrowed' ? { bgcolor: 'rgba(245,158,11,0.04)' } : {}) }}
-          >
+          <Card onClick={() => setFilterStatus('InUse')} sx={{ borderLeft: '2px solid #0ea5e9', cursor: 'pointer', bgcolor: filterStatus === 'InUse' ? 'rgba(14,165,233,0.06)' : 'rgba(14,165,233,0.02)' }}>
+            <CardContent sx={{ p: 2.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(14,165,233,0.1)', color: '#0284c7', display: 'flex' }}><Boxes size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>ใช้งานประจำ</Typography></Box>
+              <Typography variant="h4" fontWeight={800}>{byStatus.find((s: any) => s.status === 'InUse')?._count || 0}</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={6} md={3}>
+          <Card onClick={() => setFilterStatus('Borrowed')} sx={{ borderLeft: '2px solid #f59e0b', cursor: 'pointer', bgcolor: filterStatus === 'Borrowed' ? 'rgba(245,158,11,0.06)' : 'rgba(245,158,11,0.02)' }}>
             <CardContent sx={{ p: 2.5 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(245,158,11,0.1)', color: '#d97706', display: 'flex' }}><AlertTriangle size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>กำลังยืม</Typography></Box>
               <Typography variant="h4" fontWeight={800}>{byStatus.find((s: any) => s.status === 'Borrowed')?._count || 0}</Typography>
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={6} md={3}>
-          <Card 
-            onClick={() => setFilterStatus('Maintenance')}
-            sx={{ borderLeft: '4px solid #ef4444', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', cursor: 'pointer', transition: 'all 0.2s', '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 6px 12px rgba(0,0,0,0.08)' }, ...(filterStatus === 'Maintenance' ? { bgcolor: 'rgba(239,68,68,0.04)' } : {}) }}
-          >
+        
+        {/* Second Row */}
+        <Grid item xs={12} sm={4}>
+          <Card onClick={() => setFilterStatus('Maintenance')} sx={{ borderLeft: '2px solid #ef4444', cursor: 'pointer', bgcolor: filterStatus === 'Maintenance' ? 'rgba(239,68,68,0.06)' : 'rgba(239,68,68,0.02)' }}>
             <CardContent sx={{ p: 2.5 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(239,68,68,0.08)', color: '#dc2626', display: 'flex' }}><Wrench size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>ซ่อมบำรุง</Typography></Box>
               <Typography variant="h4" fontWeight={800}>{byStatus.find((s: any) => s.status === 'Maintenance')?._count || 0}</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={4}>
+          <Card onClick={() => setFilterStatus('Retired')} sx={{ borderLeft: '2px solid #64748b', cursor: 'pointer', bgcolor: filterStatus === 'Retired' ? 'rgba(100,116,139,0.06)' : 'rgba(100,116,139,0.02)' }}>
+            <CardContent sx={{ p: 2.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(100,116,139,0.1)', color: '#475569', display: 'flex' }}><Boxes size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>ปลดระวาง</Typography></Box>
+              <Typography variant="h4" fontWeight={800}>{byStatus.find((s: any) => s.status === 'Retired')?._count || 0}</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={4}>
+          <Card onClick={() => setFilterStatus('Lost')} sx={{ borderLeft: '2px solid #b91c1c', cursor: 'pointer', bgcolor: filterStatus === 'Lost' ? 'rgba(185,28,28,0.06)' : 'rgba(185,28,28,0.02)' }}>
+            <CardContent sx={{ p: 2.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(185,28,28,0.1)', color: '#991b1b', display: 'flex' }}><AlertTriangle size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>สูญหาย</Typography></Box>
+              <Typography variant="h4" fontWeight={800}>{byStatus.find((s: any) => s.status === 'Lost')?._count || 0}</Typography>
             </CardContent>
           </Card>
         </Grid>

@@ -282,7 +282,7 @@ export default function MyItemsPage() {
                 <div key={req.id} style={{
                   background: C.cardBg, borderRadius: 14,
                   border: `1px solid ${borderColor}`,
-                  borderLeft: `4px solid ${borderColor}`,
+                  borderLeft: `2px solid ${borderColor}`,
                   overflow: 'hidden', transition: 'all 0.15s',
                   cursor: 'pointer',
                 }} onClick={() => setExpandedReq(isExpanded ? null : req.id)}>

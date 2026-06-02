@@ -101,7 +101,7 @@ function RequestRow({ group, onReturn, defaultOpen = false }: { group: RequestGr
         sx={{
           '& > *': { borderBottom: 'unset' },
           bgcolor: isOverdue ? alpha('#EF4444', 0.04) : 'inherit',
-          borderLeft: isOverdue ? `3px solid ${theme.palette.error.main}` : '3px solid transparent',
+          borderLeft: isOverdue ? `2px solid ${theme.palette.error.main}` : '2px solid transparent',
         }}
       >
         <TableCell>

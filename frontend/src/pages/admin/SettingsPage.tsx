@@ -112,8 +112,27 @@ function EmailTemplateEditor({ templates, setTemplates, onSaveTemplate }: {
   const [localSubject, setLocalSubject] = useState('');
   const [localBody, setLocalBody] = useState('');
   const [resetting, setResetting] = useState(false);
+  const [testEmail, setTestEmail] = useState('watchara.kid@trrgroup.com');
+  const [sendingTest, setSendingTest] = useState(false);
 
   const editingTemplate = templates.find(t => t.id === editingId);
+
+  const handleSendTestTemplate = async () => {
+    if (!editingTemplate) return;
+    if (!testEmail.trim()) {
+      toast.error('กรุณาระบุอีเมลปลายทางสำหรับการทดสอบ');
+      return;
+    }
+    setSendingTest(true);
+    try {
+      const res = await adminAPI.testNotificationTemplate(editingTemplate.id, testEmail);
+      toast.success(res.data.message || 'ส่งอีเมลทดสอบเรียบร้อยแล้ว');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || err.message || 'เกิดข้อผิดพลาดในการทดสอบส่ง');
+    } finally {
+      setSendingTest(false);
+    }
+  };
 
   const SAMPLE_DATA: Record<string, string> = {
     requestNo: 'BR-2026051501',
@@ -130,9 +149,9 @@ function EmailTemplateEditor({ templates, setTemplates, onSaveTemplate }: {
     handoverNote: 'นำเครื่องมารับที่แผนก IT ชั้น 2',
     condition: 'ปกติ',
     assetCode: 'TRRHQ-NB-1011',
-    serialNo: 'HRVYBB4',
+    serialNo: 'TRRHQ-NB-1011',
     brand: 'Dell',
-    model: 'Pro 16 PC16250',
+    model: 'Pro 16 PC16250 HRVYBB4',
     damageNote: '-',
     accessoriesNote: 'ครบทุกชิ้น',
     returnDate: '18 พฤษภาคม 2569',
@@ -147,7 +166,7 @@ function EmailTemplateEditor({ templates, setTemplates, onSaveTemplate }: {
     let result = html;
 
     const sampleNoteHtml = '<div style="background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 14px; margin-top: 16px;"><p style="margin: 0; color: #92400e; font-size: 13px;"><b>หมายเหตุ:</b> ใช้งานเสร็จแล้วจะคืนทันที</p></div>';
-    const sampleItemsTable = '<table style="width:100%;border-collapse:collapse;margin-top:8px;"><thead><tr><th style="background:#f1f5f9;padding:10px 12px;text-align:left;font-size:12px;color:#475569;font-weight:600;border-bottom:2px solid #e2e8f0;">ทรัพย์สิน</th><th style="background:#f1f5f9;padding:10px 12px;text-align:center;font-size:12px;color:#475569;font-weight:600;border-bottom:2px solid #e2e8f0;">สถานะ</th></tr></thead><tbody><tr><td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:13px;"><div style="font-weight:600;color:#1e293b;">TRRHQ-NB-1011</div><div style="color:#64748b;font-size:12px;">HRVYBB4 Dell Pro 16 PC16250</div></td><td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;text-align:center;"><span style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;">ส่งมอบแล้ว</span></td></tr><tr><td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:13px;"><div style="font-weight:600;color:#1e293b;">TRRHQ-NB-1024</div><div style="color:#64748b;font-size:12px;">3RFGPC4 Dell Pro 14 PC14250</div></td><td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;text-align:center;"><span style="background:#d1fae5;color:#065f46;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;">อนุมัติ</span></td></tr></tbody></table>';
+    const sampleItemsTable = '<table style="width:100%;border-collapse:collapse;margin-top:8px;"><thead><tr><th style="background:#f1f5f9;padding:10px 12px;text-align:left;font-size:12px;color:#475569;font-weight:600;border-bottom:2px solid #e2e8f0;">ทรัพย์สิน</th><th style="background:#f1f5f9;padding:10px 12px;text-align:center;font-size:12px;color:#475569;font-weight:600;border-bottom:2px solid #e2e8f0;">สถานะ</th></tr></thead><tbody><tr><td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:13px;"><div style="font-weight:600;color:#1e293b;">TRRHQ-NB-1011</div><div style="color:#64748b;font-size:12px;">TRRHQ-NB-1011 Dell Pro 16 PC16250 HRVYBB4</div></td><td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;text-align:center;"><span style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;">ส่งมอบแล้ว</span></td></tr><tr><td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:13px;"><div style="font-weight:600;color:#1e293b;">TRRHQ-NB-1024</div><div style="color:#64748b;font-size:12px;">3RFGPC4 Dell Pro 14 PC14250</div></td><td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;text-align:center;"><span style="background:#d1fae5;color:#065f46;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;">อนุมัติ</span></td></tr></tbody></table>';
 
     result = result.replace(/\{\{note\}\}/g, sampleNoteHtml);
     result = result.replace(/\{\{itemsTable\}\}/g, sampleItemsTable);
@@ -232,6 +251,62 @@ function EmailTemplateEditor({ templates, setTemplates, onSaveTemplate }: {
             <Button variant="contained" size="small" startIcon={<SaveIcon size={16} />} onClick={handleSave}>บันทึก</Button>
           </Box>
         </Box>
+
+        <Paper 
+          variant="outlined" 
+          sx={{ 
+            p: 2, 
+            mb: 3, 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 2, 
+            bgcolor: '#f8fafc', 
+            borderColor: '#e2e8f0', 
+            borderRadius: 2.5,
+            flexWrap: 'wrap'
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1 }}>
+            <Box sx={{ display: 'flex', color: 'secondary.main' }}>
+              <SendIcon size={18} />
+            </Box>
+            <Box>
+              <Typography variant="subtitle2" fontWeight={700} sx={{ fontSize: '0.85rem' }}>ทดสอบส่งอีเมลตามเทมเพลตนี้</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>ระบบจะนำข้อมูลจำลองมาแทนที่ตัวแปรในเทมเพลตแล้วส่งไปยังอีเมลระบุ</Typography>
+            </Box>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: { xs: '100%', sm: 'auto' }, mt: { xs: 1, sm: 0 } }}>
+            <TextField
+              size="small"
+              placeholder="อีเมลผู้รับ..."
+              value={testEmail}
+              onChange={(e) => setTestEmail(e.target.value)}
+              sx={{ bgcolor: '#fff', width: { xs: '100%', sm: 260 } }}
+              InputProps={{
+                sx: { fontSize: '0.8rem' }
+              }}
+            />
+            <Button
+              variant="contained"
+              color="secondary"
+              size="small"
+              onClick={handleSendTestTemplate}
+              disabled={sendingTest}
+              startIcon={sendingTest ? <CircularProgress size={16} color="inherit" /> : <SendIcon size={14} />}
+              sx={{ 
+                textTransform: 'none', 
+                fontSize: '0.75rem', 
+                py: 1, 
+                px: 2, 
+                fontWeight: 600, 
+                borderRadius: 1.5,
+                whiteSpace: 'nowrap'
+              }}
+            >
+              {sendingTest ? 'กำลังส่ง...' : 'ส่งทดสอบ'}
+            </Button>
+          </Box>
+        </Paper>
 
         <Grid container spacing={3}>
           <Grid item xs={12} lg={6}>
@@ -346,8 +421,8 @@ function EmailTemplateEditor({ templates, setTemplates, onSaveTemplate }: {
                       transition: 'all 0.2s',
                       border: '1px solid',
                       borderColor: 'divider',
+                      borderLeft: `4px solid ${group.color}`,
                       '&:hover': {
-                        borderColor: group.color,
                         boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
                         transform: 'translateY(-2px)',
                       },

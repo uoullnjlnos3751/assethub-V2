@@ -115,25 +115,25 @@ export default function ReportBorrowPage() {
       {/* Summary cards */}
       <Grid container spacing={2.5} sx={{ mb: 4 }}>
         <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '4px solid #f59e0b', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}><CardContent sx={{ p: 2.5 }}>
+          <Card sx={{ borderLeft: '2px solid #f59e0b', bgcolor: 'rgba(245,158,11,0.02)' }}><CardContent sx={{ p: 2.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(245,158,11,0.1)', color: '#d97706', display: 'flex' }}><ShoppingCart size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>รออนุมัติ</Typography></Box>
             <Typography variant="h4" fontWeight={800}>{summary?.pendingApproval || 0}</Typography>
           </CardContent></Card>
         </Grid>
         <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '4px solid #3b82f6', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}><CardContent sx={{ p: 2.5 }}>
+          <Card sx={{ borderLeft: '2px solid #3b82f6', bgcolor: 'rgba(59,130,246,0.02)' }}><CardContent sx={{ p: 2.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(59,130,246,0.1)', color: '#2563eb', display: 'flex' }}><CheckCircle2 size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>กำลังยืม</Typography></Box>
             <Typography variant="h4" fontWeight={800}>{summary?.activeCheckedOut || 0}</Typography>
           </CardContent></Card>
         </Grid>
         <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '4px solid #ef4444', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}><CardContent sx={{ p: 2.5 }}>
+          <Card sx={{ borderLeft: '2px solid #ef4444', bgcolor: 'rgba(239,68,68,0.02)' }}><CardContent sx={{ p: 2.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(239,68,68,0.08)', color: '#dc2626', display: 'flex' }}><AlertTriangle size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>ยืมเกินกำหนด</Typography></Box>
             <Typography variant="h4" fontWeight={800}>{summary?.overdue || 0}</Typography>
           </CardContent></Card>
         </Grid>
         <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '4px solid #7c3aed', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}><CardContent sx={{ p: 2.5 }}>
+          <Card sx={{ borderLeft: '2px solid #7c3aed', bgcolor: 'rgba(124,58,237,0.02)' }}><CardContent sx={{ p: 2.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(139,92,246,0.1)', color: '#7c3aed', display: 'flex' }}><History size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>คำขอทั้งหมด</Typography></Box>
             <Typography variant="h4" fontWeight={800}>{history.length}</Typography>
           </CardContent></Card>

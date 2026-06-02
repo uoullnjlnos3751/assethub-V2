@@ -315,10 +315,10 @@ export default function UsersPage() {
       {/* Summary Cards */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '4px solid #4f46e5', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+          <Card sx={{ borderLeft: '2px solid #4f46e5', bgcolor: 'rgba(79,70,229,0.02)' }}>
             <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(79,70,229,0.08)', display: 'flex' }}>
+                <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(79,70,229,0.06)', display: 'flex' }}>
                   <PeopleIcon sx={{ color: '#4f46e5', fontSize: 20 }} />
                 </Box>
                 <Box>
@@ -332,10 +332,10 @@ export default function UsersPage() {
           </Card>
         </Grid>
         <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '4px solid #16a34a', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+          <Card sx={{ borderLeft: '2px solid #16a34a', bgcolor: 'rgba(22,163,74,0.02)' }}>
             <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(22,163,74,0.08)', display: 'flex' }}>
+                <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(22,163,74,0.06)', display: 'flex' }}>
                   <ShieldIcon sx={{ color: '#16a34a', fontSize: 20 }} />
                 </Box>
                 <Box>
@@ -349,10 +349,10 @@ export default function UsersPage() {
           </Card>
         </Grid>
         <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '4px solid #f59e0b', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+          <Card sx={{ borderLeft: '2px solid #f59e0b', bgcolor: 'rgba(245,158,11,0.02)' }}>
             <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(245,158,11,0.08)', display: 'flex' }}>
+                <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(245,158,11,0.06)', display: 'flex' }}>
                   <AdminIcon sx={{ color: '#f59e0b', fontSize: 20 }} />
                 </Box>
                 <Box>
@@ -366,10 +366,10 @@ export default function UsersPage() {
           </Card>
         </Grid>
         <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '4px solid #ef4444', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+          <Card sx={{ borderLeft: '2px solid #ef4444', bgcolor: 'rgba(239,68,68,0.02)' }}>
             <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(239,68,68,0.08)', display: 'flex' }}>
+                <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(239,68,68,0.06)', display: 'flex' }}>
                   <BlockIcon sx={{ color: '#ef4444', fontSize: 20 }} />
                 </Box>
                 <Box>

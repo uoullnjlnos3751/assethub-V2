@@ -410,14 +410,14 @@ export default function Layout() {
                               my: '1px',
                               borderRadius: '7px',
                               '&.Mui-selected': {
-                                bgcolor: '#fef3c7',
-                                color: '#b45309',
-                                '&:hover': { bgcolor: '#fde68a' },
+                                bgcolor: theme.palette.mode === 'dark' ? 'rgba(0, 113, 227, 0.15)' : 'rgba(0, 113, 227, 0.08)',
+                                color: theme.palette.primary.main,
+                                '&:hover': { bgcolor: theme.palette.mode === 'dark' ? 'rgba(0, 113, 227, 0.25)' : 'rgba(0, 113, 227, 0.12)' },
                               },
-                              '&:hover': { bgcolor: '#f9fafb' },
+                              '&:hover': { bgcolor: theme.palette.mode === 'dark' ? '#2d2d2f' : '#f5f5f7' },
                             }}
                           >
-                            <ListItemIcon sx={{ minWidth: 24, color: active ? '#b45309' : '#9ca3af' }}>
+                            <ListItemIcon sx={{ minWidth: 24, color: active ? theme.palette.primary.main : theme.palette.text.secondary }}>
                               {child.icon ? React.cloneElement(child.icon as React.ReactElement, { sx: { fontSize: 13 } }) : null}
                             </ListItemIcon>
                             <ListItemText
@@ -425,7 +425,7 @@ export default function Layout() {
                               primaryTypographyProps={{
                                 fontSize: '0.76rem',
                                 fontWeight: active ? 600 : 400,
-                                color: active ? '#b45309' : '#4b5563',
+                                color: active ? theme.palette.primary.main : theme.palette.text.primary,
                                 whiteSpace: 'nowrap',
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
@@ -455,14 +455,14 @@ export default function Layout() {
                 px: '12px',
                 my: '1px',
                 '&.Mui-selected': {
-                  bgcolor: '#fef3c7',
-                  color: '#b45309',
-                  '&:hover': { bgcolor: '#fde68a' },
+                  bgcolor: theme.palette.mode === 'dark' ? 'rgba(0, 113, 227, 0.15)' : 'rgba(0, 113, 227, 0.08)',
+                  color: theme.palette.primary.main,
+                  '&:hover': { bgcolor: theme.palette.mode === 'dark' ? 'rgba(0, 113, 227, 0.25)' : 'rgba(0, 113, 227, 0.12)' },
                 },
-                '&:hover': { bgcolor: '#f9fafb' },
+                '&:hover': { bgcolor: theme.palette.mode === 'dark' ? '#2d2d2f' : '#f5f5f7' },
               }}
             >
-              <ListItemIcon sx={{ minWidth: 30, color: active ? '#b45309' : '#6b7280' }}>
+              <ListItemIcon sx={{ minWidth: 30, color: active ? theme.palette.primary.main : theme.palette.text.secondary }}>
                 {item.icon}
               </ListItemIcon>
               <ListItemText
@@ -470,7 +470,7 @@ export default function Layout() {
                 primaryTypographyProps={{
                   fontSize: '0.8125rem',
                   fontWeight: active ? 600 : 500,
-                  color: active ? '#b45309' : '#374151',
+                  color: active ? theme.palette.primary.main : theme.palette.text.primary,
                 }}
               />
             </ListItemButton>

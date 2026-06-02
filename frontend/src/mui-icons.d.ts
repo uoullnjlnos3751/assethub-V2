@@ -15,3 +15,9 @@ declare module '@mui/icons-material/VisibilityOff' {
   const component: React.ComponentType<SvgIconProps>;
   export default component;
 }
+
+declare module '@mui/icons-material/ViewList' {
+  import { SvgIconProps } from '@mui/material/SvgIcon';
+  const component: React.ComponentType<SvgIconProps>;
+  export default component;
+}

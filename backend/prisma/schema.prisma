@@ -587,6 +587,7 @@ model PMRun {
   performedBy Int?
   performedAt DateTime?
   completedAt DateTime?
+  photoUrl    String?
   answers     PMRunAnswer[]
   asset       Asset         @relation(fields: [assetId], references: [id])
   performer   AppUser?      @relation("PMRunPerformedBy", fields: [performedBy], references: [id])

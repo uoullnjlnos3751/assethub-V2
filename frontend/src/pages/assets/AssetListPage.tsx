@@ -527,7 +527,7 @@ export default function AssetListPage() {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, gap: 2, flexWrap: 'wrap' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, gap: 2, flexWrap: 'wrap' }}>
         <Box>
           <Typography variant="h4" fontWeight={700}>
             {isAvailableOnlyView ? 'รายการอุปกรณ์พร้อมยืม' : typeGroupLabels[typeGroup] || 'ทะเบียนทรัพย์สิน'}
@@ -549,51 +549,16 @@ export default function AssetListPage() {
         </Box>
       </Box>
 
-      {/* ── Stat Cards — shown for admin views only ── */}
-      {!isAvailableOnlyView && (
-        <Stack direction="row" spacing={2} sx={{ mb: 3, flexWrap: 'wrap' }}>
-          {[
-            { label: 'ทั้งหมด',      value: total,  color: '#6366F1', bg: alpha('#6366F1', 0.1), dot: '#6366F1', statusKey: '' },
-            { label: 'พร้อมใช้งาน', value: null,   color: '#059669', bg: alpha('#10B981', 0.1), dot: '#10B981', statusKey: 'Available' },
-            { label: 'ใช้งานประจำ', value: null,   color: '#2563EB', bg: alpha('#3B82F6', 0.1), dot: '#3B82F6', statusKey: 'InUse' },
-            { label: 'ซ่อมบำรุง',   value: null,   color: '#d97706', bg: alpha('#f59e0b', 0.1), dot: '#f59e0b', statusKey: 'Maintenance' },
-            { label: 'ปลดระวาง',    value: null,   color: '#6b7280', bg: alpha('#9ca3af', 0.1), dot: '#9ca3af', statusKey: 'Retired' },
-          ].map((s) => {
-            const count =
-              s.statusKey === ''
-                ? total
-                : (categoryStats?.byStatus.find((b) => b.status === s.statusKey)?._count ?? '—');
-            const isActive = s.statusKey === '' ? status === '' : status === s.statusKey;
-            return (
-              <Card
-                key={s.label}
-                onClick={() => { setStatus(s.statusKey); setPage(0); }}
-                sx={{
-                  flex: '1 1 auto', minWidth: 110, cursor: 'pointer',
-                  border: '1px solid',
-                  borderColor: isActive ? s.dot : 'divider',
-                  bgcolor: isActive ? s.bg : 'background.paper',
-                  transition: 'all 0.15s',
-                  '&:hover': { borderColor: s.dot, bgcolor: s.bg },
-                }}
-              >
-                <CardContent sx={{ py: '12px !important', px: 2 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: s.dot, flexShrink: 0 }} />
-                    <Typography variant="caption" color="text.secondary" fontWeight={500} noWrap>{s.label}</Typography>
-                  </Box>
-                  <Typography variant="h5" fontWeight={700} sx={{ color: s.color, lineHeight: 1.2 }}>
-                    {typeof count === 'number' ? count.toLocaleString() : count}
-                  </Typography>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </Stack>
-      )}
-
-      <Card sx={{ p: 2.5, mb: 3 }}>
-        <Box sx={{ display: 'flex', gap: 2, flexDirection: isMobile ? 'column' : 'row', flexWrap: 'wrap', alignItems: 'center' }}>
+      <Card sx={{
+        p: 2,
+        mb: 2,
+        background: 'rgba(255, 255, 255, 0.7)',
+        backdropFilter: 'blur(20px)',
+        border: '1px solid rgba(0, 0, 0, 0.05)',
+        borderRadius: '12px',
+        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
+      }}>
+        <Box sx={{ display: 'flex', gap: 1.5, flexDirection: isMobile ? 'column' : 'row', flexWrap: 'wrap', alignItems: 'center' }}>
           <TextField
             placeholder="ค้นหาเลขครุภัณฑ์ ชื่อ S/N ยี่ห้อ..."
             size="small"
@@ -609,7 +574,7 @@ export default function AssetListPage() {
               ),
             }}
           />
-          <FormControl size="small" sx={{ minWidth: 180, width: isMobile ? '100%' : 'auto' }}>
+          <FormControl size="small" sx={{ minWidth: 160, width: isMobile ? '100%' : 'auto' }}>
             <InputLabel>ประเภท</InputLabel>
             <Select value={type} label="ประเภท" onChange={(e) => { setType(e.target.value); setPage(0); }}>
               <MenuItem value="">ทั้งหมด</MenuItem>
@@ -618,7 +583,7 @@ export default function AssetListPage() {
               ))}
             </Select>
           </FormControl>
-          <FormControl size="small" sx={{ minWidth: 180, width: isMobile ? '100%' : 'auto' }}>
+          <FormControl size="small" sx={{ minWidth: 160, width: isMobile ? '100%' : 'auto' }}>
             <InputLabel>บริษัท (Company)</InputLabel>
             <Select value={company} label="บริษัท (Company)" onChange={(e) => { setCompany(e.target.value); setPage(0); }}>
               <MenuItem value="">ทั้งหมด</MenuItem>
@@ -627,39 +592,60 @@ export default function AssetListPage() {
               ))}
             </Select>
           </FormControl>
-          <Button variant="contained" startIcon={<SearchIcon />} sx={{ width: isMobile ? '100%' : 'auto' }} onClick={handleSearch}>ค้นหา</Button>
+          <Button variant="contained" startIcon={<SearchIcon />} sx={{ width: isMobile ? '100%' : 'auto', borderRadius: '8px', textTransform: 'none' }} onClick={handleSearch}>ค้นหา</Button>
         </Box>
 
-        {/* Status filter chips — only for admin view */}
+        {/* Unified Status Filters & Stats Ribbon */}
         {!isAvailableOnlyView && (
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1.5, pt: 1.5, borderTop: '0.5px solid', borderColor: 'divider', alignItems: 'center' }}>
-            <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ mr: 0.5 }}>สถานะ:</Typography>
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1.5, pt: 1.5, borderTop: '1px solid rgba(0,0,0,0.05)', alignItems: 'center' }}>
+            <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ mr: 0.5, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>สถานะ:</Typography>
             {[
-              { value: '',            label: 'ทั้งหมด' },
-              { value: 'Available',   label: 'พร้อมใช้งาน' },
-              { value: 'InUse',       label: 'ใช้งานประจำ' },
-              { value: 'Borrowed',    label: 'กำลังยืม' },
-              { value: 'Maintenance', label: 'ซ่อมบำรุง' },
-              { value: 'Retired',     label: 'ปลดระวาง' },
-              { value: 'Lost',        label: 'สูญหาย' },
-            ].map((opt) => (
-              <Chip
-                key={opt.value}
-                label={opt.label}
-                size="small"
-                onClick={() => { setStatus(opt.value); setPage(0); }}
-                variant={status === opt.value ? 'filled' : 'outlined'}
-                color={
-                  status === opt.value
-                    ? (opt.value === 'Available' ? 'success'
-                      : opt.value === 'Maintenance' ? 'warning'
-                      : opt.value === 'Lost' ? 'error'
-                      : 'primary')
-                    : 'default'
-                }
-                sx={{ cursor: 'pointer', fontWeight: status === opt.value ? 600 : 400 }}
-              />
-            ))}
+              { value: '',            label: 'ทั้งหมด',      color: '#6366F1', bg: alpha('#6366F1', 0.08), dot: '#6366F1' },
+              { value: 'Available',   label: 'พร้อมใช้งาน',   color: '#34c759', bg: alpha('#34c759', 0.08), dot: '#34c759' },
+              { value: 'InUse',       label: 'ใช้งานประจำ',   color: '#0071e3', bg: alpha('#0071e3', 0.08), dot: '#0071e3' },
+              { value: 'Borrowed',    label: 'กำลังยืม',     color: '#5856d6', bg: alpha('#5856d6', 0.08), dot: '#5856d6' },
+              { value: 'Maintenance', label: 'ซ่อมบำรุง',    color: '#ff9500', bg: alpha('#ff9500', 0.08), dot: '#ff9500' },
+              { value: 'Retired',     label: 'ปลดระวาง',    color: '#8e8e93', bg: alpha('#8e8e93', 0.08), dot: '#8e8e93' },
+              { value: 'Lost',        label: 'สูญหาย',      color: '#ff3b30', bg: alpha('#ff3b30', 0.08), dot: '#ff3b30' },
+            ].map((opt) => {
+              const count = opt.value === ''
+                ? total
+                : (categoryStats?.byStatus.find((b) => b.status === opt.value)?._count ?? 0);
+              const isActive = status === opt.value;
+              return (
+                <Button
+                  key={opt.value}
+                  onClick={() => { setStatus(opt.value); setPage(0); }}
+                  size="small"
+                  sx={{
+                    py: 0.25,
+                    px: 1.25,
+                    borderRadius: '20px',
+                    textTransform: 'none',
+                    fontSize: '0.72rem',
+                    fontWeight: isActive ? 700 : 500,
+                    color: isActive ? opt.color : 'text.secondary',
+                    bgcolor: isActive ? opt.bg : 'transparent',
+                    border: '1px solid',
+                    borderColor: isActive ? opt.dot : 'rgba(0, 0, 0, 0.08)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 0.75,
+                    minWidth: 'auto',
+                    height: 28,
+                    '&:hover': {
+                      bgcolor: opt.bg,
+                      borderColor: opt.dot,
+                      color: opt.color
+                    }
+                  }}
+                >
+                  <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: opt.dot, flexShrink: 0 }} />
+                  <span>{opt.label}</span>
+                  <span style={{ opacity: 0.8, fontWeight: 700 }}>({count})</span>
+                </Button>
+              );
+            })}
           </Box>
         )}
       </Card>
@@ -783,8 +769,8 @@ export default function AssetListPage() {
                 <Grid item xs={12} sm={6} lg={4} key={item.id}>
                   <Card sx={{
                     height: '100%', display: 'flex', flexDirection: 'column',
-                    borderLeft: `4px solid ${isOverdue ? theme.palette.error.main : theme.palette.success.main}`,
-                    '&:hover': { boxShadow: isOverdue ? `0 8px 24px ${alpha(theme.palette.error.main, 0.15)}` : `0 8px 24px ${alpha(theme.palette.success.main, 0.15)}` },
+                    borderLeft: `2px solid ${isOverdue ? theme.palette.error.main : theme.palette.success.main}`,
+                    bgcolor: isOverdue ? alpha(theme.palette.error.main, 0.015) : alpha(theme.palette.success.main, 0.015),
                   }}>
                     <CardContent sx={{ flex: 1, pb: 1 }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 1.5 }}>

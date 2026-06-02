@@ -3,6 +3,7 @@ import { prisma } from '../index';
 import { authenticate, authorize } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { Prisma } from '@prisma/client';
+import { fetchGLPISpecBySerial } from '../services/glpi';
 import { searchADUsers } from '../services/ldap';
 import multer from 'multer';
 import * as xlsx from 'xlsx';
@@ -145,6 +146,94 @@ const normalizeAssetPayload = (data: any, isCreate = false) => {
     warrantyEndDate,
     age: calculateAssetAge(purchaseDate),
   };
+};
+
+// Validate required asset fields
+const validateAssetData = (data: any, isCreate = true) => {
+  const errors: string[] = [];
+
+  // Required for both create and update
+  const serialNo = data.serialNo ? String(data.serialNo).trim() : '';
+  if (!serialNo) {
+    errors.push('Serial Number ต้องไม่ว่างเปล่า');
+  } else if (!/^[A-Z0-9\-_\.]+$/i.test(serialNo)) {
+    errors.push('Serial Number ต้องเป็นตัวอักษร ตัวเลข หรือ ขีดกลาง/-/.');
+  }
+
+  const assetName = data.assetName ? String(data.assetName).trim() : '';
+  if (!assetName) {
+    errors.push('ชื่อทรัพย์สิน ต้องไม่ว่างเปล่า');
+  }
+
+  const type = data.type ? String(data.type).trim() : '';
+  if (!type) {
+    errors.push('ประเภท ต้องไม่ว่างเปล่า');
+  }
+
+  const brand = data.brand ? String(data.brand).trim() : '';
+  if (!brand) {
+    errors.push('ยี่ห้อ ต้องไม่ว่างเปล่า');
+  }
+
+  const departmentId = data.departmentId ? String(data.departmentId).trim() : '';
+  if (!departmentId) {
+    errors.push('แผนก ต้องไม่ว่างเปล่า');
+  }
+
+  const ownerName = data.ownerName ? String(data.ownerName).trim() : '';
+  if (!ownerName) {
+    errors.push('ผู้ถือครอง ต้องไม่ว่างเปล่า');
+  }
+
+  // Warranty Date validation
+  if (data.purchaseDate && data.warrantyEndDate) {
+    const purchaseDate = new Date(data.purchaseDate);
+    const warrantyDate = new Date(data.warrantyEndDate);
+    if (!isNaN(purchaseDate.getTime()) && !isNaN(warrantyDate.getTime())) {
+      if (warrantyDate < purchaseDate) {
+        errors.push('วันหมดประกัน ต้องหลังจาก วันที่จัดซื้อ');
+      }
+    }
+  }
+
+  return errors;
+};
+
+// Check for duplicate assets
+const checkDuplicateAssets = async (data: any, excludeId?: number) => {
+  const errors: string[] = [];
+
+  // Check duplicate Serial Number
+  if (data.serialNo && data.serialNo.trim()) {
+    const query: any = { serialNo: { equals: data.serialNo.trim() } };
+    if (excludeId) query.id = { not: excludeId };
+    const existingSerial = await prisma.asset.findFirst({ where: query });
+    if (existingSerial) {
+      errors.push(`Serial Number นี้มีอยู่แล้ว (Asset Code: ${existingSerial.assetCode})`);
+    }
+  }
+
+  // Check duplicate Asset Code (if specified)
+  if (data.assetCode && data.assetCode.trim() && data.assetCode !== '-') {
+    const query: any = { assetCode: { equals: data.assetCode.trim() } };
+    if (excludeId) query.id = { not: excludeId };
+    const existingCode = await prisma.asset.findFirst({ where: query });
+    if (existingCode) {
+      errors.push(`Asset Code นี้มีอยู่แล้ว (S/N: ${existingCode.serialNo})`);
+    }
+  }
+
+  // Check duplicate Computer S/N (for computer assets)
+  if (data.snComputer && data.snComputer.trim()) {
+    const query: any = { snComputer: { equals: data.snComputer.trim() } };
+    if (excludeId) query.id = { not: excludeId };
+    const existingComputer = await prisma.asset.findFirst({ where: query });
+    if (existingComputer) {
+      errors.push(`S/N Computer นี้มีอยู่แล้ว (Asset Code: ${existingComputer.assetCode})`);
+    }
+  }
+
+  return errors;
 };
 
 function parseBoolean(val: any): boolean | undefined {
@@ -2015,6 +2104,19 @@ function getAssetDetail(prisma: any, assetId: number, type?: string | null) {
     }
   });
 
+// ── GLPI Spec Integration for Asset Registry ──
+router.get('/glpi-spec', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const serial = req.query.serial as string;
+    if (!serial) throw new AppError('กรุณาระบุ Serial Number', 400);
+
+    const spec = await fetchGLPISpecBySerial(serial);
+    if (!spec) throw new AppError('ไม่พบข้อมูลฮาร์ดแวร์ใน GLPI สำหรับ Serial Number นี้', 404);
+
+    res.json(spec);
+  } catch (err) { next(err); }
+});
+
 router.get('/:id', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
@@ -2037,6 +2139,13 @@ router.get('/:id', authenticate, async (req: Request, res: Response, next: NextF
 router.post('/upsert', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { detail, ...assetData } = req.body;
+    
+    // Validate required fields
+    const validationErrors = validateAssetData(assetData, true);
+    if (validationErrors.length > 0) {
+      throw new AppError(validationErrors.join('; '), 400);
+    }
+
     const data = normalizeAssetPayload(assetData);
     const { assetCode, serialNo } = data;
 
@@ -2053,6 +2162,12 @@ router.post('/upsert', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async 
     }
     if (!existing && validSerialNo) {
       existing = await prisma.asset.findFirst({ where: { serialNo: validSerialNo } });
+    }
+
+    // Check for duplicates
+    const duplicateErrors = await checkDuplicateAssets(data, existing?.id);
+    if (duplicateErrors.length > 0) {
+      throw new AppError(duplicateErrors.join('; '), 400);
     }
 
     if (data.assetName) {
@@ -2107,15 +2222,21 @@ router.post('/upsert', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async 
 router.post('/', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { detail, ...assetData } = req.body;
+    
+    // Validate required fields
+    const validationErrors = validateAssetData(assetData, true);
+    if (validationErrors.length > 0) {
+      throw new AppError(validationErrors.join('; '), 400);
+    }
+
     const data = normalizeAssetPayload(assetData);
-    if (data.assetCode) {
-      const dup = await prisma.asset.findUnique({ where: { assetCode: data.assetCode } });
-      if (dup) throw new AppError('รหัสทรัพย์สินนี้มีอยู่ในระบบแล้ว');
+    
+    // Check for duplicates
+    const duplicateErrors = await checkDuplicateAssets(data);
+    if (duplicateErrors.length > 0) {
+      throw new AppError(duplicateErrors.join('; '), 400);
     }
-    if (data.serialNo) {
-      const dup = await prisma.asset.findUnique({ where: { serialNo: data.serialNo } });
-      if (dup) throw new AppError('Serial Number นี้มีอยู่ในระบบแล้ว');
-    }
+
     if (data.assetName) {
       const dup = await prisma.asset.findFirst({ where: { assetName: data.assetName } });
       if (dup) throw new AppError('ชื่อทรัพย์สินนี้มีอยู่ในระบบแล้ว');
@@ -2148,16 +2269,21 @@ router.put('/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req
     if (!old) throw new AppError('ไม่พบทรัพย์สิน', 404);
 
     const { detail, ...assetData } = req.body;
+    
+    // Validate required fields
+    const validationErrors = validateAssetData(assetData, false);
+    if (validationErrors.length > 0) {
+      throw new AppError(validationErrors.join('; '), 400);
+    }
+
     const data = normalizeAssetPayload(assetData);
 
-    if (data.assetCode && data.assetCode !== old.assetCode) {
-      const dup = await prisma.asset.findUnique({ where: { assetCode: data.assetCode } });
-      if (dup) throw new AppError('รหัสทรัพย์สินนี้มีอยู่ในระบบแล้ว');
+    // Check for duplicates (excluding current asset)
+    const duplicateErrors = await checkDuplicateAssets(data, id);
+    if (duplicateErrors.length > 0) {
+      throw new AppError(duplicateErrors.join('; '), 400);
     }
-    if (data.serialNo && data.serialNo !== old.serialNo) {
-      const dup = await prisma.asset.findUnique({ where: { serialNo: data.serialNo } });
-      if (dup) throw new AppError('Serial Number นี้มีอยู่ในระบบแล้ว');
-    }
+
     if (data.assetName && data.assetName !== old.assetName) {
       const dup = await prisma.asset.findFirst({ where: { assetName: data.assetName } });
       if (dup) throw new AppError('ชื่อทรัพย์สินนี้มีอยู่ในระบบแล้ว');
@@ -2338,6 +2464,140 @@ router.delete('/:id/documents/:docId', authenticate, authorize('IT_ADMIN', 'SUPE
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     await prisma.assetDocument.delete({ where: { id: docId } });
     res.json({ message: 'ลบเอกสารเรียบร้อย' });
+  } catch (err) { next(err); }
+});
+
+router.get('/:id/glpi-spec', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const asset = await prisma.asset.findUnique({ where: { id } });
+    if (!asset) throw new AppError('ไม่พบทรัพย์สิน', 404);
+    if (!asset.serialNo) throw new AppError('ทรัพย์สินนี้ไม่มี Serial Number สำหรับดึงข้อมูล', 400);
+
+    const spec = await fetchGLPISpecBySerial(asset.serialNo);
+    if (!spec) throw new AppError('ไม่พบข้อมูลฮาร์ดแวร์ใน GLPI สำหรับ Serial Number นี้', 404);
+
+    res.json(spec);
+  } catch (err) { next(err); }
+});
+
+router.post('/:id/glpi-sync', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const asset = await prisma.asset.findUnique({ where: { id } });
+    if (!asset) throw new AppError('ไม่พบทรัพย์สิน', 404);
+    if (!asset.serialNo) throw new AppError('ทรัพย์สินนี้ไม่มี Serial Number สำหรับดึงข้อมูล', 400);
+
+    const spec = await fetchGLPISpecBySerial(asset.serialNo);
+    if (!spec) throw new AppError('ไม่พบข้อมูลฮาร์ดแวร์ใน GLPI สำหรับ Serial Number นี้', 404);
+
+    const field = req.body.field as string;
+    const updateDetail: any = {};
+    let note = '';
+
+    if (field) {
+      if (field === 'name') {
+        await prisma.asset.update({
+          where: { id },
+          data: { assetName: spec.name }
+        });
+        note = `อัปเดตชื่อคอมพิวเตอร์ตาม GLPI เป็น "${spec.name}"`;
+      } else if (field === 'user') {
+        await prisma.asset.update({
+          where: { id },
+          data: { ownerName: spec.user }
+        });
+        note = `อัปเดตผู้ใช้งานตาม GLPI เป็น "${spec.user}"`;
+      } else {
+        if (field === 'cpu') {
+          updateDetail.cpu = spec.cpu;
+          note = `อัปเดต CPU ตาม GLPI เป็น "${spec.cpu}"`;
+        } else if (field === 'ram') {
+          updateDetail.ram = spec.ram;
+          note = `อัปเดต RAM ตาม GLPI เป็น "${spec.ram}"`;
+        } else if (field === 'os') {
+          updateDetail.osVersion = spec.os;
+          note = `อัปเดต OS ตาม GLPI เป็น "${spec.os}"`;
+        } else if (field === 'license') {
+          updateDetail.windowsLicense = spec.license;
+          note = `อัปเดต Windows License ตาม GLPI เป็น "${spec.license}"`;
+        } else if (field === 'msOffice') {
+          updateDetail.officeLicense = spec.msOffice;
+          note = `อัปเดต MS Office ตาม GLPI เป็น "${spec.msOffice}"`;
+        } else if (field === 'antivirus') {
+          updateDetail.antivirusStatus = spec.antivirus;
+          note = `อัปเดต Antivirus ตาม GLPI เป็น "${spec.antivirus}"`;
+        }
+        await upsertAssetDetail(prisma, id, asset.type || '', updateDetail);
+      }
+    } else {
+      // Sync all fields
+      await prisma.asset.update({
+        where: { id },
+        data: { 
+          assetName: spec.name,
+          ownerName: spec.user || asset.ownerName,
+        }
+      });
+      await upsertAssetDetail(prisma, id, asset.type || '', {
+        cpu: spec.cpu,
+        ram: spec.ram,
+        osVersion: spec.os,
+        windowsLicense: spec.license,
+        snComputer: spec.serial,
+        officeLicense: spec.msOffice,
+        antivirusStatus: spec.antivirus,
+      });
+      note = `อัปเดตรายละเอียดฮาร์ดแวร์ทั้งหมดตาม GLPI (CPU: ${spec.cpu}, RAM: ${spec.ram}, OS: ${spec.os}, Office: ${spec.msOffice || '—'}, AV: ${spec.antivirus || '—'})`;
+    }
+
+    // Write a history record
+    await prisma.assetHistory.create({
+      data: {
+        assetId: id,
+        actionType: 'GLPI_SYNC',
+        actorUserId: req.user!.userId,
+        note,
+      },
+    });
+
+    res.json({ message: field ? 'อัปเดตฟิลด์เรียบร้อยแล้ว' : 'อัปเดตข้อมูลรายละเอียดฮาร์ดแวร์จาก GLPI เรียบร้อยแล้ว', spec });
+  } catch (err) { next(err); }
+});
+
+// Get audit log history for an asset
+router.get('/:id/history', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    const asset = await prisma.asset.findUnique({ where: { id } });
+    if (!asset) throw new AppError('ไม่พบทรัพย์สิน', 404);
+
+    const [history, total] = await Promise.all([
+      prisma.assetHistory.findMany({
+        where: { assetId: id },
+        include: { 
+          asset: { select: { assetCode: true, assetName: true } },
+          actor: { select: { id: true, name: true, email: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip: offset,
+      }),
+      prisma.assetHistory.count({ where: { assetId: id } }),
+    ]);
+
+    res.json({
+      data: history,
+      pagination: {
+        total,
+        limit,
+        offset,
+        hasMore: offset + limit < total,
+      },
+    });
   } catch (err) { next(err); }
 });
 

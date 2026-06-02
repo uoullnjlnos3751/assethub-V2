@@ -83,7 +83,8 @@ export default function MyExtensionsPage() {
             return (
               <Grid item xs={12} key={ext.id}>
                 <Card sx={{
-                  borderLeft: `4px solid ${isPending ? theme.palette.warning.main : isApproved ? theme.palette.success.main : theme.palette.error.main}`,
+                  borderLeft: `2px solid ${isPending ? theme.palette.warning.main : isApproved ? theme.palette.success.main : theme.palette.error.main}`,
+                  bgcolor: isPending ? alpha(theme.palette.warning.main, 0.015) : isApproved ? alpha(theme.palette.success.main, 0.015) : alpha(theme.palette.error.main, 0.015),
                 }}>
                   <CardContent>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 2, flexWrap: 'wrap', gap: 1 }}>

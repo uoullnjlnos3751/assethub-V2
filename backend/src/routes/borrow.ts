@@ -60,6 +60,7 @@ function buildBorrowItemPayload(item: any, status: string) {
       serialNo: '',
       brand: `จำนวน ${item.quantity}`,
       model: item.inventoryItem.unit,
+      category: '',
       name: item.inventoryItem.name,
       quantity: item.quantity,
       unit: item.inventoryItem.unit,
@@ -67,10 +68,11 @@ function buildBorrowItemPayload(item: any, status: string) {
     };
   }
   return {
-    assetCode: item.asset?.assetCode || '-',
+    assetCode: item.asset?.assetCode || item.asset?.assetName || '-',
     serialNo: item.asset?.serialNo || '',
     brand: item.asset?.brand || '',
     model: item.asset?.model || '',
+    category: item.asset?.category?.name || '',
     status,
   };
 }
@@ -170,21 +172,23 @@ router.post('/requests', authenticate, validate(borrowRequestSchema), async (req
           ],
         },
       },
-      include: { items: { include: { asset: true, inventoryItem: true } } },
+      include: { items: { include: { asset: { include: { category: true } }, inventoryItem: true } } },
     });
 
     const itemsPayload = request.items.map(item => {
       if (item.inventoryItem) {
         return {
           name: item.inventoryItem.name,
+          category: '',
           quantity: item.quantity,
           unit: item.inventoryItem.unit,
           status: 'รอการอนุมัติ',
         };
       }
       return {
-        assetCode: item.asset!.assetCode,
+        assetCode: item.asset!.assetCode || item.asset!.assetName || '-',
         serialNo: item.asset!.serialNo,
+        category: item.asset!.category?.name || '',
         brand: item.asset!.brand,
         model: item.asset!.model,
         status: 'รอการอนุมัติ',
@@ -213,6 +217,7 @@ router.post('/requests', authenticate, validate(borrowRequestSchema), async (req
       email: user?.email || '-',
       purpose: purpose || '-',
       location: location || '-',
+      note: notes || '-',
       notes: notes || '-',
       borrowDate: borrowDateStr,
       dueDate: dueDateStr,
@@ -250,7 +255,7 @@ router.get('/requests', authenticate, async (req: Request, res: Response, next: 
         take: limitNum,
         orderBy: { createdAt: 'desc' },
         include: {
-          items: { include: { asset: true, inventoryItem: true } },
+          items: { include: { asset: { include: { category: true } }, inventoryItem: true } },
           approvals: {
             include: { approver: { select: { displayName: true, adUsername: true } } },
             orderBy: { actedAt: 'desc' }
@@ -275,7 +280,7 @@ router.get('/my-items', authenticate, async (req: Request, res: Response, next: 
         request: { requesterUserId: req.user!.userId },
         itemStatus: { in: ['CheckedOut', 'PartiallyReturned'] },
       },
-      include: { asset: true, inventoryItem: true, request: true },
+      include: { asset: { include: { category: true } }, inventoryItem: true, request: true },
       orderBy: { dueDate: 'asc' },
     });
     res.json(items);
@@ -287,7 +292,7 @@ router.get('/my-history', authenticate, async (req: Request, res: Response, next
   try {
     const items = await prisma.borrowRequestItem.findMany({
       where: { request: { requesterUserId: req.user!.userId }, itemStatus: 'Returned' },
-      include: { asset: true, inventoryItem: true, request: true, returns: true },
+      include: { asset: { include: { category: true } }, inventoryItem: true, request: true, returns: true },
       orderBy: { request: { createdAt: 'desc' } },
       take: 100,
     });
@@ -302,7 +307,7 @@ router.get('/my-extensions', authenticate, async (req: Request, res: Response, n
       where: { requestedBy: req.user!.userId },
       include: {
         request: true,
-        items: { include: { requestItem: { include: { asset: true } } } },
+        items: { include: { requestItem: { include: { asset: { include: { category: true } } } } } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -325,7 +330,7 @@ router.get('/all-requests', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), a
         skip: (pageNum - 1) * limitNum,
         take: limitNum,
         orderBy: { createdAt: 'desc' },
-        include: { items: { include: { asset: true, inventoryItem: true, returns: true } }, approvals: true, requester: { select: { id: true, displayName: true, adUsername: true, department: true, company: true } } },
+        include: { items: { include: { asset: { include: { category: true } }, inventoryItem: true, returns: true } }, approvals: true, requester: { select: { id: true, displayName: true, adUsername: true, department: true, company: true } } },
       }),
       prisma.borrowRequest.count({ where }),
     ]);
@@ -341,7 +346,7 @@ router.post('/requests/:id/approve', authenticate, authorize('IT_ADMIN', 'SUPERA
 
     const request = await prisma.borrowRequest.findUnique({
       where: { id },
-      include: { items: { include: { asset: true, inventoryItem: true } }, requester: true },
+      include: { items: { include: { asset: { include: { category: true } }, inventoryItem: true } }, requester: true },
     });
     if (!request) throw new AppError('ไม่พบคำขอ', 404);
     if (request.status !== 'Pending') throw new AppError('คำขอนี้ได้รับการดำเนินการแล้ว');
@@ -423,7 +428,7 @@ router.post('/requests/:id/approve', authenticate, authorize('IT_ADMIN', 'SUPERA
 
     const updated = await prisma.borrowRequest.findUnique({
       where: { id },
-      include: { items: { include: { asset: true, inventoryItem: true } }, approvals: true, requester: true },
+      include: { items: { include: { asset: { include: { category: true } }, inventoryItem: true } }, approvals: true, requester: true },
     });
     res.json(updated);
   } catch (err) { next(err); }
@@ -438,7 +443,7 @@ router.post('/requests/:id/checkout', authenticate, authorize('IT_ADMIN', 'SUPER
     const request = await prisma.borrowRequest.findUnique({
       where: { id },
       include: { 
-        items: { include: { asset: true, inventoryItem: true } },
+        items: { include: { asset: { include: { category: true } }, inventoryItem: true } },
         requester: true
       },
     });
@@ -518,6 +523,7 @@ router.post('/requests/:id/checkout', authenticate, authorize('IT_ADMIN', 'SUPER
         department: request.requester.department || '-',
         purpose: request.purpose || '-',
         location: '-',
+        note: request.note || '-',
         notes: request.note || '-',
         borrowDate: borrowDateStr,
         dueDate: dueDateStr,
@@ -545,7 +551,7 @@ router.post('/items/:itemId/return', authenticate, authorize('IT_ADMIN', 'SUPERA
 
     const item = await prisma.borrowRequestItem.findUnique({
       where: { id: itemId },
-      include: { request: { include: { requester: true } }, asset: true, inventoryItem: true },
+      include: { request: { include: { requester: true } }, asset: { include: { category: true } }, inventoryItem: true },
     });
     if (!item) throw new AppError('ไม่พบรายการยืม', 404);
     if (!['CheckedOut', 'PartiallyReturned'].includes(item.itemStatus)) {
@@ -618,7 +624,7 @@ router.post('/items/:itemId/return', authenticate, authorize('IT_ADMIN', 'SUPERA
         requester: item.request.requester.displayName || item.request.requester.adUsername,
         department: item.request.requester.department || '-',
         purpose: item.request.purpose || '-',
-        assetCode: item.asset?.assetCode || '-',
+        assetCode: item.asset?.assetCode || item.asset?.assetName || '-',
         serialNo: item.asset?.serialNo || '-',
         brand: item.asset?.brand || '',
         model: item.asset?.model || '',
@@ -704,6 +710,7 @@ router.post('/extensions', authenticate, validate(extensionSchema), async (req: 
           requestNo: borrowRequest.requestNo,
           requester: user?.displayName || req.user!.adUsername,
           department: user?.department || '-',
+          purpose: borrowRequest.purpose || '-',
           extraDays: String(extraDays),
           reason: reason || '-',
           oldDueDate: extension.items[0]?.oldDueDate
@@ -793,7 +800,7 @@ router.get('/extensions', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), asy
   try {
     const extensions = await prisma.borrowExtension.findMany({
       where: { status: 'Pending' },
-      include: { request: { include: { requester: true } }, items: { include: { requestItem: { include: { asset: true } } } } },
+      include: { request: { include: { requester: true } }, items: { include: { requestItem: { include: { asset: { include: { category: true } } } } } } },
       orderBy: { createdAt: 'desc' },
     });
     res.json(extensions);
@@ -809,7 +816,7 @@ router.get('/overdue', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async 
         dueDate: { lt: now },
       },
       include: {
-        asset: true,
+        asset: { include: { category: true } },
         inventoryItem: true,
         request: { include: { requester: true } },
       },
@@ -851,7 +858,7 @@ router.post('/items/:itemId/reminder', authenticate, authorize('IT_ADMIN', 'SUPE
     const itemId = parseInt(req.params.itemId);
     const item = await prisma.borrowRequestItem.findUnique({
       where: { id: itemId },
-      include: { request: { include: { requester: true } }, asset: true, inventoryItem: true },
+      include: { request: { include: { requester: true } }, asset: { include: { category: true } }, inventoryItem: true },
     });
     if (!item) throw new AppError('ไม่พบรายการยืม', 404);
     if (!item.dueDate || new Date(item.dueDate) >= new Date()) throw new AppError('รายการนี้ยังไม่เกินกำหนด');
@@ -863,7 +870,7 @@ router.post('/items/:itemId/reminder', authenticate, authorize('IT_ADMIN', 'SUPE
       requester: item.request.requester.displayName || item.request.requester.adUsername,
       department: item.request.requester.department || '-',
       purpose: item.request.purpose || '-',
-      assetCode: item.asset?.assetCode || item.inventoryItem?.name || '-',
+      assetCode: item.asset?.assetCode || item.asset?.assetName || item.inventoryItem?.name || '-',
       serialNo: item.asset?.serialNo || '',
       brand: item.asset?.brand || '',
       model: item.asset?.model || (item.inventoryItem ? `จำนวน ${item.quantity} ${item.inventoryItem.unit}` : ''),
@@ -891,7 +898,7 @@ router.get('/history', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async 
         include: {
           items: {
             include: {
-              asset: true,
+              asset: { include: { category: true } },
               inventoryItem: true,
               returns: { include: { returner: { select: { displayName: true, adUsername: true } } } },
             },

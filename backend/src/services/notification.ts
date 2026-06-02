@@ -128,6 +128,7 @@ async function sendEmail(to: string, eventType: string, payload: Record<string, 
   }
 
   let body = template.bodyTh;
+  let subject = template.subjectTh;
 
   if (payload.items && Array.isArray(payload.items)) {
     const statusColors: Record<string, { bg: string; text: string }> = {
@@ -158,8 +159,12 @@ async function sendEmail(to: string, eventType: string, payload: Record<string, 
         <tr>
           ${requesterCell}
           <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; font-size: 13px;">
-            <div style="font-weight: 600; color: #1e293b;">${item.assetCode || 'N/A'}</div>
-            <div style="color: #64748b; font-size: 12px;">${item.serialNo || ''} ${item.brand || ''} ${item.model || ''}</div>
+            <div style="color: #475569; font-size: 12px; line-height: 1.5;">
+              <div><span style="font-weight: 600; color: #1e293b;">ชื่อทรัพย์สิน :</span> ${item.assetCode || 'N/A'}</div>
+              <div><span style="font-weight: 600; color: #1e293b;">Serial No :</span> ${item.serialNo || '-'}</div>
+              <div><span style="font-weight: 600; color: #1e293b;">ประเภท :</span> ${item.category || '-'}</div>
+              <div><span style="font-weight: 600; color: #1e293b;">รุ่น :</span> ${item.model ? item.model + (item.brand ? ' ' + item.brand : '') : (item.brand || '-')}</div>
+            </div>
           </td>
           <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; font-size: 13px; text-align: center;">
             <span style="background: ${bgColor}; color: ${textColor}; padding: 3px 10px; border-radius: 12px; font-weight: 600; font-size: 11px;">${item.status || '-'}</span>
@@ -190,19 +195,24 @@ async function sendEmail(to: string, eventType: string, payload: Record<string, 
   if (payload.note && payload.note !== '-' && payload.note !== '') {
     const noteHtml = `<div class="note-box" style="background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 14px; margin-top: 16px;"><p style="margin: 0; color: #92400e; font-size: 13px;"><b>หมายเหตุ:</b> ${payload.note}</p></div>`;
     body = body.replace('{{note}}', noteHtml);
+    subject = subject.replace('{{note}}', payload.note);
   } else {
     body = body.replace(/{{note}}/g, '');
+    subject = subject.replace(/{{note}}/g, '');
   }
 
   for (const [key, val] of Object.entries(payload)) {
     if (key !== 'items' && key !== 'note') {
-      body = body.replace(new RegExp(`{{${key}}}`, 'g'), String(val));
+      const regex = new RegExp(`{{${key}}}`, 'g');
+      body = body.replace(regex, String(val));
+      subject = subject.replace(regex, String(val));
     }
   }
 
   body = body.replace(/{{\w+}}/g, '-');
+  subject = subject.replace(/{{\w+}}/g, '-');
 
-  await sendSimpleEmail(to, template.subjectTh, body);
+  await sendSimpleEmail(to, subject, body);
 }
 
 async function sendSimpleEmail(to: string, subject: string, body: string) {
@@ -234,7 +244,7 @@ async function sendTeams(eventType: string, payload: Record<string, any>) {
 
   let message = template?.bodyTh || `**${eventType}**\n${JSON.stringify(payload, null, 2)}`;
   for (const [key, val] of Object.entries(payload)) {
-    message = message.replace(`{{${key}}}`, String(val));
+    message = message.replace(new RegExp(`{{${key}}}`, 'g'), String(val));
   }
 
   const https = await import('https');
@@ -280,7 +290,7 @@ async function sendLine(eventType: string, payload: Record<string, any>) {
     }
   } else {
     for (const [key, val] of Object.entries(payload)) {
-      message = message.replace(`{{${key}}}`, String(val));
+      message = message.replace(new RegExp(`{{${key}}}`, 'g'), String(val));
     }
   }
 
