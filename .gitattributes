@@ -1,0 +1,35 @@
+# Line endings. Without this file the repository held a mix — assets.ts was
+# stored CRLF, index.ts LF, SettingsPage.tsx mixed — so a checkout on another
+# machine could show thousands of lines as changed when nothing had changed.
+#
+# `text=auto` normalises to LF inside the repository and converts to the
+# platform's native ending in the working tree, so Windows editors keep CRLF.
+* text=auto
+
+# Must stay LF wherever checked out: the shell reads the shebang line, and a
+# CRLF entrypoint fails in the container with "no such file or directory".
+*.sh text eol=lf
+
+# Windows-only scripts stay CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Never transform binaries.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.pdf binary
+*.xlsx binary
+*.xls binary
+*.zip binary
+*.dump binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+
+# Generated — collapse in diffs and skip in language stats.
+package-lock.json linguist-generated=true -diff
