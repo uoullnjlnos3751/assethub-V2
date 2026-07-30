@@ -14,8 +14,9 @@ Thumbs.db
 *.sql
 *.dump
 *.pg_dump
-# ...except tracked Prisma migration history, which must stay in git
+# ...except schema definitions that belong in git
 !backend/prisma/migrations/**/*.sql
+!database/schema.sql
 
 # Archives produced by ad-hoc migration/backup work
 *.zip
@@ -101,6 +102,8 @@ backend/where_log.json
 backend/*_report.xlsx
 
 frontend/*.cjs
+# ...but dotfile configs are real config, not throwaways
+!frontend/.*.cjs
 frontend/ldap-test.js
 frontend/ad-test.txt
 frontend/best_view.txt
