@@ -20,6 +20,8 @@ RUN npm config set registry https://registry.npmjs.org/ && npm config set fetch-
 RUN for i in 1 2 3 4 5; do npm install --only=production --no-audit --no-fund && break || sleep 5; done
 COPY --from=builder /app/prisma ./prisma/
 COPY --from=builder /app/dist ./dist/
+# Copy generated Prisma client from builder (avoids re-running prisma generate in production)
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
 ENV NODE_ENV=production
 EXPOSE 4000
