@@ -1,0 +1,42 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: assethub-postgres
+    environment:
+      POSTGRES_USER: assethub
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-assethub123}
+      POSTGRES_DB: assethub
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - assethub-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U assethub"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  nginx:
+    image: nginx:alpine
+    container_name: assethub-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx:/etc/nginx/conf.d
+    networks:
+      - assethub-net
+    depends_on:
+      - postgres
+    restart: always
+
+volumes:
+  pgdata:
+    name: itsm_pgdata # Restore original volume name to recover data
+
+networks:
+  assethub-net:
+    name: assethub-net
+    driver: bridge
