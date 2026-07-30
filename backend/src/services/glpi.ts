@@ -1,7 +1,11 @@
 import { prisma } from '../index';
-const GLPI_BASE_URL = 'http://10.100.77.229/glpi/apirest.php';
-const USER_TOKEN = 'P1e94q3AktogH4KPhYIZyHquhUZxvnJyBKA0d5P4';
-const APP_TOKEN = 'onhC08v7Cmy5zJFln9i1EHrYNAOdOAZok6BYT6Ml';
+const GLPI_BASE_URL = process.env.GLPI_API_URL || 'http://10.100.77.229/glpi/apirest.php';
+const USER_TOKEN = process.env.GLPI_USER_TOKEN || '';
+const APP_TOKEN = process.env.GLPI_APP_TOKEN || '';
+
+if (!USER_TOKEN || !APP_TOKEN) {
+  console.warn('GLPI_USER_TOKEN or GLPI_APP_TOKEN is not set. GLPI integration will not work.');
+}
 
 export async function fetchGLPISpecBySerial(serialNumber: string) {
   const serial = serialNumber?.trim();
