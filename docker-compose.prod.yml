@@ -35,6 +35,8 @@ services:
       NODE_ENV: production
       FRONTEND_URL: "${FRONTEND_URL:?FRONTEND_URL must be set for production}"
       CORS_ORIGIN: "${CORS_ORIGIN:?CORS_ORIGIN must be set for production}"
+      # Optional: hostnames allowed on any scheme/port (was hardcoded in app.ts)
+      CORS_ALLOWED_HOSTNAMES: "${CORS_ALLOWED_HOSTNAMES:-}"
     volumes:
       - uploads_data:/app/uploads
       - backups_data:/app/backups

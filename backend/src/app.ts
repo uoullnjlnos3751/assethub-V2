@@ -23,6 +23,7 @@ import floorplanRoutes from './routes/floorplan';
 import { errorHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
 import { apiLimiter, authLimiter } from './middleware/rateLimiter';
+import { isProduction } from './config/env';
 import { prisma } from './lib/prisma';
 
 function parseEnvOrigins(value: string | undefined): string[] {
@@ -34,26 +35,28 @@ function parseEnvOrigins(value: string | undefined): string[] {
     .map((v) => v.replace(/\/$/, ''));
 }
 
+// Exact origins, scheme and port included: CORS_ORIGIN (comma-separated) plus
+// FRONTEND_URL.
 const explicitAllowedOrigins = new Set<string>([
   ...parseEnvOrigins(process.env.CORS_ORIGIN),
   ...parseEnvOrigins(process.env.FRONTEND_URL),
-  'http://10.100.22.121',
-  'http://localhost:5173',
-  'http://itsm.trrgroup.com:5173',
-  'http://itsm.trrgroup.com',
-  'http://itam.trrgroup.com:5173',
-  'http://itam.trrgroup.com',
-  'https://itsm.trrgroup.com',
-  'https://itam.trrgroup.com',
 ]);
 
+// Hostname-level allowance: any scheme/port on these hosts passes. Looser than
+// the exact list, so it stays opt-in via CORS_ALLOWED_HOSTNAMES — set it for
+// hosts reached by several URLs (bare host, :5173, http and https, raw IP).
+// Outside production, localhost is allowed so `npm run dev` needs no config.
 const allowedOriginHostnames = new Set<string>([
-  'localhost',
-  '127.0.0.1',
-  '10.100.22.121',
-  'itsm.trrgroup.com',
-  'itam.trrgroup.com',
+  ...parseEnvOrigins(process.env.CORS_ALLOWED_HOSTNAMES),
+  ...(isProduction() ? [] : ['localhost', '127.0.0.1']),
 ]);
+
+if (isProduction() && explicitAllowedOrigins.size === 0 && allowedOriginHostnames.size === 0) {
+  console.warn(
+    '[cors] No origins configured — every cross-origin browser request will be rejected. ' +
+      'Set CORS_ORIGIN (and CORS_ALLOWED_HOSTNAMES if a host is reached by several URLs).'
+  );
+}
 
 export function createApp() {
   const app = express();
@@ -76,7 +79,15 @@ export function createApp() {
   }));
 
   app.use(requestLogger);
-  app.use(express.json({ limit: '50mb' }));
+
+  // Body limits. Images arrive as multipart/form-data through multer, not as
+  // JSON, so only the bulk import path (POST /api/assets/import/json) needs a
+  // large JSON body. Give that router a bigger limit and keep everything else
+  // small — a 50mb global limit let any endpoint be used to push 50mb of JSON.
+  // Order matters: the scoped parser must run first, since express.json skips
+  // a request whose body another parser already read.
+  app.use('/api/assets', express.json({ limit: process.env.IMPORT_BODY_LIMIT || '25mb' }));
+  app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '2mb' }));
 
   app.use('/uploads', uploadsRoutes);
   app.use('/api/auth', authLimiter, authRoutes);
