@@ -1,6 +1,8 @@
 node_modules/
 node_modules_old/
 dist/
+# Incremental build cache — churns on every build, no value in git
+*.tsbuildinfo
 .env
 .env.local
 .env.docker.prod
@@ -17,6 +19,13 @@ Thumbs.db
 
 # Archives produced by ad-hoc migration/backup work
 *.zip
+
+# Runtime data written by the app — user uploads and generated backups.
+# These live on a Docker volume in production and must never enter git
+# (they are large binaries and may contain real user data).
+backend/uploads/
+backend/backups/
+uploads/
 
 # Process managers / local runtime state
 .pm2/

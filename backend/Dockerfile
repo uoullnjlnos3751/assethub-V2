@@ -29,4 +29,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 RUN mkdir -p /app/uploads/documents
 
-CMD ["sh", "-c", "npx prisma db push && node dist/index.js"]
+COPY docker-entrypoint.sh ./
+RUN chmod +x ./docker-entrypoint.sh
+
+CMD ["./docker-entrypoint.sh"]
