@@ -1,0 +1,211 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Box, Typography, Button, Paper, Table, TableBody, TableCell, TableContainer,
+  TableHead, TableRow, IconButton, CircularProgress, Alert, Dialog, DialogTitle,
+  DialogContent, DialogActions, DialogContentText
+} from '@mui/material';
+import {
+  Download as DownloadIcon,
+  Delete as DeleteIcon,
+  Restore as RestoreIcon,
+  AddCircleOutline as AddIcon
+} from '@mui/icons-material';
+import { systemBackupAPI } from '../../services/api';
+import { formatDateTime } from '../../utils/dateUtils';
+
+
+interface BackupFile {
+  filename: string;
+  size: number;
+  createdAt: string;
+}
+
+export default function BackupPage() {
+  const [backups, setBackups] = useState<BackupFile[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; action: 'delete' | 'restore' | null; filename: string }>({
+    open: false, action: null, filename: ''
+  });
+
+  const fetchBackups = async () => {
+    try {
+      setLoading(true);
+      const res = await systemBackupAPI.list();
+      setBackups(res.data);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'ไม่สามารถโหลดข้อมูลแบ็คอัพได้');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBackups();
+  }, []);
+
+  const handleCreate = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      setSuccess('');
+      const res = await systemBackupAPI.create();
+      setSuccess(res.data.message || 'สร้าง Backup สำเร็จ');
+      fetchBackups();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'การสร้าง Backup ล้มเหลว');
+      setLoading(false);
+    }
+  };
+
+  const handleConfirmAction = async () => {
+    const { action, filename } = confirmDialog;
+    setConfirmDialog({ open: false, action: null, filename: '' });
+    
+    try {
+      setLoading(true);
+      setError('');
+      setSuccess('');
+      
+      if (action === 'delete') {
+        await systemBackupAPI.delete(filename);
+        setSuccess('ลบไฟล์ Backup สำเร็จ');
+        fetchBackups();
+      } else if (action === 'restore') {
+        await systemBackupAPI.restore(filename);
+        setSuccess('กู้คืนข้อมูลจาก Backup สำเร็จ');
+        // Optionally trigger a page reload or state clear
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || `การ${action === 'restore' ? 'กู้คืนข้อมูล' : 'ลบไฟล์'}ล้มเหลว`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatSize = (bytes: number) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  return (
+    <Box sx={{ p: 3, maxWidth: 1200, mx: 'auto' }}>
+      <Typography variant="h5" fontWeight={600} mb={3} color="primary">
+        การจัดการข้อมูล & Backup
+      </Typography>
+
+      {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+      {success && <Alert severity="success" sx={{ mb: 3 }}>{success}</Alert>}
+
+      <Paper sx={{ p: 3, borderRadius: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
+          <Box>
+            <Typography variant="h6" fontWeight={500}>ไฟล์ข้อมูลสำรองทั้งหมด ({backups.length} ไฟล์)</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              💡 ระบบทำการสำรองข้อมูลอัตโนมัติทุกวันเวลา 02:00 น. และจะเก็บไฟล์ย้อนหลังไว้สูงสุด 180 วัน
+            </Typography>
+          </Box>
+          <Button
+            variant="contained"
+            startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <AddIcon />}
+            onClick={handleCreate}
+            disabled={loading}
+          >
+            สร้าง Backup ตอนนี้
+          </Button>
+        </Box>
+
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>ชื่อไฟล์</TableCell>
+                <TableCell>ขนาดไฟล์</TableCell>
+                <TableCell>วันที่สร้าง</TableCell>
+                <TableCell align="right">จัดการ</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {loading && backups.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
+                    <CircularProgress />
+                  </TableCell>
+                </TableRow>
+              ) : backups.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                    ยังไม่มีข้อมูลแบ็คอัพ
+                  </TableCell>
+                </TableRow>
+              ) : (
+                backups.map((b) => (
+                  <TableRow key={b.filename}>
+                    <TableCell sx={{ fontWeight: 500 }}>{b.filename}</TableCell>
+                    <TableCell>{formatSize(b.size)}</TableCell>
+                    <TableCell>{formatDateTime(b.createdAt)}</TableCell>
+                    <TableCell align="right">
+                      <IconButton 
+                        color="primary" 
+                        onClick={() => systemBackupAPI.download(b.filename)}
+                        title="ดาวน์โหลด"
+                      >
+                        <DownloadIcon />
+                      </IconButton>
+                      <IconButton 
+                        color="warning" 
+                        onClick={() => setConfirmDialog({ open: true, action: 'restore', filename: b.filename })}
+                        title="กู้คืนข้อมูล"
+                      >
+                        <RestoreIcon />
+                      </IconButton>
+                      <IconButton 
+                        color="error" 
+                        onClick={() => setConfirmDialog({ open: true, action: 'delete', filename: b.filename })}
+                        title="ลบ"
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+
+      <Dialog open={confirmDialog.open} onClose={() => setConfirmDialog({ ...confirmDialog, open: false })}>
+        <DialogTitle sx={{ color: confirmDialog.action === 'restore' ? 'warning.main' : 'error.main' }}>
+          {confirmDialog.action === 'restore' ? 'ยืนยันการกู้คืนข้อมูล?' : 'ยืนยันการลบไฟล์?'}
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {confirmDialog.action === 'restore' 
+              ? `คำเตือน: การกู้คืนข้อมูลจะทำการลบข้อมูลปัจจุบันและแทนที่ด้วยข้อมูลจากไฟล์ ${confirmDialog.filename} คุณแน่ใจหรือไม่?`
+              : `คุณแน่ใจหรือไม่ที่จะลบไฟล์แบ็คอัพ ${confirmDialog.filename}? การกระทำนี้ไม่สามารถยกเลิกได้`
+            }
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDialog({ ...confirmDialog, open: false })} color="inherit">
+            ยกเลิก
+          </Button>
+          <Button 
+            onClick={handleConfirmAction} 
+            color={confirmDialog.action === 'restore' ? 'warning' : 'error'} 
+            variant="contained" 
+            autoFocus
+          >
+            {confirmDialog.action === 'restore' ? 'กู้คืนข้อมูล' : 'ลบไฟล์'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+}

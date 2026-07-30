@@ -4,9 +4,14 @@ import CloseIcon from '@mui/icons-material/Close';
 import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
 import { maintenanceAPI } from '../../services/api';
 import ReportHeaderTabs from './ReportHeaderTabs';
-import { Wrench, CheckCircle2, Clock, AlertTriangle, Eye, DollarSign } from 'lucide-react';
+import { Wrench, CheckCircle2, Clock, AlertTriangle, Eye, DollarSign, FileText } from 'lucide-react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { useNavigate } from 'react-router-dom';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
+import { formatDate, formatDateTime } from '../../utils/dateUtils';
+
 import 'dayjs/locale/th';
 
 dayjs.locale('th');
@@ -24,6 +29,37 @@ export default function ReportMaintenancePage() {
   const [endDate, setEndDate] = useState('');
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [exportingPDF, setExportingPDF] = useState(false);
+
+  const handleExportPDF = async () => {
+    try {
+      setExportingPDF(true);
+      const element = document.getElementById('report-content');
+      if (!element) return;
+      const canvas = await html2canvas(element, { 
+        scale: 3, 
+        useCORS: true, 
+        backgroundColor: '#ffffff',
+        logging: false
+      });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      pdf.setFontSize(18);
+      pdf.setTextColor(15, 23, 42);
+      pdf.text('Maintenance Executive Summary', 14, 20);
+      pdf.setFontSize(10);
+      pdf.setTextColor(100, 116, 139);
+      pdf.text(`Exported Date: ${new Date().toLocaleString('th-TH')}`, 14, 28);
+      pdf.addImage(imgData, 'PNG', 10, 35, pdfWidth - 20, Math.min(pdfHeight, pdf.internal.pageSize.getHeight() - 40));
+      pdf.save(`Maintenance_Executive_Report_${new Date().getTime()}.pdf`);
+    } catch (err) {
+      console.error('Failed to export PDF', err);
+    } finally {
+      setExportingPDF(false);
+    }
+  };
 
   const handleOpenDialog = (record: any) => {
     setSelectedRecord(record);
@@ -39,13 +75,17 @@ export default function ReportMaintenancePage() {
     try {
       setLoading(true);
       const params: any = {};
-      if (status !== 'ALL') params.status = status;
+      if (status !== 'ALL' && status !== 'IN_PROGRESS_ALL') params.status = status;
       if (search) params.search = search;
       if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
 
       const res = await maintenanceAPI.reportAll(params);
-      setRecords(res.data);
+      let data = res.data || [];
+      if (status === 'IN_PROGRESS_ALL') {
+        data = data.filter((r: any) => r.status === 'IN_PROGRESS' || r.status === 'PENDING');
+      }
+      setRecords(data);
     } catch (err) {
       console.error('Failed to load maintenance report', err);
     } finally {
@@ -83,7 +123,7 @@ export default function ReportMaintenancePage() {
       field: 'startedAt', 
       headerName: 'วันที่แจ้งซ่อม', 
       width: 140,
-      renderCell: ({ value }) => value ? dayjs(value).format('DD MMM YYYY') : '-'
+      renderCell: ({ value }) => value ? formatDate(value) : '-'
     },
     { 
       field: 'totalCost', 
@@ -120,43 +160,119 @@ export default function ReportMaintenancePage() {
           <Typography variant="h4" fontWeight={800} sx={{ color: '#1e293b', mb: 1 }}>รายงานประวัติการซ่อมบำรุง</Typography>
           <Typography variant="body1" color="text.secondary">สรุปประวัติการซ่อมบำรุงทรัพย์สินทั้งหมดในระบบ</Typography>
         </Box>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button 
+            variant="contained" 
+            startIcon={exportingPDF ? <CircularProgress size={16} color="inherit" /> : <FileText size={16} />} 
+            onClick={handleExportPDF}
+            disabled={exportingPDF}
+            sx={{ 
+              bgcolor: '#b45309', 
+              '&:hover': { bgcolor: '#92400e' },
+              boxShadow: '0 4px 10px rgba(180, 83, 9, 0.15)',
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600
+            }}
+          >
+            {exportingPDF ? 'Generating...' : 'Export PDF'}
+          </Button>
+        </Box>
       </Box>
 
-      {/* Summary cards */}
-      <Grid container spacing={2.5} sx={{ mb: 4 }}>
-        <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '2px solid #4f46e5', bgcolor: 'rgba(79,70,229,0.02)' }}>
-            <CardContent sx={{ p: 2.5 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(99,102,241,0.1)', color: '#4f46e5', display: 'flex' }}><Wrench size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>รายการซ่อมทั้งหมด</Typography></Box>
-              <Typography variant="h4" fontWeight={800}>{totalRecords}</Typography>
-            </CardContent>
-          </Card>
+      <Box id="report-content" sx={{ bgcolor: '#ffffff', borderRadius: 4, p: 3, mb: 4, boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: '1px solid #f1f5f9' }}>
+        {/* Summary cards */}
+        <Grid container spacing={2.5}>
+          <Grid item xs={6} md={3}>
+            <Card 
+              onClick={() => setStatus('ALL')}
+              sx={{ 
+                borderLeft: '4px solid #4f46e5', 
+                bgcolor: status === 'ALL' ? 'rgba(79,70,229,0.06)' : 'rgba(79,70,229,0.01)',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                opacity: (status === 'ALL' || status === 'COMPLETED' || status === 'IN_PROGRESS_ALL') ? 1 : 0.45,
+                transform: status === 'ALL' ? 'scale(1.02)' : 'scale(1)',
+                boxShadow: status === 'ALL' ? '0 8px 20px rgba(79,70,229,0.15)' : 'none',
+                '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 6px 15px rgba(79,70,229,0.1)' }
+              }}
+            >
+              <CardContent sx={{ p: 2.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                  <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(99,102,241,0.1)', color: '#4f46e5', display: 'flex' }}>
+                    <Wrench size={20} />
+                  </Box>
+                  <Typography variant="body2" color="text.secondary" fontWeight={700}>รายการซ่อมทั้งหมด</Typography>
+                </Box>
+                <Typography variant="h4" fontWeight={800} color="#4f46e5">{totalRecords}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={6} md={3}>
+            <Card 
+              onClick={() => setStatus(status === 'COMPLETED' ? 'ALL' : 'COMPLETED')}
+              sx={{ 
+                borderLeft: '4px solid #10b981', 
+                bgcolor: status === 'COMPLETED' ? 'rgba(16,185,129,0.06)' : 'rgba(16,185,129,0.01)',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                opacity: (status === 'ALL' || status === 'COMPLETED') ? 1 : 0.45,
+                transform: status === 'COMPLETED' ? 'scale(1.02)' : 'scale(1)',
+                boxShadow: status === 'COMPLETED' ? '0 8px 20px rgba(16,185,129,0.15)' : 'none',
+                '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 6px 15px rgba(16,185,129,0.1)' }
+              }}
+            >
+              <CardContent sx={{ p: 2.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                  <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(16,185,129,0.1)', color: '#059669', display: 'flex' }}>
+                    <CheckCircle2 size={20} />
+                  </Box>
+                  <Typography variant="body2" color="text.secondary" fontWeight={700}>ซ่อมเสร็จสิ้น</Typography>
+                </Box>
+                <Typography variant="h4" fontWeight={800} color="#059669">{completed}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={6} md={3}>
+            <Card 
+              onClick={() => setStatus(status === 'IN_PROGRESS_ALL' ? 'ALL' : 'IN_PROGRESS_ALL')}
+              sx={{ 
+                borderLeft: '4px solid #f59e0b', 
+                bgcolor: status === 'IN_PROGRESS_ALL' ? 'rgba(245,158,11,0.06)' : 'rgba(245,158,11,0.01)',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                opacity: (status === 'ALL' || status === 'IN_PROGRESS_ALL') ? 1 : 0.45,
+                transform: status === 'IN_PROGRESS_ALL' ? 'scale(1.02)' : 'scale(1)',
+                boxShadow: status === 'IN_PROGRESS_ALL' ? '0 8px 20px rgba(245,158,11,0.15)' : 'none',
+                '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 6px 15px rgba(245,158,11,0.1)' }
+              }}
+            >
+              <CardContent sx={{ p: 2.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                  <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(245,158,11,0.1)', color: '#d97706', display: 'flex' }}>
+                    <Clock size={20} />
+                  </Box>
+                  <Typography variant="body2" color="text.secondary" fontWeight={700}>กำลังดำเนินการ</Typography>
+                </Box>
+                <Typography variant="h4" fontWeight={800} color="#d97706">{inProgress}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={6} md={3}>
+            <Card sx={{ borderLeft: '4px solid #ef4444', bgcolor: 'rgba(239,68,68,0.01)' }}>
+              <CardContent sx={{ p: 2.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                  <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(239,68,68,0.08)', color: '#dc2626', display: 'flex' }}>
+                    <DollarSign size={20} />
+                  </Box>
+                  <Typography variant="body2" color="text.secondary" fontWeight={700}>ค่าใช้จ่ายรวม (บาท)</Typography>
+                </Box>
+                <Typography variant="h4" fontWeight={800} color="#dc2626">{totalCost.toLocaleString()}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
         </Grid>
-        <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '2px solid #10b981', bgcolor: 'rgba(16,185,129,0.02)' }}>
-            <CardContent sx={{ p: 2.5 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(16,185,129,0.1)', color: '#059669', display: 'flex' }}><CheckCircle2 size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>ซ่อมเสร็จสิ้น</Typography></Box>
-              <Typography variant="h4" fontWeight={800}>{completed}</Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '2px solid #f59e0b', bgcolor: 'rgba(245,158,11,0.02)' }}>
-            <CardContent sx={{ p: 2.5 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(245,158,11,0.1)', color: '#d97706', display: 'flex' }}><Clock size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>กำลังดำเนินการ</Typography></Box>
-              <Typography variant="h4" fontWeight={800}>{inProgress}</Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '2px solid #ef4444', bgcolor: 'rgba(239,68,68,0.02)' }}>
-            <CardContent sx={{ p: 2.5 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(239,68,68,0.08)', color: '#dc2626', display: 'flex' }}><DollarSign size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>ค่าใช้จ่ายรวม (บาท)</Typography></Box>
-              <Typography variant="h4" fontWeight={800}>{totalCost.toLocaleString()}</Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+      </Box>
 
       {/* Filters & Table */}
       <Card sx={{ borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid rgba(229, 231, 235, 0.5)', overflow: 'visible' }}>
@@ -172,29 +288,25 @@ export default function ReportMaintenancePage() {
             <InputLabel>สถานะ</InputLabel>
             <Select value={status} label="สถานะ" onChange={(e) => setStatus(e.target.value)} sx={{ borderRadius: '8px' }}>
               <MenuItem value="ALL">ทั้งหมด</MenuItem>
+              <MenuItem value="IN_PROGRESS_ALL">🟠 กำลังดำเนินการ (รอ/กำลังซ่อม)</MenuItem>
+              <hr style={{ margin: '8px 0', border: 'none', borderTop: '1px solid #e2e8f0' }} />
               <MenuItem value="PENDING">รอดำเนินการ</MenuItem>
               <MenuItem value="IN_PROGRESS">กำลังซ่อม</MenuItem>
               <MenuItem value="COMPLETED">ซ่อมเสร็จสิ้น</MenuItem>
               <MenuItem value="CANCELLED">ยกเลิก</MenuItem>
             </Select>
           </FormControl>
-          <TextField
-            type="date"
-            size="small"
+          <DatePicker
             label="ตั้งแต่เริ่มซ่อม"
-            InputLabelProps={{ shrink: true }}
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
+            value={startDate ? dayjs(startDate) : null}
+            onChange={(newVal) => setStartDate(newVal ? newVal.format('YYYY-MM-DD') : '')}
+            slotProps={{ textField: { size: 'small', InputLabelProps: { shrink: true }, sx: { '& .MuiOutlinedInput-root': { borderRadius: '8px' } } } }}
           />
-          <TextField
-            type="date"
-            size="small"
+          <DatePicker
             label="ถึงวันที่"
-            InputLabelProps={{ shrink: true }}
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
+            value={endDate ? dayjs(endDate) : null}
+            onChange={(newVal) => setEndDate(newVal ? newVal.format('YYYY-MM-DD') : '')}
+            slotProps={{ textField: { size: 'small', InputLabelProps: { shrink: true }, sx: { '& .MuiOutlinedInput-root': { borderRadius: '8px' } } } }}
           />
         </Box>
         
@@ -319,12 +431,12 @@ export default function ReportMaintenancePage() {
 
                       <Box sx={{ mb: 1.5 }}>
                         <Typography variant="caption" color="text.secondary">วันที่แจ้งซ่อม</Typography>
-                        <Typography variant="body2" fontWeight={500}>{selectedRecord.startedAt ? dayjs(selectedRecord.startedAt).format('DD MMM YYYY HH:mm') : '-'}</Typography>
+                        <Typography variant="body2" fontWeight={500}>{selectedRecord.startedAt ? formatDateTime(selectedRecord.startedAt) : '-'}</Typography>
                       </Box>
 
                       <Box sx={{ mb: 2 }}>
                         <Typography variant="caption" color="text.secondary">วันที่ซ่อมเสร็จ</Typography>
-                        <Typography variant="body2" fontWeight={500}>{selectedRecord.completedAt ? dayjs(selectedRecord.completedAt).format('DD MMM YYYY HH:mm') : '-'}</Typography>
+                        <Typography variant="body2" fontWeight={500}>{selectedRecord.completedAt ? formatDateTime(selectedRecord.completedAt) : '-'}</Typography>
                       </Box>
 
                       <Divider sx={{ my: 2 }} />

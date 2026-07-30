@@ -16,6 +16,8 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import CloseIcon from '@mui/icons-material/Close';
 import { donationAPI } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs from 'dayjs';
 
 export default function DonationFormPage() {
   const [assets, setAssets]                   = useState<any[]>([]);
@@ -237,12 +239,12 @@ export default function DonationFormPage() {
                   value={recipientPhone}
                   onChange={e => setRecipientPhone(e.target.value)}
                 />
-                <TextField
+                <DatePicker
                   label="วันที่บริจาค"
-                  type="date" fullWidth size="small"
-                  value={donationDate}
-                  onChange={e => setDonationDate(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
+                  format="DD/MM/YYYY"
+                  value={donationDate ? dayjs(donationDate) : null}
+                  onChange={(newVal) => setDonationDate(newVal ? newVal.format('YYYY-MM-DD') : '')}
+                  slotProps={{ textField: { size: 'small', fullWidth: true, InputLabelProps: { shrink: true } } }}
                 />
                 <TextField
                   label="เลขที่หนังสืออนุมัติ"

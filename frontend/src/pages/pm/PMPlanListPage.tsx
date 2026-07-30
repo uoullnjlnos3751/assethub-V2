@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { pmAPI, assetAPI } from '../../services/api';
+import { pmAPI, assetAPI, api } from '../../services/api';
+import { formatDate } from '../../utils/dateUtils';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs from 'dayjs';
+
 
 /* ─────────────────────────────────────────────────────────────
    Types
@@ -25,7 +29,7 @@ const THAI_YEAR = new Date().getFullYear() + 543;
 ───────────────────────────────────────────────────────────────── */
 function fmtDate(d: string | null) {
   if (!d) return '—';
-  return new Date(d).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
+  return formatDate(d);
 }
 
 function progressColor(pct: number) {
@@ -33,6 +37,10 @@ function progressColor(pct: number) {
   if (pct >= 50) return '#0ea5e9';
   if (pct >= 20) return '#f59e0b';
   return '#ef4444';
+}
+
+function invalidDateRange(startDate: string, endDate: string) {
+  return Boolean(startDate && endDate && new Date(startDate) > new Date(endDate));
 }
 
 function Modal({ open, onClose, title, children }: {
@@ -79,6 +87,12 @@ export default function PMPlanListPage() {
   const [genMsg, setGenMsg] = useState('');
   const [toast, setToast] = useState('');
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
+  const [filterCompany, setFilterCompany] = useState('');
+  const [filterDept, setFilterDept] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterDeviceType, setFilterDeviceType] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedPlanForEdit, setSelectedPlanForEdit] = useState<any>(null);
   const [editForm, setEditForm] = useState<PlanForm>({
@@ -155,7 +169,7 @@ export default function PMPlanListPage() {
           const data = res.data;
           setEligibility(data);
           setForm((prev) => (
-            prev.plannedDeviceCount === 10 && data.available > 0
+            data.available > 0
               ? { ...prev, plannedDeviceCount: data.available }
               : prev
           ));
@@ -187,6 +201,9 @@ export default function PMPlanListPage() {
 
   const handleCreate = async () => {
     if (!form.startDate || !form.endDate) { showToast('⚠️ กรุณากำหนดวันเริ่มและวันสิ้นสุด'); return; }
+    if (invalidDateRange(form.startDate, form.endDate)) { showToast('⚠️ วันที่สิ้นสุดต้องไม่น้อยกว่าวันที่เริ่ม'); return; }
+    if (!form.templateId) { showToast('⚠️ กรุณาเลือก Checklist Template ก่อนสร้างแผน PM'); return; }
+    if (form.plannedDeviceCount < 1) { showToast('⚠️ จำนวนเครื่องตามแผนต้องมากกว่า 0'); return; }
     
     // Normalize target values
     const companyVal = (form.company === '__ALL__' || !form.company) ? '' : form.company;
@@ -253,6 +270,9 @@ export default function PMPlanListPage() {
   const handleUpdate = async () => {
     if (!selectedPlanForEdit) return;
     if (!editForm.startDate || !editForm.endDate) { showToast('⚠️ กรุณากำหนดวันเริ่มและวันสิ้นสุด'); return; }
+    if (invalidDateRange(editForm.startDate, editForm.endDate)) { showToast('⚠️ วันที่สิ้นสุดต้องไม่น้อยกว่าวันที่เริ่ม'); return; }
+    if (!editForm.templateId) { showToast('⚠️ กรุณาเลือก Checklist Template ก่อนบันทึกแผน PM'); return; }
+    if (editForm.plannedDeviceCount < 1) { showToast('⚠️ จำนวนเครื่องตามแผนต้องมากกว่า 0'); return; }
 
     const companyVal = (editForm.company === '__ALL__' || !editForm.company) ? '' : editForm.company;
     const siteVal = (editForm.site === '__ALL__' || !editForm.site) ? '' : editForm.site;
@@ -302,20 +322,55 @@ export default function PMPlanListPage() {
   };
 
   const handleGenerate = async () => {
+    if (!generateModal.plan) return;
+    setSaving(true);
     try {
       const res = await pmAPI.generate(generateModal.plan.id);
       setGenMsg(res.data?.message || 'สร้างงาน PM สำเร็จ');
       fetchAll();
     } catch (err: any) {
       setGenMsg(err.response?.data?.error || 'เกิดข้อผิดพลาด');
-    }
+    } finally { setSaving(false); }
   };
 
-  const filteredPlans = plans.filter(p => p.year === filterYear);
+  const filteredPlans = plans.filter(p => {
+    if (p.year !== filterYear) return false;
+    if (filterCompany && p.company !== filterCompany) return false;
+    if (filterDept && p.deptTask !== filterDept) return false;
+    if (filterDeviceType && p.deviceType !== filterDeviceType) return false;
+    if (searchTerm) {
+      const q = searchTerm.toLowerCase();
+      const matchesSearch = (p.deptTask || '').toLowerCase().includes(q) ||
+        (p.company || '').toLowerCase().includes(q) ||
+        (p.site || '').toLowerCase().includes(q) ||
+        (p.lead || '').toLowerCase().includes(q) ||
+        (p.deviceType || '').toLowerCase().includes(q);
+      if (!matchesSearch) return false;
+    }
+    if (filterStatus) {
+      const completed = p.runs?.filter((r: any) => r.status === 'COMPLETED').length || p.completedCount || 0;
+      const total = p.runs?.length || p.totalCount || 0;
+      const isOverdue = p.endDate && new Date(p.endDate) < new Date() && completed < total;
+      if (filterStatus === 'COMPLETED' && completed < total) return false;
+      if (filterStatus === 'IN_PROGRESS' && (completed >= total || isOverdue)) return false;
+      if (filterStatus === 'OVERDUE' && !isOverdue) return false;
+      if (filterStatus === 'NOT_GENERATED' && total > 0) return false;
+    }
+    return true;
+  });
   const totalPlanned = filteredPlans.reduce((s: number, p: any) => s + (p.plannedDeviceCount || 0), 0);
   const totalRuns = filteredPlans.reduce((s: number, p: any) => s + (p.runs?.length || p.totalCount || 0), 0);
   const totalDone = filteredPlans.reduce((s: number, p: any) => s + (p.runs?.filter((r: any) => r.status === 'COMPLETED').length || p.completedCount || 0), 0);
   const overallPct = totalRuns > 0 ? Math.round(totalDone / totalRuns * 100) : 0;
+  
+  // Plans that need generation (no runs yet)
+  const plansNeedGenerate = filteredPlans.filter(p => {
+    const total = p.totalCount ?? (p.runs?.length || 0);
+    return total === 0;
+  });
+
+  // Unique device types for filter
+  const deviceTypeFilterOptions = Array.from(new Set(plans.filter(p => p.year === filterYear).map((p: any) => p.deviceType).filter(Boolean))) as string[];
 
   const yearOptions = Array.from({ length: 4 }, (_, i) => new Date().getFullYear() - 1 + i);
 
@@ -353,12 +408,15 @@ export default function PMPlanListPage() {
         .pmp-plan-stripe { height: 4px; }
         .pmp-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px;
           border-radius: 99px; font-size: 10px; font-weight: 700; }
+        .pmp-flow-step { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; min-width: 150px; flex: 1; }
+        .pmp-flow-step strong { display: block; font-size: 12px; color: #0f172a; margin-bottom: 2px; }
+        .pmp-flow-step span { display: block; font-size: 10px; color: #64748b; line-height: 1.45; }
       `}</style>
 
       <div className="pmp-root">
 
         {/* ── Page Header ── */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ width: 40, height: 40, borderRadius: 10, background: '#f0f9ff', border: '1.5px solid #bae6fd', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>📋</div>
             <div>
@@ -366,44 +424,107 @@ export default function PMPlanListPage() {
               <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>วางแผนและกำหนดกลุ่มเป้าหมาย Preventive Maintenance</div>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <select className="pmp-input pmp-select" style={{ width: 110 }} value={filterYear} onChange={e => setFilterYear(+e.target.value)}>
-              {yearOptions.map(y => <option key={y} value={y}>ปี {y + 543}</option>)}
-            </select>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <button className="pmp-btn pmp-btn-primary" onClick={() => setModalOpen(true)}>＋ สร้างแผน PM</button>
+            {plansNeedGenerate.length > 0 && (
+              <button
+                className="pmp-btn pmp-btn-success"
+                disabled={saving}
+                onClick={async () => {
+                  if (!window.confirm(`⚡ ยืนยัน Generate งาน PM ทั้ง ${plansNeedGenerate.length} แผนที่ยังไม่ได้สร้างงาน?`)) return;
+                  setSaving(true);
+                  let ok = 0, fail = 0;
+                  for (const plan of plansNeedGenerate) {
+                    try {
+                      await pmAPI.generate(plan.id);
+                      ok++;
+                    } catch {
+                      fail++;
+                    }
+                  }
+                  showToast(`⚡ Generate สำเร็จ ${ok} แผน${fail > 0 ? `, ล้มเหลว ${fail} แผน` : ''}`);
+                  fetchAll();
+                  setSaving(false);
+                }}
+              >
+                ⚡ Generate ทุกแผน ({plansNeedGenerate.length})
+              </button>
+            )}
           </div>
         </div>
 
-        {/* ── Stats Summary ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 10, marginBottom: 18 }}>
+        {/* ── Filters Bar ── */}
+        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '10px 14px', marginBottom: 14, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <select className="pmp-input pmp-select" style={{ width: 100, padding: '6px 8px', fontSize: 11 }} value={filterYear} onChange={e => setFilterYear(+e.target.value)}>
+            {yearOptions.map(y => <option key={y} value={y}>ปี {y + 543}</option>)}
+          </select>
+          <select className="pmp-input pmp-select" style={{ width: 130, padding: '6px 8px', fontSize: 11 }} value={filterCompany} onChange={e => setFilterCompany(e.target.value)}>
+            <option value="">🏢 ทุกบริษัท</option>
+            {companyOptions.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <select className="pmp-input pmp-select" style={{ width: 130, padding: '6px 8px', fontSize: 11 }} value={filterDept} onChange={e => setFilterDept(e.target.value)}>
+            <option value="">⚙️ ทุกแผนก</option>
+            {deptOptions.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+          <select className="pmp-input pmp-select" style={{ width: 130, padding: '6px 8px', fontSize: 11 }} value={filterDeviceType} onChange={e => setFilterDeviceType(e.target.value)}>
+            <option value="">💻 ทุกประเภท</option>
+            {deviceTypeFilterOptions.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <select className="pmp-input pmp-select" style={{ width: 150, padding: '6px 8px', fontSize: 11 }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+            <option value="">📊 ทุกสถานะ</option>
+            <option value="COMPLETED">✅ เสร็จสิ้นแล้ว</option>
+            <option value="IN_PROGRESS">🔄 กำลังดำเนินการ</option>
+            <option value="OVERDUE">⚠️ ล่าช้ากว่ากำหนด</option>
+            <option value="NOT_GENERATED">🆕 ยังไม่ Generate</option>
+          </select>
+          <div style={{ flex: 1, minWidth: 160 }}>
+            <input
+              type="text"
+              className="pmp-input"
+              placeholder="🔍 ค้นหาชื่อแผนก, บริษัท, ผู้รับผิดชอบ..."
+              style={{ padding: '6px 10px', fontSize: 11 }}
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: 6, padding: 3 }}>
+            <button 
+              onClick={() => setViewMode('table')}
+              style={{ border: 'none', background: viewMode === 'table' ? '#fff' : 'transparent', color: viewMode === 'table' ? '#0ea5e9' : '#64748b', borderRadius: 5, padding: '5px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', boxShadow: viewMode === 'table' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
+              📄 ตาราง
+            </button>
+            <button 
+              onClick={() => setViewMode('card')}
+              style={{ border: 'none', background: viewMode === 'card' ? '#fff' : 'transparent', color: viewMode === 'card' ? '#0ea5e9' : '#64748b', borderRadius: 5, padding: '5px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', boxShadow: viewMode === 'card' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
+              🗂️ การ์ด
+            </button>
+          </div>
+        </div>
+
+        {/* ── Stats + Progress (Combined compact) ── */}
+        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '10px 16px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
           {[
-            { icon: '📋', label: 'แผน PM', val: filteredPlans.length, color: '#0ea5e9' },
+            { icon: '📋', label: 'แผน', val: filteredPlans.length, color: '#0ea5e9' },
             { icon: '🎯', label: 'เป้าหมาย', val: totalPlanned, color: '#8b5cf6' },
-            { icon: '✅', label: 'เสร็จแล้ว', val: totalDone, color: '#10b981' },
-            { icon: '⏳', label: 'รอดำเนินการ', val: totalRuns - totalDone, color: '#f59e0b' },
-            { icon: '📊', label: 'ความคืบหน้า', val: `${overallPct}%`, color: progressColor(overallPct) },
+            { icon: '✅', label: 'เสร็จ', val: totalDone, color: '#10b981' },
+            { icon: '⏳', label: 'เหลือ', val: totalRuns - totalDone, color: '#f59e0b' },
           ].map(s => (
-            <div key={s.label} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 22 }}>{s.icon}</span>
+            <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 16 }}>{s.icon}</span>
               <div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.val}</div>
-                <div style={{ fontSize: 10, color: '#94a3b8' }}>{s.label}</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.val}</div>
+                <div style={{ fontSize: 9, color: '#94a3b8' }}>{s.label}</div>
               </div>
             </div>
           ))}
-        </div>
-
-        {/* ── Overall progress bar ── */}
-        {totalRuns > 0 && (
-          <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 16px', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>ความคืบหน้ารวม ปี {filterYear + 543}</span>
-            <div style={{ flex: 1, background: '#f1f5f9', borderRadius: 99, height: 8, overflow: 'hidden' }}>
-              <div style={{ height: '100%', borderRadius: 99, background: progressColor(overallPct), width: `${overallPct}%`, transition: 'width .4s' }} />
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, minWidth: 180 }}>
+            <div style={{ flex: 1, background: '#f1f5f9', borderRadius: 99, height: 7, overflow: 'hidden' }}>
+              <div style={{ height: '100%', borderRadius: 99, background: progressColor(overallPct), width: `${overallPct}%`, transition: 'width .3s' }} />
             </div>
-            <span style={{ fontSize: 12, fontWeight: 700, color: progressColor(overallPct), minWidth: 40 }}>{overallPct}%</span>
-            <span style={{ fontSize: 11, color: '#94a3b8' }}>{totalDone}/{totalRuns} เครื่อง</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: progressColor(overallPct), minWidth: 36 }}>{overallPct}%</span>
+            <span style={{ fontSize: 10, color: '#94a3b8', whiteSpace: 'nowrap' }}>{totalDone}/{totalRuns}</span>
           </div>
-        )}
+        </div>
 
         {/* ── Plan Cards ── */}
         {loading ? (
@@ -415,8 +536,93 @@ export default function PMPlanListPage() {
             <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4, marginBottom: 16 }}>กดปุ่ม "สร้างแผน PM" เพื่อเริ่มต้น</div>
             <button className="pmp-btn pmp-btn-primary" onClick={() => setModalOpen(true)}>＋ สร้างแผน PM แรก</button>
           </div>
+        ) : viewMode === 'table' ? (
+          <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                  <tr>
+                    <th style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#475569' }}>แผนก / สถานที่</th>
+                    <th style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#475569' }}>ประเภท</th>
+                    <th style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#475569' }}>ระยะเวลา</th>
+                    <th style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#475569' }}>ความคืบหน้า</th>
+                    <th style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#475569' }}>สถานะ</th>
+                    <th style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#475569', textAlign: 'right' }}>จัดการ</th>
+                  </tr>
+                </thead>
+                <tbody style={{ fontSize: 12, color: '#334155' }}>
+                  {filteredPlans.map((plan: any) => {
+                    const runs = plan.runs || [];
+                    const total = plan.totalCount ?? runs.length;
+                    const done = plan.completedCount ?? runs.filter((r: any) => r.status === 'COMPLETED').length;
+                    const pct = total > 0 ? Math.round(done / total * 100) : 0;
+                    
+                    const start = plan.startDate ? new Date(plan.startDate) : null;
+                    const end = plan.endDate ? new Date(plan.endDate) : null;
+                    const today = new Date();
+                    const isActive = start && end && today >= start && today <= end;
+                    const isOverdue = end && today > end && pct < 100;
+                    const isDone = pct >= 100;
+                    
+                    return (
+                      <tr key={plan.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background .15s' }}>
+                        <td style={{ padding: '8px 12px' }}>
+                          <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {plan.deptTask || 'ทุกแผนก'}
+                            {plan.isAdhoc && <span style={{ fontSize: 8, background: '#e0e7ff', color: '#4338ca', padding: '1px 5px', borderRadius: 4 }}>นอกแผน</span>}
+                          </div>
+                          {!plan.isAdhoc && <div style={{ fontSize: 10, color: '#64748b', marginTop: 1 }}>🏢 {plan.company} {plan.site ? `- ${plan.site}` : ''}</div>}
+                        </td>
+                        <td style={{ padding: '8px 12px', fontSize: 10 }}>
+                          {plan.deviceType ? <span style={{ color: '#0ea5e9', fontWeight: 600 }}>💻 {plan.deviceType}</span> : <span style={{ color: '#94a3b8' }}>—</span>}
+                        </td>
+                        <td style={{ padding: '8px 12px', fontSize: 10 }}>
+                          <div>{fmtDate(plan.startDate)} — {fmtDate(plan.endDate)}</div>
+                        </td>
+                        <td style={{ padding: '8px 12px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <div style={{ flex: 1, background: '#f1f5f9', borderRadius: 99, height: 5, minWidth: 60 }}>
+                              <div style={{ height: '100%', borderRadius: 99, background: progressColor(pct), width: `${pct}%` }} />
+                            </div>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: progressColor(pct), minWidth: 30 }}>{pct}%</span>
+                          </div>
+                          <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 2 }}>{done}/{total} (เป้า {plan.plannedDeviceCount})</div>
+                        </td>
+                        <td style={{ padding: '8px 12px' }}>
+                          <span className="pmp-badge" style={{
+                            ...(isDone ? { background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0' }
+                              : isOverdue ? { background: '#fff5f5', color: '#dc2626', border: '1px solid #fecaca' }
+                              : isActive ? { background: '#f0f9ff', color: '#0369a1', border: '1px solid #bae6fd' }
+                              : total === 0 ? { background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe' }
+                              : { background: '#f8fafc', color: '#94a3b8', border: '1px solid #e2e8f0' }),
+                          }}>
+                            {isDone ? '✅ เสร็จ' : isOverdue ? '⚠️ เกินกำหนด' : isActive ? '🔄 ดำเนินการ' : total === 0 ? '🆕 ยังไม่ Generate' : '📅 กำหนดการ'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                          <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                            {total === 0 ? (
+                              <button className="pmp-btn pmp-btn-success" style={{ padding: '3px 8px', fontSize: 10 }} onClick={() => { setGenerateModal({ open: true, plan }); setGenMsg(''); }}>
+                                ⚡ Generate
+                              </button>
+                            ) : (
+                              <button className="pmp-btn pmp-btn-primary" style={{ padding: '3px 8px', fontSize: 10 }} onClick={() => navigate(`/pm/runs?planId=${plan.id}`)}>
+                                📋 ดูงาน ({total})
+                              </button>
+                            )}
+                            <button className="pmp-btn pmp-btn-outline" style={{ padding: '3px 6px', fontSize: 10 }} onClick={() => handleOpenEdit(plan)} title="แก้ไข">✏️</button>
+                            <button className="pmp-btn pmp-btn-outline" style={{ padding: '3px 6px', fontSize: 10, borderColor: '#fecaca', color: '#ef4444' }} onClick={() => handleDelete(plan.id)} title="ลบ">🗑️</button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(320px,1fr))', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: 14 }}>
             {filteredPlans.map((plan: any) => {
               const runs = plan.runs || [];
               const total = plan.totalCount ?? runs.length;
@@ -436,7 +642,7 @@ export default function PMPlanListPage() {
 
               return (
                 <div className="pmp-plan-card" key={plan.id}>
-                  <div className="pmp-plan-stripe" style={{ background: '#0ea5e9' }} />
+                  <div className="pmp-plan-stripe" style={{ background: isDone ? '#10b981' : isOverdue ? '#ef4444' : isActive ? '#0ea5e9' : '#f59e0b' }} />
                   <div style={{ padding: '14px 16px' }}>
                     {/* Plan header */}
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
@@ -445,8 +651,15 @@ export default function PMPlanListPage() {
                           📋
                         </div>
                         <div>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{deptLabel}</div>
-                          <div style={{ fontSize: 10, color: '#64748b', fontWeight: 500, marginTop: 1 }}>🏢 {siteLabel || 'ทุกบริษัท/ทุกสถานที่'}</div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {deptLabel}
+                            {plan.isAdhoc && (
+                              <span style={{ fontSize: 9, background: '#e0e7ff', color: '#4338ca', padding: '2px 6px', borderRadius: 4, fontWeight: 700 }}>📌 นอกแผน</span>
+                            )}
+                          </div>
+                          {!plan.isAdhoc && (
+                             <div style={{ fontSize: 10, color: '#64748b', fontWeight: 500, marginTop: 1 }}>🏢 {siteLabel || 'ทุกบริษัท/ทุกสถานที่'}</div>
+                          )}
                           {plan.deviceType && <div style={{ fontSize: 10, color: '#0ea5e9', fontWeight: 600, marginTop: 2 }}>💻 {plan.deviceType}</div>}
                         </div>
                       </div>
@@ -467,7 +680,7 @@ export default function PMPlanListPage() {
                         <span style={{ fontSize: 12, fontWeight: 700, color: progressColor(pct) }}>{pct}% ({done}/{total})</span>
                       </div>
                       <div style={{ background: '#f1f5f9', borderRadius: 99, height: 6, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', borderRadius: 99, background: progressColor(pct), width: `${pct}%`, transition: 'width .4s' }} />
+                        <div style={{ height: '100%', borderRadius: 99, background: progressColor(pct), width: `${pct}%` }} />
                       </div>
                     </div>
 
@@ -500,7 +713,7 @@ export default function PMPlanListPage() {
                         <button
                           className="pmp-btn pmp-btn-primary"
                           style={{ flex: 1, justifyContent: 'center' }}
-                          onClick={() => navigate('/pm/runs')}
+                          onClick={() => navigate(`/pm/runs?planId=${plan.id}`)}
                         >
                           📋 ดูงาน PM ({total})
                         </button>
@@ -630,14 +843,24 @@ export default function PMPlanListPage() {
 
           {/* Date range */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <div>
-              <label className="pmp-label">วันที่เริ่ม *</label>
-              <input type="date" className="pmp-input" value={form.startDate} onChange={e => setForm(p => ({ ...p, startDate: e.target.value }))} />
-            </div>
-            <div>
-              <label className="pmp-label">วันที่สิ้นสุด *</label>
-              <input type="date" className="pmp-input" value={form.endDate} onChange={e => setForm(p => ({ ...p, endDate: e.target.value }))} />
-            </div>
+              <div>
+                <label className="pmp-label">วันที่เริ่ม *</label>
+                <DatePicker
+                  format="DD/MM/YYYY"
+                  value={form.startDate ? dayjs(form.startDate) : null}
+                  onChange={(newVal) => setForm(p => ({ ...p, startDate: newVal ? newVal.format('YYYY-MM-DD') : '' }))}
+                  slotProps={{ textField: { size: 'small', fullWidth: true, sx: { bgcolor: '#fff', borderRadius: '6px' } } }}
+                />
+              </div>
+              <div>
+                <label className="pmp-label">วันที่สิ้นสุด *</label>
+                <DatePicker
+                  format="DD/MM/YYYY"
+                  value={form.endDate ? dayjs(form.endDate) : null}
+                  onChange={(newVal) => setForm(p => ({ ...p, endDate: newVal ? newVal.format('YYYY-MM-DD') : '' }))}
+                  slotProps={{ textField: { size: 'small', fullWidth: true, sx: { bgcolor: '#fff', borderRadius: '6px' } } }}
+                />
+              </div>
           </div>
 
           {/* Duration hint */}
@@ -655,12 +878,17 @@ export default function PMPlanListPage() {
           <div>
             <label className="pmp-label">PM Template (Checklist)</label>
             <select className="pmp-input pmp-select" value={form.templateId} onChange={e => setForm(p => ({ ...p, templateId: e.target.value }))}>
-              <option value="">-- เลือก Template (ถ้ามี) --</option>
+              <option value="">-- เลือก Template สำหรับตรวจ PM --</option>
               {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
             {templates.length === 0 && (
               <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 4 }}>
                 💡 ยังไม่มี Template — <span style={{ color: '#0ea5e9', cursor: 'pointer', textDecoration: 'underline' }} onClick={() => { setModalOpen(false); setTimeout(() => window.location.href = '/pm/templates', 100); }}>สร้าง Template</span>
+              </div>
+            )}
+            {templates.length > 0 && (
+              <div style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>
+                จำเป็นต้องเลือก Template เพราะงาน PM ต้องมีรายการตรวจเช็คก่อนบันทึกผลได้
               </div>
             )}
           </div>
@@ -758,7 +986,6 @@ export default function PMPlanListPage() {
                   <select 
                     className="pmp-input pmp-select" 
                     value={editForm.deviceType} 
-                    disabled={hasCompletedRuns}
                     onChange={e => setEditForm(p => ({ ...p, deviceType: e.target.value }))}
                   >
                     <option value="">📌 ทุกประเภท (All Types)</option>
@@ -777,24 +1004,34 @@ export default function PMPlanListPage() {
                     <input 
                       type="number" 
                       className="pmp-input" 
-                      min={1} 
+                      min={completedRuns > 0 ? completedRuns : 1} 
                       value={editForm.plannedDeviceCount} 
-                      disabled={hasCompletedRuns}
                       onChange={e => setEditForm(p => ({ ...p, plannedDeviceCount: +e.target.value }))} 
                     />
+                    {hasCompletedRuns && <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 4 }}>* ปรับเป้าหมายให้ตรงกับงานจริงได้</div>}
                   </div>
                 </div>
 
                 {/* Date range */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <div>
-                    <label className="pmp-label">วันที่เริ่ม *</label>
-                    <input type="date" className="pmp-input" value={editForm.startDate} onChange={e => setEditForm(p => ({ ...p, startDate: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label className="pmp-label">วันที่สิ้นสุด *</label>
-                    <input type="date" className="pmp-input" value={editForm.endDate} onChange={e => setEditForm(p => ({ ...p, endDate: e.target.value }))} />
-                  </div>
+                    <div>
+                      <label className="pmp-label">วันที่เริ่ม *</label>
+                      <DatePicker
+                        format="DD/MM/YYYY"
+                        value={editForm.startDate ? dayjs(editForm.startDate) : null}
+                        onChange={(newVal) => setEditForm(p => ({ ...p, startDate: newVal ? newVal.format('YYYY-MM-DD') : '' }))}
+                        slotProps={{ textField: { size: 'small', fullWidth: true, sx: { bgcolor: '#fff', borderRadius: '6px' } } }}
+                      />
+                    </div>
+                    <div>
+                      <label className="pmp-label">วันที่สิ้นสุด *</label>
+                      <DatePicker
+                        format="DD/MM/YYYY"
+                        value={editForm.endDate ? dayjs(editForm.endDate) : null}
+                        onChange={(newVal) => setEditForm(p => ({ ...p, endDate: newVal ? newVal.format('YYYY-MM-DD') : '' }))}
+                        slotProps={{ textField: { size: 'small', fullWidth: true, sx: { bgcolor: '#fff', borderRadius: '6px' } } }}
+                      />
+                    </div>
                 </div>
 
                 {/* Duration hint */}
@@ -817,9 +1054,12 @@ export default function PMPlanListPage() {
                     disabled={hasCompletedRuns}
                     onChange={e => setEditForm(p => ({ ...p, templateId: e.target.value }))}
                   >
-                    <option value="">-- เลือก Template (ถ้ามี) --</option>
+                    <option value="">-- เลือก Template สำหรับตรวจ PM --</option>
                     {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
+                  <div style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>
+                    Template เป็นแบบฟอร์มตรวจจริงของงาน PM และต้องคงไว้เพื่อให้ผลรายงานอ่านย้อนหลังได้
+                  </div>
                 </div>
               </div>
 
@@ -873,9 +1113,11 @@ export default function PMPlanListPage() {
         </div>
         <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button className="pmp-btn pmp-btn-outline" onClick={() => setGenerateModal({ open: false, plan: null })}>ปิด</button>
-          {!genMsg && <button className="pmp-btn pmp-btn-success" onClick={handleGenerate}>⚡ Generate</button>}
+          {!genMsg && <button className="pmp-btn pmp-btn-success" onClick={handleGenerate} disabled={saving || (generateEligibility && generateEligibility.creatable < 1)}>
+            {saving ? '⏳ กำลัง Generate...' : '⚡ Generate'}
+          </button>}
           {genMsg && !genMsg.includes('ผิดพลาด') && (
-            <button className="pmp-btn pmp-btn-primary" onClick={() => { setGenerateModal({ open: false, plan: null }); navigate('/pm/runs'); }}>
+            <button className="pmp-btn pmp-btn-primary" onClick={() => { const planId = generateModal.plan?.id; setGenerateModal({ open: false, plan: null }); navigate(planId ? `/pm/runs?planId=${planId}` : '/pm/runs'); }}>
               📋 ไปหน้าทำ PM
             </button>
           )}

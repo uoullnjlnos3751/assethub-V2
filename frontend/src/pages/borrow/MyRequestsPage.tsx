@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { borrowAPI } from '../../services/api';
-import { useTheme, useMediaQuery } from '@mui/material';
+import { useTheme, useMediaQuery, Stepper, Step, StepLabel, StepConnector, stepConnectorClasses } from '@mui/material';
+import { styled } from '@mui/material/styles';
+import { formatDate } from '../../utils/dateUtils';
+
 
 const statusMeta: Record<string, { label: string; color: string; bg: string; border: string }> = {
   Pending:          { label: 'รออนุมัติ',    color: '#d97706', bg: '#fffbeb', border: '#fcd34d' },
@@ -160,7 +163,7 @@ export default function MyRequestsPage() {
               {filtered.map((r) => {
                 const sm = statusMeta[r.status] || statusMeta.Pending;
                 return (
-                  <div key={r.id} style={{ padding: 14, border: '1px solid #e2e8f0', borderRadius: 12, background: '#fafbfc' }}>
+                  <div key={r.id} style={{ padding: 16, border: '1px solid #e2e8f0', borderRadius: 14, background: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                       <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0f172a' }}>{r.requestNo}</span>
                       <span style={{ background: sm.bg, color: sm.color, border: `1px solid ${sm.border}`, borderRadius: 20, padding: '2px 10px', fontSize: '0.72rem', fontWeight: 700 }}>{sm.label}</span>
@@ -168,17 +171,17 @@ export default function MyRequestsPage() {
                     {r.purpose && <div style={{ fontSize: '0.82rem', color: '#475569', marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.purpose}</div>}
                     <div style={{ display: 'flex', gap: 12, fontSize: '0.78rem', color: '#64748b', marginBottom: 8, flexWrap: 'wrap' }}>
                       <span>📦 {r.items?.length || 0} รายการ</span>
-                      <span>📅 {new Date(r.createdAt).toLocaleDateString('th-TH')}</span>
-                      {r.items?.[0]?.dueDate && <span>⏰ คืน {new Date(r.items[0].dueDate).toLocaleDateString('th-TH')}</span>}
+                      <span>📅 {formatDate(r.createdAt)}</span>
+                      {r.items?.[0]?.dueDate && <span>⏰ คืน {formatDate(r.items[0].dueDate)}</span>}
                     </div>
-                    <div style={{ display: 'flex', gap: 6 }}>
+                    <div style={{ display: 'flex', gap: 8 }}>
                       <button onClick={() => setDetailReq(r)}
-                        style={{ flex: 1, background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0', borderRadius: 7, padding: '7px 12px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>
+                        style={{ flex: 1, background: '#f8fafc', color: '#334155', border: '1px solid #e2e8f0', borderRadius: 10, padding: '10px 12px', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}>
                         👁 ดูรายละเอียด
                       </button>
                       {r.status === 'Pending' && (
                         <button onClick={() => setCancelDialog({ open: true, id: r.id })}
-                          style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 7, padding: '7px 12px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}>
+                          style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 10, padding: '10px 12px', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}>
                           ✕ ยกเลิก
                         </button>
                       )}
@@ -212,9 +215,9 @@ export default function MyRequestsPage() {
                           {r.items?.length || 0} {"\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23"}
                         </span>
                       </td>
-                      <td style={{ padding: '13px 16px', color: '#64748b', whiteSpace: 'nowrap' }}>{new Date(r.createdAt).toLocaleDateString('th-TH')}</td>
+                      <td style={{ padding: '13px 16px', color: '#64748b', whiteSpace: 'nowrap' }}>{formatDate(r.createdAt)}</td>
                       <td style={{ padding: '13px 16px', color: '#64748b', whiteSpace: 'nowrap' }}>
-                        {r.items?.[0]?.dueDate ? new Date(r.items[0].dueDate).toLocaleDateString('th-TH') : '-'}
+                        {r.items?.[0]?.dueDate ? formatDate(r.items[0].dueDate) : '-'}
                       </td>
                       <td style={{ padding: '13px 16px' }}>
                         <span style={{ background: sm.bg, color: sm.color, border: `1px solid ${sm.border}`, borderRadius: 20, padding: '3px 10px', fontSize: '0.75rem', fontWeight: 700 }}>
@@ -314,6 +317,26 @@ export default function MyRequestsPage() {
                 </div>
               )}
 
+              {/* Timeline Tracking */}
+              <div style={{ marginBottom: 20, padding: '16px 20px', background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155', marginBottom: 16 }}>สถานะคำขอ</div>
+                <Stepper activeStep={
+                  detailReq.status === 'Pending' ? 1 :
+                  detailReq.status === 'Approved' ? 2 :
+                  detailReq.status === 'CheckedOut' ? 3 :
+                  detailReq.status === 'Returned' ? 4 : 1
+                } alternativeLabel>
+                  <Step><StepLabel>สร้างคำขอ</StepLabel></Step>
+                  <Step>
+                    <StepLabel error={detailReq.status === 'Rejected'}>
+                      {detailReq.status === 'Rejected' ? 'ไม่อนุมัติ' : 'รอ IT อนุมัติ'}
+                    </StepLabel>
+                  </Step>
+                  <Step><StepLabel>เตรียมอุปกรณ์</StepLabel></Step>
+                  <Step><StepLabel>กำลังใช้งาน</StepLabel></Step>
+                </Stepper>
+              </div>
+
               {/* Items */}
               <div style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>{"\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e17\u0e35\u0e48\u0e02\u0e2d\u0e22\u0e37\u0e21"} ({detailReq.items?.length || 0})</div>
@@ -337,7 +360,7 @@ export default function MyRequestsPage() {
                             </div>
                           )}
                           <div style={{ fontSize: '0.73rem', color: '#94a3b8', marginTop: 4 }}>
-                            {"\u0e01\u0e33\u0e2b\u0e19\u0e14\u0e04\u0e37\u0e19:"} {item.dueDate ? new Date(item.dueDate).toLocaleDateString('th-TH') : '-'}
+                            {"\u0e01\u0e33\u0e2b\u0e19\u0e14\u0e04\u0e37\u0e19:"} {item.dueDate ? formatDate(item.dueDate) : '-'}
                           </div>
                         </div>
                         <span style={{ background: ism.bg, color: ism.color, border: `1px solid ${ism.border}`, borderRadius: 20, padding: '3px 10px', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}>

@@ -1,10 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { assetAPI } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
 
 /* ─────────────────────────────────────────────────────────────────
    Types
 ───────────────────────────────────────────────────────────────── */
 type StatusOption = { code: string; name: string };
+
+interface MasterDataItem {
+  id: number;
+  name: string;
+  code?: string;
+  description?: string | null;
+  company?: string;
+  isActive: boolean;
+  assetCount?: number;
+}
 
 type MasterDataPageProps = {
   title: string;
@@ -19,6 +29,7 @@ type MasterDataPageProps = {
   importItems?: () => Promise<any>;
   statusOptions?: StatusOption[];
   showCompanyField?: boolean;
+  showCodeField?: boolean;
 };
 
 const emptyForm = { code: '', name: '', company: '', description: '', isActive: true };
@@ -91,21 +102,21 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 export default function MasterDataPage({
   title, subtitle, itemLabel, icon = '📋', accentColor = '#0ea5e9',
   fetchItems, createItem, updateItem, deleteItem,
-  importItems, statusOptions, showCompanyField,
+  importItems, statusOptions, showCompanyField, showCodeField,
 }: MasterDataPageProps) {
 
-  const [items, setItems] = useState<any[]>([]);
-  const [filtered, setFiltered] = useState<any[]>([]);
+  const toast = useToast();
+  const [items, setItems] = useState<MasterDataItem[]>([]);
+  const [filtered, setFiltered] = useState<MasterDataItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<any>(null);
+  const [editingItem, setEditingItem] = useState<MasterDataItem | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
-  const [toast, setToast] = useState('');
   const [importing, setImporting] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState<any>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<MasterDataItem | null>(null);
 
   const isStatusPage = Boolean(statusOptions?.length);
 
@@ -114,7 +125,7 @@ export default function MasterDataPage({
     setLoading(true);
     try {
       const res = await fetchItems();
-      const data = res.data || [];
+      const data = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
       setItems(data);
       setFiltered(data);
     } finally {
@@ -132,12 +143,6 @@ export default function MasterDataPage({
       (i.description || '').toLowerCase().includes(q)
     ) : items);
   }, [search, items]);
-
-  /* ── Toast ── */
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(''), 2500);
-  };
 
   /* ── Dialog ── */
   const openCreate = () => {
@@ -166,7 +171,7 @@ export default function MasterDataPage({
     setSaving(true); setError('');
     try {
       const data = {
-        code: isStatusPage ? form.code.trim() : undefined,
+        code: isStatusPage ? form.code.trim() : showCodeField ? form.code.trim() || null : undefined,
         name: form.name.trim(),
         company: showCompanyField ? form.company.trim() || null : undefined,
         description: form.description.trim() || null,
@@ -174,10 +179,10 @@ export default function MasterDataPage({
       };
       if (editingItem) {
         await updateItem(editingItem.id, data);
-        showToast(`แก้ไข "${form.name}" สำเร็จ`);
+        toast.success(`แก้ไข "${form.name}" สำเร็จ`);
       } else {
         await createItem(data);
-        showToast(`เพิ่ม "${form.name}" สำเร็จ`);
+        toast.success(`เพิ่ม "${form.name}" สำเร็จ`);
       }
       setDialogOpen(false);
       loadItems();
@@ -193,10 +198,10 @@ export default function MasterDataPage({
       await deleteItem(item.id);
       setDeleteConfirm(null);
       loadItems();
-      showToast(`ลบ "${item.name}" สำเร็จ`);
+      toast.success(`ลบ "${item.name}" สำเร็จ`);
     } catch (err: any) {
       setDeleteConfirm(null);
-      showToast(`❌ ${err.response?.data?.error || `ไม่สามารถลบ${itemLabel}ได้`}`);
+      toast.error(`❌ ${err.response?.data?.error || `ไม่สามารถลบ${itemLabel}ได้`}`);
     }
   };
 
@@ -206,9 +211,9 @@ export default function MasterDataPage({
     try {
       const res = await importItems();
       await loadItems();
-      showToast(`นำเข้าสำเร็จ ${res.data?.imported ?? ''} รายการ`);
+      toast.success(`นำเข้าสำเร็จ ${res?.data?.imported ?? ''} รายการ`);
     } catch (err: any) {
-      showToast(`❌ ${err.response?.data?.error || 'นำเข้าไม่สำเร็จ'}`);
+      toast.error(err?.response?.data?.error || 'นำเข้าไม่สำเร็จ');
     } finally {
       setImporting(false);
     }
@@ -279,10 +284,6 @@ export default function MasterDataPage({
         .mdp-error { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 8px 12px; font-size: 11px; color: #dc2626; }
         .mdp-toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; }
         .mdp-toggle-lbl { font-size: 12px; color: #334155; font-weight: 500; }
-
-        /* Toast */
-        .mdp-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #0f172a; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 12px; font-family: 'Sarabun', sans-serif; z-index: 9999; box-shadow: 0 8px 24px rgba(0,0,0,.2); pointer-events: none; animation: fadeUp .2s ease; }
-        @keyframes fadeUp { from { opacity: 0; transform: translateX(-50%) translateY(8px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
 
         /* Delete confirm */
         .mdp-confirm { padding: 18px 20px; }
@@ -369,7 +370,7 @@ export default function MasterDataPage({
               <thead>
                 <tr>
                   <th style={{ width: '40px' }}>#</th>
-                  {isStatusPage && <th>รหัส</th>}
+                  {(isStatusPage || showCodeField) && <th>รหัส</th>}
                   <th>{itemLabel}</th>
                   {showCompanyField && <th>Company</th>}
                   <th>รายละเอียด</th>
@@ -382,8 +383,8 @@ export default function MasterDataPage({
                 {filtered.map((item, idx) => (
                   <tr key={item.id}>
                     <td style={{ color: '#cbd5e1', fontSize: '11px' }}>{idx + 1}</td>
-                    {isStatusPage && (
-                      <td><span className="mdp-code">{item.code}</span></td>
+                    {(isStatusPage || showCodeField) && (
+                      <td><span className="mdp-code">{item.code || '—'}</span></td>
                     )}
                     <td>
                       <span style={{ fontWeight: 600, color: '#0f172a' }}>{item.name}</span>
@@ -451,6 +452,18 @@ export default function MasterDataPage({
                   <option key={s.code} value={s.code}>{s.code} — {s.name}</option>
                 ))}
               </select>
+            </div>
+          )}
+
+          {showCodeField && !isStatusPage && (
+            <div>
+              <div className="mdp-label">รหัส</div>
+              <input
+                className="mdp-input"
+                placeholder="รหัสแผนก (ไม่บังคับ)"
+                value={form.code}
+                onChange={e => setForm(p => ({ ...p, code: e.target.value }))}
+              />
             </div>
           )}
 
@@ -533,8 +546,6 @@ export default function MasterDataPage({
         </div>
       </Modal>
 
-      {/* ── Toast ── */}
-      {toast && <div className="mdp-toast">{toast}</div>}
     </>
   );
 }

@@ -1,8 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { authenticate } from '../middleware/auth';
 
-const prisma = new PrismaClient();
 const router = express.Router();
 
 // GET /notifications - Fetch user's notifications

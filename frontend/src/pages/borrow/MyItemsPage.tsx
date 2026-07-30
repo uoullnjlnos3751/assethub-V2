@@ -2,6 +2,9 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { borrowAPI, adminAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { formatDate } from '../../utils/dateUtils';
+import { useTheme, useMediaQuery } from '@mui/material';
+
 
 const statusMeta: Record<string, { label: string; color: string; bg: string }> = {
   Pending:          { label: 'รออนุมัติ',    color: '#d97706', bg: '#fffbeb' },
@@ -18,9 +21,6 @@ function getDaysLeft(dueDate: string | null): number | null {
   return Math.ceil((new Date(dueDate).getTime() - Date.now()) / 86400000);
 }
 
-function formatDate(d: string) {
-  return new Date(d).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
-}
 
 function DueBar({ dueDate }: { dueDate: string }) {
   const days = getDaysLeft(dueDate);
@@ -31,7 +31,7 @@ function DueBar({ dueDate }: { dueDate: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
       <div style={{ flex: 1, height: 6, background: '#e2e8f0', borderRadius: 3, overflow: 'hidden' }}>
-        <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 3, transition: 'width 0.3s' }} />
+        <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 3 }} />
       </div>
       <span style={{ fontSize: '0.72rem', fontWeight: 700, color, whiteSpace: 'nowrap' }}>
         {days < 0 ? `เกิน ${Math.abs(days)} วัน` : `เหลือ ${days} วัน`}
@@ -53,6 +53,8 @@ const PER_PAGE = 10;
 export default function MyItemsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -217,17 +219,17 @@ export default function MyItemsPage() {
         )}
 
         {/* Summary cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 20 }}>
           {[
             { label: 'กำลังยืม',    value: countBy('CheckedOut'),  icon: '📦', color: '#16a34a', bg: isDark ? '#052e16' : '#f0fdf4' },
             { label: 'เกินกำหนด',   value: overdueCount,           icon: '🔴', color: '#dc2626', bg: isDark ? '#450a0a' : '#fef2f2' },
             { label: 'รออนุมัติ',   value: countBy('Pending'),     icon: '⏳', color: '#d97706', bg: isDark ? '#451a03' : '#fffbeb' },
             { label: 'คืนแล้ว',     value: countBy('Returned'),    icon: '📥', color: '#6b7280', bg: isDark ? '#1e293b' : '#f9fafb' },
           ].map(s => (
-            <div key={s.label} style={{ background: C.statBg, borderRadius: 14, padding: '14px 16px', border: `1px solid ${C.cardBorder}`, display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 40, height: 40, borderRadius: 10, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>{s.icon}</div>
+            <div key={s.label} style={{ background: C.statBg, borderRadius: 14, padding: isMobile ? '12px' : '14px 16px', border: `1px solid ${C.cardBorder}`, display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12 }}>
+              <div style={{ width: isMobile ? 32 : 40, height: isMobile ? 32 : 40, borderRadius: 10, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: isMobile ? '1rem' : '1.2rem' }}>{s.icon}</div>
               <div>
-                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: s.color, lineHeight: 1.2 }}>{s.value}</div>
+                <div style={{ fontSize: isMobile ? '1.3rem' : '1.5rem', fontWeight: 800, color: s.color, lineHeight: 1.2 }}>{s.value}</div>
                 <div style={{ fontSize: '0.72rem', color: C.textMuted, fontWeight: 600 }}>{s.label}</div>
               </div>
             </div>
@@ -235,20 +237,20 @@ export default function MyItemsPage() {
         </div>
 
         {/* Tabs */}
-        <div style={{ display: 'flex', gap: 2, background: isDark ? '#1e293b' : '#e2e8f0', borderRadius: 10, padding: 3, marginBottom: 20, overflowX: 'auto' }}>
+        <div style={{ display: 'flex', gap: 4, background: isDark ? '#1e293b' : '#e2e8f0', borderRadius: 12, padding: 4, marginBottom: 20, overflowX: 'auto', scrollbarWidth: 'none' }}>
           {TABS.map((t, i) => {
             const cnt = i === 3 ? requests.length : countBy(t.filter);
             return (
               <button key={t.label} onClick={() => { setActiveTab(i); setPage(1); setExpandedReq(null); }} style={{
-                flex: 1, border: 'none', padding: '8px 14px', cursor: 'pointer', borderRadius: 8, whiteSpace: 'nowrap',
-                fontWeight: activeTab === i ? 700 : 500, fontSize: '0.82rem',
+                flex: 1, border: 'none', padding: isMobile ? '10px 12px' : '8px 14px', cursor: 'pointer', borderRadius: 10, whiteSpace: 'nowrap',
+                fontWeight: activeTab === i ? 700 : 600, fontSize: '0.85rem',
                 background: activeTab === i ? (isDark ? '#0f172a' : '#fff') : 'transparent',
                 color: activeTab === i ? C.tabActive : C.textDim,
                 boxShadow: activeTab === i ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
                 transition: 'all 0.15s',
               }}>
                 {t.label}
-                {cnt > 0 && <span style={{ marginLeft: 4, opacity: 0.7 }}>({cnt})</span>}
+                {cnt > 0 && <span style={{ marginLeft: 4, opacity: 0.7, fontSize: '0.75rem' }}>({cnt})</span>}
               </button>
             );
           })}
@@ -307,8 +309,8 @@ export default function MyItemsPage() {
                   {isExpanded && (
                     <div style={{ borderTop: `1px solid ${C.border}` }} onClick={e => e.stopPropagation()}>
                       {/* Purpose */}
-                      <div style={{ padding: '12px 18px', background: C.sectionBg, display: 'flex', gap: 20, flexWrap: 'wrap', borderBottom: `1px solid ${C.border}`, fontSize: '0.82rem' }}>
-                        <div><span style={{ color: C.textMuted }}>วัตถุประสงค์: </span><span style={{ color: C.text, fontWeight: 500 }}>{req.purpose || '-'}</span></div>
+                      <div style={{ padding: '12px 18px', background: C.sectionBg, display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 8 : 20, flexWrap: 'wrap', borderBottom: `1px solid ${C.border}`, fontSize: '0.85rem' }}>
+                        <div><span style={{ color: C.textMuted }}>วัตถุประสงค์: </span><span style={{ color: C.text, fontWeight: 600 }}>{req.purpose || '-'}</span></div>
                         {checkedOutItems.length > 0 && checkedOutItems[0]?.dueDate && (
                           <div><span style={{ color: C.textMuted }}>กำหนดคืน: </span><span style={{ color: hasOverdue ? '#dc2626' : C.text, fontWeight: 700 }}>{formatDate(checkedOutItems[0].dueDate)}</span></div>
                         )}
@@ -356,10 +358,10 @@ export default function MyItemsPage() {
                               {isCheckedOut && item.dueDate && <DueBar dueDate={item.dueDate} />}
 
                               {/* Actions */}
-                              <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(120px, auto))', gap: 8, marginTop: 12 }}>
                                 {!item.isQuantityBased && item.assetId && (
                                   <button onClick={() => navigate('/assets/' + item.assetId)}
-                                    style={{ padding: '5px 12px', borderRadius: 7, border: `1px solid ${C.border}`, background: 'transparent', color: C.textDim, fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>
+                                    style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${C.border}`, background: 'transparent', color: C.textDim, fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}>
                                     🔍 ดูรายละเอียด
                                   </button>
                                 )}
@@ -372,7 +374,7 @@ export default function MyItemsPage() {
                                       disabled={!!pendingExt}
                                       title="ขยายวันยืม"
                                       style={{
-                                        padding: '5px 12px', borderRadius: 7, fontSize: '0.75rem', fontWeight: 700, cursor: pendingExt ? 'not-allowed' : 'pointer',
+                                        padding: '8px 12px', borderRadius: 8, fontSize: '0.8rem', fontWeight: 800, cursor: pendingExt ? 'not-allowed' : 'pointer',
                                         background: pendingExt ? (isDark ? '#1e293b' : '#f1f5f9') : (isDark ? '#0c4a6e' : '#f0f9ff'),
                                         color: pendingExt ? (isDark ? '#475569' : '#94a3b8') : (isDark ? '#38bdf8' : '#0284c7'),
                                         border: `1px solid ${pendingExt ? (isDark ? '#334155' : '#e2e8f0') : (isDark ? '#0e7490' : '#bae6fd')}`,
@@ -382,14 +384,14 @@ export default function MyItemsPage() {
                                     {isAdmin && (
                                       <button onClick={() => navigate(`/borrow/return?itemId=${item.id}`)}
                                         title="ดำเนินการคืน (IT)"
-                                        style={{ padding: '5px 12px', borderRadius: 7, border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}>
-                                        ↩ คืน
+                                        style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}>
+                                        ↩ คืน (IT)
                                       </button>
                                     )}
                                   </>
                                 )}
                                 {item.itemStatus === 'Returned' && item.returnDate && (
-                                  <span style={{ fontSize: '0.72rem', color: C.textMuted, padding: '5px 0' }}>
+                                  <span style={{ fontSize: '0.75rem', color: C.textMuted, padding: '5px 0', textAlign: isMobile ? 'center' : 'left' }}>
                                     ✅ คืนแล้ว {formatDate(item.returnDate)}
                                   </span>
                                 )}
@@ -420,21 +422,21 @@ export default function MyItemsPage() {
                       )}
 
                       {/* Footer actions */}
-                      <div style={{ padding: '10px 18px', borderTop: `1px solid ${C.border}`, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <div style={{ padding: '12px 18px', borderTop: `1px solid ${C.border}`, display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 10, flexWrap: 'wrap' }}>
                         {req.status === 'Pending' && (
                           <button onClick={() => setCancelDialog({ open: true, id: req.id })}
-                            style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}>
+                            style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', flex: isMobile ? 1 : undefined }}>
                             ✕ ยกเลิกคำขอ
                           </button>
                         )}
                         {req.status === 'CheckedOut' && checkedOutItems.length > 0 && isAdmin && (
                           <button onClick={() => navigate(`/borrow/return?requestId=${req.id}`)}
-                            style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}>
+                            style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', flex: isMobile ? 1 : undefined }}>
                             ↩ คืนทั้งหมด ({checkedOutItems.length} รายการ)
                           </button>
                         )}
                         {req.approvals?.[0] && (
-                          <span style={{ fontSize: '0.72rem', color: C.textMuted, padding: '6px 0' }}>
+                          <span style={{ fontSize: '0.75rem', color: C.textMuted, padding: '6px 0', textAlign: isMobile ? 'center' : 'left', width: isMobile ? '100%' : 'auto' }}>
                             {req.approvals[0].action === 'Rejected' ? 'ปฏิเสธ' : 'อนุมัติ'} โดย {req.approvals[0].approver?.displayName || req.approvals[0].approver?.adUsername || 'ระบบ'} เมื่อ {formatDate(req.approvals[0].actedAt)}
                           </span>
                         )}

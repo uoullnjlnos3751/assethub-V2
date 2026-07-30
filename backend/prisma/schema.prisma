@@ -8,32 +8,33 @@ datasource db {
 }
 
 model AppUser {
-  id                Int               @id @default(autoincrement())
-  adUsername        String            @unique
-  displayName       String?
-  email             String?
-  department        String?
-  company           String?
-  companyThai       String?
-  avatarUrl         String?
-  role              UserRole          @default(USER)
-  isActive          Boolean           @default(true)
-  authType          AuthType          @default(AD)
-  passwordHash      String?
-  lastLoginAt       DateTime?
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  assetHistory      AssetHistory[]    @relation("ActorUser")
-  assetHistoryOwner AssetHistory[]    @relation("OwnerUser")
-  borrowApprovals   BorrowApproval[]
-  extensionRequests BorrowExtension[]
-  borrowRequests    BorrowRequest[]
-  checkouts         Checkout[]
-  pmRunsPerformed   PMRun[]           @relation("PMRunPerformedBy")
-  returns           Return[]
-  donations         Donation[]
+  id                 Int                 @id @default(autoincrement())
+  adUsername         String              @unique
+  displayName        String?
+  email              String?
+  department         String?
+  company            String?
+  companyThai        String?
+  thaiName           String?
+  avatarUrl          String?
+  role               UserRole            @default(USER)
+  isActive           Boolean             @default(true)
+  authType           AuthType            @default(AD)
+  passwordHash       String?
+  lastLoginAt        DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  assetHistory       AssetHistory[]      @relation("ActorUser")
+  assetHistoryOwner  AssetHistory[]      @relation("OwnerUser")
+  borrowApprovals    BorrowApproval[]
+  extensionRequests  BorrowExtension[]
+  borrowRequests     BorrowRequest[]
+  checkouts          Checkout[]
+  pmRunsPerformed    PMRun[]             @relation("PMRunPerformedBy")
+  returns            Return[]
+  donations          Donation[]
   maintenanceRecords MaintenanceRecord[]
-  notifications     AppNotification[]
+  notifications      AppNotification[]
 
   @@index([role, isActive])
   @@index([department])
@@ -41,66 +42,74 @@ model AppUser {
 }
 
 model Asset {
-  id                 Int                     @id @default(autoincrement())
-  assetCode          String?                 @unique
-  assetName          String?
-  serialNo           String                  @unique
-  type               String?
-  categoryId         Int?
-  brand              String?
-  model              String?
-  cpu                String?
-  ram                String?
-  osVersion          String?
-  windowsLicense     String?
-  officeLicense      String?
-  antivirusStatus    String?
-  vendor             String?
-  poNumber           String?
-  prNumber           String?
-  purchaseDate       DateTime?
-  purchasePrice      Float?
-  warrantyEndDate    DateTime?
-  age                Int?
-  ownerName          String?
-  departmentId       String?
-  location           String?
-  status             AssetStatus             @default(Available)
-  remark             String?
-  createdAt          DateTime                @default(now())
-  updatedAt          DateTime                @updatedAt
-  company            String?
-  oldAssetCode       String?
-  cpuGeneration      String?
-  domainName         String?
-  floor              String?
-  poDate             DateTime?
-  ramDetail          String?
-  gpu                String?
-  osType             String?
-  budget             String?
-  ramSlot1           String?
-  ramSlot2           String?
-  snComputer         String?
-  storage1           String?
-  storage2           String?
-  image              String?
-  assetHistory       AssetHistory[]          @relation("AssetHistoryAsset")
-  borrowRequestItems BorrowRequestItem[]
-  pmRuns             PMRun[]
-  computerDetail     ComputerDetail?
-  phoneDetail        PhoneDetail?
-  monitorDetail      MonitorDetail?
-  deviceDetail       DeviceDetail?
+  id                  Int                  @id @default(autoincrement())
+  assetCode           String?              @unique
+  assetName           String?
+  serialNo            String               @unique
+  type                String?
+  categoryId          Int?
+  brand               String?
+  model               String?
+  cpu                 String?
+  ram                 String?
+  osVersion           String?
+  windowsLicense      String?
+  officeLicense       String?
+  antivirusStatus     String?
+  vendor              String?
+  poNumber            String?
+  prNumber            String?
+  purchaseDate        DateTime?
+  purchasePrice       Float?
+  warrantyEndDate     DateTime?
+  age                 Int?
+  ownerName           String?
+  departmentId        String?
+  location            String?
+  status              AssetStatus          @default(Available)
+  remark              String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  company             String?
+  oldAssetCode        String?
+  cpuGeneration       String?
+  domainName          String?
+  floor               String?
+  poDate              DateTime?
+  ramDetail           String?
+  gpu                 String?
+  osType              String?
+  budget              String?
+  ramSlot1            String?
+  ramSlot2            String?
+  memoryType          String?
+  ramOnboard          String?
+  ramType             String?
+  ramSpeed            String?
+  ramMaxSupported     String?
+  ramAvailableSlots   String?
+  ramUpgradeable      String?
+  snComputer          String?
+  storage1            String?
+  storage2            String?
+  image               String?
+  assetHistory        AssetHistory[]       @relation("AssetHistoryAsset")
+  borrowRequestItems  BorrowRequestItem[]
+  pmRuns              PMRun[]
+  computerDetail      ComputerDetail?
+  phoneDetail         PhoneDetail?
+  monitorDetail       MonitorDetail?
+  deviceDetail        DeviceDetail?
   networkDeviceDetail NetworkDeviceDetail?
-  rackDetail         RackDetail?
-  printerDetail      PrinterDetail?
-  cableDetail        CableDetail?
-  consumableDetail   ConsumableDetail?
-  category           Category?               @relation(fields: [categoryId], references: [id])
-  donationItem       DonationItem?
-  documents          AssetDocument[]
-  maintenanceRecords MaintenanceRecord[]
+  rackDetail          RackDetail?
+  printerDetail       PrinterDetail?
+  cableDetail         CableDetail?
+  consumableDetail    ConsumableDetail?
+  category            Category?            @relation(fields: [categoryId], references: [id])
+  donationItem        DonationItem?
+  documents           AssetDocument[]
+  maintenanceRecords  MaintenanceRecord[]
+  floorPlanPins       FloorPlanPin[]
 
   @@index([status, departmentId, location])
   @@index([type, brand])
@@ -133,9 +142,9 @@ model ComputerDetail {
 }
 
 model PhoneDetail {
-  id              Int     @id @default(autoincrement())
-  assetId         Int     @unique
-  asset           Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  id              Int      @id @default(autoincrement())
+  assetId         Int      @unique
+  asset           Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
   imei1           String?
   imei2           String?
   osVersion       String?
@@ -143,20 +152,20 @@ model PhoneDetail {
   ram             String?
   phoneNumber     String?
   mdmEnrolled     Boolean?
-  simProvider     String?  // AIS, TrueMove, DTAC
+  simProvider     String? // AIS, TrueMove, DTAC
 
   @@map("phone_details")
 }
 
 model MonitorDetail {
-  id          Int     @id @default(autoincrement())
-  assetId     Int     @unique
-  asset       Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  screenSize  String?  // 24", 27", 34" Ultrawide
-  resolution  String?  // 1920x1080, 4K
-  panelType   String?  // IPS, VA, TN, OLED
-  refreshRate String?  // 60Hz, 144Hz, 240Hz
-  ports       String?  // HDMI, DisplayPort, USB-C
+  id          Int      @id @default(autoincrement())
+  assetId     Int      @unique
+  asset       Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  screenSize  String? // 24", 27", 34" Ultrawide
+  resolution  String? // 1920x1080, 4K
+  panelType   String? // IPS, VA, TN, OLED
+  refreshRate String? // 60Hz, 144Hz, 240Hz
+  ports       String? // HDMI, DisplayPort, USB-C
   hasSpeaker  Boolean?
   curved      Boolean?
 
@@ -164,22 +173,22 @@ model MonitorDetail {
 }
 
 model DeviceDetail {
-  id             Int     @id @default(autoincrement())
-  assetId        Int     @unique
-  asset          Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  deviceType     String?  // Keyboard, Mouse, Headset, Webcam
-  connectionType String?  // USB, Wireless 2.4G, Bluetooth
-  powerSource    String?  // Battery AA, Rechargeable, USB Powered
+  id             Int      @id @default(autoincrement())
+  assetId        Int      @unique
+  asset          Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  deviceType     String? // Keyboard, Mouse, Headset, Webcam
+  connectionType String? // USB, Wireless 2.4G, Bluetooth
+  powerSource    String? // Battery AA, Rechargeable, USB Powered
   rgbSupport     Boolean?
 
   @@map("device_details")
 }
 
 model NetworkDeviceDetail {
-  id              Int     @id @default(autoincrement())
-  assetId         Int     @unique
-  asset           Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  networkType     String?  // Switch, Router, Firewall, Access Point
+  id              Int      @id @default(autoincrement())
+  assetId         Int      @unique
+  asset           Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  networkType     String? // Switch, Router, Firewall, Access Point
   ipAddress       String?
   macAddress      String?
   firmwareVersion String?
@@ -194,7 +203,7 @@ model RackDetail {
   id            Int     @id @default(autoincrement())
   assetId       Int     @unique
   asset         Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  subType       String?  // Rack, Enclosure, PDU
+  subType       String? // Rack, Enclosure, PDU
   rackUnits     String?
   powerCapacity String?
   rackLocation  String?
@@ -203,10 +212,10 @@ model RackDetail {
 }
 
 model PrinterDetail {
-  id            Int     @id @default(autoincrement())
-  assetId       Int     @unique
-  asset         Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  printerType   String?  // Laser, Inkjet, Dot Matrix, Thermal
+  id            Int      @id @default(autoincrement())
+  assetId       Int      @unique
+  asset         Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  printerType   String? // Laser, Inkjet, Dot Matrix, Thermal
   isColor       Boolean?
   networkReady  Boolean?
   ipAddress     String?
@@ -218,65 +227,65 @@ model PrinterDetail {
 }
 
 model CableDetail {
-  id             Int     @id @default(autoincrement())
-  assetId        Int     @unique
-  asset          Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  cableType      String?  // HDMI, LAN CAT6, USB-C to Lightning
-  length         String?  // 1.5m, 3m, 5m
-  stockQuantity  Int?
-  minimumStock   Int?
+  id            Int     @id @default(autoincrement())
+  assetId       Int     @unique
+  asset         Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  cableType     String? // HDMI, LAN CAT6, USB-C to Lightning
+  length        String? // 1.5m, 3m, 5m
+  stockQuantity Int?
+  minimumStock  Int?
 
   @@map("cable_details")
 }
 
 model ConsumableDetail {
-  id              Int      @id @default(autoincrement())
-  assetId         Int      @unique
-  asset           Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  consumableType  String?   // Toner, Ink Cartridge, ถ่าน AA
-  compatibleWith  String?   // Printer Brother HL-L2320D etc.
-  stockQuantity   Int?
-  minimumStock    Int?
-  expiryDate      DateTime?
+  id             Int       @id @default(autoincrement())
+  assetId        Int       @unique
+  asset          Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  consumableType String? // Toner, Ink Cartridge, ถ่าน AA
+  compatibleWith String? // Printer Brother HL-L2320D etc.
+  stockQuantity  Int?
+  minimumStock   Int?
+  expiryDate     DateTime?
 
   @@map("consumable_details")
 }
 
 model AssetDocument {
-  id           Int      @id @default(autoincrement())
-  assetId      Int
-  fileName     String
-  storedName   String
-  fileSize     Int
-  mimeType     String
-  docType      String   @default("OTHER")
-  note         String?
-  uploadedBy   String?
-  createdAt    DateTime @default(now())
-  asset        Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  id         Int      @id @default(autoincrement())
+  assetId    Int
+  fileName   String
+  storedName String
+  fileSize   Int
+  mimeType   String
+  docType    String   @default("OTHER")
+  note       String?
+  uploadedBy String?
+  createdAt  DateTime @default(now())
+  asset      Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
 
   @@index([assetId])
   @@map("asset_documents")
 }
 
 model InventoryItem {
-  id              Int                    @id @default(autoincrement())
-  name            String
-  category        String                 // Cable, Cartridge, Consumable, Other
-  brand           String?
-  model           String?
-  totalQuantity   Int                    @default(0)
-  availableQuantity Int                  @default(0)
-  minStockLevel   Int                    @default(0)
-  unit            String                 // ชิ้น, ม้วน, เส้น, ตลับ, etc.
-  location        String?
-  remark          String?
-  image           String?
-  isActive        Boolean                @default(true)
-  createdAt       DateTime               @default(now())
-  updatedAt       DateTime               @updatedAt
-  transactions    InventoryTransaction[]
-  borrowItems     BorrowRequestItem[]    @relation("InventoryBorrowItems")
+  id                Int                    @id @default(autoincrement())
+  name              String
+  category          String // Cable, Cartridge, Consumable, Other
+  brand             String?
+  model             String?
+  totalQuantity     Int                    @default(0)
+  availableQuantity Int                    @default(0)
+  minStockLevel     Int                    @default(0)
+  unit              String // ชิ้น, ม้วน, เส้น, ตลับ, etc.
+  location          String?
+  remark            String?
+  image             String?
+  isActive          Boolean                @default(true)
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  transactions      InventoryTransaction[]
+  borrowItems       BorrowRequestItem[]    @relation("InventoryBorrowItems")
 
   @@index([category, isActive])
   @@index([name])
@@ -284,16 +293,16 @@ model InventoryItem {
 }
 
 model InventoryTransaction {
-  id          Int           @id @default(autoincrement())
-  itemId      Int
-  item        InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  action      String        // checkin, checkout
-  quantity    Int
-  userId      Int?
-  userName    String?
-  note        String?
-  refNo       String?       // Reference number (e.g. borrow request no)
-  createdAt   DateTime      @default(now())
+  id        Int           @id @default(autoincrement())
+  itemId    Int
+  item      InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  action    String // checkin, checkout
+  quantity  Int
+  userId    Int?
+  userName  String?
+  note      String?
+  refNo     String? // Reference number (e.g. borrow request no)
+  createdAt DateTime      @default(now())
 
   @@index([itemId])
   @@index([createdAt])
@@ -313,7 +322,10 @@ model DeviceType {
 
 model Company {
   id                Int      @id @default(autoincrement())
+  code              String?  @unique
   name              String   @unique
+  nameEng           String?
+  logoUrl           String?
   description       String?
   assetCompanyCodes String?
   isActive          Boolean  @default(true)
@@ -323,35 +335,48 @@ model Company {
   @@map("companies")
 }
 
+model Department {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  nameEng     String?
+  code        String   @unique
+  logoUrl     String?
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("departments")
+}
+
 model Category {
-  id          Int            @id @default(autoincrement())
-  name        String         @unique
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
   icon        String
   description String?
-  sortOrder   Int            @default(0)
-  isActive    Boolean        @default(true)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  types       CategoryType[]
-  assets      Asset[]
+  types  CategoryType[]
+  assets Asset[]
 
   @@map("categories")
 }
 
 model CategoryType {
-  id            Int      @id @default(autoincrement())
-  categoryId    Int
-  category      Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  name          String
-  description   String?
-  detailTable   String?  // "computer_details", "phone_details", etc.
-  isBorrowable  Boolean  @default(true)
-  isAssignable  Boolean  @default(true)
-  sortOrder     Int      @default(0)
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           Int      @id @default(autoincrement())
+  categoryId   Int
+  category     Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  detailTable  String? // "computer_details", "phone_details", etc.
+  isBorrowable Boolean  @default(true)
+  isAssignable Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@unique([categoryId, name])
   @@map("category_types")
@@ -439,21 +464,21 @@ model BorrowRequest {
 }
 
 model BorrowRequestItem {
-  id               Int                   @id @default(autoincrement())
-  requestId        Int
-  assetId          Int?
-  inventoryItemId  Int?
-  isQuantityBased  Boolean               @default(false)
-  quantity         Int                   @default(1)
-  borrowDate       DateTime?
-  dueDate          DateTime?
-  itemStatus       BorrowItemStatus      @default(Pending)
-  note             String?
-  extensions       BorrowExtensionItem[]
-  asset            Asset?                @relation(fields: [assetId], references: [id])
-  inventoryItem    InventoryItem?        @relation("InventoryBorrowItems", fields: [inventoryItemId], references: [id])
-  request          BorrowRequest         @relation(fields: [requestId], references: [id])
-  returns          Return[]
+  id              Int                   @id @default(autoincrement())
+  requestId       Int
+  assetId         Int?
+  inventoryItemId Int?
+  isQuantityBased Boolean               @default(false)
+  quantity        Int                   @default(1)
+  borrowDate      DateTime?
+  dueDate         DateTime?
+  itemStatus      BorrowItemStatus      @default(Pending)
+  note            String?
+  extensions      BorrowExtensionItem[]
+  asset           Asset?                @relation(fields: [assetId], references: [id])
+  inventoryItem   InventoryItem?        @relation("InventoryBorrowItems", fields: [inventoryItemId], references: [id])
+  request         BorrowRequest         @relation(fields: [requestId], references: [id])
+  returns         Return[]
 
   @@index([assetId, itemStatus, dueDate])
   @@index([requestId, itemStatus])
@@ -572,6 +597,7 @@ model PMPlan {
   startDate          DateTime?
   endDate            DateTime?
   templateId         Int
+  isAdhoc            Boolean    @default(false)
   template           PMTemplate @relation(fields: [templateId], references: [id])
   runs               PMRun[]
 
@@ -588,6 +614,8 @@ model PMRun {
   performedAt DateTime?
   completedAt DateTime?
   photoUrl    String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt @default(now())
   answers     PMRunAnswer[]
   asset       Asset         @relation(fields: [assetId], references: [id])
   performer   AppUser?      @relation("PMRunPerformedBy", fields: [performedBy], references: [id])
@@ -649,20 +677,20 @@ model AppNotification {
   link      String?
   createdAt DateTime @default(now())
   user      AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
   @@index([userId, isRead])
   @@map("app_notifications")
 }
 
 model NotificationSetting {
-  id               Int     @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
   // General
-  systemName       String  @default("AssetHub")
-  organizationName String  @default("TRR Group")
-  logoUrl          String?
-  timezone         String  @default("Asia/Bangkok")
-  darkMode         Boolean @default(false)
+  systemName        String  @default("ITAM")
+  organizationName  String  @default("TRR Group")
+  logoUrl           String?
+  timezone          String  @default("Asia/Bangkok")
+  darkMode          Boolean @default(false)
   showWelcomeBanner Boolean @default(true)
 
   // Borrow Rules
@@ -686,15 +714,16 @@ model NotificationSetting {
   smtpPass      String?
   smtpFromEmail String?
   smtpFromName  String?
+  emailCc       String?
 
   // LINE
-  enableLine              Boolean @default(false)
-  lineChannelAccessToken  String?
-  lineWebhookUrl          String?
-  lineWebhookVerifyToken  String?
-  lineSendMode            String  @default("broadcast")
-  lineUserIds             String? 
-  lineEnabledStatuses     String  @default("รอรับเรื่อง,รับเรื่องแล้ว,กำลังดำเนินการ,รอชิ้นส่วน,เสร็จสิ้น,ยกเลิก")
+  enableLine             Boolean @default(false)
+  lineChannelAccessToken String?
+  lineWebhookUrl         String?
+  lineWebhookVerifyToken String?
+  lineSendMode           String  @default("broadcast")
+  lineUserIds            String?
+  lineEnabledStatuses    String  @default("รอรับเรื่อง,รับเรื่องแล้ว,กำลังดำเนินการ,รอชิ้นส่วน,เสร็จสิ้น,ยกเลิก")
 
   // Security
   requireStrongPassword Boolean @default(true)
@@ -702,6 +731,16 @@ model NotificationSetting {
   sessionTimeoutHours   Int     @default(8)
 
   @@map("notification_settings")
+}
+
+model SystemSetting {
+  id          Int      @id @default(autoincrement())
+  group       String   @default("GENERAL") // e.g., 'ASSET_GENERATION'
+  key         String   @unique
+  value       String   // JSON text or plain string
+  description String?
+  updatedAt   DateTime @updatedAt
+  updatedBy   Int?     // User ID who last updated
 }
 
 model ScheduledJob {
@@ -722,8 +761,8 @@ enum DonationStatus {
 }
 
 model Donation {
-  id               Int            @id @default(autoincrement())
-  batchRef         String         @unique
+  id               Int             @id @default(autoincrement())
+  batchRef         String          @unique
   donationDate     DateTime
   recipientName    String
   recipientAddress String?
@@ -731,13 +770,13 @@ model Donation {
   recipientPhone   String?
   approvalRef      String?
   notes            String?
-  status           DonationStatus @default(PENDING)
+  status           DonationStatus  @default(PENDING)
   createdById      Int
-  createdBy        AppUser        @relation(fields: [createdById], references: [id])
+  createdBy        AppUser         @relation(fields: [createdById], references: [id])
   items            DonationItem[]
   images           DonationImage[]
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 
   @@map("donations")
 }
@@ -789,20 +828,20 @@ enum AssetStatus {
 }
 
 model MaintenanceRecord {
-  id              Int               @id @default(autoincrement())
-  ticketNo        String            @unique
+  id              Int                @id @default(autoincrement())
+  ticketNo        String             @unique
   assetId         Int
-  asset           Asset             @relation(fields: [assetId], references: [id])
+  asset           Asset              @relation(fields: [assetId], references: [id])
   reportedProblem String
   repairType      String
   vendorName      String?
   resolutionNote  String?
-  totalCost       Float             @default(0)
-  status          String            @default("IN_PROGRESS")
-  startedAt       DateTime          @default(now())
+  totalCost       Float              @default(0)
+  status          String             @default("IN_PROGRESS")
+  startedAt       DateTime           @default(now())
   completedAt     DateTime?
   technicianId    Int
-  technician      AppUser           @relation(fields: [technicianId], references: [id])
+  technician      AppUser            @relation(fields: [technicianId], references: [id])
   replacedParts   MaintenancePart[]
   images          MaintenanceImage[]
 
@@ -810,24 +849,24 @@ model MaintenanceRecord {
 }
 
 model MaintenancePart {
-  id              Int               @id @default(autoincrement())
-  recordId        Int
-  record          MaintenanceRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
-  partName        String
-  quantity        Int               @default(1)
-  price           Float             @default(0)
+  id       Int               @id @default(autoincrement())
+  recordId Int
+  record   MaintenanceRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  partName String
+  quantity Int               @default(1)
+  price    Float             @default(0)
 
   @@map("maintenance_parts")
 }
 
 model MaintenanceImage {
-  id              Int               @id @default(autoincrement())
-  recordId        Int
-  record          MaintenanceRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
-  imageType       String
-  imageUrl        String
-  description     String?
-  createdAt       DateTime          @default(now())
+  id          Int               @id @default(autoincrement())
+  recordId    Int
+  record      MaintenanceRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  imageType   String
+  imageUrl    String
+  description String?
+  createdAt   DateTime          @default(now())
 
   @@map("maintenance_images")
 }
@@ -881,4 +920,120 @@ enum NotificationStatus {
   PENDING
   SENT
   FAILED
+}
+
+model PMSwHub {
+  id         Int      @id @default(autoincrement())
+  planId     Int?
+  formId     String   @unique
+  floor      String
+  date       DateTime
+  technician String
+  period     String
+  remark     String?
+  signTech   String?
+  signMgr    String?
+  status     String   @default("Pending") // Pass, Fail, Pending
+  photoBeforeUrl String?
+  photoAfterUrl  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  plan       PMSwHubPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
+  items      PMSwHubItem[]
+
+  @@map("pm_sw_hubs")
+}
+
+model PMSwHubPlan {
+  id                 Int       @id @default(autoincrement())
+  year               Int
+  floor              String
+  period             String    // 'Monthly' | 'Quarterly' | 'Annual'
+  startDate          DateTime?
+  endDate            DateTime?
+  technician         String?
+  status             String    @default("Pending") // 'Pending', 'Completed'
+  templateId         Int?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  
+  template           PMSwHubTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  swHubs             PMSwHub[] 
+
+  @@map("pm_sw_hub_plans")
+}
+
+model PMSwHubItem {
+  id            Int       @id @default(autoincrement())
+  pmSwHubId     Int
+  category      String
+  checkItem     String
+  status        String? // pass, fail, na
+  note          String?
+  photoUrl      String?
+  resolveStatus String? // open, inprogress, resolved (only for fail)
+  resolvedAt    DateTime?
+
+  pmSwHub PMSwHub @relation(fields: [pmSwHubId], references: [id], onDelete: Cascade)
+
+  @@map("pm_sw_hub_items")
+}
+
+model PMSwHubTemplate {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  items       PMSwHubTemplateItem[]
+  plans       PMSwHubPlan[]
+  
+  @@map("pm_sw_hub_templates")
+}
+
+model PMSwHubTemplateItem {
+  id         Int             @id @default(autoincrement())
+  templateId Int
+  template   PMSwHubTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  group      String          // 'power', 'network', 'env', 'physical', 'cable'
+  key        String
+  label      String
+  type       String          @default("boolean")
+  required   Boolean         @default(false)
+  order      Int             @default(0)
+  
+  @@map("pm_sw_hub_template_items")
+}
+
+model FloorPlan {
+  id        Int            @id @default(autoincrement())
+  name      String
+  floor     String
+  building  String?
+  company   String?
+  imageUrl  String
+  isActive  Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  pins      FloorPlanPin[]
+
+  @@map("floor_plans")
+}
+
+model FloorPlanPin {
+  id          Int       @id @default(autoincrement())
+  floorPlanId Int
+  floorPlan   FloorPlan @relation(fields: [floorPlanId], references: [id], onDelete: Cascade)
+  assetId     Int
+  asset       Asset     @relation(fields: [assetId], references: [id])
+  x           Float
+  y           Float
+  label       String?
+  createdAt   DateTime  @default(now())
+
+  @@unique([floorPlanId, assetId])
+  @@map("floor_plan_pins")
 }

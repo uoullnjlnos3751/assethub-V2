@@ -1,0 +1,31 @@
+export const DEFAULT_CHECKLIST = [
+  { key: 'computer_name', label: 'ตรวจสอบ Computer Name (ถูกต้องตามมาตรฐาน)', group: 'user', type: 'boolean' },
+  { key: 'change_name', label: 'เปลี่ยน Computer Name (ถ้าไม่ตรงมาตรฐาน)', group: 'user', type: 'boolean' },
+  { key: 'ip_phone', label: 'ตรวจสอบ IP Phone / หมายเลขโทรศัพท์ภายใน', group: 'user', type: 'boolean' },
+  { key: 'windows_version', label: 'ตรวจสอบ Windows Version และ Activate', group: 'os', type: 'boolean' },
+  { key: 'windows_update', label: 'ตรวจสอบ Windows Update (winver)', group: 'os', type: 'boolean' },
+  { key: 'office_check', label: 'ตรวจสอบ Microsoft Office & Activate', group: 'os', type: 'boolean' },
+  { key: 'antivirus', label: 'อัปเดต Antivirus (Virus Definition)', group: 'os', type: 'boolean' },
+  { key: 'change_password', label: 'เปลี่ยน Password Local Admin', group: 'security', type: 'boolean' },
+  { key: 'usb_policy', label: 'ตรวจสอบ USB Policy (Block/Allow)', group: 'security', type: 'boolean' },
+  { key: 'glpi_agent', label: 'ติดตั้ง/ตรวจสอบ GLPI Agent v1.6/1.7', group: 'agent', type: 'boolean' },
+  { key: 'spiceworks', label: 'ติดตั้ง Spiceworks Agent', group: 'agent', type: 'boolean' },
+  { key: 'pc_audit', label: 'PC Audit (บันทึก Hardware spec)', group: 'agent', type: 'boolean' },
+  { key: 'hw_info', label: 'HW Info (Serial No., Service Tag)', group: 'agent', type: 'boolean' },
+  { key: 'cleaning', label: 'ทำความสะอาดอุปกรณ์ (Cleaning Device)', group: 'hardware', type: 'boolean' },
+  { key: 'printer', label: 'ตรวจสอบ Printer Local', group: 'hardware', type: 'printer_array' },
+  { key: 'ups', label: 'ตรวจสอบ UPS', group: 'hardware', type: 'boolean' },
+  { key: 'monitor', label: 'ตรวจสอบจอ Monitor (Monitor 1 & 2)', group: 'hardware', type: 'monitor_array' },
+  { key: 'issue_note', label: 'ปัญหาที่พบ / ข้อเสนอแนะ', group: 'result', type: 'text' },
+  { key: 'satisfaction', label: 'ความพึงพอใจผู้ใช้ (1–5 ดาว)', group: 'result', type: 'rating' },
+  { key: 'staff_name', label: 'เจ้าหน้าที่ผู้ทำ PM', group: 'result', type: 'text' },
+];
+
+export const GROUP_INFO: Record<string, { label: string; icon: string }> = {
+  user: { label: 'ข้อมูลผู้ใช้และอุปกรณ์', icon: '👤' },
+  os: { label: 'ระบบปฏิบัติการ (OS) & Software', icon: '🪟' },
+  security: { label: 'ความปลอดภัย (Security)', icon: '🔒' },
+  agent: { label: 'ติดตั้ง Agent / Tools', icon: '🛠' },
+  hardware: { label: 'Hardware & Peripheral', icon: '🖥' },
+  result: { label: 'ผลการประเมิน', icon: '⭐' },
+};

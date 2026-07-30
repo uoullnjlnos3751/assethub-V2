@@ -1,52 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
-  AppBar, Box, CssBaseline, Drawer, IconButton, List, ListItem, ListItemButton,
+  AppBar, Box, Drawer, IconButton, List, ListItem, ListItemButton,
   ListItemIcon, ListItemText, Toolbar, Typography, Button, Avatar, Menu, MenuItem,
-  Divider, Collapse, alpha, useTheme, Badge, TextField, InputAdornment, Tooltip
+  Divider, Collapse, alpha, useTheme, Badge, TextField, InputAdornment, Tooltip,
+  useMediaQuery, BottomNavigation, BottomNavigationAction, Paper
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import SearchIcon from '@mui/icons-material/Search';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import DevicesIcon from '@mui/icons-material/Devices';
-import ComputerIcon from '@mui/icons-material/Computer';
-import DesktopWindowsIcon from '@mui/icons-material/DesktopWindows';
-import PrintIcon from '@mui/icons-material/Print';
-import PhoneAndroidIcon from '@mui/icons-material/PhoneAndroid';
-import RouterIcon from '@mui/icons-material/Router';
-import CableIcon from '@mui/icons-material/Cable';
-import ScienceIcon from '@mui/icons-material/Science';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
-import BuildCircleIcon from '@mui/icons-material/BuildCircle';
-import PeopleIcon from '@mui/icons-material/People';
-import SettingsIcon from '@mui/icons-material/Settings';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import LogoutIcon from '@mui/icons-material/Logout';
-import HandymanIcon from '@mui/icons-material/Handyman';
-import HistoryIcon from '@mui/icons-material/History';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import AssignmentReturnIcon from '@mui/icons-material/AssignmentReturn';
-import ExtensionIcon from '@mui/icons-material/Extension';
-import AddBoxIcon from '@mui/icons-material/AddBox';
-import ListAltIcon from '@mui/icons-material/ListAlt';
-import CategoryIcon from '@mui/icons-material/Category';
-import LocationOnIcon from '@mui/icons-material/LocationOn';
-import StoreIcon from '@mui/icons-material/Store';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import ImportExportIcon from '@mui/icons-material/ImportExport';
-import ErrorIcon from '@mui/icons-material/Error';
-import AssessmentIcon from '@mui/icons-material/Assessment';
-import AssignmentIcon from '@mui/icons-material/Assignment';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import DescriptionIcon from '@mui/icons-material/Description';
-import InventoryIcon from '@mui/icons-material/Inventory';
-import CategoryManagementIcon from '@mui/icons-material/Category';
-import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
-import DomainIcon from '@mui/icons-material/Domain';
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
@@ -56,132 +25,16 @@ import Breadcrumbs from '../components/Breadcrumbs';
 import PageTransition from '../components/PageTransition';
 import QRScannerModal from '../components/QRScannerModal';
 import { notificationAPI } from '../services/api';
+import { adminNav, NavGroup, NavItem, userNavItems } from '../navigation/nav';
 
 // ── Sidebar width matching ITSM HTML (210px) ───────────────────────────────
 const drawerWidth = 220;
+const mobileDrawerWidth = 240;
 const appBarHeight = 50;
-
-interface NavItem {
-  label: string;
-  path?: string;
-  icon?: React.ReactNode;
-  roles?: string[];
-  isHeader?: boolean;
-}
-
-interface NavGroup {
-  label: string;
-  icon: React.ReactNode;
-  children: NavItem[];
-  roles?: string[];
-}
-
-type NavEntry = NavItem | NavGroup;
-
-// ── Nav data (unchanged) ─────────────────────────────────────────────────
-const userNavItems: NavItem[] = [
-  { label: 'รายการของพร้อมยืม', path: '/assets?status=Available', icon: <CheckCircleOutlineIcon fontSize="small" /> },
-  { label: 'ยืมทรัพย์สิน', path: '/borrow/new', icon: <AddBoxIcon fontSize="small" /> },
-  { label: 'คำขอของฉัน', path: '/borrow/my-requests', icon: <ListAltIcon fontSize="small" /> },
-  { label: 'รายการที่ยืม', path: '/borrow/my-items', icon: <ShoppingCartIcon fontSize="small" /> },
-  { label: 'คำขอขยายวัน', path: '/borrow/my-extensions', icon: <ExtensionIcon fontSize="small" /> },
-  { label: 'ประวัติการยืม', path: '/borrow/my-history', icon: <HistoryIcon fontSize="small" /> },
-];
-
-const adminNav: NavEntry[] = [
-  { label: 'แดชบอร์ด', path: '/dashboard', icon: <DashboardIcon fontSize="small" /> },
-  {
-    label: 'ทะเบียนทรัพย์สิน',
-    icon: <DevicesIcon fontSize="small" />,
-    children: [
-      { label: 'ทะเบียน IT Asset', path: '/assets', icon: <DevicesIcon fontSize="small" /> },
-      { label: 'คอมพิวเตอร์', path: '/assets?typeGroup=computers', icon: <ComputerIcon fontSize="small" /> },
-      { label: 'จอภาพ', path: '/assets?typeGroup=monitors', icon: <DesktopWindowsIcon fontSize="small" /> },
-      { label: 'เครื่องพิมพ์', path: '/assets?typeGroup=printers', icon: <PrintIcon fontSize="small" /> },
-      { label: 'อุปกรณ์เครือข่าย', path: '/assets?typeGroup=network', icon: <RouterIcon fontSize="small" /> },
-      { label: 'อุปกรณ์สื่อสาร', path: '/assets?typeGroup=phonesTablets', icon: <PhoneAndroidIcon fontSize="small" /> },
-      { label: 'อุปกรณ์ต่อพ่วง', path: '/assets?typeGroup=devices', icon: <DevicesIcon fontSize="small" /> },
-      { label: 'Rack & Infrastructure', path: '/assets?typeGroup=rack', icon: <HandymanIcon fontSize="small" /> },
-    ],
-  },
-  {
-    label: 'จัดการคลัง',
-    icon: <InventoryIcon fontSize="small" />,
-    children: [
-      { label: 'ภาพรวมคลังสินค้า', path: '/inventory', icon: <InventoryIcon fontSize="small" /> },
-      { label: 'สายสัญญาณ', path: '/inventory?category=Cable', icon: <CableIcon fontSize="small" /> },
-      { label: 'วัสดุสิ้นเปลือง', path: '/inventory?category=Consumable', icon: <ScienceIcon fontSize="small" /> },
-    ],
-  },
-  {
-    label: 'เครื่องมือ',
-    icon: <ImportExportIcon fontSize="small" />,
-    children: [
-      { label: 'นำเข้า/ส่งออก', path: '/assets/import-export', icon: <ImportExportIcon fontSize="small" /> },
-      { label: 'พิมพ์ QR สติ๊กเกอร์', path: '/assets/print-qr', icon: <PrintIcon fontSize="small" /> },
-      { label: 'บริจาคทรัพย์สิน', path: '/donations', icon: <HandymanIcon fontSize="small" /> },
-    ],
-  },
-  {
-    label: 'ยืม-คืน',
-    icon: <ShoppingCartIcon fontSize="small" />,
-    children: [
-      { label: 'รายการของพร้อมยืม', path: '/assets?status=Available', icon: <CheckCircleOutlineIcon fontSize="small" /> },
-      { label: 'รออนุมัติ', path: '/borrow/approval-queue', icon: <CheckCircleIcon fontSize="small" /> },
-      { label: 'ส่งมอบ (Check-out)', path: '/borrow/checkout', icon: <HandymanIcon fontSize="small" /> },
-      { label: 'รับคืน (Return)', path: '/borrow/return', icon: <AssignmentReturnIcon fontSize="small" /> },
-      { label: 'ยืมเกินกำหนด (Overdue)', path: '/borrow/overdue', icon: <ErrorIcon fontSize="small" /> },
-      { label: 'ประวัติยืมทั้งหมด', path: '/borrow/history', icon: <HistoryIcon fontSize="small" /> },
-      { label: 'ขยายวัน (Extension)', path: '/borrow/extensions', icon: <ExtensionIcon fontSize="small" /> },
-    ],
-  },
-  {
-    label: 'PM ตรวจนับ',
-    icon: <BuildCircleIcon fontSize="small" />,
-    children: [
-      { label: 'PM Dashboard', path: '/pm', icon: <DashboardIcon fontSize="small" /> },
-      { label: 'แผน PM', path: '/pm/plans', icon: <AssignmentIcon fontSize="small" /> },
-      { label: 'ทำ PM (Checklist)', path: '/pm/runs', icon: <PlayArrowIcon fontSize="small" /> },
-      { label: 'กำหนดการ PM (Gantt)', path: '/pm/schedule', icon: <CalendarTodayIcon fontSize="small" /> },
-      { label: 'PM Template', path: '/pm/templates', icon: <DescriptionIcon fontSize="small" /> },
-    ],
-  },
-  {
-    label: 'รายงาน',
-    icon: <AssessmentIcon fontSize="small" />,
-    children: [
-      { label: 'รายงานทรัพย์สิน', path: '/reports/assets', icon: <InventoryIcon fontSize="small" /> },
-      { label: 'รายงานยืม-คืน', path: '/reports/borrow', icon: <ReceiptLongIcon fontSize="small" /> },
-      { label: 'รายงาน PM', path: '/reports/pm', icon: <AssessmentIcon fontSize="small" /> },
-      { label: 'รายงานประวัติซ่อมบำรุง', path: '/reports/maintenance', icon: <BuildCircleIcon fontSize="small" /> },
-    ],
-  },
-  {
-    label: 'ตั้งค่าระบบ',
-    icon: <SettingsIcon fontSize="small" />,
-    roles: ['SUPERADMIN', 'IT_ADMIN'],
-    children: [
-      { label: 'ข้อมูลตั้งต้นทรัพย์สิน', isHeader: true },
-      { label: 'ประเภทอุปกรณ์ (Device Types)', path: '/assets/device-types', icon: <CategoryIcon fontSize="small" /> },
-      { label: 'สถานที่ตั้ง (Location & Company)', path: '/assets/locations', icon: <LocationOnIcon fontSize="small" /> },
-      { label: 'ผู้จำหน่าย (Vendor)', path: '/assets/vendors', icon: <StoreIcon fontSize="small" /> },
-      { label: 'สถานะอุปกรณ์ (Asset Status)', path: '/assets/statuses', icon: <CheckCircleOutlineIcon fontSize="small" /> },
-      { label: 'จัดการหมวดหมู่ (Categories)', path: '/categories', icon: <CategoryManagementIcon fontSize="small" /> },
-      
-      { label: 'การตั้งค่า & ความปลอดภัย', isHeader: true, roles: ['SUPERADMIN', 'IT_ADMIN'] },
-      { label: 'ตั้งค่าระบบหลัก', path: '/admin/settings', icon: <SettingsIcon fontSize="small" />, roles: ['SUPERADMIN'] },
-      { label: 'จัดการผู้ใช้', path: '/admin/users', icon: <PeopleIcon fontSize="small" />, roles: ['SUPERADMIN'] },
-      { label: 'จัดการบริษัท', path: '/admin/companies', icon: <DomainIcon fontSize="small" />, roles: ['SUPERADMIN', 'IT_ADMIN'] },
-      
-      { label: 'ระบบ Log การทำงาน', isHeader: true, roles: ['SUPERADMIN', 'IT_ADMIN'] },
-      { label: 'ประวัติแจ้งเตือน', path: '/admin/notification-logs', icon: <NotificationsIcon fontSize="small" />, roles: ['SUPERADMIN'] },
-      { label: 'Audit Log', path: '/admin/audit-log', icon: <ReceiptLongIcon fontSize="small" />, roles: ['IT_ADMIN', 'SUPERADMIN'] },
-    ],
-  },
-];
 
 // ── Section label component ──────────────────────────────────────────────
 function SidebarSection({ children }: { children: React.ReactNode }) {
+  const theme = useTheme();
   return (
     <Typography
       variant="caption"
@@ -192,7 +45,7 @@ function SidebarSection({ children }: { children: React.ReactNode }) {
         pb: '4px',
         fontSize: '10px',
         fontWeight: 500,
-        color: '#9ca3af',
+        color: theme.palette.text.secondary,
         textTransform: 'uppercase',
         letterSpacing: '0.07em',
         lineHeight: 1,
@@ -205,6 +58,7 @@ function SidebarSection({ children }: { children: React.ReactNode }) {
 
 export default function Layout() {
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const { mode, toggleColorMode } = useAppTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -233,10 +87,17 @@ export default function Layout() {
       })
     : userNavItems;
 
-  const isActive = (path: string) =>
-    location.pathname === path ||
-    (path !== '/' && location.pathname.startsWith(path + '?')) ||
-    (path !== '/' && location.pathname.startsWith(path + '/'));
+  const isActive = (path: string) => {
+    if (!path) return false;
+    if (path.includes('?')) return location.pathname + location.search === path;
+    if (path === '/pm') return location.pathname === '/pm';
+    return location.pathname === path || (path !== '/' && location.pathname.startsWith(path + '/'));
+  };
+
+  useEffect(() => {
+    const title = systemSettings?.systemName || 'IT Asset Management (ITAM) - ระบบบริหารทรัพย์สิน IT';
+    document.title = title;
+  }, [systemSettings?.systemName]);
 
   const toggleGroup = (label: string) => {
     setOpenGroups(prev => ({ ...prev, [label]: !prev[label] }));
@@ -247,7 +108,7 @@ export default function Layout() {
     if (isAdmin) {
       adminNav.forEach(entry => {
         if ('children' in entry) {
-          const anyActive = entry.children.some(child => location.pathname + location.search === child.path);
+          const anyActive = entry.children.some(child => child.path ? isActive(child.path) : false);
           if (anyActive) newOpen[entry.label] = true;
         }
       });
@@ -298,14 +159,13 @@ export default function Layout() {
 
   // ── Section grouping for sidebar visual clarity ─────────────────────
   const getSectionLabel = (label: string): string | null => {
-    if (label === 'แดชบอร์ด') return 'ภาพรวม';
-    if (label === 'ทะเบียนทรัพย์สิน') return 'จัดการทรัพย์สิน';
-    if (label === 'จัดการคลัง') return null;
-    if (label === 'เครื่องมือ') return null;
-    if (label === 'ยืม-คืน') return 'Service Desk';
-    if (label === 'PM ตรวจนับ') return null;
-    if (label === 'รายงาน') return 'รายงาน';
-    if (label === 'ตั้งค่าระบบ') return 'ผู้ดูแลระบบ';
+    if (label === 'แดชบอร์ด') return 'ภาพรวมระบบ';
+    if (label === 'ทะเบียนทรัพย์สิน IT') return 'จัดการทรัพย์สิน';
+    if (label === 'ระบบจัดการคลัง') return null;
+    if (label === 'ระบบยืม-คืน') return 'Service Desk';
+    if (label === 'ซ่อมบำรุง & PM') return 'งานซ่อมบำรุง';
+    if (label === 'รายงานระบบ') return 'สรุปและรายงาน';
+    if (label === 'ตั้งค่าผู้ดูแลระบบ') return 'ผู้ดูแลระบบ';
     return null;
   };
 
@@ -395,7 +255,7 @@ export default function Layout() {
                         );
                       }
 
-                      const active = location.pathname + location.search === child.path;
+                      const active = child.path ? isActive(child.path) : false;
                       const pathKey = child.path || `item-${child.label}`;
                       return (
                         <ListItem key={pathKey} disablePadding>
@@ -484,7 +344,7 @@ export default function Layout() {
 
   // ── Sidebar content ────────────────────────────────────────────────────
   const drawer = (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: '#ffffff' }}>
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: theme.palette.background.paper }}>
       {/* Logo / Brand */}
       <Box sx={{
         display: 'flex',
@@ -492,7 +352,7 @@ export default function Layout() {
         gap: '10px',
         px: '14px',
         height: `${appBarHeight}px`,
-        borderBottom: '0.5px solid #e5e7eb',
+        borderBottom: `0.5px solid ${theme.palette.divider}`,
         flexShrink: 0,
       }}>
         {systemSettings?.logoUrl ? (
@@ -504,7 +364,7 @@ export default function Layout() {
             width: 34,
             height: 34,
             borderRadius: '8px',
-            background: '#f59e0b',
+            background: theme.palette.warning.main,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -518,10 +378,10 @@ export default function Layout() {
           </Box>
         )}
         <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Typography noWrap sx={{ fontSize: '13px', fontWeight: 600, color: '#111827', lineHeight: 1.2 }}>
-            {systemSettings?.systemName || 'IT Asset Pro'}
+          <Typography noWrap sx={{ fontSize: '13px', fontWeight: 600, color: theme.palette.text.primary, lineHeight: 1.2 }}>
+            ITAM
           </Typography>
-          <Typography noWrap sx={{ fontSize: '10px', color: '#6b7280', lineHeight: 1 }}>
+          <Typography noWrap sx={{ fontSize: '10px', color: theme.palette.text.secondary, lineHeight: 1 }}>
             {systemSettings?.organizationName || 'ระบบจัดการ IT ครบวงจร'}
           </Typography>
         </Box>
@@ -539,13 +399,13 @@ export default function Layout() {
         gap: '8px',
         px: '14px',
         py: '10px',
-        borderTop: '0.5px solid #e5e7eb',
+        borderTop: `0.5px solid ${theme.palette.divider}`,
         mt: 'auto',
       }}>
         <Avatar sx={{
           width: 32,
           height: 32,
-          background: 'linear-gradient(135deg, #f59e0b, #8b5cf6)',
+          background: `linear-gradient(135deg, ${theme.palette.warning.main}, ${theme.palette.primary.main})`,
           fontSize: '11px',
           fontWeight: 500,
           flexShrink: 0,
@@ -555,17 +415,17 @@ export default function Layout() {
           {user?.displayName?.charAt(0) || 'U'}
         </Avatar>
         <Box sx={{ overflow: 'hidden', flex: 1 }}>
-          <Typography noWrap sx={{ fontSize: '12px', fontWeight: 500, color: '#111827', lineHeight: 1.3 }}>
+          <Typography noWrap sx={{ fontSize: '12px', fontWeight: 500, color: theme.palette.text.primary, lineHeight: 1.3 }}>
             {user?.displayName || user?.adUsername}
           </Typography>
-          <Typography sx={{ fontSize: '10px', color: '#f59e0b', lineHeight: 1 }}>
+          <Typography sx={{ fontSize: '10px', color: theme.palette.warning.main, lineHeight: 1 }}>
             {user?.role === 'SUPERADMIN' ? 'Super Admin' : user?.role === 'IT_ADMIN' ? 'IT Admin' : 'User'}
           </Typography>
         </Box>
         <IconButton
           size="small"
           onClick={() => { logout(); navigate('/login'); }}
-          sx={{ color: '#9ca3af', p: '4px', '&:hover': { color: '#ef4444', bgcolor: '#fef2f2' } }}
+          sx={{ color: theme.palette.text.secondary, p: '4px', '&:hover': { color: theme.palette.error.main, bgcolor: alpha(theme.palette.error.main, 0.08) } }}
           title="ออกจากระบบ"
         >
           <LogoutIcon sx={{ fontSize: 16 }} />
@@ -575,8 +435,7 @@ export default function Layout() {
   );
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', position: 'relative', bgcolor: '#f5f6fa' }}>
-      <CssBaseline />
+    <Box sx={{ display: 'flex', minHeight: '100vh', position: 'relative', bgcolor: theme.palette.background.default }}>
 
       {/* ── AppBar / Topbar ──────────────────────────────────────────── */}
       <AppBar
@@ -587,6 +446,9 @@ export default function Layout() {
           ml: { md: `${drawerWidth}px` },
           zIndex: (t) => t.zIndex.drawer + 1,
           height: `${appBarHeight}px`,
+          backgroundColor: alpha(theme.palette.background.paper, 0.85),
+          backdropFilter: 'blur(20px)',
+          borderBottom: `1px solid ${theme.palette.divider}`,
         }}
       >
         <Toolbar
@@ -602,7 +464,7 @@ export default function Layout() {
             color="inherit"
             edge="start"
             onClick={() => setMobileOpen(!mobileOpen)}
-            sx={{ mr: 1, display: { md: 'none' }, color: '#374151' }}
+            sx={{ mr: 1, display: { md: 'none' }, color: theme.palette.text.secondary }}
           >
             <MenuIcon sx={{ fontSize: 20 }} />
           </IconButton>
@@ -612,17 +474,17 @@ export default function Layout() {
              <Typography
                sx={{
                  fontWeight: 600,
-                 color: '#111827',
+                 color: theme.palette.text.primary,
                  fontSize: '15px',
                  lineHeight: 1.2,
                }}
              >
-               {systemSettings?.systemName || 'ระบบบริหารทรัพย์สิน IT'}
+               ITAM
              </Typography>
            </Box>
 
            {/* Global Search Bar */}
-           <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center', px: 2 }}>
+           <Box sx={{ flex: 1, display: { xs: 'none', sm: 'flex' }, justifyContent: 'center', px: 2 }}>
              <form onSubmit={handleSearch} style={{ width: '100%', maxWidth: '400px', position: 'relative' }}>
                <TextField
                  fullWidth
@@ -634,16 +496,16 @@ export default function Layout() {
                  sx={{
                    '& .MuiOutlinedInput-root': {
                      borderRadius: '8px',
-                     bgcolor: alpha('#ffffff', 0.8),
+                     bgcolor: alpha(theme.palette.background.paper, 0.8),
                      backdropFilter: 'blur(4px)',
-                     '& fieldset': { borderColor: '#e5e7eb' },
-                     '&:hover fieldset': { borderColor: '#d1d5db' },
+                     '& fieldset': { borderColor: theme.palette.divider },
+                     '&:hover fieldset': { borderColor: theme.palette.divider },
                    },
                  }}
                  InputProps={{
                    startAdornment: (
                      <InputAdornment position="start">
-                       <SearchIcon sx={{ color: '#9ca3af', fontSize: 20 }} />
+                      <SearchIcon sx={{ color: theme.palette.text.secondary, fontSize: 20 }} />
                      </InputAdornment>
                    ),
                  }}
@@ -651,21 +513,23 @@ export default function Layout() {
              </form>
            </Box>
 
+           <Box sx={{ flex: 1, display: { xs: 'flex', sm: 'none' } }} />
+
            {/* Right side: notification + user */}
            <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
 
-            {/* QR Scanner Button (Mobile Friendly) */}
+            {/* QR Scanner Button (Desktop only since mobile has BottomNav) */}
             <IconButton
               size="small"
               onClick={() => setQrOpen(true)}
               sx={{
-                width: 32,
-                height: 32,
+                width: 36,
+                height: 36,
                 borderRadius: '7px',
-                border: '0.5px solid #e5e7eb',
-                color: '#6b7280',
-                display: { xs: 'flex', md: 'flex' }, // Show on all sizes or just mobile
-                '&:hover': { bgcolor: '#f9fafb', color: '#2563eb', borderColor: '#bfdbfe' },
+                border: `0.5px solid ${theme.palette.divider}`,
+                color: theme.palette.text.secondary,
+                display: { xs: 'none', sm: 'flex' },
+                '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06), color: theme.palette.primary.main, borderColor: theme.palette.primary.main },
               }}
             >
               <QrCodeScannerIcon sx={{ fontSize: 18 }} />
@@ -677,12 +541,12 @@ export default function Layout() {
                 size="small"
                 onClick={toggleColorMode}
                 sx={{
-                  width: 32,
-                  height: 32,
+                  width: 36,
+                  height: 36,
                   borderRadius: '7px',
-                  border: '0.5px solid #e5e7eb',
-                  color: '#6b7280',
-                  '&:hover': { bgcolor: '#f9fafb', color: '#f59e0b', borderColor: '#fde68a' },
+                  border: `0.5px solid ${theme.palette.divider}`,
+                  color: theme.palette.text.secondary,
+                  '&:hover': { bgcolor: alpha(theme.palette.warning.main, 0.08), color: theme.palette.warning.main, borderColor: theme.palette.warning.main },
                 }}
               >
                 {mode === 'dark' ? <LightModeIcon sx={{ fontSize: 18 }} /> : <DarkModeIcon sx={{ fontSize: 18 }} />}
@@ -694,12 +558,12 @@ export default function Layout() {
               size="small"
               onClick={(e) => setAnchorElNotif(e.currentTarget)}
               sx={{
-                width: 32,
-                height: 32,
+                width: 36,
+                height: 36,
                 borderRadius: '7px',
-                border: '0.5px solid #e5e7eb',
-                color: '#6b7280',
-                '&:hover': { bgcolor: '#f9fafb' },
+                border: `0.5px solid ${theme.palette.divider}`,
+                color: theme.palette.text.secondary,
+                '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.04) },
               }}
             >
               <Badge badgeContent={notifications.filter(n => !n.isRead).length} color="error" sx={{ '& .MuiBadge-badge': { fontSize: '10px', height: 16, minWidth: 16 } }}>
@@ -784,7 +648,7 @@ export default function Layout() {
                     width: 22,
                     height: 22,
                     fontSize: '10px',
-                    bgcolor: '#4f46e5',
+                    bgcolor: theme.palette.primary.main,
                     color: '#fff',
                     fontWeight: 500,
                     border: 'none',
@@ -799,12 +663,12 @@ export default function Layout() {
                 px: '10px',
                 py: '5px',
                 height: 32,
-                color: '#111827',
+                color: theme.palette.text.primary,
                 fontSize: '12px',
                 fontWeight: 500,
-                border: '0.5px solid #e5e7eb',
-                bgcolor: '#ffffff',
-                '&:hover': { bgcolor: '#f9fafb' },
+                border: `0.5px solid ${theme.palette.divider}`,
+                bgcolor: theme.palette.background.paper,
+                '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.04) },
                 '& .MuiButton-startIcon': { mr: '6px' },
               }}
             >
@@ -824,27 +688,36 @@ export default function Layout() {
                   minWidth: 200,
                   borderRadius: '8px',
                   boxShadow: '0 8px 20px rgba(0,0,0,0.1)',
-                  border: '0.5px solid #e5e7eb',
+                  border: `0.5px solid ${theme.palette.divider}`,
                   p: '4px',
                 },
               }}
             >
-              <Box sx={{ px: '12px', py: '10px', borderBottom: '0.5px solid #f3f4f6', mb: '4px' }}>
-                <Typography sx={{ fontWeight: 600, fontSize: '13px', color: '#111827', lineHeight: 1.3 }}>
+              <Box sx={{ px: '12px', py: '10px', borderBottom: `0.5px solid ${theme.palette.divider}`, mb: '4px' }}>
+                <Typography sx={{ fontWeight: 600, fontSize: '13px', color: theme.palette.text.primary, lineHeight: 1.3 }}>
                   {user?.displayName}
                 </Typography>
-                <Typography sx={{ fontSize: '11px', color: '#6b7280', mt: '2px' }}>
+                <Typography sx={{ fontSize: '11px', color: theme.palette.text.secondary, mt: '2px' }}>
                   {user?.role === 'SUPERADMIN' ? 'ผู้ดูแลระบบสูงสุด' : user?.role === 'IT_ADMIN' ? 'IT Admin' : 'ผู้ใช้'}
                 </Typography>
               </Box>
               <MenuItem
+                onClick={() => { setAnchorEl(null); navigate('/profile'); }}
+                sx={{ borderRadius: '6px', fontSize: '13px', fontWeight: 500, color: theme.palette.text.primary }}
+              >
+                <PersonOutlineIcon sx={{ mr: 1.5, fontSize: 16 }} />
+                โปรไฟล์ของฉัน
+              </MenuItem>
+              <Divider sx={{ my: '4px', borderColor: theme.palette.divider }} />
+              <MenuItem
                 onClick={() => { setAnchorEl(null); logout(); navigate('/login'); }}
-                sx={{ color: '#ef4444', borderRadius: '6px', fontSize: '13px', fontWeight: 500 }}
+                sx={{ color: theme.palette.error.main, borderRadius: '6px', fontSize: '13px', fontWeight: 500 }}
               >
                 <LogoutIcon sx={{ mr: 1.5, fontSize: 16 }} />
-                {/* ออกจากระบบ */}
+                ออกจากระบบ
               </MenuItem>
             </Menu>
+
           </Box>
         </Toolbar>
       </AppBar>
@@ -858,7 +731,12 @@ export default function Layout() {
           onClose={() => setMobileOpen(false)}
           sx={{
             display: { xs: 'block', md: 'none' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+            '& .MuiDrawer-paper': { 
+              boxSizing: 'border-box', 
+              width: mobileDrawerWidth,
+              borderRight: 'none',
+              boxShadow: '10px 0 25px rgba(0,0,0,0.05)',
+            },
           }}
         >
           {drawer}
@@ -869,7 +747,11 @@ export default function Layout() {
           variant="permanent"
           sx={{
             display: { xs: 'none', md: 'block' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+            '& .MuiDrawer-paper': { 
+              boxSizing: 'border-box', 
+              width: drawerWidth,
+              borderRight: `1px solid ${theme.palette.divider}`,
+            },
           }}
           open
         >
@@ -882,12 +764,13 @@ export default function Layout() {
         component="main"
         sx={{
           flexGrow: 1,
-          p: { xs: 2, md: '20px' },
+          p: { xs: 2, md: '24px' },
           width: { md: `calc(100% - ${drawerWidth}px)` },
           mt: `${appBarHeight}px`,
+          mb: { xs: '56px', md: 0 },
           position: 'relative',
           minHeight: `calc(100vh - ${appBarHeight}px)`,
-          bgcolor: '#f5f6fa',
+          bgcolor: theme.palette.background.default,
         }}
       >
         <Breadcrumbs />
@@ -895,6 +778,59 @@ export default function Layout() {
           <Outlet />
         </PageTransition>
       </Box>
+
+      {/* Mobile Bottom Navigation */}
+      {isMobile && (
+        <Paper 
+          sx={{ 
+            position: 'fixed', 
+            bottom: 0, 
+            left: 0, 
+            right: 0, 
+            zIndex: 1000, 
+            borderRadius: '24px 24px 0 0', 
+            borderTop: '1px solid rgba(255, 255, 255, 0.3)',
+            background: 'rgba(255, 255, 255, 0.85)',
+            backdropFilter: 'blur(20px)',
+            boxShadow: '0 -4px 30px rgba(0, 0, 0, 0.03), 0 -1px 3px rgba(0, 0, 0, 0.02)',
+            overflow: 'hidden'
+          }} 
+          elevation={0}
+        >
+          <BottomNavigation
+            showLabels
+            value={location.pathname}
+            onChange={(_, newValue) => {
+              if (newValue === 'scan') {
+                setQrOpen(true);
+              } else {
+                navigate(newValue);
+              }
+            }}
+            sx={{ 
+              height: 64, 
+              background: 'transparent',
+              '& .MuiBottomNavigationAction-root': {
+                color: '#94a3b8',
+                padding: '6px 0 8px',
+                transition: 'all 0.2s',
+                '&.Mui-selected': {
+                  color: '#2563eb',
+                  fontWeight: 700,
+                  '& .MuiSvgIcon-root': {
+                    transform: 'scale(1.1)',
+                  }
+                }
+              }
+            }}
+          >
+            <BottomNavigationAction label="หน้าหลัก" value="/dashboard" icon={<DashboardIcon />} />
+            <BottomNavigationAction label="ทรัพย์สิน" value="/assets" icon={<DevicesIcon />} />
+            <BottomNavigationAction label="ยืม-คืน" value="/borrow/new" icon={<ShoppingCartIcon />} />
+            <BottomNavigationAction label="สแกน" value="scan" icon={<QrCodeScannerIcon />} />
+          </BottomNavigation>
+        </Paper>
+      )}
 
       {/* QR Scanner Modal */}
       <QRScannerModal open={qrOpen} onClose={() => setQrOpen(false)} />

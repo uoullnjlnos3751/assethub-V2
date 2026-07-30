@@ -9,6 +9,8 @@ import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import { borrowAPI } from '../../services/api';
+import { formatDate } from '../../utils/dateUtils';
+
 
 interface HistoryItem {
   id: number;
@@ -198,10 +200,11 @@ export default function MyHistoryPage() {
                 key={item.id}
                 sx={{
                   backgroundColor: '#fff',
-                  borderRadius: '12px',
+                  borderRadius: '14px',
                   border: '1px solid #e2e8f0',
-                  p: '14px',
-                  mb: '10px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                  p: '16px',
+                  mb: '12px',
                 }}
               >
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
@@ -235,7 +238,7 @@ export default function MyHistoryPage() {
                       วันที่ยืม
                     </Typography>
                     <Typography variant="body2">
-                      {new Date(item.borrowDate).toLocaleDateString('th-TH')}
+                      {formatDate(item.borrowDate)}
                     </Typography>
                   </Box>
                   <Box>
@@ -244,7 +247,7 @@ export default function MyHistoryPage() {
                     </Typography>
                     <Typography variant="body2">
                       {item.returnDate
-                        ? new Date(item.returnDate).toLocaleDateString('th-TH')
+                        ? formatDate(item.returnDate)
                         : '-'}
                     </Typography>
                   </Box>
@@ -259,14 +262,16 @@ export default function MyHistoryPage() {
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
                   <Button
-                    size="small"
+                    size="medium"
                     startIcon={<VisibilityIcon />}
                     onClick={() => {
                       setSelectedItem(item);
                       setDetailDialog(true);
                     }}
+                    sx={{ width: '100%', borderRadius: 2 }}
+                    variant="outlined"
                   >
-                    ดู
+                    ดูรายละเอียด
                   </Button>
                 </Box>
               </Box>
@@ -306,10 +311,10 @@ export default function MyHistoryPage() {
                       <TableCell>
                         {item.brand} {item.model}
                       </TableCell>
-                      <TableCell>{new Date(item.borrowDate).toLocaleDateString('th-TH')}</TableCell>
+                      <TableCell>{formatDate(item.borrowDate)}</TableCell>
                       <TableCell>
                         {item.returnDate
-                          ? new Date(item.returnDate).toLocaleDateString('th-TH')
+                          ? formatDate(item.returnDate)
                           : '-'}
                       </TableCell>
                       <TableCell align="center">
@@ -386,7 +391,7 @@ export default function MyHistoryPage() {
                     วันที่ยืม
                   </Typography>
                   <Typography>
-                    {new Date(selectedItem.borrowDate).toLocaleDateString('th-TH')}
+                    {formatDate(selectedItem.borrowDate)}
                   </Typography>
                 </Grid>
                 <Grid item xs={6}>
@@ -395,7 +400,7 @@ export default function MyHistoryPage() {
                   </Typography>
                   <Typography>
                     {selectedItem.returnDate
-                      ? new Date(selectedItem.returnDate).toLocaleDateString('th-TH')
+                      ? formatDate(selectedItem.returnDate)
                       : '-'}
                   </Typography>
                 </Grid>

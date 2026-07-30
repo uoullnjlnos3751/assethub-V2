@@ -1,16 +1,17 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { authenticate, authorize } from '../middleware/auth';
 
 const router = Router();
 
 router.get('/asset-summary', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const [byStatus, byDepartment, byCompany, byType, total, byCategory] = await Promise.all([
+    const [byStatus, byDepartment, byCompany, byType, byLocation, total, byCategory] = await Promise.all([
       prisma.asset.groupBy({ by: ['status'], _count: true }),
       prisma.asset.groupBy({ by: ['departmentId'], _count: true }),
       prisma.asset.groupBy({ by: ['company'], _count: true }),
       prisma.asset.groupBy({ by: ['type'], _count: true }),
+      prisma.asset.groupBy({ by: ['location'], _count: true }),
       prisma.asset.count(),
       prisma.category.findMany({
         where: { isActive: true },
@@ -21,7 +22,30 @@ router.get('/asset-summary', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), 
     const byCategoryFlat = byCategory.map(c => ({
       id: c.id, name: c.name, icon: c.icon, assetCount: c._count.assets,
     }));
-    res.json({ total, byStatus, byDepartment, byCompany, byType, byCategory: byCategoryFlat });
+    res.json({ total, byStatus, byDepartment, byCompany, byType, byLocation, byCategory: byCategoryFlat });
+  } catch (err) { next(err); }
+});
+
+router.get('/data-health', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const [missingSerial, missingLocation, missingCompany, missingType, outdatedOSCount] = await Promise.all([
+      prisma.asset.count({ where: { OR: [{ serialNo: '' }, { serialNo: '-' }] } }),
+      prisma.asset.count({ where: { OR: [{ location: null }, { location: '' }, { location: '-' }] } }),
+      prisma.asset.count({ where: { OR: [{ company: null }, { company: '' }, { company: '-' }] } }),
+      prisma.asset.count({ where: { OR: [{ type: null }, { type: '' }] } }),
+      prisma.asset.count({
+        where: {
+          computerDetail: {
+            OR: [
+              { osVersion: { contains: 'Windows 7', mode: 'insensitive' } },
+              { osVersion: { contains: 'Windows 8', mode: 'insensitive' } },
+              { osVersion: { contains: 'Windows 10', mode: 'insensitive' } }
+            ]
+          }
+        }
+      }),
+    ]);
+    res.json({ missingSerial, missingLocation, missingCompany, missingType, outdatedOSCount });
   } catch (err) { next(err); }
 });
 
@@ -165,4 +189,44 @@ router.get('/proactive-alerts', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'
   }
 });
 
+
+router.get('/warranty-expiring', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const days = parseInt(req.query.days as string) || 30;
+    const now = new Date();
+    const future = new Date();
+    future.setDate(now.getDate() + days);
+
+    const [expiring, expired] = await Promise.all([
+      prisma.asset.findMany({
+        where: {
+          warrantyEndDate: { gte: now, lte: future },
+          status: { not: 'Retired' },
+        },
+        select: {
+          id: true, assetCode: true, brand: true, model: true,
+          warrantyEndDate: true, status: true,
+          category: { select: { name: true, icon: true } },
+        },
+        orderBy: { warrantyEndDate: 'asc' },
+        take: 20,
+      }),
+      prisma.asset.count({
+        where: {
+          warrantyEndDate: { lt: now },
+          status: { not: 'Retired' },
+        },
+      }),
+    ]);
+
+    const result = expiring.map(a => {
+      const diff = Math.ceil((new Date(a.warrantyEndDate!).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      return { ...a, daysLeft: diff };
+    });
+
+    res.json({ expiring: result, expiredCount: expired, days });
+  } catch (err) { next(err); }
+});
+
 export default router;
+

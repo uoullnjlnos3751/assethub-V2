@@ -32,7 +32,7 @@ const pmPhotoUpload = multer({
 
 function buildPMAssetWhere(plan: { company?: string | null; site?: string | null; deptTask?: string | null; deviceType?: string | null }) {
   return {
-    status: { not: 'Retired' as const },
+    status: { notIn: ['Retired', 'Lost', 'Damaged'] },
     ...(plan.company ? { company: { contains: plan.company } } : {}),
     ...(plan.site ? { location: { contains: plan.site } } : {}),
     ...(plan.deptTask ? { departmentId: { contains: plan.deptTask } } : {}),
@@ -58,7 +58,7 @@ async function getPMEligibility(client: any, plan: { year: number; company?: str
   const requestedCount = Math.max(0, parseInt(String(plan.plannedDeviceCount ?? availableAssetIds.length), 10) || 0);
 
   return {
-    totalInScope: scopedAssetIds.length,
+    totalInScope: scopedAssets.length,
     alreadyInYear: existingAssetIds.size,
     available: availableAssetIds.length,
     requestedCount,
@@ -113,42 +113,35 @@ router.put('/templates/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), 
 
     const incomingItems: any[] = items || [];
 
-    // Step 1: Update template name/description
     await prisma.pMTemplate.update({
       where: { id },
       data: { name, description: description || null },
     });
 
-    // Step 2: Get existing items for this template
     const existingItems = await prisma.pMTemplateItem.findMany({ where: { templateId: id } });
     const existingIds = new Set(existingItems.map(i => i.id));
 
-    // Step 3: Separate incoming items into "has id" (update) vs "no id" (create)
     const toUpdate = incomingItems.filter(i => i.id && existingIds.has(i.id));
     const toCreate = incomingItems.filter(i => !i.id);
     const incomingIdSet = new Set(incomingItems.filter(i => i.id).map(i => i.id));
 
-    // Step 4: Items to potentially delete = existing items not in incoming list
     const candidateDeleteIds = existingItems
       .filter(i => !incomingIdSet.has(i.id))
       .map(i => i.id);
 
-    // Step 5: Check which candidates have PMRunAnswer references (cannot delete)
     const referencedItems = await prisma.pMRunAnswer.findMany({
       where: { itemId: { in: candidateDeleteIds } },
       select: { itemId: true },
       distinct: ['itemId'],
     });
     const referencedIds = new Set(referencedItems.map(r => r.itemId));
-    const safeToDeleteIds = candidateDeleteIds.filter(i => !referencedIds.has(i));
 
     await prisma.$transaction(async (tx) => {
-      // Delete items with no answer references
-      if (safeToDeleteIds.length > 0) {
-        await tx.pMTemplateItem.deleteMany({ where: { id: { in: safeToDeleteIds } } });
+      if (candidateDeleteIds.length > 0) {
+        await tx.pMRunAnswer.deleteMany({ where: { itemId: { in: candidateDeleteIds } } });
+        await tx.pMTemplateItem.deleteMany({ where: { id: { in: candidateDeleteIds } } });
       }
 
-      // Update existing items
       for (const item of toUpdate) {
         await tx.pMTemplateItem.update({
           where: { id: item.id },
@@ -163,7 +156,6 @@ router.put('/templates/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), 
         });
       }
 
-      // Create new items
       if (toCreate.length > 0) {
         await tx.pMTemplateItem.createMany({
           data: toCreate.map((item, idx) => ({
@@ -184,13 +176,10 @@ router.put('/templates/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), 
       include: { templateItems: { orderBy: { order: 'asc' } } },
     });
 
-    // Warn if some items were kept due to existing answers
     const keptCount = referencedIds.size;
     res.json({ ...updated, _warning: keptCount > 0 ? `${keptCount} รายการที่มีข้อมูล PM ผูกอยู่ไม่ถูกลบ` : null });
   } catch (err) { next(err); }
 });
-
-
 
 // ── PM Plans ──
 router.get('/plans', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
@@ -200,10 +189,29 @@ router.get('/plans', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (r
     if (year) where.year = parseInt(year as string);
     const plans = await prisma.pMPlan.findMany({
       where,
-      include: { template: true, runs: { include: { asset: true } } },
+      include: { template: true },
       orderBy: [{ year: 'desc' }, { site: 'asc' }],
     });
-    res.json(plans);
+    const planIds = plans.map(p => p.id);
+    let runStats: any[] = [];
+    if (planIds.length > 0) {
+      runStats = await (prisma.pMRun.groupBy as any)({
+        by: ['planId', 'status'],
+        where: { planId: { in: planIds } },
+        _count: { id: true },
+      });
+    }
+    const plansWithCounts = plans.map(plan => {
+      const planStats = runStats.filter(s => s.planId === plan.id);
+      const totalCount = planStats.reduce((acc, curr) => acc + curr._count.id, 0);
+      const completedCount = planStats.filter(s => s.status === 'COMPLETED').reduce((acc, curr) => acc + curr._count.id, 0);
+      return {
+        ...plan,
+        totalCount,
+        completedCount
+      };
+    });
+    res.json(plansWithCounts);
   } catch (err) { next(err); }
 });
 
@@ -225,6 +233,37 @@ router.post('/plans', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (
       },
     });
     res.status(201).json(plan);
+  } catch (err) { next(err); }
+});
+
+router.get('/plans/cleanup-mismatch', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const plans = await prisma.pMPlan.findMany();
+    let deletedCount = 0;
+    for (const plan of plans) {
+      if (!plan.deviceType) continue;
+      const mismatchRuns = await prisma.pMRun.findMany({
+        where: {
+          planId: plan.id,
+          status: 'DRAFT',
+          asset: {
+            type: { not: plan.deviceType }
+          }
+        },
+        select: { id: true }
+      });
+      if (mismatchRuns.length > 0) {
+        const runIds = mismatchRuns.map(r => r.id);
+        await prisma.pMRunAnswer.deleteMany({
+          where: { runId: { in: runIds } }
+        });
+        const dRes = await prisma.pMRun.deleteMany({
+          where: { id: { in: runIds } }
+        });
+        deletedCount += dRes.count;
+      }
+    }
+    res.json({ message: `ลบงาน PM ที่ไม่ตรงกับประเภทอุปกรณ์สำเร็จ (${deletedCount} รายการ)` });
   } catch (err) { next(err); }
 });
 
@@ -252,7 +291,6 @@ router.put('/plans/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), asyn
     const plan = await prisma.pMPlan.findUnique({ where: { id } });
     if (!plan) throw new AppError('ไม่พบแผน PM', 404);
 
-    // Check if there are any completed runs
     const completedCount = await prisma.pMRun.count({
       where: { planId: id, status: 'COMPLETED' },
     });
@@ -263,16 +301,20 @@ router.put('/plans/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), asyn
       endDate: endDate ? new Date(endDate) : null,
     };
 
+    if (deviceType !== undefined) {
+      data.deviceType = deviceType;
+    }
+    if (plannedDeviceCount !== undefined) {
+      data.plannedDeviceCount = parseInt(plannedDeviceCount);
+    }
+
     if (completedCount === 0) {
       if (year !== undefined) data.year = parseInt(year);
       if (site !== undefined) data.site = site;
       if (deptTask !== undefined) data.deptTask = deptTask;
       if (company !== undefined) data.company = company;
-      if (deviceType !== undefined) data.deviceType = deviceType;
-      if (plannedDeviceCount !== undefined) data.plannedDeviceCount = parseInt(plannedDeviceCount);
       if (templateId !== undefined) data.templateId = parseInt(templateId);
 
-      // Check if target criteria or template actually changed
       const isTargetOrTemplateChanged =
         (year !== undefined && parseInt(year) !== plan.year) ||
         (site !== undefined && site !== plan.site) ||
@@ -282,13 +324,8 @@ router.put('/plans/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), asyn
         (plannedDeviceCount !== undefined && parseInt(plannedDeviceCount) !== plan.plannedDeviceCount) ||
         (templateId !== undefined && parseInt(templateId) !== plan.templateId);
 
-      // Check if runs exist (they must be drafts since completedCount === 0)
-      const runCount = await prisma.pMRun.count({ where: { planId: id } });
-
-      if (isTargetOrTemplateChanged && runCount > 0) {
-        // Run as a transaction to delete old draft runs and answers, update plan, and generate new workload
+      if (isTargetOrTemplateChanged) {
         const updated = await prisma.$transaction(async (tx) => {
-          // Get existing runs to delete answers
           const runs = await tx.pMRun.findMany({
             where: { planId: id },
             select: { id: true },
@@ -303,7 +340,6 @@ router.put('/plans/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), asyn
             });
           }
 
-          // Update the plan
           const updatedPlan = await tx.pMPlan.update({
             where: { id },
             data,
@@ -348,9 +384,13 @@ router.delete('/plans/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), a
     const plan = await prisma.pMPlan.findUnique({ where: { id } });
     if (!plan) throw new AppError('ไม่พบแผน PM', 404);
 
-    // Safely delete associated runs and answers in a transaction
+    const completedCount = await prisma.pMRun.count({
+      where: { planId: id, status: 'COMPLETED' },
+    });
+    if (completedCount > 0) {
+      throw new AppError(`ไม่สามารถลบแผน PM ได้ เนื่องจากมีงาน PM ที่ดำเนินการเสร็จแล้ว ${completedCount} รายการ กรุณาลบงาน PM ที่เสร็จแล้วก่อน`, 400);
+    }
 
-    // Safely delete associated draft runs and answers in a transaction
     await prisma.$transaction(async (tx) => {
       const runs = await tx.pMRun.findMany({
         where: { planId: id },
@@ -359,17 +399,14 @@ router.delete('/plans/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), a
       const runIds = runs.map(r => r.id);
 
       if (runIds.length > 0) {
-        // Delete answers
         await tx.pMRunAnswer.deleteMany({
           where: { runId: { in: runIds } },
         });
-        // Delete runs
         await tx.pMRun.deleteMany({
           where: { planId: id },
         });
       }
 
-      // Delete plan
       await tx.pMPlan.delete({
         where: { id },
       });
@@ -378,7 +415,6 @@ router.delete('/plans/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), a
     res.json({ message: 'ลบแผน PM สำเร็จ' });
   } catch (err) { next(err); }
 });
-
 
 // ── Generate PM workload ──
 router.post('/plans/:id/generate', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
@@ -418,14 +454,22 @@ router.post('/plans/:id/generate', authenticate, authorize('IT_ADMIN', 'SUPERADM
 router.get('/runs', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { planId, status } = req.query;
-    const where: any = {};
+    const where: any = {
+      asset: { status: { notIn: ['Retired', 'Lost', 'Damaged'] } }
+    };
     if (planId) where.planId = parseInt(planId as string);
     if (status) where.status = status as string;
 
     const runs = await prisma.pMRun.findMany({
       where,
       include: {
-        asset: true,
+        asset: {
+          select: {
+            id: true, assetCode: true, assetName: true, brand: true, model: true,
+            serialNo: true, ownerName: true, type: true, company: true,
+            departmentId: true, location: true, status: true, age: true
+          }
+        },
         performer: { select: { id: true, displayName: true, adUsername: true } },
         plan: {
           include: {
@@ -440,14 +484,227 @@ router.get('/runs', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (re
   } catch (err) { next(err); }
 });
 
+async function generateAssetCode(tx: any, companyStr: string, isPrinter: boolean = false): Promise<string> {
+  companyStr = String(companyStr || '').toUpperCase().replace(/\s/g, '');
+  let prefix = isPrinter ? 'HQ-TRRT-P' : 'HQ-TRRT-M';
+  let padding = 3;
+  try {
+    const setting = await tx.systemSetting.findUnique({ where: { key: 'COMPANY_PREFIXES' } });
+    if (setting && setting.value) {
+      const prefixes = JSON.parse(setting.value);
+      if (prefixes[companyStr]) {
+        prefix = isPrinter ? prefixes[companyStr].printerPrefix : prefixes[companyStr].monitorPrefix;
+        padding = prefixes[companyStr].padding || 3;
+      } else if (companyStr) {
+        prefix = `${companyStr}-${isPrinter ? 'P' : 'M'}`;
+      }
+    }
+  } catch (err) {
+    console.error('Error loading COMPANY_PREFIXES setting:', err);
+    if (companyStr) {
+      prefix = `${companyStr}-${isPrinter ? 'P' : 'M'}`;
+    }
+  }
+
+  const lastAsset = await tx.asset.findFirst({
+    where: { assetCode: { startsWith: prefix } },
+    orderBy: { assetCode: 'desc' },
+  });
+
+  let nextNum = 1;
+  if (lastAsset && lastAsset.assetCode) {
+    const digitMatch = lastAsset.assetCode.match(/(\d+)$/);
+    if (digitMatch) nextNum = parseInt(digitMatch[1], 10) + 1;
+  }
+
+  return `${prefix}${nextNum.toString().padStart(padding, '0')}`;
+}
+
+async function processDeviceAnswers(tx: any, run: any, answers: any[], oldAnswers: any[] = []): Promise<any[]> {
+  const templateItems = run.plan.template.templateItems;
+  const processedAnswers: any[] = [];
+
+  if (Array.isArray(answers)) {
+    for (const ans of answers) {
+      let itemDef = null;
+      if (ans.key) {
+        itemDef = templateItems.find((i: any) => i.key === ans.key);
+      } else if (ans.itemId) {
+        itemDef = templateItems.find((i: any) => i.id === Number(ans.itemId));
+      }
+
+      if (itemDef) {
+        let value = String(ans.value ?? '');
+        const itemTypeUpper = (itemDef.type || '').toUpperCase();
+
+        if (itemTypeUpper === 'MONITOR_ARRAY' || itemTypeUpper === 'PRINTER_ARRAY') {
+          const newAssetIds = new Set<number>();
+          if (value && value !== 'no') {
+            try {
+              const devices = JSON.parse(value);
+              const isPrinter = itemTypeUpper === 'PRINTER_ARRAY';
+              for (let i = 0; i < devices.length; i++) {
+                const dev = devices[i];
+                let existingAsset = null;
+                if (dev.serialNo && dev.serialNo.trim() !== '') {
+                  existingAsset = await tx.asset.findFirst({ where: { serialNo: dev.serialNo.trim() } });
+                }
+
+                if (!existingAsset) {
+                  if (!dev._assetId) {
+                    const sNo = dev.serialNo?.trim();
+                    if (!sNo) {
+                      throw new AppError(`กรุณาระบุ Serial No. สำหรับ ${isPrinter ? 'Printer' : 'Monitor'} ให้ครบถ้วนก่อนบันทึก`, 400);
+                    }
+
+                    let finalCode = '';
+                    if (dev.assetCode && dev.assetCode.trim() !== '') {
+                      const parts = dev.assetCode.split('/');
+                      finalCode = parts[parts.length - 1].trim();
+                    }
+
+                    const isPlaceholder = !finalCode || finalCode.includes('X') || finalCode.includes('x') || finalCode.includes('ร่าง');
+                    if (isPlaceholder) {
+                      finalCode = await generateAssetCode(tx, dev.company || run.asset?.company || 'HQ-TRRT', isPrinter);
+                    }
+
+                    const newAsset = await tx.asset.create({
+                      data: {
+                        assetCode: finalCode,
+                        serialNo: sNo,
+                        assetName: isPrinter ? 'Printer' : 'Monitor',
+                        type: isPrinter ? 'Printer' : 'Monitor',
+                        company: dev.company || run.asset?.company,
+                        brand: dev.brand || '',
+                        model: dev.model || '',
+                        departmentId: run.asset?.departmentId,
+                        location: run.asset?.location,
+                        ownerName: run.asset?.ownerName,
+                        status: run.asset?.status || 'InUse',
+                      }
+                    });
+
+                    // Create MonitorDetail if specs are present
+                    if (!isPrinter && (dev.screenSize || dev.ports || dev.hasSpeaker !== undefined)) {
+                      await tx.monitorDetail.create({
+                        data: {
+                          assetId: newAsset.id,
+                          screenSize: dev.screenSize || null,
+                          ports: dev.ports || null,
+                          hasSpeaker: !!dev.hasSpeaker,
+                        }
+                      });
+                    }
+
+                    devices[i].assetCode = `${isPrinter ? 'Printer' : 'Monitor'} / ${finalCode}`;
+                    devices[i]._assetId = newAsset.id;
+                    newAssetIds.add(newAsset.id);
+                  }
+                } else {
+                  let finalCode = existingAsset.assetCode;
+                  if (dev.assetCode && dev.assetCode.trim() !== '') {
+                    const parts = dev.assetCode.split('/');
+                    finalCode = parts[parts.length - 1].trim();
+                  }
+
+                  await tx.asset.update({
+                    where: { id: existingAsset.id },
+                    data: {
+                      assetCode: finalCode,
+                      brand: dev.brand || existingAsset.brand,
+                      model: dev.model || existingAsset.model,
+                      company: dev.company || existingAsset.company,
+                      departmentId: run.asset?.departmentId,
+                      location: run.asset?.location,
+                      ownerName: run.asset?.ownerName,
+                      status: run.asset?.status || existingAsset.status,
+                    }
+                  });
+
+                  // Upsert MonitorDetail if specs are present
+                  if (!isPrinter && (dev.screenSize || dev.ports || dev.hasSpeaker !== undefined)) {
+                    await tx.monitorDetail.upsert({
+                      where: { assetId: existingAsset.id },
+                      create: {
+                        assetId: existingAsset.id,
+                        screenSize: dev.screenSize || null,
+                        ports: dev.ports || null,
+                        hasSpeaker: !!dev.hasSpeaker,
+                      },
+                      update: {
+                        screenSize: dev.screenSize || null,
+                        ports: dev.ports || null,
+                        hasSpeaker: !!dev.hasSpeaker,
+                      }
+                    });
+                  }
+
+                  devices[i].assetCode = [existingAsset.assetName || (isPrinter ? 'Printer' : 'Monitor'), finalCode].filter(Boolean).join(' / ');
+                  devices[i]._assetId = existingAsset.id;
+                  newAssetIds.add(existingAsset.id);
+                }
+              }
+              value = JSON.stringify(devices);
+            } catch (e) {
+              console.error('Error processing PM devices:', e);
+              throw e;
+            }
+          }
+
+          // Unlinking logic
+          const oldAns = oldAnswers.find((oa) => oa.itemId === itemDef.id);
+          if (oldAns && oldAns.value && oldAns.value !== 'no') {
+            try {
+              const oldDevices = JSON.parse(oldAns.value);
+              for (const oldDev of oldDevices) {
+                if (oldDev._assetId && !newAssetIds.has(Number(oldDev._assetId))) {
+                  await tx.asset.update({
+                    where: { id: Number(oldDev._assetId) },
+                    data: {
+                      status: 'Available',
+                      ownerName: null,
+                    }
+                  });
+                  console.log(`Unlinked device ${oldDev._assetId} from PM run ${run.id}`);
+                }
+              }
+            } catch (e) {
+              console.error('Error parsing old devices for unlinking:', e);
+            }
+          }
+        }
+
+        processedAnswers.push({
+          runId: run.id,
+          itemId: itemDef.id,
+          value,
+        });
+      }
+    }
+  }
+  return processedAnswers;
+}
+
 // ── Perform PM ──
 router.post('/runs/:id/perform', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const runId = parseInt(req.params.id);
-    const { answers, status = 'COMPLETED' } = req.body; // array of { itemId, value }
-    const nextStatus = status === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'COMPLETED';
+    const { answers, status = 'COMPLETED' } = req.body;
+    const nextStatus = ['IN_PROGRESS', 'DRAFT', 'COMPLETED'].includes(status) ? status : 'COMPLETED';
 
-    const run = await prisma.pMRun.findUnique({ where: { id: runId }, include: { plan: { include: { template: { include: { templateItems: true } } } } } });
+    const run = await prisma.pMRun.findUnique({
+      where: { id: runId },
+      include: {
+        asset: true,
+        plan: {
+          include: {
+            template: {
+              include: { templateItems: true }
+            }
+          }
+        }
+      }
+    });
     if (!run) throw new AppError('ไม่พบงาน PM', 404);
     if (!run.plan.template.templateItems.length) throw new AppError('แผน PM นี้ยังไม่มี Checklist Template', 400);
 
@@ -457,13 +714,35 @@ router.post('/runs/:id/perform', authenticate, authorize('IT_ADMIN', 'SUPERADMIN
       : [];
 
     await prisma.$transaction(async (tx) => {
-      // Delete old answers if re-performing
+      const oldAnswers = await tx.pMRunAnswer.findMany({ where: { runId: run.id } });
       await tx.pMRunAnswer.deleteMany({ where: { runId } });
 
-      if (cleanAnswers.length > 0) {
+      const processedAnswers = await processDeviceAnswers(tx, run, cleanAnswers, oldAnswers);
+      for (const ans of processedAnswers) {
+        await tx.pMRunAnswer.create({
+          data: ans,
+        });
+      }
+
+      // Auto-Sync PC Specs
+      if (run.assetId && run.asset?.type === 'Computer') {
+        const specUpdates: any = {};
         for (const ans of cleanAnswers) {
-          await tx.pMRunAnswer.create({
-            data: { runId, itemId: Number(ans.itemId), value: String(ans.value ?? '') },
+          const itemDef = run.plan.template.templateItems.find((i) => i.id === Number(ans.itemId));
+          if (!itemDef || !ans.value) continue;
+          const v = ans.value.split('::')[0];
+          if (itemDef.key === 'cpu') specUpdates.cpu = v;
+          else if (itemDef.key === 'ram') specUpdates.ram = v;
+          else if (itemDef.key === 'storage') specUpdates.storage1 = v;
+          else if (itemDef.key === 'windows_version' || itemDef.key === 'os') specUpdates.osVersion = v;
+          else if (itemDef.key === 'computer_name') specUpdates.domainName = v;
+        }
+
+        if (Object.keys(specUpdates).length > 0) {
+          await tx.computerDetail.upsert({
+            where: { assetId: run.assetId },
+            create: { assetId: run.assetId, ...specUpdates },
+            update: { ...specUpdates }
           });
         }
       }
@@ -493,7 +772,10 @@ router.get('/dashboard', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), asyn
     const planIds = plans.map(p => p.id);
 
     const runs = await prisma.pMRun.findMany({
-      where: { planId: { in: planIds } },
+      where: {
+        planId: { in: planIds },
+        asset: { status: { notIn: ['Retired', 'Lost', 'Damaged'] } }
+      },
       include: { plan: true },
     });
 
@@ -527,7 +809,6 @@ router.post('/runs/:id/upload', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'
     if (!run) throw new AppError('ไม่พบงาน PM', 404);
     if (!req.file) throw new AppError('ไม่พบไฟล์รูปภาพ', 400);
 
-    // Delete old file if exists
     if (run.photoUrl) {
       const oldPath = path.join(PM_UPLOAD_DIR, run.photoUrl);
       if (fs.existsSync(oldPath)) {
@@ -554,32 +835,23 @@ router.post('/runs/bulk-perform', authenticate, authorize('IT_ADMIN', 'SUPERADMI
 
     const validRuns = await prisma.pMRun.findMany({
       where: { id: { in: runIds } },
-      include: { plan: { include: { template: { include: { templateItems: true } } } } }
+      include: { asset: true, plan: { include: { template: { include: { templateItems: true } } } } }
     });
 
     if (validRuns.length === 0) throw new AppError('ไม่พบรายการ PM ที่ระบุ', 404);
 
     await prisma.$transaction(async (tx) => {
-      // For each run, delete old answers and create new ones
       for (const run of validRuns) {
+        const oldAnswers = await tx.pMRunAnswer.findMany({ where: { runId: run.id } });
         await tx.pMRunAnswer.deleteMany({ where: { runId: run.id } });
 
-        const validItemIds = new Set(run.plan.template.templateItems.map(item => item.id));
-        const cleanAnswers = Array.isArray(answers)
-          ? answers.filter((ans: any) => validItemIds.has(Number(ans.itemId)))
-          : [];
-
-        if (cleanAnswers.length > 0) {
+        const processedAnswers = await processDeviceAnswers(tx, run, answers, oldAnswers);
+        if (processedAnswers.length > 0) {
           await tx.pMRunAnswer.createMany({
-            data: cleanAnswers.map((ans: any) => ({
-              runId: run.id,
-              itemId: Number(ans.itemId),
-              value: String(ans.value ?? ''),
-            })),
+            data: processedAnswers,
           });
         }
 
-        // Update PMRun status
         await tx.pMRun.update({
           where: { id: run.id },
           data: {
@@ -615,6 +887,206 @@ router.get('/runs/:id/glpi-spec', authenticate, authorize('IT_ADMIN', 'SUPERADMI
     }
 
     res.json(spec);
+  } catch (err) { next(err); }
+});
+
+// ── Delete PM Run ──
+router.delete('/runs/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    await prisma.$transaction(async (tx) => {
+      const run = await tx.pMRun.findUnique({ where: { id } });
+      if (!run) throw new AppError('ไม่พบงาน PM', 404);
+      await tx.pMRunAnswer.deleteMany({ where: { runId: id } });
+      await tx.pMRun.delete({ where: { id } });
+    });
+    res.json({ message: 'ลบงาน PM สำเร็จ' });
+  } catch (err) { next(err); }
+});
+
+// ── Helpers for PM Components ──
+router.post('/upload-temp', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), pmPhotoUpload.single('file'), (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.file) throw new AppError('กรุณาอัพโหลดไฟล์', 400);
+    const fileUrl = `/uploads/pm/${req.file.filename}`;
+    res.json({ url: fileUrl });
+  } catch (err) { next(err); }
+});
+
+router.get('/check-serial', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { serialNo } = req.query;
+    if (!serialNo) return res.json({ found: false });
+    const asset = await prisma.asset.findFirst({
+      where: { serialNo: String(serialNo), status: { notIn: ['Retired', 'Lost', 'Damaged'] } },
+      select: {
+        id: true,
+        assetCode: true,
+        serialNo: true,
+        assetName: true,
+        brand: true,
+        model: true,
+        type: true,
+        company: true,
+        monitorDetail: {
+          select: {
+            screenSize: true,
+            ports: true,
+            hasSpeaker: true
+          }
+        }
+      }
+    });
+    if (asset) {
+      res.json({ found: true, asset });
+    } else {
+      res.json({ found: false });
+    }
+  } catch (err) { next(err); }
+});
+
+router.get('/preview-monitor-code', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const companyStr = String(req.query.company || '').toUpperCase().replace(/\s/g, '');
+    const index = parseInt(String(req.query.index || '0'), 10);
+    let prefix = 'HQ-TRRT-M';
+    let padding = 3;
+    try {
+      const setting = await prisma.systemSetting.findUnique({ where: { key: 'COMPANY_PREFIXES' } });
+      if (setting && setting.value) {
+        const prefixes = JSON.parse(setting.value);
+        if (prefixes[companyStr]) {
+          prefix = prefixes[companyStr].monitorPrefix;
+          padding = prefixes[companyStr].padding || 3;
+        } else if (companyStr) {
+          prefix = `${String(req.query.company).toUpperCase()}-M`;
+        }
+      }
+    } catch (err) {
+      if (companyStr) prefix = `${String(req.query.company).toUpperCase()}-M`;
+    }
+
+    const lastAsset = await prisma.asset.findFirst({
+      where: { assetCode: { startsWith: prefix } },
+      orderBy: { assetCode: 'desc' },
+    });
+
+    let nextNum = 1;
+    if (lastAsset && lastAsset.assetCode) {
+      const digitMatch = lastAsset.assetCode.match(/(\d+)$/);
+      if (digitMatch) nextNum = parseInt(digitMatch[1], 10) + 1;
+    }
+    nextNum += index;
+    const code = `${prefix}${nextNum.toString().padStart(padding, '0')}`;
+    res.json({ code });
+  } catch (err) { next(err); }
+});
+
+router.get('/preview-printer-code', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const companyStr = String(req.query.company || '').toUpperCase().replace(/\s/g, '');
+    const index = parseInt(String(req.query.index || '0'), 10);
+    let prefix = 'HQ-TRRT-P';
+    let padding = 3;
+    try {
+      const setting = await prisma.systemSetting.findUnique({ where: { key: 'COMPANY_PREFIXES' } });
+      if (setting && setting.value) {
+        const prefixes = JSON.parse(setting.value);
+        if (prefixes[companyStr]) {
+          prefix = prefixes[companyStr].printerPrefix;
+          padding = prefixes[companyStr].padding || 3;
+        } else if (companyStr) {
+          prefix = `${String(req.query.company).toUpperCase()}-P`;
+        }
+      }
+    } catch (err) {
+      if (companyStr) prefix = `${String(req.query.company).toUpperCase()}-P`;
+    }
+
+    const lastAsset = await prisma.asset.findFirst({
+      where: { assetCode: { startsWith: prefix } },
+      orderBy: { assetCode: 'desc' },
+    });
+
+    let nextNum = 1;
+    if (lastAsset && lastAsset.assetCode) {
+      const digitMatch = lastAsset.assetCode.match(/(\d+)$/);
+      if (digitMatch) nextNum = parseInt(digitMatch[1], 10) + 1;
+    }
+    nextNum += index;
+    const code = `${prefix}${nextNum.toString().padStart(padding, '0')}`;
+    res.json({ code });
+  } catch (err) { next(err); }
+});
+
+// ── Ad-hoc PM ──
+router.get('/runs/adhoc-search', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const q = String(req.query.q || '').trim();
+    if (q.length < 3) return res.json({ data: [] });
+    const assets = await prisma.asset.findMany({
+      where: {
+        OR: [
+          { assetCode: { contains: q, mode: 'insensitive' } },
+          { serialNo: { contains: q, mode: 'insensitive' } },
+          { assetName: { contains: q, mode: 'insensitive' } },
+          { ownerName: { contains: q, mode: 'insensitive' } },
+        ],
+        status: { notIn: ['Retired', 'Lost', 'Damaged'] },
+      },
+      take: 10,
+    });
+    res.json({ data: assets });
+  } catch (err) { next(err); }
+});
+
+router.post('/runs/adhoc', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { assetId, templateId } = req.body;
+    if (!assetId || !templateId) throw new AppError('ระบุ assetId และ templateId ไม่ครบ', 400);
+
+    const asset = await prisma.asset.findUnique({ where: { id: assetId } });
+    if (!asset) throw new AppError('ไม่พบทรัพย์สิน', 404);
+
+    const year = new Date().getFullYear();
+    let plan = await prisma.pMPlan.findFirst({
+      where: { year, site: 'Ad-hoc', deptTask: 'Ad-hoc', company: 'Ad-hoc', deviceType: asset.type },
+    });
+
+    if (!plan) {
+      plan = await prisma.pMPlan.create({
+        data: {
+          year,
+          site: 'Ad-hoc',
+          deptTask: 'Ad-hoc',
+          company: 'Ad-hoc',
+          deviceType: asset.type,
+          lead: 'Ad-hoc',
+          plannedDeviceCount: 1,
+          templateId,
+        },
+      });
+    } else {
+      await prisma.pMPlan.update({
+        where: { id: plan.id },
+        data: { plannedDeviceCount: plan.plannedDeviceCount + 1 },
+      });
+    }
+
+    const run = await prisma.pMRun.create({
+      data: {
+        planId: plan.id,
+        assetId,
+        year,
+        status: 'DRAFT',
+      },
+      include: {
+        asset: true,
+        plan: { include: { template: { include: { templateItems: { orderBy: { order: 'asc' } } } } } },
+      },
+    });
+
+    res.json({ run });
   } catch (err) { next(err); }
 });
 

@@ -8,20 +8,18 @@ import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { Sync as SyncIcon, Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import { adminAPI, assetAPI } from '../../services/api';
 
-export default function CompaniesPage() {
+export default function CompaniesPage({ embedded }: { embedded?: boolean }) {
   const [companies, setCompanies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Sync Dialog state
-  const [syncDialog, setSyncDialog] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [adCompanies, setAdCompanies] = useState<string[]>([]);
-  const [selectedAD, setSelectedAD] = useState<string[]>([]);
 
   // Add/Edit Dialog state
   const [editDialog, setEditDialog] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [newCompanyCode, setNewCompanyCode] = useState('');
   const [newCompanyName, setNewCompanyName] = useState('');
+  const [newCompanyNameEng, setNewCompanyNameEng] = useState('');
   const [assetCompanyCodes, setAssetCompanyCodes] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -34,60 +32,35 @@ export default function CompaniesPage() {
 
   useEffect(() => { fetchCompanies(); }, []);
 
-  const handleOpenSync = async () => {
-    setSyncDialog(true);
+  const handleSyncAD = async () => {
+    if (!window.confirm('คุณต้องการดึงข้อมูลบริษัททั้งหมดจากระบบ Intra-tools ใช่หรือไม่?')) return;
+    
     setSyncing(true);
     try {
       const res = await adminAPI.syncADCompanies();
-      setAdCompanies(res.data || []);
-      // Default select all that are NOT already in the system
-      const existingNames = companies.map(c => c.name.toLowerCase());
-      const newFromAD = (res.data || []).filter((c: string) => !existingNames.includes(c.toLowerCase()));
-      setSelectedAD(newFromAD);
+      alert(res.data.message || 'ดึงข้อมูลสำเร็จ');
+      fetchCompanies();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'เกิดข้อผิดพลาดในการดึงข้อมูลจาก AD');
-      setSyncDialog(false);
+      alert(err.response?.data?.message || err.response?.data?.error || 'เกิดข้อผิดพลาดในการเชื่อมต่อ');
     } finally {
       setSyncing(false);
     }
   };
 
-  const handleToggleADSelect = (name: string) => {
-    if (selectedAD.includes(name)) {
-      setSelectedAD(selectedAD.filter(c => c !== name));
-    } else {
-      setSelectedAD([...selectedAD, name]);
-    }
-  };
-
-  const handleConfirmSync = async () => {
-    if (selectedAD.length === 0) {
-      alert('กรุณาเลือกอย่างน้อย 1 บริษัท');
-      return;
-    }
-    setSaving(true);
-    try {
-      const res = await adminAPI.saveADCompanies(selectedAD);
-      alert(res.data.message || `นำเข้าสำเร็จ ${res.data.syncedCount} รายการ`);
-      setSyncDialog(false);
-      fetchCompanies();
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'เกิดข้อผิดพลาดในการนำเข้า');
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const handleOpenAdd = () => {
     setEditingId(null);
+    setNewCompanyCode('');
     setNewCompanyName('');
+    setNewCompanyNameEng('');
     setAssetCompanyCodes('');
     setEditDialog(true);
   };
 
   const handleOpenEdit = (row: any) => {
     setEditingId(row.id);
-    setNewCompanyName(row.name);
+    setNewCompanyCode(row.code || '');
+    setNewCompanyName(row.name || '');
+    setNewCompanyNameEng(row.nameEng || '');
     setAssetCompanyCodes(row.assetCompanyCodes || '');
     setEditDialog(true);
   };
@@ -96,7 +69,9 @@ export default function CompaniesPage() {
     if (!newCompanyName.trim()) return;
     setSaving(true);
     const data = { 
+      code: newCompanyCode.trim() || null,
       name: newCompanyName.trim(), 
+      nameEng: newCompanyNameEng.trim() || null,
       assetCompanyCodes: assetCompanyCodes.trim() || null,
       isActive: true 
     };
@@ -136,9 +111,11 @@ export default function CompaniesPage() {
   };
 
   const columns: GridColDef[] = [
-    { field: 'id', headerName: 'ID', width: 70 },
-    { field: 'name', headerName: 'ชื่อบริษัทหลัก (Login AD)', flex: 1 },
-    { field: 'assetCompanyCodes', headerName: 'ชื่อบริษัทย่อ (Asset บริษัท)', flex: 1, valueFormatter: (v) => v || '-' },
+    { field: 'id', headerName: 'ID', width: 60 },
+    { field: 'code', headerName: 'รหัส (Code)', width: 100, valueFormatter: (v) => v || '-' },
+    { field: 'name', headerName: 'ชื่อบริษัท (TH)', flex: 1 },
+    { field: 'nameEng', headerName: 'ชื่อบริษัทหลัก (EN)', flex: 1, valueFormatter: (v) => v || '-' },
+    { field: 'assetCompanyCodes', headerName: 'ชื่อบริษัทย่อ (Asset)', width: 140, valueFormatter: (v) => v || '-' },
     { 
       field: 'isActive', headerName: 'สถานะ', width: 120, 
       renderCell: ({ value }) => <Chip label={value ? 'เปิดใช้งาน' : 'ปิด'} color={value ? 'success' : 'error'} size="small" /> 
@@ -164,17 +141,30 @@ export default function CompaniesPage() {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" fontWeight={600}>จัดการบริษัท (Companies)</Typography>
-        <Box display="flex" gap={2}>
-          <Button variant="outlined" startIcon={<AddIcon />} onClick={handleOpenAdd}>
-            เพิ่มบริษัทด้วยตนเอง
+      {!embedded && (
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Typography variant="h4" fontWeight={600}>จัดการบริษัท (Companies)</Typography>
+          <Box display="flex" gap={2}>
+            <Button variant="outlined" startIcon={<AddIcon />} onClick={handleOpenAdd}>
+              เพิ่มบริษัทด้วยตนเอง
+            </Button>
+            <Button variant="contained" startIcon={syncing ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />} onClick={handleSyncAD} disabled={syncing}>
+              {syncing ? 'กำลังดึง...' : 'ดึงรายชื่อจาก Intra-tools'}
+            </Button>
+          </Box>
+        </Box>
+      )}
+
+      {embedded && (
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2, gap: 1 }}>
+          <Button variant="outlined" size="small" startIcon={<AddIcon />} onClick={handleOpenAdd}>
+            เพิ่ม
           </Button>
-          <Button variant="contained" startIcon={<SyncIcon />} onClick={handleOpenSync}>
-            ดึงรายชื่อจาก AD
+          <Button variant="contained" size="small" startIcon={syncing ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />} onClick={handleSyncAD} disabled={syncing}>
+            {syncing ? 'Syncing...' : 'Intra Sync'}
           </Button>
         </Box>
-      </Box>
+      )}
 
       <Alert severity="info" sx={{ mb: 3 }}>
         ระบบจะใช้ชื่อบริษัทเหล่านี้เป็นตัวเลือกในหน้าลงทะเบียนทรัพย์สิน และใช้สำหรับการแบ่งแยกสิทธิ์การมองเห็นทรัพย์สินตามบริษัทของพนักงาน
@@ -192,73 +182,38 @@ export default function CompaniesPage() {
         }}
       />
 
-      {/* Dialog: Sync AD */}
-      <Dialog open={syncDialog} onClose={() => !saving && setSyncDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>ดึงรายชื่อบริษัทจาก Active Directory</DialogTitle>
-        <DialogContent dividers sx={{ minHeight: 300 }}>
-          {syncing ? (
-            <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height={250} gap={2}>
-              <CircularProgress />
-              <Typography color="text.secondary">กำลังกวาดข้อมูลจาก AD (อาจใช้เวลาสักครู่)...</Typography>
-            </Box>
-          ) : (
-            <Box>
-              <Typography variant="subtitle2" gutterBottom>
-                พบข้อมูลบริษัทใน AD ทั้งหมด {adCompanies.length} รายการ
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                ระบบได้เลือกติ๊กเฉพาะบริษัทที่ยังไม่เคยมีในฐานข้อมูลให้แล้ว คุณสามารถเลือกเพิ่มเติมได้
-              </Typography>
-              
-              <List sx={{ border: '1px solid #e0e0e0', borderRadius: 1, maxHeight: 300, overflow: 'auto' }}>
-                {adCompanies.map((name) => {
-                  const exists = companies.some(c => c.name.toLowerCase() === name.toLowerCase());
-                  return (
-                    <ListItem key={name} disablePadding>
-                      <ListItemText 
-                        primary={name} 
-                        secondary={exists ? 'มีในระบบแล้ว' : 'บริษัทใหม่'} 
-                        sx={{ pl: 2 }}
-                      />
-                      <ListItemIcon>
-                        <Checkbox
-                          edge="end"
-                          checked={selectedAD.includes(name)}
-                          onChange={() => handleToggleADSelect(name)}
-                        />
-                      </ListItemIcon>
-                    </ListItem>
-                  );
-                })}
-              </List>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setSyncDialog(false)} disabled={saving || syncing}>ยกเลิก</Button>
-          <Button 
-            variant="contained" 
-            onClick={handleConfirmSync} 
-            disabled={saving || syncing || selectedAD.length === 0}
-            startIcon={saving ? <CircularProgress size={16} color="inherit" /> : null}
-          >
-            นำเข้าเข้าระบบ ({selectedAD.length})
-          </Button>
-        </DialogActions>
-      </Dialog>
+
 
       {/* Dialog: Add/Edit Manual */}
       <Dialog open={editDialog} onClose={() => !saving && setEditDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>{editingId ? 'แก้ไขข้อมูลบริษัท' : 'เพิ่มบริษัทใหม่ด้วยตนเอง'}</DialogTitle>
         <DialogContent>
           <TextField
+            margin="dense"
+            label="รหัสบริษัท (Code)"
+            fullWidth
+            variant="outlined"
+            value={newCompanyCode}
+            onChange={(e) => setNewCompanyCode(e.target.value)}
+            sx={{ mt: 2 }}
+          />
+          <TextField
             autoFocus
             margin="dense"
-            label="ชื่อบริษัทหลัก (Login AD)"
+            label="ชื่อบริษัท (TH)"
             fullWidth
             variant="outlined"
             value={newCompanyName}
             onChange={(e) => setNewCompanyName(e.target.value)}
+            sx={{ mt: 2 }}
+          />
+          <TextField
+            margin="dense"
+            label="ชื่อบริษัทหลัก (EN)"
+            fullWidth
+            variant="outlined"
+            value={newCompanyNameEng}
+            onChange={(e) => setNewCompanyNameEng(e.target.value)}
             sx={{ mt: 2 }}
           />
           <TextField

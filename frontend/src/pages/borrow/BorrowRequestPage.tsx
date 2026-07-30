@@ -3,6 +3,34 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { assetAPI, borrowAPI, inventoryAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme, useMediaQuery } from '@mui/material';
+import { formatDate } from '../../utils/dateUtils';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs from 'dayjs';
+import { Laptop, Monitor, Printer, Smartphone, Mouse, Wifi, Package } from 'lucide-react';
+
+const getMuiCategoryIcon = (categoryName: string) => {
+  const name = categoryName.toLowerCase();
+  if (name.includes('notebook') || name.includes('laptop') || name.includes('macbook')) {
+    return <Laptop size={18} />;
+  }
+  if (name.includes('monitor') || name.includes('จอ')) {
+    return <Monitor size={18} />;
+  }
+  if (name.includes('printer') || name.includes('พิมพ์')) {
+    return <Printer size={18} />;
+  }
+  if (name.includes('phone') || name.includes('mobile') || name.includes('โทรศัพท์')) {
+    return <Smartphone size={18} />;
+  }
+  if (name.includes('mouse') || name.includes('เมาส์')) {
+    return <Mouse size={18} />;
+  }
+  if (name.includes('wifi') || name.includes('router') || name.includes('network')) {
+    return <Wifi size={18} />;
+  }
+  return <Package size={18} />;
+};
+
 
 export default function BorrowRequestPage() {
   const { user, systemSettings } = useAuth();
@@ -167,7 +195,7 @@ export default function BorrowRequestPage() {
   );
 
   return (
-    <div style={{ paddingBottom: 48, maxWidth: 1200, margin: '0 auto', padding: isMobile ? '0 8px' : undefined }}>
+    <div style={{ paddingBottom: isMobile ? 120 : 48, paddingLeft: isMobile ? 8 : 0, paddingRight: isMobile ? 8 : 0, maxWidth: 1200, margin: '0 auto' }}>
       {toast && (
         <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 9999, background: toastType === 'ok' ? '#1e293b' : '#dc2626', color: '#fff', padding: '12px 20px', borderRadius: 10, fontWeight: 600, boxShadow: '0 4px 20px rgba(0,0,0,0.3)', fontSize: '0.9rem', maxWidth: 360 }}>
           {toast}
@@ -194,7 +222,7 @@ export default function BorrowRequestPage() {
                   {overdueItems.map((item: any) => (
                     <li key={item.id}>
                       {item.asset ? `${item.asset.assetCode} - ${item.asset.brand} ${item.asset.model}` : item.inventoryItem?.name}{' '}
-                      ({new Date(item.dueDate).toLocaleDateString('th-TH')})
+                      ({formatDate(item.dueDate)})
                     </li>
                   ))}
                 </ul>
@@ -231,9 +259,14 @@ export default function BorrowRequestPage() {
                   <span>{"\u0e01\u0e33\u0e2b\u0e19\u0e14\u0e04\u0e37\u0e19"}</span>
                   <span style={{ color: '#0ea5e9', fontWeight: 800 }}>{getBorrowDurationText()}</span>
                 </label>
-                <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
-                  min={new Date().toISOString().split('T')[0]}
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: '0.9rem', boxSizing: 'border-box' }} />
+                <DatePicker
+                  format="DD/MM/YYYY"
+                  value={dueDate ? dayjs(dueDate) : null}
+                  onChange={(newVal) => setDueDate(newVal ? newVal.format('YYYY-MM-DD') : '')}
+                  minDate={dayjs()}
+                  maxDate={dayjs().add(systemSettings?.maxBorrowDays ?? 30, 'day')}
+                  slotProps={{ textField: { size: 'small', fullWidth: true, sx: { bgcolor: '#fff', borderRadius: '8px' } } }}
+                />
                 <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: 4 }}>{"\u0e04\u0e48\u0e32\u0e40\u0e23\u0e34\u0e48\u0e21\u0e15\u0e49\u0e19"} {effectiveBorrowDays} {"\u0e27\u0e31\u0e19\u0e19\u0e31\u0e1a\u0e08\u0e32\u0e01\u0e27\u0e31\u0e19\u0e19\u0e35\u0e49"} ({"\u0e2a\u0e39\u0e07\u0e2a\u0e39\u0e14"} {systemSettings?.maxBorrowDays ?? 30} {"\u0e27\u0e31\u0e19"})</div>
               </div>
               <div style={{ gridColumn: '1 / -1' }}>
@@ -249,7 +282,7 @@ export default function BorrowRequestPage() {
           <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '20px 24px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
             {/* Tabs */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-              {[{ label: `🖥 ทรัพย์สิน IT (${assets.length})`, value: 0 }, { label: `📦 วัสดุสิ้นเปลือง (${inventoryItems.filter(i => i.availableQuantity > 0).length})`, value: 1 }].map(t => (
+              {[{ label: `🖥 อุปกรณ์และทรัพย์สิน (${assets.length})`, value: 0 }, { label: `📦 วัสดุสิ้นเปลือง (${inventoryItems.filter(i => i.availableQuantity > 0).length})`, value: 1 }].map(t => (
                 <button key={t.value} onClick={() => setActiveTab(t.value)}
                   style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid ${activeTab === t.value ? '#0ea5e9' : '#e2e8f0'}`, background: activeTab === t.value ? '#e0f2fe' : '#f8fafc', color: activeTab === t.value ? '#0284c7' : '#64748b', fontWeight: activeTab === t.value ? 700 : 500, cursor: 'pointer', fontSize: '0.85rem' }}>
                   {t.label}
@@ -295,75 +328,125 @@ export default function BorrowRequestPage() {
                   <span style={{ background: selected.length > 0 ? '#dcfce7' : '#f1f5f9', color: selected.length > 0 ? '#16a34a' : '#94a3b8', borderRadius: 20, padding: '2px 10px', fontSize: '0.75rem', fontWeight: 700 }}>เลือกแล้ว {selected.length}</span>
                 </div>
 
-                {/* Asset Table */}
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden', maxHeight: isMobile ? 300 : 350, overflowY: 'auto', overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
-                    <thead>
-                      <tr style={{ background: '#f8fafc', position: 'sticky', top: 0 }}>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8', width: 36 }}></th>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>ชื่อทรัพย์สิน</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>Serial No.</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>ยี่ห้อ/รุ่น</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>ประเภท</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>สถานที่</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>บริษัท</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredAssets.length === 0 ? (
-                        <tr><td colSpan={7} style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>ไม่พบรายการ</td></tr>
-                      ) : filteredAssets.map((a, idx) => {
-                        const isSelected = selected.includes(a.id);
-                        const isTypeBlocked = a.type && blockedTypes.includes(a.type);
-                        return (
-                          <tr key={a.id}
-                            onClick={() => !isTypeBlocked && toggleAsset(a.id)}
-                            onMouseEnter={() => setAssetHover(isTypeBlocked ? null : a)}
-                            onMouseLeave={() => setAssetHover(null)}
-                            style={{
-                              borderTop: idx > 0 ? '1px solid #f1f5f9' : 'none',
-                              background: isTypeBlocked ? '#f1f5f9' : isSelected ? '#f0f9ff' : 'transparent',
-                              cursor: isTypeBlocked ? 'not-allowed' : 'pointer',
-                              opacity: isTypeBlocked ? 0.5 : 1,
-                              transition: 'background 0.1s',
-                            }}
-                            title={isTypeBlocked ? `คุณยืม "${a.type}" อยู่แล้ว กรุณาคืนก่อนจึงจะยืมเพิ่มได้` : ''}>
-                            <td style={{ padding: '10px 12px' }}>
-                              {isTypeBlocked ? (
-                                <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>🔒</span>
-                              ) : (
-                                <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${isSelected ? '#0ea5e9' : '#d1d5db'}`, background: isSelected ? '#0ea5e9' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}>
-                                  {isSelected && <span style={{ color: '#fff', fontSize: '0.7rem', fontWeight: 900 }}>✓</span>}
-                                </div>
-                              )}
-                            </td>
-                            <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0f172a' }}>
-                              <div>{a.assetName || a.assetCode}</div>
-                              {a.assetName ? <div style={{ fontSize: '0.73rem', color: '#94a3b8', fontWeight: 400 }}>{a.assetCode}</div> : null}
-                            </td>
-                            <td style={{ padding: '10px 12px', color: '#374151' }}>{a.serialNo || '-'}</td>
-                            <td style={{ padding: '10px 12px', color: '#374151' }}>{`${a.brand || ''} ${a.model || ''}`.trim() || '-'}</td>
-                            <td style={{ padding: '10px 12px' }}>
-                              {(a.deviceType || a.category?.name) ? <span style={{ background: '#f1f5f9', color: '#475569', borderRadius: 20, padding: '2px 8px', fontSize: '0.72rem', fontWeight: 600 }}>{a.deviceType || a.category?.name}</span> : <span style={{ color: '#cbd5e1' }}>-</span>}
-                            </td>
-                            <td style={{ padding: '10px 12px', color: '#64748b', fontSize: '0.8rem' }}>{a.location || '-'}</td>
-                            <td style={{ padding: '10px 12px', color: '#64748b', fontSize: '0.8rem' }}>{a.company || '-'}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                {/* Catalog Card Grid */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                  gap: 16,
+                  maxHeight: 400,
+                  overflowY: 'auto',
+                  padding: '6px 4px',
+                  scrollbarWidth: 'thin'
+                }}>
+                  {filteredAssets.length === 0 ? (
+                    <div style={{ gridColumn: '1 / -1', padding: '48px', textAlign: 'center', color: '#94a3b8' }}>
+                      ไม่พบรายการทรัพย์สินที่พร้อมยืม
+                    </div>
+                  ) : filteredAssets.map((a) => {
+                    const isSelected = selected.includes(a.id);
+                    const isTypeBlocked = a.type && blockedTypes.includes(a.type);
+                    
+                    return (
+                      <div
+                        key={a.id}
+                        onClick={() => !isTypeBlocked && toggleAsset(a.id)}
+                        style={{
+                          background: isTypeBlocked ? '#f8fafc' : isSelected ? '#f0f9ff' : '#ffffff',
+                          border: `1.5px solid ${isSelected ? '#3b82f6' : '#e2e8f0'}`,
+                          borderRadius: 16,
+                          padding: 16,
+                          cursor: isTypeBlocked ? 'not-allowed' : 'pointer',
+                          opacity: isTypeBlocked ? 0.65 : 1,
+                          boxShadow: isSelected ? '0 10px 15px -3px rgba(59, 130, 246, 0.1)' : '0 1px 3px rgba(0, 0, 0, 0.02)',
+                          transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          gap: 12,
+                          position: 'relative'
+                        }}
+                      >
+                        {/* Card Header: Category Icon & Checkbox */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 10,
+                            background: isSelected ? 'rgba(59, 130, 246, 0.15)' : '#f1f5f9',
+                            color: isSelected ? '#2563eb' : '#64748b',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}>
+                            {getMuiCategoryIcon(a.deviceType || a.category?.name || '')}
+                          </div>
+                          
+                          {/* Selection indicator */}
+                          <div style={{
+                            width: 20,
+                            height: 20,
+                            borderRadius: '50%',
+                            border: `2px solid ${isTypeBlocked ? '#cbd5e1' : isSelected ? '#2563eb' : '#cbd5e1'}`,
+                            background: isSelected ? '#2563eb' : 'transparent',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.15s'
+                          }}>
+                            {isSelected && <span style={{ color: '#fff', fontSize: '0.65rem', fontWeight: 900 }}>✓</span>}
+                          </div>
+                        </div>
 
-                {/* Hover detail tooltip */}
-                {assetHover && !selected.includes(assetHover.id) && (
-                  <div style={{ marginTop: 10, padding: '10px 14px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 10, fontSize: '0.82rem', color: '#0369a1' }}>
-                    <strong>{assetHover.assetCode}</strong> · {assetHover.brand} {assetHover.model}
-                    {assetHover.cpu && <> · CPU: {assetHover.cpu}</>}
-                    {assetHover.ram && <> · RAM: {assetHover.ram}</>}
-                    {assetHover.os && <> · OS: {assetHover.os}</>}
-                  </div>
-                )}
+                        {/* Card Content */}
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.925rem', marginBottom: 2, wordBreak: 'break-word' }}>
+                            {a.assetName || a.assetCode}
+                          </div>
+                          {a.assetName && (
+                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: 6 }}>
+                              {a.assetCode}
+                            </div>
+                          )}
+                          <div style={{ fontSize: '0.78rem', color: '#475569', display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+                            {a.brand && <span style={{ background: '#f1f5f9', padding: '2px 8px', borderRadius: 20 }}>{a.brand} {a.model}</span>}
+                            {a.serialNo && <span style={{ color: '#94a3b8', fontSize: '0.7rem' }}>S/N: {a.serialNo}</span>}
+                          </div>
+                          
+                          {/* Spec details */}
+                          {(a.cpu || a.ram || a.os) && (
+                            <div style={{
+                              fontSize: '0.72rem',
+                              color: '#4f46e5',
+                              background: 'rgba(79, 70, 229, 0.05)',
+                              padding: '4px 8px',
+                              borderRadius: 8,
+                              marginTop: 4
+                            }}>
+                              {a.cpu && <span>CPU: {a.cpu} </span>}
+                              {a.ram && <span>RAM: {a.ram} </span>}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Card Footer: Location & Lock */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: 8 }}>
+                          <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                            📍 {a.location || 'ไม่ระบุสถานที่'}
+                          </span>
+                          
+                          {isTypeBlocked && (
+                            <span
+                              style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 2 }}
+                              title={`คุณยืม "${a.type}" อยู่แล้ว กรุณาคืนก่อนจึงจะยืมเพิ่มได้`}
+                            >
+                              🔒 จำกัดสิทธิ์
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </>
             ) : (
               <>
@@ -373,123 +456,208 @@ export default function BorrowRequestPage() {
                     placeholder="ค้นหาวัสดุ..."
                     style={{ width: '100%', padding: '9px 12px 9px 32px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: '0.85rem', boxSizing: 'border-box' }} />
                 </div>
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden', maxHeight: 350, overflowY: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
-                    <thead>
-                      <tr style={{ background: '#f8fafc', position: 'sticky', top: 0 }}>
-                        <th style={{ padding: '10px 12px', width: 36 }}></th>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>ชื่อรายการ</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>หมวด</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#94a3b8' }}>คงเหลือ</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredInventory.length === 0 ? (
-                        <tr><td colSpan={4} style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>ไม่มีวัสดุให้ยืม</td></tr>
-                      ) : filteredInventory.map((item, idx) => {
-                        const isSel = selectedInventory.some(s => s.item.id === item.id);
-                        return (
-                          <tr key={item.id} onClick={() => toggleInventory(item)}
-                            style={{ borderTop: idx > 0 ? '1px solid #f1f5f9' : 'none', background: isSel ? '#f0fdf4' : 'transparent', cursor: 'pointer' }}>
-                            <td style={{ padding: '10px 12px' }}>
-                              <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${isSel ? '#16a34a' : '#d1d5db'}`, background: isSel ? '#16a34a' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                {isSel && <span style={{ color: '#fff', fontSize: '0.7rem', fontWeight: 900 }}>✓</span>}
-                              </div>
-                            </td>
-                            <td style={{ padding: '10px 12px', fontWeight: 600, color: '#0f172a' }}>{item.name}</td>
-                            <td style={{ padding: '10px 12px' }}><span style={{ background: '#f1f5f9', color: '#475569', borderRadius: 20, padding: '2px 8px', fontSize: '0.72rem' }}>{item.category}</span></td>
-                            <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>{item.availableQuantity} {item.unit}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                {isMobile ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 400, overflowY: 'auto', padding: '4px 0', scrollbarWidth: 'none' }}>
+                    {filteredInventory.length === 0 ? (
+                      <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>ไม่มีวัสดุให้ยืม</div>
+                    ) : filteredInventory.map((item) => {
+                      const isSel = selectedInventory.some(s => s.item.id === item.id);
+                      return (
+                        <div key={item.id} onClick={() => toggleInventory(item)}
+                          style={{
+                            display: 'flex', gap: 12, alignItems: 'center',
+                            padding: '14px 16px', borderRadius: 12,
+                            border: `2px solid ${isSel ? '#16a34a' : '#e2e8f0'}`,
+                            background: isSel ? '#f0fdf4' : '#fff',
+                            cursor: 'pointer',
+                            boxShadow: isSel ? '0 2px 8px rgba(22,163,74,0.15)' : '0 1px 2px rgba(0,0,0,0.02)',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          <div style={{ width: 24, height: 24, flexShrink: 0, borderRadius: 6, border: `2px solid ${isSel ? '#16a34a' : '#cbd5e1'}`, background: isSel ? '#16a34a' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {isSel && <span style={{ color: '#fff', fontSize: '0.9rem', fontWeight: 900 }}>✓</span>}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem', marginBottom: 2 }}>{item.name}</div>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', gap: 6 }}>
+                              <span style={{ background: '#f1f5f9', padding: '2px 8px', borderRadius: 12 }}>{item.category}</span>
+                            </div>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700 }}>คงเหลือ</div>
+                            <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#16a34a' }}>{item.availableQuantity} <span style={{ fontSize: '0.75rem' }}>{item.unit}</span></div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden', maxHeight: 350, overflowY: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
+                      <thead>
+                        <tr style={{ background: '#f8fafc', position: 'sticky', top: 0 }}>
+                          <th style={{ padding: '10px 12px', width: 36 }}></th>
+                          <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>ชื่อรายการ</th>
+                          <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>หมวด</th>
+                          <th style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#94a3b8' }}>คงเหลือ</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredInventory.length === 0 ? (
+                          <tr><td colSpan={4} style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>ไม่มีวัสดุให้ยืม</td></tr>
+                        ) : filteredInventory.map((item, idx) => {
+                          const isSel = selectedInventory.some(s => s.item.id === item.id);
+                          return (
+                            <tr key={item.id} onClick={() => toggleInventory(item)}
+                              style={{ borderTop: idx > 0 ? '1px solid #f1f5f9' : 'none', background: isSel ? '#f0fdf4' : 'transparent', cursor: 'pointer' }}>
+                              <td style={{ padding: '10px 12px' }}>
+                                <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${isSel ? '#16a34a' : '#d1d5db'}`, background: isSel ? '#16a34a' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  {isSel && <span style={{ color: '#fff', fontSize: '0.7rem', fontWeight: 900 }}>✓</span>}
+                                </div>
+                              </td>
+                              <td style={{ padding: '10px 12px', fontWeight: 600, color: '#0f172a' }}>{item.name}</td>
+                              <td style={{ padding: '10px 12px' }}><span style={{ background: '#f1f5f9', color: '#475569', borderRadius: 20, padding: '2px 8px', fontSize: '0.72rem' }}>{item.category}</span></td>
+                              <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>{item.availableQuantity} {item.unit}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </>
             )}
           </div>
-        </div>
-
-        {/* Right: Summary Card (sticky) */}
-        <div style={{ position: isMobile ? 'relative' : 'sticky', top: isMobile ? undefined : 20 }}>
-          <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '20px 22px', boxShadow: '0 4px 20px rgba(0,0,0,0.07)' }}>
-            <h3 style={{ margin: '0 0 4px', fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>สรุปการยืม</h3>
-            <div style={{ borderTop: '1px solid #f1f5f9', marginTop: 12, paddingTop: 14 }}>
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', marginBottom: 3 }}>ผู้ขอ</div>
-                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>{user?.displayName || user?.adUsername || '-'}</div>
-              </div>
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', marginBottom: 3 }}>รายการที่เลือก</div>
-                <div style={{ fontSize: '2rem', fontWeight: 900, color: totalSelected > 0 ? '#0ea5e9' : '#94a3b8' }}>{totalSelected}</div>
-              </div>
-
-              {/* Selected items list */}
-              <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 16 }}>
-                {selectedAssets.map(a => (
-                  <div key={a.id} style={{ padding: '10px 12px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 9, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.assetCode}</div>
-                      <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{a.brand} {a.model}</div>
-                    </div>
-                    <button onClick={() => removeAsset(a.id)}
-                      style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1rem', lineHeight: 1, padding: 2 }}>✕</button>
-                  </div>
-                ))}
-                {selectedInventory.map(({ item, qty }) => (
-                  <div key={item.id} style={{ padding: '10px 12px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 9 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                      <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#0f172a' }}>{item.name}</div>
-                      <button onClick={() => setSelectedInventory(prev => prev.filter(s => s.item.id !== item.id))}
-                        style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1rem', lineHeight: 1, padding: 2 }}>✕</button>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <button onClick={() => updateQty(item.id, qty - 1)} style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer', fontWeight: 700 }}>-</button>
-                      <span style={{ fontWeight: 700, minWidth: 24, textAlign: 'center' }}>{qty}</span>
-                      <button onClick={() => updateQty(item.id, qty + 1)} style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer', fontWeight: 700 }}>+</button>
-                      <span style={{ fontSize: '0.78rem', color: '#64748b' }}>{item.unit} (คงเหลือ {item.availableQuantity})</span>
-                    </div>
-                  </div>
-                ))}
-                {totalSelected === 0 && (
-                  <div style={{ padding: '20px', textAlign: 'center', color: '#cbd5e1', fontSize: '0.85rem' }}>
-                    <div style={{ fontSize: '1.8rem', marginBottom: 6 }}>📋</div>
-                    ยังไม่มีรายการที่เลือก
-                  </div>
-                )}
-              </div>
-
-              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 14 }}>
-                <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  ℹ️ {"\u0e01\u0e33\u0e2b\u0e19\u0e14\u0e04\u0e37\u0e19\u0e2d\u0e31\u0e15\u0e42\u0e19\u0e21\u0e31\u0e15\u0e34"} <strong style={{ color: '#374151' }}>{effectiveBorrowDays} {"\u0e27\u0e31\u0e19"}</strong> {"\u0e19\u0e31\u0e1a\u0e08\u0e32\u0e01\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48\u0e22\u0e37\u0e21"} ({"\u0e2a\u0e39\u0e07\u0e2a\u0e39\u0e14"} {systemSettings?.maxBorrowDays ?? 30} {"\u0e27\u0e31\u0e19"})
-                </div>
-                <button onClick={handleSubmit} disabled={submitting || totalSelected === 0 || !purpose.trim() || overdueItems.length > 0}
-                  style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', background: totalSelected === 0 || !purpose.trim() || overdueItems.length > 0 ? '#e2e8f0' : '#0ea5e9', color: totalSelected === 0 || !purpose.trim() || overdueItems.length > 0 ? '#94a3b8' : '#fff', fontWeight: 800, fontSize: '0.95rem', cursor: totalSelected === 0 || !purpose.trim() || overdueItems.length > 0 ? 'not-allowed' : 'pointer', transition: 'all 0.2s', marginBottom: 8 }}
-                  title={overdueItems.length > 0 ? "\u0e04\u0e38\u0e13\u0e44\u0e21\u0e48\u0e2a\u0e32\u0e21\u0e32\u0e23\u0e16\u0e22\u0e37\u0e21\u0e17\u0e23\u0e31\u0e1e\u0e22\u0e4c\u0e2a\u0e34\u0e19\u0e43\u0e2b\u0e21\u0e48\u0e44\u0e14\u0e49 \u0e40\u0e19\u0e37\u0e48\u0e2d\u0e07\u0e08\u0e32\u0e01\u0e21\u0e35\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e04\u0e49\u0e32\u0e07\u0e2a\u0e48\u0e07\u0e04\u0e37\u0e19\u0e40\u0e01\u0e34\u0e19\u0e01\u0e33\u0e2b\u0e19\u0e14" : ""}>
-                  {submitting ? '⏳ ...' : overdueItems.length > 0 ? "\u0e04\u0e38\u0e13\u0e44\u0e21\u0e48\u0e2a\u0e32\u0e21\u0e32\u0e23\u0e16\u0e22\u0e37\u0e21\u0e43\u0e2b\u0e21\u0e48\u0e44\u0e14\u0e49" : `📤 \u0e2a\u0e48\u0e07\u0e04\u0e33\u0e02\u0e2d\u0e22\u0e37\u0e21${totalSelected > 0 ? ` (${totalSelected} \u0e23\u0e32\u0e22\u0e01\u0e32\u0e23)` : ''}`}
-                </button>
-                <button onClick={() => navigate('/borrow/my-requests')}
-                  style={{ width: '100%', padding: '10px', borderRadius: 10, border: '1px solid #e2e8f0', background: '#f8fafc', color: '#64748b', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>
-                  {"\u0e22\u0e01\u0e40\u0e25\u0e34\u0e01"}
-                </button>
-              </div>
-
-              {/* Policy Card */}
-              <div style={{ background: 'linear-gradient(135deg, #f8fafc, #f1f5f9)', borderRadius: 14, border: '1px solid #e2e8f0', padding: '16px 20px', marginTop: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
-                <h4 style={{ margin: '0 0 10px', fontSize: '0.85rem', fontWeight: 800, color: '#475569', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span>🛡️</span> {"\u0e19\u0e42\u0e22\u0e1a\u0e32\u0e22\u0e01\u0e32\u0e23\u0e22\u0e37\u0e21\u0e04\u0e37\u0e19"}
-                </h4>
-                <div style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', flexDirection: 'column', gap: 8, lineHeight: 1.4 }}>
-                  <div>{"1. \u0e2a\u0e32\u0e21\u0e32\u0e23\u0e16\u0e22\u0e37\u0e21\u0e17\u0e23\u0e31\u0e1e\u0e22\u0e4c\u0e2a\u0e34\u0e19\u0e41\u0e25\u0e30\u0e27\u0e31\u0e2a\u0e14\u0e38\u0e2a\u0e34\u0e49\u0e19\u0e40\u0e1b\u0e25\u0e37\u0e2d\u0e07\u0e44\u0e14\u0e49\u0e15\u0e32\u0e21\u0e42\u0e04\u0e27\u0e15\u0e32\u0e17\u0e35\u0e48\u0e01\u0e33\u0e2b\u0e19\u0e14"}</div>
-                  <div>{"2. \u0e08\u0e33\u0e19\u0e27\u0e19\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e17\u0e35\u0e48\u0e22\u0e37\u0e21\u0e44\u0e14\u0e49\u0e2a\u0e39\u0e07\u0e2a\u0e38\u0e14:"} <strong style={{ color: '#0ea5e9' }}>{systemSettings?.maxItemsPerRequest ?? 5} {"\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e15\u0e48\u0e2d\u0e04\u0e33\u0e02\u0e2d"}</strong></div>
-                  <div>{"3. \u0e23\u0e30\u0e22\u0e30\u0e40\u0e27\u0e25\u0e32\u0e01\u0e32\u0e23\u0e22\u0e37\u0e21\u0e2a\u0e39\u0e07\u0e2a\u0e38\u0e14:"} <strong style={{ color: '#0ea5e9' }}>{systemSettings?.maxBorrowDays ?? 30} {"\u0e27\u0e31\u0e19"}</strong></div>
-                  <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: 8, color: '#b91c1c' }}>
-                    {"4. \u0e01\u0e23\u0e38\u0e13\u0e32\u0e2a\u0e48\u0e07\u0e04\u0e37\u0e19\u0e17\u0e23\u0e31\u0e1e\u0e22\u0e4c\u0e2a\u0e34\u0e19\u0e15\u0e23\u0e07\u0e40\u0e27\u0e25\u0e32 \u0e2b\u0e32\u0e01\u0e21\u0e35\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e40\u0e01\u0e34\u0e19\u0e01\u0e33\u0e2b\u0e19\u0e14\u0e2a\u0e48\u0e07\u0e04\u0e37\u0e19 \u0e08\u0e30\u0e15\u0e49\u0e2d\u0e07\u0e04\u0e37\u0e19\u0e17\u0e23\u0e31\u0e1e\u0e22\u0e4c\u0e2a\u0e34\u0e19\u0e19\u0e31\u0e49\u0e19\u0e01\u0e48\u0e2d\u0e19\u0e08\u0e36\u0e07\u0e08\u0e30\u0e22\u0e37\u0e21\u0e43\u0e2b\u0e21\u0e48\u0e44\u0e14\u0e49"}
-                  </div>
+          
+          {/* Policy Card on Mobile */}
+          {isMobile && (
+            <div style={{ background: 'linear-gradient(135deg, #f8fafc, #f1f5f9)', borderRadius: 14, border: '1px solid #e2e8f0', padding: '16px 20px', marginTop: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+              <h4 style={{ margin: '0 0 10px', fontSize: '0.85rem', fontWeight: 800, color: '#475569', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>🛡️</span> {"\u0e19\u0e42\u0e22\u0e1a\u0e32\u0e22\u0e01\u0e32\u0e23\u0e22\u0e37\u0e21\u0e04\u0e37\u0e19"}
+              </h4>
+              <div style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', flexDirection: 'column', gap: 8, lineHeight: 1.4 }}>
+                <div>{"1. \u0e2a\u0e32\u0e21\u0e32\u0e23\u0e16\u0e22\u0e37\u0e21\u0e17\u0e23\u0e31\u0e1e\u0e22\u0e4c\u0e2a\u0e34\u0e19\u0e41\u0e25\u0e30\u0e27\u0e31\u0e2a\u0e14\u0e38\u0e2a\u0e34\u0e49\u0e19\u0e40\u0e1b\u0e25\u0e37\u0e2d\u0e07\u0e44\u0e14\u0e49\u0e15\u0e32\u0e21\u0e42\u0e04\u0e27\u0e15\u0e32\u0e17\u0e35\u0e48\u0e01\u0e33\u0e2b\u0e19\u0e14"}</div>
+                <div>{"2. \u0e08\u0e33\u0e19\u0e27\u0e19\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e17\u0e35\u0e48\u0e22\u0e37\u0e21\u0e44\u0e14\u0e49\u0e2a\u0e39\u0e07\u0e2a\u0e38\u0e14:"} <strong style={{ color: '#0ea5e9' }}>{systemSettings?.maxItemsPerRequest ?? 5} {"\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e15\u0e48\u0e2d\u0e04\u0e33\u0e02\u0e2d"}</strong></div>
+                <div>{"3. \u0e23\u0e30\u0e22\u0e30\u0e40\u0e27\u0e25\u0e32\u0e01\u0e32\u0e23\u0e22\u0e37\u0e21\u0e2a\u0e39\u0e07\u0e2a\u0e38\u0e14:"} <strong style={{ color: '#0ea5e9' }}>{systemSettings?.maxBorrowDays ?? 30} {"\u0e27\u0e31\u0e19"}</strong></div>
+                <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: 8, color: '#b91c1c' }}>
+                  {"4. \u0e01\u0e23\u0e38\u0e13\u0e32\u0e2a\u0e48\u0e07\u0e04\u0e37\u0e19\u0e17\u0e23\u0e31\u0e1e\u0e22\u0e4c\u0e2a\u0e34\u0e19\u0e15\u0e23\u0e07\u0e40\u0e27\u0e25\u0e32 \u0e2b\u0e32\u0e01\u0e21\u0e35\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e40\u0e01\u0e34\u0e19\u0e01\u0e33\u0e2b\u0e19\u0e14\u0e2a\u0e48\u0e07\u0e04\u0e37\u0e19 \u0e08\u0e30\u0e15\u0e49\u0e2d\u0e07\u0e04\u0e37\u0e19\u0e17\u0e23\u0e31\u0e1e\u0e22\u0e4c\u0e2a\u0e34\u0e19\u0e19\u0e31\u0e49\u0e19\u0e01\u0e48\u0e2d\u0e19\u0e08\u0e36\u0e07\u0e08\u0e30\u0e22\u0e37\u0e21\u0e43\u0e2b\u0e21\u0e48\u0e44\u0e14\u0e49"}
                 </div>
               </div>
             </div>
-          </div>
+          )}
+        </div>
+
+        {/* Right: Summary Card (sticky) */}
+        <div style={{
+          position: isMobile ? 'fixed' : 'sticky',
+          bottom: isMobile ? 0 : undefined,
+          top: isMobile ? undefined : 20,
+          left: 0, right: 0,
+          zIndex: isMobile ? 1000 : 1,
+          padding: isMobile ? '12px 16px' : 0,
+          background: isMobile ? 'rgba(255,255,255,0.95)' : 'transparent',
+          backdropFilter: isMobile ? 'blur(10px)' : 'none',
+          borderTop: isMobile ? '1px solid #e2e8f0' : 'none',
+          boxShadow: isMobile ? '0 -4px 20px rgba(0,0,0,0.08)' : 'none'
+        }}>
+          {isMobile ? (
+            /* Mobile Quick Summary Bar */
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', maxWidth: 600, margin: '0 auto' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>รายการที่เลือก</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: 900, color: totalSelected > 0 ? '#0ea5e9' : '#94a3b8' }}>{totalSelected} รายการ</div>
+              </div>
+              <button onClick={() => navigate('/borrow/my-requests')}
+                style={{ padding: '12px 16px', borderRadius: 10, border: '1px solid #e2e8f0', background: '#f8fafc', color: '#64748b', fontWeight: 700, cursor: 'pointer' }}>
+                ยกเลิก
+              </button>
+              <button onClick={handleSubmit} disabled={submitting || totalSelected === 0 || !purpose.trim() || overdueItems.length > 0}
+                style={{ padding: '12px 24px', borderRadius: 10, border: 'none', background: totalSelected === 0 || !purpose.trim() || overdueItems.length > 0 ? '#e2e8f0' : '#0ea5e9', color: totalSelected === 0 || !purpose.trim() || overdueItems.length > 0 ? '#94a3b8' : '#fff', fontWeight: 800, cursor: totalSelected === 0 || !purpose.trim() || overdueItems.length > 0 ? 'not-allowed' : 'pointer', transition: 'all 0.2s' }}>
+                {submitting ? '⏳ ...' : overdueItems.length > 0 ? 'ยืมไม่ได้' : 'ส่งคำขอ'}
+              </button>
+            </div>
+          ) : (
+            <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '20px 22px', boxShadow: '0 4px 20px rgba(0,0,0,0.07)' }}>
+              <h3 style={{ margin: '0 0 4px', fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>สรุปการยืม</h3>
+              <div style={{ borderTop: '1px solid #f1f5f9', marginTop: 12, paddingTop: 14 }}>
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', marginBottom: 3 }}>ผู้ขอ</div>
+                  <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>{user?.displayName || user?.adUsername || '-'}</div>
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', marginBottom: 3 }}>รายการที่เลือก</div>
+                  <div style={{ fontSize: '2rem', fontWeight: 900, color: totalSelected > 0 ? '#0ea5e9' : '#94a3b8' }}>{totalSelected}</div>
+                </div>
+
+                {/* Selected items list */}
+                <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 16 }}>
+                  {selectedAssets.map(a => (
+                    <div key={a.id} style={{ padding: '10px 12px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 9, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.assetCode}</div>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{a.brand} {a.model}</div>
+                      </div>
+                      <button onClick={() => removeAsset(a.id)}
+                        style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1rem', lineHeight: 1, padding: 2 }}>✕</button>
+                    </div>
+                  ))}
+                  {selectedInventory.map(({ item, qty }) => (
+                    <div key={item.id} style={{ padding: '10px 12px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 9 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#0f172a' }}>{item.name}</div>
+                        <button onClick={() => setSelectedInventory(prev => prev.filter(s => s.item.id !== item.id))}
+                          style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1rem', lineHeight: 1, padding: 2 }}>✕</button>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <button onClick={() => updateQty(item.id, qty - 1)} style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer', fontWeight: 700 }}>-</button>
+                        <span style={{ fontWeight: 700, minWidth: 24, textAlign: 'center' }}>{qty}</span>
+                        <button onClick={() => updateQty(item.id, qty + 1)} style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer', fontWeight: 700 }}>+</button>
+                        <span style={{ fontSize: '0.78rem', color: '#64748b' }}>{item.unit} (คงเหลือ {item.availableQuantity})</span>
+                      </div>
+                    </div>
+                  ))}
+                  {totalSelected === 0 && (
+                    <div style={{ padding: '20px', textAlign: 'center', color: '#cbd5e1', fontSize: '0.85rem' }}>
+                      <div style={{ fontSize: '1.8rem', marginBottom: 6 }}>📋</div>
+                      ยังไม่มีรายการที่เลือก
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 14 }}>
+                  <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    ℹ️ {"\u0e01\u0e33\u0e2b\u0e19\u0e14\u0e04\u0e37\u0e19\u0e2d\u0e31\u0e15\u0e42\u0e19\u0e21\u0e31\u0e15\u0e34"} <strong style={{ color: '#374151' }}>{effectiveBorrowDays} {"\u0e27\u0e31\u0e19"}</strong> {"\u0e19\u0e31\u0e1a\u0e08\u0e32\u0e01\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48\u0e22\u0e37\u0e21"} ({"\u0e2a\u0e39\u0e07\u0e2a\u0e39\u0e14"} {systemSettings?.maxBorrowDays ?? 30} {"\u0e27\u0e31\u0e19"})
+                  </div>
+                  <button onClick={handleSubmit} disabled={submitting || totalSelected === 0 || !purpose.trim() || overdueItems.length > 0}
+                    style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', background: totalSelected === 0 || !purpose.trim() || overdueItems.length > 0 ? '#e2e8f0' : '#0ea5e9', color: totalSelected === 0 || !purpose.trim() || overdueItems.length > 0 ? '#94a3b8' : '#fff', fontWeight: 800, fontSize: '0.95rem', cursor: totalSelected === 0 || !purpose.trim() || overdueItems.length > 0 ? 'not-allowed' : 'pointer', transition: 'all 0.2s', marginBottom: 8 }}
+                    title={overdueItems.length > 0 ? "\u0e04\u0e38\u0e13\u0e44\u0e21\u0e48\u0e2a\u0e32\u0e21\u0e32\u0e23\u0e16\u0e22\u0e37\u0e21\u0e17\u0e23\u0e31\u0e1e\u0e22\u0e4c\u0e2a\u0e34\u0e19\u0e43\u0e2b\u0e21\u0e48\u0e44\u0e14\u0e49 \u0e40\u0e19\u0e37\u0e48\u0e2d\u0e07\u0e08\u0e32\u0e01\u0e21\u0e35\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e04\u0e49\u0e32\u0e07\u0e2a\u0e48\u0e07\u0e04\u0e37\u0e19\u0e40\u0e01\u0e34\u0e19\u0e01\u0e33\u0e2b\u0e19\u0e14" : ""}>
+                    {submitting ? '⏳ ...' : overdueItems.length > 0 ? "\u0e04\u0e38\u0e13\u0e44\u0e21\u0e48\u0e2a\u0e32\u0e21\u0e32\u0e23\u0e16\u0e22\u0e37\u0e21\u0e43\u0e2b\u0e21\u0e48\u0e44\u0e14\u0e49" : `📤 \u0e2a\u0e48\u0e07\u0e04\u0e33\u0e02\u0e2d\u0e22\u0e37\u0e21${totalSelected > 0 ? ` (${totalSelected} \u0e23\u0e32\u0e22\u0e01\u0e32\u0e23)` : ''}`}
+                  </button>
+                  <button onClick={() => navigate('/borrow/my-requests')}
+                    style={{ width: '100%', padding: '10px', borderRadius: 10, border: '1px solid #e2e8f0', background: '#f8fafc', color: '#64748b', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>
+                    {"\u0e22\u0e01\u0e40\u0e25\u0e34\u0e01"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Policy Card on Desktop */}
+          {!isMobile && (
+            <div style={{ background: 'linear-gradient(135deg, #f8fafc, #f1f5f9)', borderRadius: 14, border: '1px solid #e2e8f0', padding: '16px 20px', marginTop: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+              <h4 style={{ margin: '0 0 10px', fontSize: '0.85rem', fontWeight: 800, color: '#475569', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>🛡️</span> {"\u0e19\u0e42\u0e22\u0e1a\u0e32\u0e22\u0e01\u0e32\u0e23\u0e22\u0e37\u0e21\u0e04\u0e37\u0e19"}
+              </h4>
+              <div style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', flexDirection: 'column', gap: 8, lineHeight: 1.4 }}>
+                <div>{"1. \u0e2a\u0e32\u0e21\u0e32\u0e23\u0e16\u0e22\u0e37\u0e21\u0e17\u0e23\u0e31\u0e1e\u0e22\u0e4c\u0e2a\u0e34\u0e19\u0e41\u0e25\u0e30\u0e27\u0e31\u0e2a\u0e14\u0e38\u0e2a\u0e34\u0e49\u0e19\u0e40\u0e1b\u0e25\u0e37\u0e2d\u0e07\u0e44\u0e14\u0e49\u0e15\u0e32\u0e21\u0e42\u0e04\u0e27\u0e15\u0e32\u0e17\u0e35\u0e48\u0e01\u0e33\u0e2b\u0e19\u0e14"}</div>
+                <div>{"2. \u0e08\u0e33\u0e19\u0e27\u0e19\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e17\u0e35\u0e48\u0e22\u0e37\u0e21\u0e44\u0e14\u0e49\u0e2a\u0e39\u0e07\u0e2a\u0e38\u0e14:"} <strong style={{ color: '#0ea5e9' }}>{systemSettings?.maxItemsPerRequest ?? 5} {"\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e15\u0e48\u0e2d\u0e04\u0e33\u0e02\u0e2d"}</strong></div>
+                <div>{"3. \u0e23\u0e30\u0e22\u0e30\u0e40\u0e27\u0e25\u0e32\u0e01\u0e32\u0e23\u0e22\u0e37\u0e21\u0e2a\u0e39\u0e07\u0e2a\u0e38\u0e14:"} <strong style={{ color: '#0ea5e9' }}>{systemSettings?.maxBorrowDays ?? 30} {"\u0e27\u0e31\u0e19"}</strong></div>
+                <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: 8, color: '#b91c1c' }}>
+                  {"4. \u0e01\u0e23\u0e38\u0e13\u0e32\u0e2a\u0e48\u0e07\u0e04\u0e37\u0e19\u0e17\u0e23\u0e31\u0e1e\u0e22\u0e4c\u0e2a\u0e34\u0e19\u0e15\u0e23\u0e07\u0e40\u0e27\u0e25\u0e32 \u0e2b\u0e32\u0e01\u0e21\u0e35\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e40\u0e01\u0e34\u0e19\u0e01\u0e33\u0e2b\u0e19\u0e14\u0e2a\u0e48\u0e07\u0e04\u0e37\u0e19 \u0e08\u0e30\u0e15\u0e49\u0e2d\u0e07\u0e04\u0e37\u0e19\u0e17\u0e23\u0e31\u0e1e\u0e22\u0e4c\u0e2a\u0e34\u0e19\u0e19\u0e31\u0e49\u0e19\u0e01\u0e48\u0e2d\u0e19\u0e08\u0e36\u0e07\u0e08\u0e30\u0e22\u0e37\u0e21\u0e43\u0e2b\u0e21\u0e48\u0e44\u0e14\u0e49"}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

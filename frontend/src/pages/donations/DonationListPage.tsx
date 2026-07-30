@@ -16,6 +16,8 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import InboxIcon from '@mui/icons-material/Inbox';
 import { donationAPI } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
+import { formatDate } from '../../utils/dateUtils';
+
 
 const statusConfig: Record<string, { label: string; color: 'warning' | 'success' | 'default' }> = {
   PENDING:   { label: 'รอส่งมอบ',    color: 'warning' },
@@ -259,7 +261,7 @@ export default function DonationListPage() {
                       >
                         <TableCell sx={{ fontWeight: 600, color: 'primary.dark' }}>{d.batchRef}</TableCell>
                         <TableCell>{d.recipientName}</TableCell>
-                        <TableCell>{new Date(d.donationDate).toLocaleDateString('th-TH')}</TableCell>
+                        <TableCell>{formatDate(d.donationDate)}</TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <Box sx={{

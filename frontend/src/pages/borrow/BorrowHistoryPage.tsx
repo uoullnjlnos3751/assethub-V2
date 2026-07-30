@@ -9,6 +9,8 @@ import ClearIcon from '@mui/icons-material/Clear';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DownloadIcon from '@mui/icons-material/Download';
 import { borrowAPI } from '../../services/api';
+import { formatDate } from '../../utils/dateUtils';
+
 
 interface HistoryRecord {
   id: number;
@@ -261,7 +263,7 @@ export default function BorrowHistoryPage() {
                         <Chip label={statusInfo.label} color={statusInfo.color} size="small" />
                       </TableCell>
                       <TableCell sx={{ fontSize: '0.85rem' }}>{receiverDisplay}</TableCell>
-                      <TableCell>{new Date(record.createdAt).toLocaleDateString('th-TH')}</TableCell>
+                      <TableCell>{formatDate(record.createdAt)}</TableCell>
                       <TableCell align="right">
                         <Button
                           size="small"
@@ -370,7 +372,7 @@ export default function BorrowHistoryPage() {
                           </Typography>
                           {ret.returnedAt && (
                             <Typography variant="caption" color="text.secondary">
-                              {new Date(ret.returnedAt).toLocaleDateString('th-TH')}
+                              {formatDate(ret.returnedAt)}
                             </Typography>
                           )}
                         </Box>

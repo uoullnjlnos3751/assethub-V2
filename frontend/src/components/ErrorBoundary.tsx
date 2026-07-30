@@ -9,6 +9,13 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   static getDerivedStateFromError(error: Error) { return { hasError: true, error }; }
 
+  componentDidCatch(error: Error) {
+    if (error.message && error.message.includes('Failed to fetch dynamically imported module')) {
+      console.warn('Dynamic import failed (chunk mismatch). Reloading page...');
+      window.location.reload();
+    }
+  }
+
   render() {
     if (this.state.hasError) {
       return (

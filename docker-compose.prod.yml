@@ -3,10 +3,11 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: assethub
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-assethub123}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set for production}
       POSTGRES_DB: assethub
-    ports:
-      - "5433:5432"
+    # Production: ไม่เปิด port ออกภายนอก — backend เข้าถึงผ่าน internal network
+    # ports:
+    #   - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -14,6 +15,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
     deploy:
       resources:
         limits:
@@ -25,22 +27,25 @@ services:
       dockerfile: Dockerfile
       target: production
     ports:
-      - "4000:4000"
+      - "${BACKEND_PORT:-4000}:4000"
     env_file:
       - ./backend/.env
     environment:
-      DATABASE_URL: "postgresql://assethub:${POSTGRES_PASSWORD:-assethub123}@postgres:5432/assethub?schema=public"
+      DATABASE_URL: "postgresql://assethub:${POSTGRES_PASSWORD}@postgres:5432/assethub?schema=public"
       NODE_ENV: production
+      FRONTEND_URL: "${FRONTEND_URL:?FRONTEND_URL must be set for production}"
+      CORS_ORIGIN: "${CORS_ORIGIN:?CORS_ORIGIN must be set for production}"
     volumes:
       - uploads_data:/app/uploads
       - backups_data:/app/backups
     depends_on:
       postgres:
         condition: service_healthy
+    restart: unless-stopped
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 2048M
 
   frontend:
     build:
@@ -48,9 +53,10 @@ services:
       dockerfile: Dockerfile
       target: production
     ports:
-      - "80:80"
+      - "${FRONTEND_PORT:-5173}:80"
     depends_on:
       - backend
+    restart: unless-stopped
     deploy:
       resources:
         limits:

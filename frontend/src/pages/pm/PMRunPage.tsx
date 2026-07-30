@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { pmAPI } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 import * as XLSX from 'xlsx';
 import { Html5Qrcode } from 'html5-qrcode';
+import { PMDeviceArrayInput } from './components/PMDeviceArrayInput';
 
 /* ─────────────────────────────────────────────────────────────
    Types & Constants
@@ -22,6 +24,9 @@ const DEFAULT_CHECKLIST = [
   { key: 'pc_audit',           label: 'PC Audit (บันทึก Hardware spec)', group: 'agent', type: 'boolean' },
   { key: 'hw_info',            label: 'HW Info (Serial No., Service Tag)', group: 'agent', type: 'boolean' },
   { key: 'cleaning',           label: 'ทำความสะอาดอุปกรณ์ (Cleaning Device)', group: 'hardware', type: 'boolean' },
+  { key: 'cpu',                label: 'CPU (Processor)', group: 'hardware', type: 'text' },
+  { key: 'ram',                label: 'RAM (Memory)', group: 'hardware', type: 'text' },
+  { key: 'storage',            label: 'Storage (Disk)', group: 'hardware', type: 'text' },
   { key: 'printer',            label: 'ตรวจสอบ Printer Local', group: 'hardware', type: 'boolean' },
   { key: 'ups',                label: 'ตรวจสอบ UPS', group: 'hardware', type: 'boolean' },
   { key: 'monitor',            label: 'ตรวจสอบจอ Monitor (Monitor 1 & 2)', group: 'hardware', type: 'boolean' },
@@ -62,11 +67,19 @@ function Modal({ open, onClose, title, children, maxWidth = 640 }: {
 /* ─────────────────────────────────────────────────────────────
    Stars
 ───────────────────────────────────────────────────────────────── */
-function StarRating({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+function StarRating({ value, onChange, disabled }: { value: number; onChange: (v: number) => void; disabled?: boolean }) {
   return (
     <div style={{ display: 'flex', gap: 4 }}>
       {[1, 2, 3, 4, 5].map(n => (
-        <span key={n} onClick={() => onChange(n)} style={{ fontSize: 24, cursor: 'pointer', color: n <= value ? '#ff9500' : '#d2d2d7', transition: 'color .1s' }}>★</span>
+        <span key={n} 
+          onClick={() => !disabled && onChange(n)} 
+          style={{ 
+            fontSize: 24, 
+            cursor: disabled ? 'default' : 'pointer', 
+            color: n <= value ? '#ff9500' : '#d2d2d7', 
+            transition: 'color .1s' 
+          }}
+        >★</span>
       ))}
     </div>
   );
@@ -77,6 +90,7 @@ function StarRating({ value, onChange }: { value: number; onChange: (v: number) 
 ───────────────────────────────────────────────────────────────── */
 export default function PMRunPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const planIdParam = searchParams.get('planId') || '';
 
@@ -84,12 +98,12 @@ export default function PMRunPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-  const [filterPlan, setFilterPlan] = useState(planIdParam);
+  const [filterPlan, setFilterPlan] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterStaff, setFilterStaff] = useState('');
   const [plans, setPlans] = useState<any[]>([]);
   
-  const [pmModal, setPMModal] = useState<{ open: boolean; run: any }>({ open: false, run: null });
+  const [pmModal, setPMModal] = useState<{ open: boolean; run: any; readOnly?: boolean }>({ open: false, run: null, readOnly: false });
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState('');
@@ -97,6 +111,9 @@ export default function PMRunPage() {
 
   // New States
   const [selectedRunIds, setSelectedRunIds] = useState<number[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const [bulkPMModal, setBulkPMModal] = useState<{ open: boolean; templateId: number | null }>({ open: false, templateId: null });
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -118,10 +135,13 @@ export default function PMRunPage() {
   useEffect(() => { fetchData(); }, []);
 
   useEffect(() => {
-    if (planIdParam) {
-      setFilterPlan(planIdParam);
+    if (planIdParam && plans.length > 0) {
+      const p = plans.find(plan => String(plan.id) === planIdParam);
+      if (p) {
+        setFilterPlan(p.deptTask || p.site || `Plan #${p.id}`);
+      }
     }
-  }, [planIdParam]);
+  }, [planIdParam, plans]);
 
   // Autosave Drafts
   useEffect(() => {
@@ -174,16 +194,36 @@ export default function PMRunPage() {
   /* ── Filter ── */
   const filtered = runs.filter(r => {
     const q = search.toLowerCase();
-    const matchQ = !q || (r.asset?.assetCode || '').toLowerCase().includes(q) || (r.asset?.ownerName || '').toLowerCase().includes(q) || (r.asset?.brand || '').toLowerCase().includes(q) || (r.asset?.model || '').toLowerCase().includes(q) || (r.asset?.serialNo || '').toLowerCase().includes(q);
-    const matchStatus = !filterStatus || r.status === filterStatus;
-    const matchPlan = !filterPlan || String(r.plan?.id) === filterPlan;
+    const matchQ = !q || (r.asset?.assetName || '').toLowerCase().includes(q) || (r.asset?.assetCode || '').toLowerCase().includes(q) || (r.asset?.ownerName || '').toLowerCase().includes(q) || (r.asset?.brand || '').toLowerCase().includes(q) || (r.asset?.model || '').toLowerCase().includes(q) || (r.asset?.serialNo || '').toLowerCase().includes(q);
+    const isOverdue = r.status !== 'COMPLETED' && r.plan?.endDate && new Date(r.plan.endDate).getTime() < new Date().setHours(0,0,0,0);
+    const matchStatus = !filterStatus ? true : filterStatus === 'OVERDUE' ? isOverdue : r.status === filterStatus;
+    const planName = r.plan?.deptTask || r.plan?.site || `Plan #${r.plan?.id}`;
+    const matchPlan = !filterPlan || planName === filterPlan;
     const matchType = !filterType || r.asset?.type === filterType;
     const matchStaff = !filterStaff || (r.performer?.displayName || r.staffName) === filterStaff;
     return matchQ && matchStatus && matchPlan && matchType && matchStaff;
   });
 
+  const sortedRuns = [...filtered].sort((a, b) => {
+    if (!sortConfig) return 0;
+    let valA: any = '';
+    let valB: any = '';
+    switch (sortConfig.key) {
+      case 'id': valA = a.id; valB = b.id; break;
+      case 'status': valA = a.status; valB = b.status; break;
+      case 'dueDate': valA = a.plan?.endDate || ''; valB = b.plan?.endDate || ''; break;
+      case 'dept': valA = a.asset?.departmentId || a.plan?.deptTask || ''; valB = b.asset?.departmentId || b.plan?.deptTask || ''; break;
+    }
+    if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const paginatedRuns = sortedRuns.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const totalPages = Math.ceil(sortedRuns.length / pageSize);
+
   // Checklist Selection Helpers
-  const selectableRuns = filtered.filter(r => r.status !== 'COMPLETED');
+  const selectableRuns = sortedRuns.filter(r => r.status !== 'COMPLETED');
   const allSelected = selectableRuns.length > 0 && selectableRuns.every(r => selectedRunIds.includes(r.id));
   
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -212,6 +252,15 @@ export default function PMRunPage() {
       const newAnswers = { ...answers };
       if (res.data.os) {
         newAnswers['windows_version'] = 'yes';
+        newAnswers['windows_version_note'] = res.data.os;
+      }
+      if (res.data.msOffice) {
+        newAnswers['office_check'] = 'yes';
+        newAnswers['office_check_note'] = res.data.msOffice;
+      }
+      if (res.data.antivirus) {
+        newAnswers['antivirus'] = 'yes';
+        newAnswers['antivirus_note'] = res.data.antivirus;
       }
       setAnswers(newAnswers);
     } catch (err: any) {
@@ -222,7 +271,7 @@ export default function PMRunPage() {
   };
 
   /* ── Open PM Checklist ── */
-  const openPM = (run: any) => {
+  const openPM = (run: any, readOnly = false) => {
     if (!run.plan?.template?.templateItems?.length) {
       showToast('❌ แผน PM นี้ยังไม่มี Checklist Template กรุณาไปเพิ่มในเมนู จัดการแผน');
       return;
@@ -230,33 +279,45 @@ export default function PMRunPage() {
     
     setGlpiSpec(null); // Reset GLPI Spec
 
-    // Load local draft first
-    const draftKey = `pm_draft_${run.id}`;
-    const localDraft = localStorage.getItem(draftKey);
+    // 1. Load from DB first
     let pre: Record<string, any> = {};
-    if (localDraft) {
-      try {
-        pre = JSON.parse(localDraft);
-      } catch (e) {
-        console.error('Failed to parse local draft', e);
-      }
-    } else {
-      // Fallback from DB answers
-      (run.answers || []).forEach((a: any) => {
-        const key = a.item?.key || a.key || a.itemKey;
-        if (key) {
-          if (a.value && typeof a.value === 'string' && a.value.includes('::')) {
-            const [v, ...noteParts] = a.value.split('::');
-            pre[key] = v;
-            pre[`${key}_note`] = noteParts.join('::');
-          } else {
-            pre[key] = a.value;
-          }
+    (run.answers || []).forEach((a: any) => {
+      const key = a.item?.key || a.key || a.itemKey;
+      if (key) {
+        if (a.value && typeof a.value === 'string' && a.value.includes('::')) {
+          const [v, ...noteParts] = a.value.split('::');
+          pre[key] = v;
+          pre[`${key}_note`] = noteParts.join('::');
+        } else {
+          pre[key] = a.value;
         }
-      });
+      }
+    });
+
+    // 2. Override with Local Draft (if any), BUT ONLY IF NOT COMPLETED
+    const draftKey = `pm_draft_${run.id}`;
+    if (run.status === 'COMPLETED') {
+      localStorage.removeItem(draftKey); // Clean up stale draft if any
+    } else {
+      const localDraft = localStorage.getItem(draftKey);
+      if (localDraft) {
+        try {
+          const draftParsed = JSON.parse(localDraft);
+          if (Object.keys(draftParsed).length > 0) {
+             pre = { ...pre, ...draftParsed };
+          }
+        } catch (e) {
+          console.error('Failed to parse local draft', e);
+        }
+      }
     }
+
+    if (!pre['staff_name'] && user && !readOnly) {
+      pre['staff_name'] = user.displayName || user.username || '';
+    }
+
     setAnswers(pre);
-    setPMModal({ open: true, run });
+    setPMModal({ open: true, run, readOnly });
   };
 
   /* ── Get checklist items ── */
@@ -275,7 +336,8 @@ export default function PMRunPage() {
       const items = getChecklistItems(run);
       const answerList = items.filter((item: any) => item.id).map((item: any) => {
         let val = answers[item.key] !== undefined ? String(answers[item.key]) : '';
-        if ((val === 'no' || val === 'na') && answers[`${item.key}_note`]) {
+        const shouldSaveNote = (val === 'no' || val === 'na') || (val === 'yes' && ['windows_version', 'office_check', 'antivirus'].includes(item.key));
+        if (shouldSaveNote && answers[`${item.key}_note`]) {
           val = `${val}::${answers[`${item.key}_note`]}`;
         }
         return { itemId: item.id, key: item.key, value: val };
@@ -290,12 +352,12 @@ export default function PMRunPage() {
       localStorage.removeItem(`pm_draft_${run.id}`);
 
       if (nextStatus === 'IN_PROGRESS') {
-        showToast(`✅ บันทึกร่าง PM สำหรับ ${run.asset?.assetCode} สำเร็จ`);
+        showToast(`✅ บันทึกร่าง PM สำหรับ ${run.asset?.assetName || run.asset?.assetCode} สำเร็จ`);
         setPMModal({ open: false, run: null });
         fetchData();
         return;
       }
-      showToast(`✅ บันทึก PM สำหรับ ${run.asset?.assetCode} สำเร็จ`);
+      showToast(`✅ บันทึก PM สำหรับ ${run.asset?.assetName || run.asset?.assetCode} สำเร็จ`);
       setPMModal({ open: false, run: null });
       fetchData();
     } catch (err: any) {
@@ -314,7 +376,8 @@ export default function PMRunPage() {
       const items = getChecklistItems(firstRun);
       const answerList = items.filter((item: any) => item.id).map((item: any) => {
         let val = answers[item.key] !== undefined ? String(answers[item.key]) : '';
-        if ((val === 'no' || val === 'na') && answers[`${item.key}_note`]) {
+        const shouldSaveNote = (val === 'no' || val === 'na') || (val === 'yes' && ['windows_version', 'office_check', 'antivirus'].includes(item.key));
+        if (shouldSaveNote && answers[`${item.key}_note`]) {
           val = `${val}::${answers[`${item.key}_note`]}`;
         }
         return { itemId: item.id, key: item.key, value: val };
@@ -368,6 +431,17 @@ export default function PMRunPage() {
     }
   };
 
+  /* ── Delete Run ── */
+  const handleDeleteRun = async (id: number) => {
+    if (!window.confirm('คุณแน่ใจหรือไม่ว่าต้องการลบงาน PM นี้?')) return;
+    try {
+      await pmAPI.deleteRun(id);
+      loadRuns(); // Refresh the list
+    } catch (err: any) {
+      alert(err.response?.data?.message || err.message || 'เกิดข้อผิดพลาดในการลบงาน PM');
+    }
+  };
+
   /* ── Export Excel ── */
   const handleExport = async () => {
     setExporting(true);
@@ -376,6 +450,7 @@ export default function PMRunPage() {
         const row: any = {
           '#': idx + 1,
           'รหัสทรัพย์สิน': r.asset?.assetCode || '',
+          'ชื่ออุปกรณ์': r.asset?.assetName || '',
           'Serial No.': r.asset?.serialNo || '',
           'ยี่ห้อ': r.asset?.brand || '',
           'รุ่น': r.asset?.model || '',
@@ -409,6 +484,7 @@ export default function PMRunPage() {
   const done = runs.filter(r => r.status === 'COMPLETED').length;
   const pending = runs.filter(r => r.status === 'DRAFT').length;
   const inProgress = runs.filter(r => r.status === 'IN_PROGRESS').length;
+  const overdueCount = runs.filter(r => r.status !== 'COMPLETED' && r.plan?.endDate && new Date(r.plan.endDate).getTime() < new Date().setHours(0,0,0,0)).length;
 
   /* ── Checklist progress ── */
   const checkItems = pmModal.run ? getChecklistItems(pmModal.run) : [];
@@ -442,6 +518,17 @@ export default function PMRunPage() {
         .pmr-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #e5e5ea; transition: background .15s; }
         .pmr-row:last-child { border-bottom: none; }
         .pmr-row:hover { background: #f5f5f7; }
+        .pmr-table-header { position: sticky; top: 0; z-index: 10; background: #f5f5f7; border-bottom: 1px solid #e5e5ea; }
+        .pmr-sort-icon { display: inline-block; margin-left: 4px; font-size: 10px; color: #86868b; }
+        .pmr-icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; border: 1px solid #e5e5ea; background: #fff; cursor: pointer; transition: all 0.2s; color: #515154; }
+        .pmr-icon-btn:hover { background: #f5f5f7; color: #1d1d1f; border-color: #d2d2d7; }
+        .pmr-icon-btn.primary { color: #0071e3; border-color: #0071e3; background: #eff5fc; }
+        .pmr-icon-btn.primary:hover { background: #0071e3; color: #fff; }
+        .pmr-icon-btn.success { color: #34c759; border-color: #34c759; background: #eaf6ed; }
+        .pmr-icon-btn.success:hover { background: #34c759; color: #fff; }
+        .pmr-sticky-action-bar { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #fff; padding: 12px 24px; border-radius: 100px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 16px; z-index: 9000; border: 1px solid #e5e5ea; animation: pmrFadeUp .3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .pmr-th-sortable { cursor: pointer; user-select: none; transition: background 0.2s; }
+        .pmr-th-sortable:hover { background: #e5e5ea; }
         .pmr-check-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid #e5e5ea; }
         .pmr-check-row:last-child { border-bottom: none; }
         .pmr-radio { padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 500;
@@ -472,21 +559,6 @@ export default function PMRunPage() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            {selectedRunIds.length > 0 && (
-              <button 
-                type="button" 
-                className="pmr-btn pmr-btn-primary"
-                onClick={() => {
-                  const firstRun = runs.find(r => r.id === selectedRunIds[0]);
-                  if (firstRun) {
-                    setAnswers({});
-                    setBulkPMModal({ open: true, templateId: firstRun.plan?.templateId || null });
-                  }
-                }}
-              >
-                🔧 ทำกลุ่ม ({selectedRunIds.length})
-              </button>
-            )}
             <button className="pmr-btn pmr-btn-outline" onClick={handleExport} disabled={exporting || filtered.length === 0}>
               {exporting ? '⏳' : '📥'} Export Excel
             </button>
@@ -499,15 +571,31 @@ export default function PMRunPage() {
           {[
             { icon: '📦', label: 'ทั้งหมด', val: runs.length, color: '#1d1d1f' },
             { icon: '✅', label: 'เสร็จแล้ว', val: done, color: '#34c759' },
-            { icon: '🔄', label: 'กำลังทำ', val: inProgress, color: '#af52de' },
+            ...(overdueCount > 0 
+              ? [{ icon: '⚠️', label: 'เลยกำหนด', val: overdueCount, color: '#ff3b30' }]
+              : [{ icon: '🔄', label: 'กำลังทำ', val: inProgress, color: '#af52de' }]),
             { icon: '⏳', label: 'รอดำเนินการ', val: pending, color: '#ff9500' },
-            { icon: '📊', label: '% เสร็จ', val: runs.length > 0 ? `${Math.round(done / runs.length * 100)}%` : '0%', color: '#34c759' },
-          ].map(s => (
+            { icon: '📊', label: '% เสร็จ', val: runs.length > 0 ? Math.round(done / runs.length * 100) : 0, color: '#34c759', isProgress: true },
+          ].map((s: any) => (
             <div key={s.label} style={{ background: '#fff', border: '1px solid #e5e5ea', borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
-              <span style={{ fontSize: 22 }}>{s.icon}</span>
-              <div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: s.color, lineHeight: 1.1, letterSpacing: '-0.02em' }}>{s.val}</div>
-                <div style={{ fontSize: 11, color: '#86868b', marginTop: 2 }}>{s.label}</div>
+              {!s.isProgress && <span style={{ fontSize: 22 }}>{s.icon}</span>}
+              <div style={{ flex: 1 }}>
+                {s.isProgress ? (
+                  <>
+                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: s.color }}>{s.val}%</span>
+                        <span style={{ fontSize: 11, color: '#86868b' }}>{s.label}</span>
+                     </div>
+                     <div style={{ height: 6, background: '#e5e5ea', borderRadius: 4, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', background: s.color, width: `${s.val}%`, borderRadius: 4 }} />
+                     </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: s.color, lineHeight: 1.1, letterSpacing: '-0.02em' }}>{s.val}</div>
+                    <div style={{ fontSize: 11, color: '#86868b', marginTop: 2 }}>{s.label}</div>
+                  </>
+                )}
               </div>
             </div>
           ))}
@@ -522,34 +610,31 @@ export default function PMRunPage() {
                 backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2386868b' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E")`,
                 backgroundRepeat: 'no-repeat', backgroundPosition: '12px center', paddingLeft: 36,
               }}
-              placeholder="ค้นหารหัส / ชื่อผู้ใช้ / ยี่ห้อ / รุ่น..."
+              placeholder="ค้นหาชื่ออุปกรณ์ / รหัส / ชื่อผู้ใช้ / ยี่ห้อ..."
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
             />
-            <button 
-              type="button" 
-              className="pmr-btn pmr-btn-outline" 
-              onClick={() => setQrModalOpen(true)} 
-              style={{ padding: '8px 12px' }}
-            >
-              📷 สแกน QR
-            </button>
+            <button title="สแกน QR Code" type="button" className="pmr-btn pmr-btn-outline" onClick={() => setQrModalOpen(true)} style={{ padding: '8px 12px' }}>📷</button>
+            <button title="ล้างตัวกรอง" type="button" className="pmr-btn pmr-btn-outline" onClick={() => { setSearch(''); setFilterStatus(''); setFilterPlan(''); setFilterType(''); setFilterStaff(''); setCurrentPage(1); }} style={{ padding: '8px 12px' }}>🔄</button>
           </div>
-          <select className="pmr-input pmr-select" style={{ minWidth: 120 }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+          <select className="pmr-input pmr-select" style={{ minWidth: 120 }} value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1); }}>
             <option value="">ทุกสถานะ</option>
             <option value="DRAFT">⏳ รอดำเนินการ</option>
             <option value="IN_PROGRESS">🔄 กำลังทำ</option>
             <option value="COMPLETED">✅ เสร็จแล้ว</option>
+            <option value="OVERDUE">⚠️ เลยกำหนด</option>
           </select>
-          <select className="pmr-input pmr-select" style={{ minWidth: 120 }} value={filterPlan} onChange={e => setFilterPlan(e.target.value)}>
+          <select className="pmr-input pmr-select" style={{ minWidth: 120 }} value={filterPlan} onChange={e => { setFilterPlan(e.target.value); setCurrentPage(1); }}>
             <option value="">ทุกแผน</option>
-            {plans.map(p => <option key={p.id} value={p.id}>{p.deptTask || p.site || `Plan #${p.id}`}</option>)}
+            {Array.from(new Set(plans.map(p => p.deptTask || p.site || `Plan #${p.id}`))).map(name => 
+              <option key={name} value={name}>{name}</option>
+            )}
           </select>
-          <select className="pmr-input pmr-select" style={{ minWidth: 140 }} value={filterType} onChange={e => setFilterType(e.target.value)}>
+          <select className="pmr-input pmr-select" style={{ minWidth: 140 }} value={filterType} onChange={e => { setFilterType(e.target.value); setCurrentPage(1); }}>
             <option value="">ทุกประเภทอุปกรณ์</option>
             {uniqueTypes.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
-          <select className="pmr-input pmr-select" style={{ minWidth: 130 }} value={filterStaff} onChange={e => setFilterStaff(e.target.value)}>
+          <select className="pmr-input pmr-select" style={{ minWidth: 130 }} value={filterStaff} onChange={e => { setFilterStaff(e.target.value); setCurrentPage(1); }}>
             <option value="">ทุกผู้ทำ PM</option>
             {uniqueStaff.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
@@ -575,86 +660,92 @@ export default function PMRunPage() {
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, textAlign: 'left' }}>
-                <thead>
-                  <tr style={{ background: '#f5f5f7', borderBottom: '1px solid #e5e5ea' }}>
-                    <th style={{ padding: '12px 16px', width: 30 }}>
-                      <input 
-                        type="checkbox" 
-                        checked={allSelected} 
-                        onChange={handleSelectAll} 
-                        disabled={selectableRuns.length === 0} 
-                        style={{ cursor: 'pointer' }}
-                      />
-                    </th>
-                    {['#', 'รหัสทรัพย์สิน', 'ยี่ห้อ / รุ่น', 'ผู้ถือครอง', 'แผนก / Location', 'แผน PM', 'สถานะ', 'วันที่เสร็จ', 'จัดการ'].map((h, i) => (
-                      <th key={h} style={{ padding: '12px 16px', textAlign: i === 8 ? 'center' : 'left', fontSize: 11, fontWeight: 600, color: '#86868b', textTransform: 'uppercase', letterSpacing: '.05em', whiteSpace: 'nowrap', width: i === 0 ? 40 : undefined }}>
-                        {h}
-                      </th>
-                    ))}
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, textAlign: 'left' }}>
+                <thead className="pmr-table-header">
+                  <tr>
+                    <th style={{ padding: '8px 12px', width: 40 }}><input type="checkbox" className="pmr-radio" style={{ margin: 0, padding: 0 }} checked={allSelected} onChange={handleSelectAll} /></th>
+                    <th style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#86868b', width: 50, textAlign: 'center' }}>ลำดับ</th>
+                    <th style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#86868b' }}>สถานะ</th>
+                    <th style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#86868b' }}>รหัสทรัพย์สิน / ชื่ออุปกรณ์</th>
+                    <th style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#86868b' }}>แผนก / ผู้ถือครอง</th>
+                    <th style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#86868b' }}>แผน PM (กำหนดเสร็จ)</th>
+                    <th style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#86868b' }}>ประเภท</th>
+                    <th style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#86868b', textAlign: 'right' }}>จัดการ</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {filtered.map((r, idx) => {
+                <tbody style={{ fontSize: 12, color: '#1d1d1f' }}>
+                  {paginatedRuns.map((r, i) => {
+                    const idx = (currentPage - 1) * pageSize + i;
                     const isDone = r.status === 'COMPLETED';
                     const isInProgress = r.status === 'IN_PROGRESS';
+                    const isOverdue = !isDone && r.plan?.endDate && new Date(r.plan.endDate).getTime() < new Date().setHours(0,0,0,0);
+                    
+                    const statusConfig = {
+                      COMPLETED: { color: '#34c759', bg: '#eaf6ed', lbl: 'เสร็จแล้ว' },
+                      IN_PROGRESS: { color: '#0071e3', bg: '#eff5fc', lbl: 'กำลังทำ' },
+                      DRAFT: { color: '#ff9500', bg: '#fff5e5', lbl: 'รอดำเนินการ' },
+                    }[r.status as 'COMPLETED' | 'IN_PROGRESS' | 'DRAFT'] || { color: '#86868b', bg: '#f5f5f7', lbl: r.status };
+
+                    const overdueColor = isOverdue ? '#ff3b30' : statusConfig.color;
+                    const overdueBg = isOverdue ? '#fff0f0' : statusConfig.bg;
+
                     return (
-                      <tr key={r.id} style={{ borderBottom: '1px solid #e5e5ea', transition: 'background .15s' }}
-                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(0,113,227,0.01)'}
-                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ''}
-                      >
-                        <td style={{ padding: '12px 16px', width: 30 }}>
-                          <input 
-                            type="checkbox" 
-                            checked={selectedRunIds.includes(r.id)} 
-                            onChange={() => handleSelectOne(r.id)} 
-                            disabled={isDone} 
-                            style={{ cursor: isDone ? 'not-allowed' : 'pointer' }}
-                          />
+                      <tr key={r.id} className="pmr-row" style={{ display: 'table-row' }}>
+                        <td style={{ padding: '8px 12px' }}>
+                          <input type="checkbox" className="pmr-radio" style={{ margin: 0, padding: 0 }} disabled={r.status === 'COMPLETED'} checked={selectedRunIds.includes(r.id)} onChange={() => handleSelectOne(r.id)} />
                         </td>
-                        <td style={{ padding: '12px 16px', color: '#86868b', fontSize: 12 }}>{idx + 1}</td>
-                        <td style={{ padding: '12px 16px' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            <code style={{ fontSize: 12, fontWeight: 600, background: '#f5f5f7', padding: '2px 8px', borderRadius: 4, color: '#1d1d1f', width: 'fit-content' }}>{r.asset?.assetCode || '—'}</code>
-                            <span style={{ fontSize: 11, color: '#86868b' }}>{r.asset?.serialNo || ''}</span>
+                        <td style={{ padding: '8px 12px', textAlign: 'center', color: '#86868b', fontWeight: 500, fontSize: 11 }}>
+                          {idx + 1}
+                        </td>
+                        <td style={{ padding: '8px 12px' }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 20, background: overdueBg, color: overdueColor, fontSize: 10, fontWeight: 700 }}>
+                            <div style={{ width: 6, height: 6, borderRadius: '50%', background: overdueColor }}></div>
+                            {isOverdue ? '⚠️ เกินกำหนด' : statusConfig.lbl}
+                          </span>
+                        </td>
+                        <td style={{ padding: '8px 12px' }}>
+                          <div style={{ fontWeight: 600, fontSize: 12, color: '#0071e3', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                             {(r.asset?.type === 'Monitor' || r.asset?.assetName?.toLowerCase().includes('monitor')) && <span title="Monitor" style={{ fontSize: 12 }}>📺</span>}
+                             <span>{r.asset?.assetCode || 'ไม่มีรหัส'} / {r.asset?.assetName || 'ไม่มีชื่ออุปกรณ์'}</span>
+                             {r.photoUrl && <span title="มีรูปถ่าย" style={{ fontSize: 12 }}>📸</span>}
+                          </div>
+                          <div style={{ fontSize: 11, color: '#515154', marginTop: 4, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                            {r.asset?.brand || r.asset?.model ? <span style={{ background: '#f5f5f7', padding: '2px 6px', borderRadius: 4 }}>{r.asset?.brand || ''} {r.asset?.model || ''}</span> : null}
+                            <span style={{ color: '#86868b' }}>S/N: {r.asset?.serialNo || '—'}</span>
                           </div>
                         </td>
-                        <td style={{ padding: '12px 16px' }}>
-                          <div style={{ fontWeight: 600, color: '#1d1d1f' }}>{r.asset?.brand || '—'}</div>
-                          <div style={{ fontSize: 11, color: '#86868b' }}>{r.asset?.model || ''}</div>
+                        <td style={{ padding: '8px 12px' }}>
+                          <div style={{ fontWeight: 500, fontSize: 12 }}>{r.asset?.departmentId || r.plan?.deptTask || '—'}</div>
+                          <div style={{ fontSize: 10, color: '#86868b', marginTop: 2 }}>👤 {r.asset?.ownerName || '—'}</div>
                         </td>
-                        <td style={{ padding: '12px 16px', fontSize: 12, color: '#515154' }}>{r.asset?.ownerName || '—'}</td>
-                        <td style={{ padding: '12px 16px', fontSize: 12, color: '#515154' }}>
-                          {r.asset?.departmentId || r.plan?.deptTask || r.asset?.location || r.plan?.site || '—'}
+                        <td style={{ padding: '8px 12px', fontSize: 11 }}>
+                          <div style={{ color: '#1d1d1f', fontWeight: 500 }}>{r.plan?.deptTask || r.plan?.site || `Plan #${r.plan?.id}`}</div>
+                          <div style={{ color: isOverdue ? '#ff3b30' : '#86868b', marginTop: 2 }}>
+                             📅 สิ้นสุด {r.plan?.endDate ? new Date(r.plan.endDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' }) : '—'}
+                          </div>
                         </td>
-                        <td style={{ padding: '12px 16px' }}>
-                          <span style={{ fontSize: 11, fontWeight: 600, background: '#f5f5f7', border: '1px solid #d2d2d7', padding: '2px 8px', borderRadius: 6, color: '#1d1d1f' }}>
-                            {r.plan?.deptTask || r.plan?.site || `Plan #${r.plan?.id}`}
-                          </span>
+                        <td style={{ padding: '8px 12px', fontSize: 11, color: '#515154' }}>
+                          {r.asset?.type || '—'}
                         </td>
-                        <td style={{ padding: '12px 16px' }}>
-                          <span style={{
-                            display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 99, fontSize: 11, fontWeight: 600,
-                            ...(isDone ? { background: '#eaf6ed', color: '#1c873b', border: '1px solid rgba(52,199,89,0.2)' }
-                              : isInProgress ? { background: '#f4f0fa', color: '#8946cc', border: '1px solid rgba(175,82,222,0.2)' }
-                              : { background: '#fff9e6', color: '#d97706', border: '1px solid rgba(255,149,0,0.2)' }),
-                          }}>
-                            {isDone ? '✅ เสร็จแล้ว' : isInProgress ? '🔄 กำลังทำ' : '⏳ รอดำเนินการ'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '12px 16px', fontSize: 12, color: '#86868b' }}>
-                          {r.performedAt ? new Date(r.performedAt).toLocaleDateString('th-TH') : '—'}
-                        </td>
-                        <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                          {!isDone ? (
-                            <button type="button" className="pmr-btn pmr-btn-success" style={{ padding: '6px 12px', fontSize: 12, borderRadius: 6, opacity: !r.plan?.template?.templateItems?.length ? 0.5 : 1 }} onClick={() => openPM(r)}>
-                              🔧 ทำ PM
+                        <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                            <button title="ดูรายละเอียด PM" type="button" className="pmr-icon-btn primary" style={{ width: 28, height: 28, fontSize: 12 }} onClick={() => openPM(r, true)} disabled={!r.plan?.template?.templateItems?.length}>
+                              👁
                             </button>
-                          ) : (
-                            <button type="button" className="pmr-btn pmr-btn-outline" style={{ padding: '6px 12px', fontSize: 12, borderRadius: 6 }} onClick={() => openPM(r)}>
-                              👁 ดู / แก้ไข
+                            <button 
+                              title="แก้ไข / บันทึกผล PM" 
+                              type="button" 
+                              className="pmr-icon-btn success" 
+                              style={{ width: 28, height: 28, fontSize: 12, opacity: (!r.plan?.template?.templateItems?.length) ? 0.5 : 1, cursor: (!r.plan?.template?.templateItems?.length) ? 'not-allowed' : 'pointer' }}
+                              onClick={() => openPM(r, false)} 
+                              disabled={!r.plan?.template?.templateItems?.length}
+                            >
+                              ✏️
                             </button>
-                          )}
+                            <button title="ลบข้อมูล" type="button" className="pmr-icon-btn" style={{ width: 28, height: 28, fontSize: 12, background: '#fff0f0', color: '#ff3b30' }} onClick={() => handleDeleteRun(r.id)}>
+                              🗑
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -663,21 +754,81 @@ export default function PMRunPage() {
               </table>
             </div>
           )}
+
+          {/* Pagination */}
+          {!loading && sortedRuns.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderTop: '1px solid #e5e5ea', background: '#fff' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                 <span style={{ fontSize: 12, color: '#86868b' }}>แสดง:</span>
+                 <select className="pmr-input pmr-select" style={{ padding: '4px 24px 4px 8px', minWidth: 'unset', fontSize: 12 }} value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}>
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                 </select>
+                 <span style={{ fontSize: 12, color: '#86868b' }}>รายการ</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                 <button className="pmr-btn pmr-btn-outline" style={{ padding: '4px 8px' }} disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>◀</button>
+                 <span style={{ fontSize: 13, fontWeight: 500, margin: '0 8px' }}>หน้าที่ {currentPage} / {totalPages}</span>
+                 <button className="pmr-btn pmr-btn-outline" style={{ padding: '4px 8px' }} disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)}>▶</button>
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* Sticky Bulk Action Bar */}
+        {selectedRunIds.length > 0 && (
+           <div className="pmr-sticky-action-bar">
+             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#0071e3', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600 }}>{selectedRunIds.length}</div>
+                <span style={{ fontSize: 14, fontWeight: 600, color: '#1d1d1f' }}>เลือกรายการแล้ว</span>
+             </div>
+             <div style={{ width: 1, height: 24, background: '#e5e5ea' }}></div>
+             <button
+               type="button"
+               className="pmr-btn pmr-btn-primary"
+               onClick={() => {
+                 const firstRun = runs.find((r) => r.id === selectedRunIds[0]);
+                 if (firstRun) {
+                   setAnswers({ staff_name: user?.displayName || user?.username || '' });
+                   setBulkPMModal({ open: true, templateId: firstRun.plan?.templateId || null });
+                 }
+               }}
+             >
+               🔧 ทำ PM พร้อมกัน
+             </button>
+             <button
+               type="button"
+               className="pmr-btn pmr-btn-outline"
+               onClick={() => setSelectedRunIds([])}
+             >
+               ยกเลิก
+             </button>
+           </div>
+        )}
       </div>
 
       {/* ── PM Checklist Modal ── */}
-      <Modal open={pmModal.open} onClose={() => setPMModal({ open: false, run: null })} maxWidth={760}
-        title={`🔧 บันทึกข้อมูล PM: ${pmModal.run?.asset?.assetCode || ''} — ${pmModal.run?.asset?.brand || ''} ${pmModal.run?.asset?.model || ''}`}
+      <Modal open={pmModal.open} onClose={() => setPMModal({ open: false, run: null, readOnly: false })} maxWidth={760}
+        title={`${pmModal.readOnly || pmModal.run?.status === 'COMPLETED' ? '👁️ รายละเอียดข้อมูล' : '🔧 บันทึกข้อมูล'} PM: ${pmModal.run?.asset?.assetName || pmModal.run?.asset?.assetCode || ''} — ${pmModal.run?.asset?.brand || ''} ${pmModal.run?.asset?.model || ''}`}
       >
         {pmModal.run && (() => {
           const rawItems = getChecklistItems(pmModal.run);
           const items = [...rawItems].sort((a: any, b: any) => {
-            if (a.group !== b.group) return (a.group || '').localeCompare(b.group || '');
+            if (a.group !== b.group) {
+              const groupOrder = Object.keys(GROUP_INFO);
+              const aIdx = groupOrder.indexOf(a.group || '');
+              const bIdx = groupOrder.indexOf(b.group || '');
+              if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+              if (aIdx !== -1) return -1;
+              if (bIdx !== -1) return 1;
+              return (a.group || '').localeCompare(b.group || '');
+            }
             return (a.order || 0) - (b.order || 0);
           });
           const groups = Array.from(new Set(items.map((i: any) => i.group)));
-          const isDoneRun = pmModal.run.status === 'COMPLETED';
+          const isReadOnly = pmModal.readOnly;
 
           const setAll = (val: string) => {
             const newAns = { ...answers };
@@ -688,8 +839,8 @@ export default function PMRunPage() {
           return (
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '80vh' }}>
               {/* Header Info */}
-              <div style={{ background: '#fff', borderBottom: '1px solid #e5e5ea', padding: '16px 24px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '16px 32px', flexShrink: 0 }}>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px 32px' }}>
+              <div style={{ background: '#fff', borderBottom: '1px solid #e5e5ea', padding: '12px 24px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '12px 24px', flexShrink: 0 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px 24px' }}>
                   {[
                     { lbl: 'ผู้ถือครอง', val: pmModal.run.asset?.ownerName || '—' },
                     { lbl: 'แผนก', val: pmModal.run.asset?.departmentId || pmModal.run.plan?.deptTask || '—' },
@@ -702,7 +853,7 @@ export default function PMRunPage() {
                     </div>
                   ))}
                 </div>
-                {pmModal.run.asset?.serialNo && (
+                {pmModal.run.asset?.serialNo && !isReadOnly && (
                   <button
                     type="button"
                     className="pmr-btn pmr-btn-outline"
@@ -715,23 +866,9 @@ export default function PMRunPage() {
                 )}
               </div>
 
-              {/* GLPI Spec Display */}
-              {glpiSpec && (
-                <div style={{ background: '#eaf6ed', borderBottom: '1px solid rgba(52,199,89,0.2)', padding: '12px 24px', display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12, color: '#1c873b', animation: 'pmrFadeUp 0.15s ease' }}>
-                  <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span>📡 ข้อมูลฮาร์ดแวร์สแกนอัตโนมัติจาก GLPI:</span>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px 16px' }}>
-                    <div><strong>CPU:</strong> {glpiSpec.cpu || '—'}</div>
-                    <div><strong>RAM:</strong> {glpiSpec.ram || '—'}</div>
-                    <div><strong>OS:</strong> {glpiSpec.os || '—'}</div>
-                    <div><strong>Product Key / License:</strong> {glpiSpec.license || '—'}</div>
-                  </div>
-                </div>
-              )}
 
               {/* Progress & Actions */}
-              <div style={{ padding: '14px 24px', borderBottom: '1px solid #e5e5ea', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, flexWrap: 'wrap', gap: 12, background: '#f5f5f7' }}>
+              <div style={{ padding: '10px 24px', borderBottom: '1px solid #e5e5ea', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, flexWrap: 'wrap', gap: 12, background: '#f5f5f7' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 220 }}>
                   <span style={{ fontSize: 12, color: '#515154', fontWeight: 600 }}>ความคืบหน้า</span>
                   <div style={{ flex: 1, background: '#e5e5ea', borderRadius: 99, height: 6, overflow: 'hidden' }}>
@@ -739,44 +876,90 @@ export default function PMRunPage() {
                   </div>
                   <span style={{ fontSize: 12, fontWeight: 700, color: '#34c759', minWidth: 40 }}>{checkPct}%</span>
                 </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button type="button" className="pmr-btn pmr-btn-outline" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => setAll('yes')}>✓ ทำทั้งหมด (Yes)</button>
-                  <button type="button" className="pmr-btn pmr-btn-outline" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => {
-                    setAnswers({});
-                    localStorage.removeItem(`pm_draft_${pmModal.run.id}`);
-                  }}>↺ ล้างข้อมูล</button>
-                </div>
+                {!isReadOnly && (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button type="button" className="pmr-btn pmr-btn-outline" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => setAll('yes')}>✓ ทำทั้งหมด (Yes)</button>
+                    <button type="button" className="pmr-btn pmr-btn-outline" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => {
+                      setAnswers({
+                      staff_name: user?.displayName || user?.username || ''
+                    });
+                      localStorage.removeItem(`pm_draft_${pmModal.run.id}`);
+                    }}>↺ ล้างข้อมูล</button>
+                  </div>
+                )}
               </div>
 
               {/* Photo Upload Section */}
-              <div style={{ padding: '16px 24px', borderBottom: '1px solid #e5e5ea', background: '#fff', flexShrink: 0 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: '#86868b', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <div style={{ padding: '10px 24px', borderBottom: '1px solid #e5e5ea', background: '#fff', flexShrink: 0 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#86868b', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   📸 รูปถ่ายขณะทำ PM (Photo attachment)
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                   {pmModal.run.photoUrl ? (
-                    <div style={{ position: 'relative', width: 80, height: 80, borderRadius: 8, border: '1px solid #d2d2d7', overflow: 'hidden', background: '#f5f5f7' }}>
+                    <div style={{ position: 'relative', width: 64, height: 64, borderRadius: 8, border: '1px solid #d2d2d7', overflow: 'hidden', background: '#f5f5f7' }}>
                       <img src={`/uploads/pm/${pmModal.run.photoUrl}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="PM Attachment" />
                     </div>
                   ) : (
-                    <div style={{ width: 80, height: 80, borderRadius: 8, border: '1px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, color: '#94a3b8', background: '#f5f5f7' }}>
-                      📷
+                    <div style={{ width: 64, height: 64, borderRadius: 8, border: '1px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: isReadOnly ? 11 : 24, color: '#94a3b8', background: '#f5f5f7' }}>
+                      {isReadOnly ? 'ไม่มีรูปถ่าย' : '📷'}
                     </div>
                   )}
-                  <div>
-                    <label className="pmr-btn pmr-btn-outline" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 6, padding: '6px 12px', fontSize: 12 }}>
-                      {uploadingPhoto ? '⏳ กำลังอัปโหลด...' : '📸 เลือกรูปภาพ'}
-                      <input type="file" accept="image/*" onChange={handlePhotoUpload} style={{ display: 'none' }} disabled={uploadingPhoto} />
-                    </label>
-                    <div style={{ fontSize: 10, color: '#86868b', marginTop: 6 }}>
-                      รองรับไฟล์ JPG, PNG, GIF, WEBP ขนาดไม่เกิน 10MB
+                  {!isReadOnly && (
+                    <div>
+                      <label className="pmr-btn pmr-btn-outline" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 6, padding: '6px 12px', fontSize: 12 }}>
+                        {uploadingPhoto ? '⏳ กำลังอัปโหลด...' : '📸 เลือกรูปภาพ'}
+                        <input type="file" accept="image/*" onChange={handlePhotoUpload} style={{ display: 'none' }} disabled={uploadingPhoto} />
+                      </label>
+                      <div style={{ fontSize: 10, color: '#86868b', marginTop: 6 }}>
+                        รองรับไฟล์ JPG, PNG, GIF, WEBP ขนาดไม่เกิน 10MB
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
 
               {/* Checklist Scrollable Body */}
-              <div style={{ padding: '24px', overflowY: 'auto', flex: 1, background: '#f5f5f7' }}>
+              <div style={{ padding: '16px 24px', overflowY: 'auto', flex: 1, background: '#f5f5f7' }}>
+                
+                {/* GLPI Spec Display (Moved inside scroll area) */}
+                {glpiSpec && (
+                  <div style={{ background: '#eaf6ed', border: '1px solid rgba(52,199,89,0.3)', borderRadius: 8, padding: '12px 24px', display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12, color: '#1c873b', marginBottom: 16, animation: 'pmrFadeUp 0.15s ease' }}>
+                    <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span>📡 ข้อมูลฮาร์ดแวร์สแกนอัตโนมัติจาก GLPI:</span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '8px 16px' }}>
+                      <div><strong>CPU:</strong> {glpiSpec.cpu || '—'}</div>
+                      <div><strong>RAM:</strong> {glpiSpec.ram || '—'}</div>
+                      <div><strong>OS:</strong> {glpiSpec.os || '—'}</div>
+                      <div><strong>Office:</strong> {glpiSpec.msOffice || '—'}</div>
+                      <div><strong>Antivirus:</strong> {glpiSpec.antivirus || '—'}</div>
+                      <div><strong>License:</strong> {glpiSpec.license || '—'}</div>
+                      {glpiSpec.monitors && glpiSpec.monitors.length > 0 && (
+                        <div style={{ gridColumn: '1 / -1', marginTop: 4, background: '#ffffff50', padding: '10px 14px', borderRadius: 8 }}>
+                          <strong style={{ opacity: 0.8, display: 'block', marginBottom: 6 }}>จอภาพที่เชื่อมต่อ:</strong>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                            {glpiSpec.monitors.map((m: any, idx: number) => (
+                              <span key={idx} style={{ 
+                                background: '#fff', 
+                                padding: '6px 12px', 
+                                borderRadius: 6, 
+                                border: '1px solid rgba(52,199,89,0.3)',
+                                display: 'inline-flex', 
+                                alignItems: 'center', 
+                                gap: 6,
+                                fontWeight: 500,
+                                color: '#1c873b'
+                              }}>
+                                📺 {m.brand} {m.model} <span style={{ opacity: 0.7 }}>(S/N: {m.serial})</span>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <div className="checklist-card">
                   {groups.map((group: any) => {
                     const groupItems = items.filter((i: any) => i.group === group);
@@ -790,15 +973,16 @@ export default function PMRunPage() {
                             <div style={{ flex: 1, minWidth: 220 }}>
                               <div style={{ fontSize: 13, color: '#1d1d1f', fontWeight: 500 }}>{item.label}</div>
                               {item.type?.toLowerCase() === 'text' && (
-                                <textarea style={{ width: '100%', border: '1px solid #d2d2d7', borderRadius: 8, padding: '10px 14px', fontSize: 12, fontFamily: 'inherit', minHeight: 70, marginTop: 8, resize: 'vertical', outline: 'none' }}
+                                <textarea style={{ width: '100%', border: '1px solid #d2d2d7', borderRadius: 8, padding: '10px 14px', fontSize: 12, fontFamily: 'inherit', minHeight: 70, marginTop: 8, resize: 'vertical', outline: 'none', background: (isReadOnly || item.key === 'staff_name') ? '#f5f5f7' : '#fff', color: (isReadOnly || item.key === 'staff_name') ? '#86868b' : '#1d1d1f', cursor: (isReadOnly || item.key === 'staff_name') ? 'not-allowed' : 'text' }}
                                   placeholder={item.key === 'issue_note' ? 'ระบุข้อเสนอแนะหรือปัญหาที่พบ...' : 'ระบุรายละเอียด...'}
                                   value={answers[item.key] || ''}
                                   onChange={e => setAnswers(p => ({ ...p, [item.key]: e.target.value }))}
+                                  disabled={isReadOnly || item.key === 'staff_name'}
                                 />
                               )}
                               {item.type?.toLowerCase() === 'rating' && (
                                 <div style={{ marginTop: 8 }}>
-                                  <StarRating value={parseInt(answers[item.key] || '0')} onChange={v => setAnswers(p => ({ ...p, [item.key]: String(v) }))} />
+                                  <StarRating value={parseInt(answers[item.key] || '0')} onChange={v => setAnswers(p => ({ ...p, [item.key]: String(v) }))} disabled={isReadOnly} />
                                 </div>
                               )}
                             </div>
@@ -807,21 +991,93 @@ export default function PMRunPage() {
                                 {[{ val: 'yes', lbl: '✓ ใช่' }, { val: 'no', lbl: '✗ ไม่' }, { val: 'na', lbl: '— N/A' }].map(opt => (
                                   <button key={opt.val} type="button"
                                     className={`pmr-radio ${answers[item.key] === opt.val ? `sel-${opt.val}` : ''}`}
-                                    onClick={() => setAnswers(p => ({ ...p, [item.key]: opt.val }))}
+                                    onClick={() => !isReadOnly && setAnswers(p => ({ ...p, [item.key]: opt.val }))}
+                                    disabled={isReadOnly}
+                                    style={{ 
+                                      cursor: isReadOnly ? 'not-allowed' : 'pointer',
+                                      opacity: isReadOnly && answers[item.key] !== opt.val ? 0.5 : 1
+                                    }}
                                   >{opt.lbl}</button>
                                 ))}
                               </div>
                             )}
                             
-                            {/* Inline Note for No/NA */}
-                            {item.type?.toLowerCase() === 'boolean' && (answers[item.key] === 'no' || answers[item.key] === 'na') && (
+                            {item.type?.toLowerCase().startsWith('select') && (
+                              <div style={{ marginTop: 8 }}>
+                                <select
+                                  style={{
+                                    width: '100%',
+                                    maxWidth: 400,
+                                    border: (['select_physical', 'select_result'].includes(item.type?.toLowerCase()) && (answers[item.key] === 'ชำรุดรอซ่อม' || answers[item.key] === 'ไม่ผ่านเกณฑ์')) ? '1px solid #ef4444' : '1px solid #d2d2d7',
+                                    borderRadius: 8, padding: '10px 14px', fontSize: 13, fontFamily: 'inherit', outline: 'none',
+                                    background: isReadOnly ? '#f5f5f7' : (['select_physical', 'select_result'].includes(item.type?.toLowerCase()) && (answers[item.key] === 'ชำรุดรอซ่อม' || answers[item.key] === 'ไม่ผ่านเกณฑ์')) ? '#fef2f2' : '#fff',
+                                    color: isReadOnly ? '#86868b' : '#1d1d1f',
+                                    cursor: isReadOnly ? 'not-allowed' : 'pointer'
+                                  }}
+                                  value={answers[item.key] || ''}
+                                  onChange={(e) => setAnswers((p) => ({ ...p, [item.key]: e.target.value }))}
+                                  disabled={isReadOnly}
+                                >
+                                  <option value="">-- กรุณาเลือก --</option>
+                                  {item.type?.toLowerCase() === 'select_physical' && ['สภาพปกติ', 'ชำรุดเล็กน้อย', 'ชำรุดรอซ่อม', 'หมดสภาพ'].map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                  {item.type?.toLowerCase() === 'select_speed' && ['เร็วปกติ', 'เริ่มหน่วงหนืด', 'ช้ามาก'].map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                  {item.type?.toLowerCase() === 'select_result' && ['ผ่านเกณฑ์', 'แก้ไขเรียบร้อย', 'ไม่ผ่านเกณฑ์'].map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                  {item.type?.toLowerCase() === 'select' && item.options?.split(',').map((opt: string) => opt.trim()).filter(Boolean).map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
+                                </select>
+                              </div>
+                            )}
+                            
+                            {item.type?.toLowerCase() === 'monitor_array' && (
+                              <div style={{ marginTop: 8 }}>
+                                <PMDeviceArrayInput
+                                  type="monitor"
+                                  value={answers[item.key] || ''}
+                                  onChange={(v) => setAnswers((p) => ({ ...p, [item.key]: v }))}
+                                  parentAsset={pmModal.run?.asset}
+                                  readOnly={isReadOnly}
+                                />
+                              </div>
+                            )}
+                            
+                            {item.type?.toLowerCase() === 'printer_array' && (
+                              <div style={{ marginTop: 8 }}>
+                                <PMDeviceArrayInput
+                                  type="printer"
+                                  value={answers[item.key] || ''}
+                                  onChange={(v) => setAnswers((p) => ({ ...p, [item.key]: v }))}
+                                  parentAsset={pmModal.run?.asset}
+                                  readOnly={isReadOnly}
+                                />
+                              </div>
+                            )}
+
+                            {/* Inline Note for No/NA or specific fields */}
+                            {item.type?.toLowerCase() === 'boolean' && (answers[item.key] === 'no' || answers[item.key] === 'na' || (answers[item.key] === 'yes' && ['windows_version', 'office_check', 'antivirus'].includes(item.key))) && (
                               <div style={{ width: '100%', paddingLeft: 38, marginTop: 6, animation: 'pmrFadeUp 0.15s ease' }}>
                                 <input type="text"
-                                  style={{ width: '100%', border: '1px solid #ff9500', borderRadius: 6, padding: '8px 12px', fontSize: 12, background: '#fffbeb', outline: 'none', fontFamily: 'inherit' }}
-                                  placeholder="ระบุสาเหตุประกอบการเลือกไม่ใช่หรือไม่ระบุ..."
+                                  style={{ width: '100%', border: '1px solid #ff9500', borderRadius: 6, padding: '8px 12px', fontSize: 12, background: isReadOnly ? '#f5f5f7' : '#fffbeb', color: isReadOnly ? '#86868b' : '#0f172a', outline: 'none', fontFamily: 'inherit', cursor: isReadOnly ? 'not-allowed' : 'text' }}
+                                  placeholder={['windows_version', 'office_check', 'antivirus'].includes(item.key) ? "ระบุรายละเอียดเพิ่มเติม (เช่น เวอร์ชัน, License)..." : "ระบุสาเหตุประกอบการเลือกไม่ใช่หรือไม่ระบุ..."}
                                   value={answers[`${item.key}_note`] || ''}
                                   onChange={e => setAnswers(p => ({ ...p, [`${item.key}_note`]: e.target.value }))}
+                                  disabled={isReadOnly}
                                 />
+                              </div>
+                            )}
+                            
+                            {/* Green Box for IP Phone (Yes) */}
+                            {item.type?.toLowerCase() === 'boolean' && item.key === 'ip_phone' && answers[item.key] === 'yes' && (
+                              <div style={{ width: '100%', paddingLeft: 38, marginTop: 6, animation: 'pmrFadeUp 0.15s ease' }}>
+                                <div style={{ background: '#ecfdf5', border: '1px solid #6ee7b7', borderRadius: 8, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                  <label style={{ fontSize: 11, color: '#047857', fontWeight: 600 }}>📞 ระบุหมายเลขโทรศัพท์ภายใน (Extension Number)</label>
+                                  <input
+                                    type="text"
+                                    style={{ width: '100%', maxWidth: 300, border: '1px solid #34d399', borderRadius: 6, padding: '8px 12px', fontSize: 12, background: isReadOnly ? '#f5f5f7' : '#fff', color: isReadOnly ? '#86868b' : '#0f172a', outline: 'none', fontFamily: 'inherit', cursor: isReadOnly ? 'not-allowed' : 'text' }}
+                                    placeholder="ตัวอย่าง: 1035, 1036..."
+                                    value={answers[`${item.key}_note`] || ''}
+                                    onChange={(e) => setAnswers((p) => ({ ...p, [`${item.key}_note`]: e.target.value }))}
+                                    disabled={isReadOnly}
+                                  />
+                                </div>
                               </div>
                             )}
                           </div>
@@ -834,8 +1090,8 @@ export default function PMRunPage() {
 
               {/* Footer Actions */}
               <div style={{ padding: '16px 24px', borderTop: '1px solid #e5e5ea', display: 'flex', justifyContent: 'flex-end', gap: 10, background: '#fff', flexShrink: 0 }}>
-                <button type="button" className="pmr-btn pmr-btn-outline" onClick={() => setPMModal({ open: false, run: null })}>ปิด</button>
-                {!isDoneRun && (
+                <button type="button" className="pmr-btn pmr-btn-outline" onClick={() => setPMModal({ open: false, run: null, readOnly: false })}>ปิด</button>
+                {!isReadOnly && (
                   <>
                     <button type="button" className="pmr-btn pmr-btn-outline" onClick={() => handleSave('IN_PROGRESS')} disabled={saving}>
                       {saving ? '⏳...' : '💾 บันทึกร่าง'}
@@ -861,7 +1117,15 @@ export default function PMRunPage() {
           
           const rawItems = getChecklistItems(firstRun);
           const items = [...rawItems].sort((a: any, b: any) => {
-            if (a.group !== b.group) return (a.group || '').localeCompare(b.group || '');
+            if (a.group !== b.group) {
+              const groupOrder = Object.keys(GROUP_INFO);
+              const aIdx = groupOrder.indexOf(a.group || '');
+              const bIdx = groupOrder.indexOf(b.group || '');
+              if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+              if (aIdx !== -1) return -1;
+              if (bIdx !== -1) return 1;
+              return (a.group || '').localeCompare(b.group || '');
+            }
             return (a.order || 0) - (b.order || 0);
           });
           const groups = Array.from(new Set(items.map((i: any) => i.group)));
@@ -882,7 +1146,7 @@ export default function PMRunPage() {
               {/* Quick Actions */}
               <div style={{ padding: '14px 24px', borderBottom: '1px solid #e5e5ea', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexShrink: 0, gap: 12, background: '#f5f5f7' }}>
                 <button type="button" className="pmr-btn pmr-btn-outline" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => setAll('yes')}>✓ ทำทั้งหมด (Yes)</button>
-                <button type="button" className="pmr-btn pmr-btn-outline" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => setAnswers({})}>↺ ล้างข้อมูล</button>
+                <button type="button" className="pmr-btn pmr-btn-outline" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => setAnswers({ staff_name: user?.displayName || user?.username || '' })}>↺ ล้างข้อมูล</button>
               </div>
 
               {/* Checklist Scrollable Body */}
@@ -900,10 +1164,11 @@ export default function PMRunPage() {
                             <div style={{ flex: 1, minWidth: 220 }}>
                               <div style={{ fontSize: 13, color: '#1d1d1f', fontWeight: 500 }}>{item.label}</div>
                               {item.type?.toLowerCase() === 'text' && (
-                                <textarea style={{ width: '100%', border: '1px solid #d2d2d7', borderRadius: 8, padding: '10px 14px', fontSize: 12, fontFamily: 'inherit', minHeight: 70, marginTop: 8, resize: 'vertical', outline: 'none' }}
+                                <textarea style={{ width: '100%', border: '1px solid #d2d2d7', borderRadius: 8, padding: '10px 14px', fontSize: 12, fontFamily: 'inherit', minHeight: 70, marginTop: 8, resize: 'vertical', outline: 'none', background: item.key === 'staff_name' ? '#f5f5f7' : '#fff', color: item.key === 'staff_name' ? '#86868b' : '#1d1d1f', cursor: item.key === 'staff_name' ? 'not-allowed' : 'text' }}
                                   placeholder={item.key === 'issue_note' ? 'ระบุข้อเสนอแนะหรือปัญหาที่พบ...' : 'ระบุรายละเอียด...'}
                                   value={answers[item.key] || ''}
                                   onChange={e => setAnswers(p => ({ ...p, [item.key]: e.target.value }))}
+                                  disabled={item.key === 'staff_name'}
                                 />
                               )}
                               {item.type?.toLowerCase() === 'rating' && (
@@ -923,15 +1188,78 @@ export default function PMRunPage() {
                               </div>
                             )}
                             
-                            {/* Inline Note for No/NA */}
-                            {item.type?.toLowerCase() === 'boolean' && (answers[item.key] === 'no' || answers[item.key] === 'na') && (
+                            {item.type?.toLowerCase().startsWith('select') && (
+                              <div style={{ marginTop: 8 }}>
+                                <select
+                                  style={{
+                                    width: '100%',
+                                    maxWidth: 400,
+                                    border: (['select_physical', 'select_result'].includes(item.type?.toLowerCase()) && (answers[item.key] === 'ชำรุดรอซ่อม' || answers[item.key] === 'ไม่ผ่านเกณฑ์')) ? '1px solid #ef4444' : '1px solid #d2d2d7',
+                                    borderRadius: 8, padding: '10px 14px', fontSize: 13, fontFamily: 'inherit', outline: 'none',
+                                    background: (['select_physical', 'select_result'].includes(item.type?.toLowerCase()) && (answers[item.key] === 'ชำรุดรอซ่อม' || answers[item.key] === 'ไม่ผ่านเกณฑ์')) ? '#fef2f2' : '#fff',
+                                    color: '#1d1d1f',
+                                  }}
+                                  value={answers[item.key] || ''}
+                                  onChange={(e) => setAnswers((p) => ({ ...p, [item.key]: e.target.value }))}
+                                >
+                                  <option value="">-- กรุณาเลือก --</option>
+                                  {item.type?.toLowerCase() === 'select_physical' && ['สภาพปกติ', 'ชำรุดเล็กน้อย', 'ชำรุดรอซ่อม', 'หมดสภาพ'].map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                  {item.type?.toLowerCase() === 'select_speed' && ['เร็วปกติ', 'เริ่มหน่วงหนืด', 'ช้ามาก'].map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                  {item.type?.toLowerCase() === 'select_result' && ['ผ่านเกณฑ์', 'แก้ไขเรียบร้อย', 'ไม่ผ่านเกณฑ์'].map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                  {item.type?.toLowerCase() === 'select' && item.options?.split(',').map((opt: string) => opt.trim()).filter(Boolean).map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
+                                </select>
+                              </div>
+                            )}
+                            
+                            {item.type?.toLowerCase() === 'monitor_array' && (
+                              <div style={{ marginTop: 8 }}>
+                                <PMDeviceArrayInput
+                                  type="monitor"
+                                  value={answers[item.key] || ''}
+                                  onChange={(v) => setAnswers((p) => ({ ...p, [item.key]: v }))}
+                                  parentAsset={firstRun?.asset}
+                                  readOnly={false}
+                                />
+                              </div>
+                            )}
+                            
+                            {item.type?.toLowerCase() === 'printer_array' && (
+                              <div style={{ marginTop: 8 }}>
+                                <PMDeviceArrayInput
+                                  type="printer"
+                                  value={answers[item.key] || ''}
+                                  onChange={(v) => setAnswers((p) => ({ ...p, [item.key]: v }))}
+                                  parentAsset={firstRun?.asset}
+                                  readOnly={false}
+                                />
+                              </div>
+                            )}
+
+                            {/* Inline Note for No/NA or specific fields */}
+                            {item.type?.toLowerCase() === 'boolean' && (answers[item.key] === 'no' || answers[item.key] === 'na' || (answers[item.key] === 'yes' && ['windows_version', 'office_check', 'antivirus'].includes(item.key))) && (
                               <div style={{ width: '100%', paddingLeft: 38, marginTop: 6, animation: 'pmrFadeUp 0.15s ease' }}>
                                 <input type="text"
                                   style={{ width: '100%', border: '1px solid #ff9500', borderRadius: 6, padding: '8px 12px', fontSize: 12, background: '#fffbeb', outline: 'none', fontFamily: 'inherit' }}
-                                  placeholder="ระบุสาเหตุประกอบการเลือกไม่ใช่หรือไม่ระบุ..."
+                                  placeholder={['windows_version', 'office_check', 'antivirus'].includes(item.key) ? "ระบุรายละเอียดเพิ่มเติม (เช่น เวอร์ชัน, License)..." : "ระบุสาเหตุประกอบการเลือกไม่ใช่หรือไม่ระบุ..."}
                                   value={answers[`${item.key}_note`] || ''}
                                   onChange={e => setAnswers(p => ({ ...p, [`${item.key}_note`]: e.target.value }))}
                                 />
+                              </div>
+                            )}
+                            
+                            {/* Green Box for IP Phone (Yes) */}
+                            {item.type?.toLowerCase() === 'boolean' && item.key === 'ip_phone' && answers[item.key] === 'yes' && (
+                              <div style={{ width: '100%', paddingLeft: 38, marginTop: 6, animation: 'pmrFadeUp 0.15s ease' }}>
+                                <div style={{ background: '#ecfdf5', border: '1px solid #6ee7b7', borderRadius: 8, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                  <label style={{ fontSize: 11, color: '#047857', fontWeight: 600 }}>📞 ระบุหมายเลขโทรศัพท์ภายใน (Extension Number)</label>
+                                  <input
+                                    type="text"
+                                    style={{ width: '100%', maxWidth: 300, border: '1px solid #34d399', borderRadius: 6, padding: '8px 12px', fontSize: 12, background: '#fff', outline: 'none', fontFamily: 'inherit', color: '#0f172a' }}
+                                    placeholder="ตัวอย่าง: 1035, 1036..."
+                                    value={answers[`${item.key}_note`] || ''}
+                                    onChange={(e) => setAnswers((p) => ({ ...p, [`${item.key}_note`]: e.target.value }))}
+                                  />
+                                </div>
                               </div>
                             )}
                           </div>

@@ -26,11 +26,13 @@ import {
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import SyncIcon from '@mui/icons-material/Sync';
 import { departmentAPI } from '../../services/api';
 
 interface Department {
   id: number;
   name: string;
+  nameEng?: string;
   code: string;
   description?: string;
 }
@@ -44,6 +46,7 @@ export default function DepartmentManagementPage() {
   const [formData, setFormData] = useState({ name: '', code: '', description: '' });
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     fetchDepartments();
@@ -119,6 +122,23 @@ export default function DepartmentManagementPage() {
     }
   };
 
+  const handleSyncAD = async () => {
+    if (!window.confirm('คุณต้องการดึงข้อมูลแผนกและบริษัททั้งหมดจากระบบ Intra-tools ใช่หรือไม่?')) return;
+    
+    setSyncing(true);
+    setError('');
+    setSuccessMsg('');
+    try {
+      const res = await departmentAPI.syncAD();
+      setSuccessMsg(res.data?.message || 'ดึงข้อมูลสำเร็จ');
+      fetchDepartments();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อ AD');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, p: 2 }}>
       <Card sx={{
@@ -150,17 +170,35 @@ export default function DepartmentManagementPage() {
               size="small"
               sx={{ minWidth: 250 }}
             />
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => handleOpenDialog()}
-              sx={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                color: 'white',
-              }}
-            >
-              เพิ่มแผนกใหม่
-            </Button>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant="outlined"
+                startIcon={syncing ? <CircularProgress size={16} /> : <SyncIcon />}
+                onClick={handleSyncAD}
+                disabled={syncing}
+                sx={{
+                  borderColor: '#4f46e5',
+                  color: '#4f46e5',
+                  '&:hover': {
+                    borderColor: '#4338ca',
+                    bgcolor: 'rgba(79, 70, 229, 0.04)'
+                  }
+                }}
+              >
+                {syncing ? 'กำลังดึง...' : 'ดึงจาก Intra-tools'}
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => handleOpenDialog()}
+                sx={{
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: 'white',
+                }}
+              >
+                เพิ่มแผนกใหม่
+              </Button>
+            </Box>
           </Box>
 
           {loading ? (
@@ -176,7 +214,8 @@ export default function DepartmentManagementPage() {
               <Table>
                 <TableHead>
                   <TableRow sx={{ bgcolor: 'rgba(99, 102, 241, 0.05)' }}>
-                    <TableCell><strong>ชื่อแผนก</strong></TableCell>
+                    <TableCell><strong>ชื่อแผนก (TH)</strong></TableCell>
+                    <TableCell><strong>ชื่อแผนก (EN)</strong></TableCell>
                     <TableCell><strong>รหัส</strong></TableCell>
                     <TableCell><strong>รายละเอียด</strong></TableCell>
                     <TableCell align="right"><strong>การดำเนินการ</strong></TableCell>
@@ -186,6 +225,7 @@ export default function DepartmentManagementPage() {
                   {departments.map((dept) => (
                     <TableRow key={dept.id} sx={{ '&:hover': { bgcolor: 'rgba(99, 102, 241, 0.03)' } }}>
                       <TableCell sx={{ fontWeight: 500 }}>{dept.name}</TableCell>
+                      <TableCell>{dept.nameEng || '—'}</TableCell>
                       <TableCell>
                         <Chip label={dept.code} size="small" variant="outlined" />
                       </TableCell>

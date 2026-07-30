@@ -10,6 +10,8 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import { borrowAPI } from '../../services/api';
+import { formatDate } from '../../utils/dateUtils';
+
 
 interface Request {
   id: number;
@@ -189,7 +191,7 @@ export default function ApprovalQueuePage() {
                       {request.requestNo}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {new Date(request.createdAt).toLocaleDateString('th-TH')}
+                      {formatDate(request.createdAt)}
                     </Typography>
                   </Box>
                   
@@ -284,7 +286,7 @@ export default function ApprovalQueuePage() {
                       <TableCell>{(request.requester as any)?.company || '-'}</TableCell>
                       <TableCell>{request.purpose}</TableCell>
                       <TableCell>{request.items.length} รายการ</TableCell>
-                      <TableCell>{new Date(request.createdAt).toLocaleDateString('th-TH')}</TableCell>
+                      <TableCell>{formatDate(request.createdAt)}</TableCell>
                       <TableCell align="right">
                         <Button
                           size="small"

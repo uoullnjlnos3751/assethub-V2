@@ -34,6 +34,9 @@ const routeLabels: Record<string, string> = {
   settings: 'ตั้งค่า',
   'notification-logs': 'ประวัติแจ้งเตือน',
   'audit-log': 'Audit Log',
+  inventory: 'คลังพัสดุ',
+  categories: 'หมวดหมู่',
+  donations: 'บริจาค',
 };
 
 export default function Breadcrumbs() {
@@ -46,7 +49,7 @@ export default function Breadcrumbs() {
   return (
     <MuiBreadcrumbs
       separator={<ChevronRight size={16} color={theme.palette.text.secondary} />}
-      sx={{ mb: 3 }}
+      sx={{ mb: { xs: 2, md: 3 } }}
     >
       <RouterLink
         to="/dashboard"
@@ -57,16 +60,20 @@ export default function Breadcrumbs() {
           textDecoration: 'none',
           color: theme.palette.text.secondary,
           fontWeight: 500,
-          fontSize: '0.85rem',
+          fontSize: '0.8125rem',
         }}
       >
-        <Home size={16} />
+        <Home size={14} />
         หน้าหลัก
       </RouterLink>
       {pathnames.map((segment, index) => {
         const isLast = index === pathnames.length - 1;
         const to = `/${pathnames.slice(0, index + 1).join('/')}`;
-        const label = routeLabels[segment] || segment;
+        
+        let label = routeLabels[segment] || segment;
+        if (/^\d+$/.test(segment)) {
+          label = 'รายละเอียด';
+        }
 
         if (isLast) {
           return (
@@ -74,8 +81,8 @@ export default function Breadcrumbs() {
               key={to}
               sx={{
                 fontWeight: 700,
-                color: theme.palette.primary.main,
-                fontSize: '0.85rem',
+                color: theme.palette.text.primary,
+                fontSize: '0.8125rem',
               }}
             >
               {label}

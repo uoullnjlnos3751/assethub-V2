@@ -2,9 +2,12 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { Box, Typography, Card, CardContent, Grid, CircularProgress, Chip, MenuItem, Select, FormControl, Button, TextField, InputLabel, alpha } from '@mui/material';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { dashboardAPI, pmAPI } from '../../services/api';
-import { Wrench, CheckCircle2, Clock, ArrowRight, FolderOpen, Building2, Download, Search, Filter } from 'lucide-react';
+import { Wrench, CheckCircle2, Clock, ArrowRight, FolderOpen, Building2, Download, Search, Filter, FileText, Star, AlertTriangle, ShieldAlert, Check } from 'lucide-react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import ReportHeaderTabs from './ReportHeaderTabs';
 import * as XLSX from 'xlsx';
+import { PieChart as ReChartsPieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
 
 const CAT_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16'];
 const statusLabels: Record<string, string> = { COMPLETED: 'เสร็จสิ้น', IN_PROGRESS: 'กำลังตรวจ', DRAFT: 'รอดำเนินการ' };
@@ -19,6 +22,37 @@ export default function ReportPMPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [searchAsset, setSearchAsset] = useState('');
   const [searchPerformer, setSearchPerformer] = useState('');
+  const [exportingPDF, setExportingPDF] = useState(false);
+
+  const handleExportPDF = async () => {
+    try {
+      setExportingPDF(true);
+      const element = document.getElementById('report-content');
+      if (!element) return;
+      const canvas = await html2canvas(element, { 
+        scale: 3, 
+        useCORS: true, 
+        backgroundColor: '#ffffff',
+        logging: false
+      });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      pdf.setFontSize(18);
+      pdf.setTextColor(15, 23, 42);
+      pdf.text('PM Executive Summary', 14, 20);
+      pdf.setFontSize(10);
+      pdf.setTextColor(100, 116, 139);
+      pdf.text(`Fiscal Year: ${year} | Exported Date: ${new Date().toLocaleString('th-TH')}`, 14, 28);
+      pdf.addImage(imgData, 'PNG', 10, 35, pdfWidth - 20, Math.min(pdfHeight, pdf.internal.pageSize.getHeight() - 40));
+      pdf.save(`PM_Executive_Report_${year}_${new Date().getTime()}.pdf`);
+    } catch (err) {
+      console.error('Failed to export PDF', err);
+    } finally {
+      setExportingPDF(false);
+    }
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -40,7 +74,11 @@ export default function ReportPMPage() {
     let list = runs;
     
     if (statusFilter) {
-      list = list.filter(r => r.status === statusFilter);
+      if (statusFilter === 'REMAINING') {
+        list = list.filter(r => r.status !== 'COMPLETED');
+      } else {
+        list = list.filter(r => r.status === statusFilter);
+      }
     }
     
     if (searchAsset) {
@@ -60,6 +98,86 @@ export default function ReportPMPage() {
     
     return list;
   }, [runs, statusFilter, searchAsset, searchPerformer]);
+
+  const getAnswerValue = (run: any, key: string) => {
+    const ans = run.answers?.find((a: any) => (a.item?.key || a.key) === key);
+    if (!ans?.value) return '';
+    if (ans.value.includes('::')) return ans.value.split('::')[0];
+    return ans.value;
+  };
+
+  const getAnswerNote = (run: any, key: string) => {
+    const ans = run.answers?.find((a: any) => (a.item?.key || a.key) === key);
+    if (!ans?.value) return '';
+    if (ans.value.includes('::')) return ans.value.split('::')[1];
+    return '';
+  };
+
+  const completedRuns = useMemo(() => runs.filter(r => r.status === 'COMPLETED'), [runs]);
+
+  // 1. Satisfaction Rating
+  const satisfactionStats = useMemo(() => {
+    const ratings = completedRuns
+      .map(r => getAnswerValue(r, 'satisfaction'))
+      .filter(v => v && !isNaN(Number(v)))
+      .map(Number);
+    const count = ratings.length;
+    const avg = count > 0 ? (ratings.reduce((a, b) => a + b, 0) / count).toFixed(1) : 'N/A';
+    return { avg, count };
+  }, [completedRuns]);
+
+  // 2. Physical Condition Pie Data
+  const physicalData = useMemo(() => {
+    const counts = { normal: 0, minor_damage: 0, broken: 0, retired: 0 };
+    completedRuns.forEach(r => {
+      const val = getAnswerValue(r, 'physical_condition');
+      if (val in counts) counts[val as keyof typeof counts]++;
+    });
+    return [
+      { name: 'ปกติสมบูรณ์', value: counts.normal, color: '#10b981' },
+      { name: 'ชำรุดเล็กน้อย', value: counts.minor_damage, color: '#eab308' },
+      { name: 'ชำรุดรอซ่อม', value: counts.broken, color: '#f97316' },
+      { name: 'หมดสภาพ', value: counts.retired, color: '#ef4444' }
+    ].filter(d => d.value > 0);
+  }, [completedRuns]);
+
+  // 3. Speed / Performance Pie Data
+  const performanceData = useMemo(() => {
+    const counts = { fast: 0, slow: 0, very_slow: 0 };
+    completedRuns.forEach(r => {
+      const val = getAnswerValue(r, 'speed_performance');
+      if (val in counts) counts[val as keyof typeof counts]++;
+    });
+    return [
+      { name: 'เร็วปกติ', value: counts.fast, color: '#10b981' },
+      { name: 'เริ่มช้า/หน่วง', value: counts.slow, color: '#f97316' },
+      { name: 'ช้ามาก', value: counts.very_slow, color: '#ef4444' }
+    ].filter(d => d.value > 0);
+  }, [completedRuns]);
+
+  // 4. Overall Check Result Pie Data
+  const pmResultData = useMemo(() => {
+    const counts = { passed: 0, resolved: 0, pending: 0 };
+    completedRuns.forEach(r => {
+      const val = getAnswerValue(r, 'pm_result');
+      if (val in counts) counts[val as keyof typeof counts]++;
+    });
+    return [
+      { name: 'ผ่านเกณฑ์มาตรฐาน', value: counts.passed, color: '#10b981' },
+      { name: 'แก้ไขแล้วขณะตรวจ', value: counts.resolved, color: '#3b82f6' },
+      { name: 'ไม่ผ่าน/รอซ่อมต่อ', value: counts.pending, color: '#ef4444' }
+    ].filter(d => d.value > 0);
+  }, [completedRuns]);
+
+  // 5. Action Items (To-Do list)
+  const actionItems = useMemo(() => {
+    return completedRuns.filter(r => {
+      const cond = getAnswerValue(r, 'physical_condition');
+      const speed = getAnswerValue(r, 'speed_performance');
+      const res = getAnswerValue(r, 'pm_result');
+      return cond === 'broken' || speed === 'very_slow' || res === 'pending';
+    });
+  }, [completedRuns]);
 
   // Client-side Excel Export
   const handleExportExcel = () => {
@@ -125,54 +243,143 @@ export default function ReportPMPage() {
           <Typography variant="body2" color="text.secondary">สรุปผลการตรวจนับและบำรุงรักษาทรัพย์สินประจำปี</Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-          <FormControl size="small" sx={{ minWidth: 110 }}>
+          <FormControl size="small" sx={{ minWidth: 110, bgcolor: '#fff' }}>
             <Select value={year} onChange={e => setYear(Number(e.target.value))}>
               {[2024, 2025, 2026].map(y => <MenuItem key={y} value={y}>{y} ปี</MenuItem>)}
             </Select>
           </FormControl>
           <Button 
-            variant="contained" 
+            variant="outlined" 
             startIcon={<Download size={16} />} 
             onClick={handleExportExcel}
             sx={{ 
-              bgcolor: '#b45309', 
-              '&:hover': { bgcolor: '#92400e' },
-              boxShadow: '0 4px 10px rgba(180, 83, 9, 0.15)',
-              textTransform: 'none'
+              borderColor: '#cbd5e1', 
+              color: '#475569', 
+              '&:hover': { bgcolor: '#f1f5f9', borderColor: '#94a3b8' },
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600
             }}
           >
             Export Excel
           </Button>
+          <Button 
+            variant="contained" 
+            startIcon={exportingPDF ? <CircularProgress size={16} color="inherit" /> : <FileText size={16} />} 
+            onClick={handleExportPDF}
+            disabled={exportingPDF}
+            sx={{ 
+              bgcolor: '#b45309', 
+              '&:hover': { bgcolor: '#92400e' },
+              boxShadow: '0 4px 10px rgba(180, 83, 9, 0.15)',
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600
+            }}
+          >
+            {exportingPDF ? 'Generating...' : 'Export PDF'}
+          </Button>
         </Box>
       </Box>
 
-      {/* Summary cards */}
-      <Grid container spacing={2.5} sx={{ mb: 4 }}>
-        <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '2px solid #4f46e5', bgcolor: 'rgba(79,70,229,0.02)' }}><CardContent sx={{ p: 2.5 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(99,102,241,0.1)', color: '#4f46e5', display: 'flex' }}><Wrench size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>แผนงานทั้งหมด</Typography></Box>
-            <Typography variant="h4" fontWeight={800}>{summary?.total || 0}</Typography>
-          </CardContent></Card>
+      <Box id="report-content" sx={{ bgcolor: '#ffffff', borderRadius: 4, p: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: '1px solid #f1f5f9' }}>
+        {/* Summary cards */}
+        <Grid container spacing={2.5} sx={{ mb: 4 }}>
+          <Grid item xs={6} md={3}>
+            <Card 
+              onClick={() => setStatusFilter('')}
+              sx={{ 
+                borderLeft: '4px solid #4f46e5', 
+                bgcolor: statusFilter === '' ? 'rgba(79,70,229,0.06)' : 'rgba(79,70,229,0.01)',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                opacity: (statusFilter === '' || statusFilter === 'COMPLETED' || statusFilter === 'REMAINING') ? 1 : 0.45,
+                transform: statusFilter === '' ? 'scale(1.02)' : 'scale(1)',
+                boxShadow: statusFilter === '' ? '0 8px 20px rgba(79,70,229,0.15)' : 'none',
+                '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 6px 15px rgba(79,70,229,0.1)' }
+              }}
+            >
+              <CardContent sx={{ p: 2.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                  <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(99,102,241,0.1)', color: '#4f46e5', display: 'flex' }}>
+                    <Wrench size={20} />
+                  </Box>
+                  <Typography variant="body2" color="text.secondary" fontWeight={700}>แผนงานทั้งหมด</Typography>
+                </Box>
+                <Typography variant="h4" fontWeight={800} color="#4f46e5">{summary?.total || 0}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={6} md={3}>
+            <Card 
+              onClick={() => setStatusFilter(statusFilter === 'COMPLETED' ? '' : 'COMPLETED')}
+              sx={{ 
+                borderLeft: '4px solid #10b981', 
+                bgcolor: statusFilter === 'COMPLETED' ? 'rgba(16,185,129,0.06)' : 'rgba(16,185,129,0.01)',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                opacity: (statusFilter === '' || statusFilter === 'COMPLETED') ? 1 : 0.45,
+                transform: statusFilter === 'COMPLETED' ? 'scale(1.02)' : 'scale(1)',
+                boxShadow: statusFilter === 'COMPLETED' ? '0 8px 20px rgba(16,185,129,0.15)' : 'none',
+                '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 6px 15px rgba(16,185,129,0.1)' }
+              }}
+            >
+              <CardContent sx={{ p: 2.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                  <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(16,185,129,0.1)', color: '#059669', display: 'flex' }}>
+                    <CheckCircle2 size={20} />
+                  </Box>
+                  <Typography variant="body2" color="text.secondary" fontWeight={700}>ดำเนินการเสร็จ</Typography>
+                </Box>
+                <Typography variant="h4" fontWeight={800} color="#059669">{summary?.completed || 0}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={6} md={3}>
+            <Card 
+              onClick={() => setStatusFilter(statusFilter === 'REMAINING' ? '' : 'REMAINING')}
+              sx={{ 
+                borderLeft: '4px solid #f59e0b', 
+                bgcolor: statusFilter === 'REMAINING' ? 'rgba(245,158,11,0.06)' : 'rgba(245,158,11,0.01)',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                opacity: (statusFilter === '' || statusFilter === 'REMAINING') ? 1 : 0.45,
+                transform: statusFilter === 'REMAINING' ? 'scale(1.02)' : 'scale(1)',
+                boxShadow: statusFilter === 'REMAINING' ? '0 8px 20px rgba(245,158,11,0.15)' : 'none',
+                '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 6px 15px rgba(245,158,11,0.1)' }
+              }}
+            >
+              <CardContent sx={{ p: 2.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                  <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(245,158,11,0.1)', color: '#d97706', display: 'flex' }}>
+                    <Clock size={20} />
+                  </Box>
+                  <Typography variant="body2" color="text.secondary" fontWeight={700}>คงเหลือ</Typography>
+                </Box>
+                <Typography variant="h4" fontWeight={800} color="#d97706">{summary?.remaining || 0}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={6} md={3}>
+            <Card 
+              sx={{ 
+                borderLeft: '4px solid #7c3aed', 
+                bgcolor: 'rgba(124,58,237,0.01)',
+                opacity: 1
+              }}
+            >
+              <CardContent sx={{ p: 2.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                  <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(139,92,246,0.1)', color: '#7c3aed', display: 'flex' }}>
+                    <ArrowRight size={20} />
+                  </Box>
+                  <Typography variant="body2" color="text.secondary" fontWeight={700}>ความคืบหน้า</Typography>
+                </Box>
+                <Typography variant="h4" fontWeight={800} color="#7c3aed">{completionRate}%</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
         </Grid>
-        <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '2px solid #10b981', bgcolor: 'rgba(16,185,129,0.02)' }}><CardContent sx={{ p: 2.5 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(16,185,129,0.1)', color: '#059669', display: 'flex' }}><CheckCircle2 size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>ดำเนินการเสร็จ</Typography></Box>
-            <Typography variant="h4" fontWeight={800}>{summary?.completed || 0}</Typography>
-          </CardContent></Card>
-        </Grid>
-        <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '2px solid #f59e0b', bgcolor: 'rgba(245,158,11,0.02)' }}><CardContent sx={{ p: 2.5 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(245,158,11,0.1)', color: '#d97706', display: 'flex' }}><Clock size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>คงเหลือ</Typography></Box>
-            <Typography variant="h4" fontWeight={800}>{summary?.remaining || 0}</Typography>
-          </CardContent></Card>
-        </Grid>
-        <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '2px solid #7c3aed', bgcolor: 'rgba(124,58,237,0.02)' }}><CardContent sx={{ p: 2.5 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(139,92,246,0.1)', color: '#7c3aed', display: 'flex' }}><ArrowRight size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>ความคืบหน้า</Typography></Box>
-            <Typography variant="h4" fontWeight={800}>{completionRate}%</Typography>
-          </CardContent></Card>
-        </Grid>
-      </Grid>
 
       {/* Progress + Stats */}
       <Grid container spacing={2.5} sx={{ mb: 4 }}>
@@ -263,7 +470,7 @@ export default function ReportPMPage() {
                   <Box key={dept.name || i} sx={{ display: 'flex', alignItems: 'center', gap: 2, px: 3, py: 2, borderBottom: i < byDepartment.length - 1 ? '1px solid #f1f5f9' : 'none', '&:hover': { bgcolor: '#f8fafc' } }}>
                     <Typography variant="body2" fontWeight={700} sx={{ minWidth: 160, color: '#475569' }}>{dept.name}</Typography>
                     <Box sx={{ flex: 1, height: 8, bgcolor: '#e2e8f0', borderRadius: 4, overflow: 'hidden' }}>
-                      <Box sx={{ height: '100%', width: `${pct}%`, borderRadius: 4, bgcolor: pct >= 80 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444', transition: 'width 0.5s' }} />
+                      <Box sx={{ height: '100%', width: `${pct}%`, borderRadius: 4, bgcolor: pct >= 80 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444' }} />
                     </Box>
                     <Typography variant="caption" fontWeight={700} sx={{ minWidth: 70, textAlign: 'right', color: '#64748b' }}>{dept.completed}/{dept.total} เครื่อง</Typography>
                     <Typography variant="caption" fontWeight={800} color={pct >= 80 ? '#059669' : '#d97706'} sx={{ minWidth: 45, textAlign: 'right' }}>{pct}%</Typography>
@@ -274,6 +481,241 @@ export default function ReportPMPage() {
           </Card>
         </Box>
       )}
+
+      {/* 📊 ส่วนสรุปผลการประเมินและสถิติ (Evaluation & Proactive Maintenance) */}
+      <Box sx={{ mt: 4, pt: 4, borderTop: '2px dashed #f1f5f9' }}>
+        <Typography variant="h6" fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3, color: '#1e293b' }}>
+          <Star size={20} color="#b45309" fill="#b45309" /> ผลการประเมินและความพึงพอใจการทำ PM ({completedRuns.length} เครื่องที่เสร็จสิ้น)
+        </Typography>
+
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          {/* Satisfaction Card */}
+          <Grid item xs={12} md={4}>
+            <Card sx={{ height: '100%', borderRadius: '12px', border: '1px solid rgba(229,231,235,0.7)', boxShadow: '0 4px 12px rgba(0,0,0,0.02)', display: 'flex', flexDirection: 'column', justifyContent: 'center', p: 1 }}>
+              <CardContent sx={{ textAlign: 'center' }}>
+                <Typography variant="body2" color="text.secondary" fontWeight={700} gutterBottom>ความพึงพอใจจากผู้ใช้เฉลี่ย</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, my: 1.5 }}>
+                  <Star size={36} color="#eab308" fill="#eab308" />
+                  <Typography variant="h3" fontWeight={800} color="#1e293b">{satisfactionStats.avg}</Typography>
+                  <Typography variant="h6" color="text.secondary" sx={{ pt: 1.5 }}>/ 5.0</Typography>
+                </Box>
+                <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                  ประเมินแล้วทั้งหมด {satisfactionStats.count} เครื่อง
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Action Items Count Card */}
+          <Grid item xs={12} md={4}>
+            <Card sx={{ height: '100%', borderRadius: '12px', border: '1px solid rgba(229,231,235,0.7)', boxShadow: '0 4px 12px rgba(0,0,0,0.02)', display: 'flex', flexDirection: 'column', justifyContent: 'center', p: 1 }}>
+              <CardContent sx={{ textAlign: 'center' }}>
+                <Typography variant="body2" color="text.secondary" fontWeight={700} gutterBottom>พบเครื่องทำงานช้า/ชำรุดรอซ่อม</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, my: 1.5 }}>
+                  <AlertTriangle size={36} color="#f97316" />
+                  <Typography variant="h3" fontWeight={800} color="#f97316">{actionItems.length}</Typography>
+                  <Typography variant="h6" color="text.secondary" sx={{ pt: 1.5 }}>เครื่อง</Typography>
+                </Box>
+                <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                  คิดเป็น {completedRuns.length ? Math.round((actionItems.length / completedRuns.length) * 100) : 0}% ของเครื่องที่ตรวจแล้ว
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Average Passed Rate */}
+          <Grid item xs={12} md={4}>
+            <Card sx={{ height: '100%', borderRadius: '12px', border: '1px solid rgba(229,231,235,0.7)', boxShadow: '0 4px 12px rgba(0,0,0,0.02)', display: 'flex', flexDirection: 'column', justifyContent: 'center', p: 1 }}>
+              <CardContent sx={{ textAlign: 'center' }}>
+                <Typography variant="body2" color="text.secondary" fontWeight={700} gutterBottom>อัตราผ่านเกณฑ์มาตรฐานทันที</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, my: 1.5 }}>
+                  <ShieldAlert size={36} color="#10b981" />
+                  <Typography variant="h3" fontWeight={800} color="#10b981">
+                    {completedRuns.length ? Math.round(((completedRuns.filter(r => getAnswerValue(r, 'pm_result') === 'passed').length) / completedRuns.length) * 100) : 0}
+                  </Typography>
+                  <Typography variant="h5" color="#10b981" sx={{ pt: 1 }}>%</Typography>
+                </Box>
+                <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                  ผ่านเกณฑ์มาตรฐาน ไม่ต้องแก้ไขหรือซ่อมต่อ
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+
+        {/* Charts Row */}
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          {/* Chart 1: Physical Condition */}
+          <Grid item xs={12} md={4}>
+            <Card sx={{ borderRadius: '12px', border: '1px solid rgba(229,231,235,0.7)', boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
+              <CardContent sx={{ p: 2 }}>
+                <Typography variant="body2" fontWeight={700} sx={{ mb: 2, textAlign: 'center', color: '#475569' }}>สภาพภายนอกอุปกรณ์</Typography>
+                <Box sx={{ height: 180, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                  {physicalData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ReChartsPieChart>
+                        <Pie data={physicalData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={45} outerRadius={65} paddingAngle={3}>
+                          {physicalData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <RechartsTooltip formatter={(v) => [`${v} เครื่อง`, 'จำนวน']} />
+                      </ReChartsPieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <Typography variant="caption" color="text.secondary">ไม่มีข้อมูลการประเมิน</Typography>
+                  )}
+                </Box>
+                {/* Custom Legend */}
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 1.5, mt: 1 }}>
+                  {physicalData.map((d, idx) => (
+                    <Box key={idx} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: d.color }} />
+                      <Typography style={{ fontSize: 10, color: '#64748b', fontWeight: 600 }}>{d.name} ({d.value})</Typography>
+                    </Box>
+                  ))}
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Chart 2: Performance Speed */}
+          <Grid item xs={12} md={4}>
+            <Card sx={{ borderRadius: '12px', border: '1px solid rgba(229,231,235,0.7)', boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
+              <CardContent sx={{ p: 2 }}>
+                <Typography variant="body2" fontWeight={700} sx={{ mb: 2, textAlign: 'center', color: '#475569' }}>ประสิทธิภาพความเร็วคอมพิวเตอร์</Typography>
+                <Box sx={{ height: 180, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                  {performanceData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ReChartsPieChart>
+                        <Pie data={performanceData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={45} outerRadius={65} paddingAngle={3}>
+                          {performanceData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <RechartsTooltip formatter={(v) => [`${v} เครื่อง`, 'จำนวน']} />
+                      </ReChartsPieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <Typography variant="caption" color="text.secondary">ไม่มีข้อมูลการประเมิน</Typography>
+                  )}
+                </Box>
+                {/* Custom Legend */}
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 1.5, mt: 1 }}>
+                  {performanceData.map((d, idx) => (
+                    <Box key={idx} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: d.color }} />
+                      <Typography style={{ fontSize: 10, color: '#64748b', fontWeight: 600 }}>{d.name} ({d.value})</Typography>
+                    </Box>
+                  ))}
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Chart 3: PM Result status */}
+          <Grid item xs={12} md={4}>
+            <Card sx={{ borderRadius: '12px', border: '1px solid rgba(229,231,235,0.7)', boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
+              <CardContent sx={{ p: 2 }}>
+                <Typography variant="body2" fontWeight={700} sx={{ mb: 2, textAlign: 'center', color: '#475569' }}>สรุปผลการตรวจสอบ PM</Typography>
+                <Box sx={{ height: 180, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                  {pmResultData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ReChartsPieChart>
+                        <Pie data={pmResultData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={45} outerRadius={65} paddingAngle={3}>
+                          {pmResultData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <RechartsTooltip formatter={(v) => [`${v} เครื่อง`, 'จำนวน']} />
+                      </ReChartsPieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <Typography variant="caption" color="text.secondary">ไม่มีข้อมูลการประเมิน</Typography>
+                  )}
+                </Box>
+                {/* Custom Legend */}
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 1.5, mt: 1 }}>
+                  {pmResultData.map((d, idx) => (
+                    <Box key={idx} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: d.color }} />
+                      <Typography style={{ fontSize: 10, color: '#64748b', fontWeight: 600 }}>{d.name} ({d.value})</Typography>
+                    </Box>
+                  ))}
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+
+        {/* Action Items List (To-Do list) */}
+        {actionItems.length > 0 && (
+          <Box sx={{ mt: 3 }}>
+            <Typography variant="body2" fontWeight={700} sx={{ mb: 1.5, color: '#475569', display: 'flex', alignItems: 'center', gap: 1 }}>
+              <AlertTriangle size={16} color="#f97316" /> คอมพิวเตอร์ที่พบข้อบกพร่อง/ต้องซ่อมบำรุงเชิงรุกต่อ ({actionItems.length} เครื่อง)
+            </Typography>
+            <Card sx={{ border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px', overflow: 'hidden' }}>
+              <Box sx={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ background: '#fef2f2', borderBottom: '1px solid #fee2e2', color: '#991b1b', fontWeight: 700 }}>
+                      <th style={{ padding: '10px 16px', textAlign: 'left' }}>รหัสทรัพย์สิน</th>
+                      <th style={{ padding: '10px 16px', textAlign: 'left' }}>แบรนด์/รุ่น</th>
+                      <th style={{ padding: '10px 16px', textAlign: 'left' }}>แผนก</th>
+                      <th style={{ padding: '10px 16px', textAlign: 'left' }}>อาการ/สภาพที่พบ</th>
+                      <th style={{ padding: '10px 16px', textAlign: 'left' }}>ข้อเสนอแนะของช่าง</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {actionItems.map((r, idx) => {
+                      const cond = getAnswerValue(r, 'physical_condition');
+                      const speed = getAnswerValue(r, 'speed_performance');
+                      const res = getAnswerValue(r, 'pm_result');
+                      const note = getAnswerValue(r, 'issue_note') || '-';
+                      
+                      let issues = [];
+                      if (cond === 'broken') issues.push('❌ ชำรุดรอซ่อม');
+                      else if (cond === 'minor_damage') issues.push('⚠ ชำรุดเล็กน้อย');
+                      else if (cond === 'retired') issues.push('☠ ควรจำหน่ายออก');
+
+                      if (speed === 'very_slow') issues.push('⚡ ช้ามาก');
+                      else if (speed === 'slow') issues.push('⚡ เริ่มหน่วง');
+
+                      if (res === 'pending') issues.push('⚙ รอดำเนินการแก้ไข');
+
+                      return (
+                        <tr key={r.id} style={{ borderBottom: idx < actionItems.length - 1 ? '1px solid #f1f5f9' : 'none', background: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
+                          <td style={{ padding: '10px 16px', color: '#1e293b', fontWeight: 600 }}>
+                            <a href={`/inventory?search=${r.asset?.assetCode}`} style={{ color: '#b45309', textDecoration: 'none', fontWeight: 700 }}>
+                              {r.asset?.assetCode || '-'}
+                            </a>
+                          </td>
+                          <td style={{ padding: '10px 16px', color: '#475569' }}>{r.asset?.brand || ''} {r.asset?.model || ''}</td>
+                          <td style={{ padding: '10px 16px', color: '#475569' }}>{r.asset?.departmentId || '-'}</td>
+                          <td style={{ padding: '10px 16px' }}>
+                            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                              {issues.map((iss, i) => (
+                                <span key={i} style={{ padding: '2px 6px', borderRadius: 4, background: '#fef2f2', border: '1px solid #fee2e2', color: '#ef4444', fontSize: 10, fontWeight: 600 }}>
+                                  {iss}
+                                </span>
+                              ))}
+                            </Box>
+                          </td>
+                          <td style={{ padding: '10px 16px', color: '#64748b', fontStyle: note !== '-' ? 'italic' : 'normal' }}>
+                            {note}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </Box>
+            </Card>
+          </Box>
+        )}
+      </Box>
+
+      </Box>
 
       {/* Filter Section for PM Runs Table */}
       <Typography variant="h6" fontWeight={700} sx={{ mb: 2, color: '#1e293b' }}>
@@ -288,6 +730,8 @@ export default function ReportPMPage() {
               <InputLabel>สถานะ PM</InputLabel>
               <Select value={statusFilter} label="สถานะ PM" onChange={e => setStatusFilter(e.target.value)}>
                 <MenuItem value="">ทั้งหมด</MenuItem>
+                <MenuItem value="REMAINING">🟠 คงเหลือที่ต้องตรวจ</MenuItem>
+                <hr style={{ margin: '8px 0', border: 'none', borderTop: '1px solid #e2e8f0' }} />
                 {Object.entries(statusLabels).map(([k, v]) => <MenuItem key={k} value={k}>{v}</MenuItem>)}
               </Select>
             </FormControl>

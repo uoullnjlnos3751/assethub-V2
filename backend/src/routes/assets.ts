@@ -22,7 +22,7 @@ declare global {
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req: any, file: any, cb: any) => {
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
@@ -113,6 +113,7 @@ const ALLOWED_ASSET_FIELDS = new Set([
   'floor', 'poDate', 'ramDetail', 'gpu', 'osType', 'ramSlot1', 'ramSlot2',
   'snComputer', 'storage1', 'storage2', 'createdAt', 'updatedAt',
   'oldAssetCode', 'budget', 'image', 'categoryId',
+  'memoryType', 'ramOnboard', 'ramType', 'ramSpeed', 'ramMaxSupported', 'ramAvailableSlots', 'ramUpgradeable',
 ]);
 
 const normalizeAssetPayload = (data: any, isCreate = false) => {
@@ -489,17 +490,32 @@ const ASSET_TYPE_GROUPS: Record<string, string[]> = {
 
 router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { search, status, department, location, type, typeGroup, categoryId, cpu, ram, warrantyStatus, warrantyExpiringInDays, ownerName, screenSize, resolution, panelType, printerType, isColor, ipAddress, storage, osType, company, page = '1', limit = '50' } = req.query;
+    const { search, status, department, location, type, typeGroup, categoryId, cpu, ram, warrantyStatus, warrantyExpiringInDays, ownerName, exactOwnerName, screenSize, resolution, panelType, printerType, isColor, ipAddress, storage, osType, company, serialNo, page = '1', limit = '50' } = req.query;
     const pageNum = parseInt(page as string);
-    const limitNum = Math.min(parseInt(limit as string), 100);
+    const parsedLimit = parseInt(limit as string);
+    const limitNum = parsedLimit === 10000 ? 10000 : Math.min(parsedLimit, 100);
     const skip = (pageNum - 1) * limitNum;
 
     const where: any = {};
     if (status) where.status = status as string;
     if (department) where.departmentId = department as string;
-    if (location) where.location = location as string;
+    if (location === '__EMPTY__') {
+      where.OR = [...(where.OR || []), { location: null }, { location: '' }];
+    } else if (location) {
+      where.location = location as string;
+    }
     if (categoryId) where.categoryId = parseInt(categoryId as string);
-    if (company) where.company = company as string;
+    if (company === '__EMPTY__') {
+      where.OR = [...(where.OR || []), { company: null }, { company: '' }];
+    } else if (company) {
+      where.company = company as string;
+    }
+    if (serialNo === '__EMPTY__') {
+      // serialNo is a required field (String @unique), so null filter is invalid — use empty/dash only
+      where.OR = [...(where.OR || []), { serialNo: '' }, { serialNo: '-' }];
+    } else if (serialNo) {
+      where.serialNo = serialNo as string;
+    }
 
     // Apply company visibility mapping for non-admins
     if (req.user && !['SUPERADMIN', 'IT_ADMIN'].includes(req.user.role)) {
@@ -522,14 +538,18 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
         where.company = { in: ['__NONE__'] };
       }
     }
-    if (type) {
+    if (type === '__EMPTY__') {
+      where.OR = [...(where.OR || []), { type: null }, { type: '' }];
+    } else if (type) {
       where.type = type as string;
     } else if (typeGroup && ASSET_TYPE_GROUPS[String(typeGroup)]) {
       where.type = { in: ASSET_TYPE_GROUPS[String(typeGroup)] };
     }
-    if (ownerName) {
-      where.ownerName = { contains: ownerName as string, mode: 'insensitive' };
-    }
+      if (exactOwnerName) {
+        where.ownerName = { equals: exactOwnerName as string, mode: 'insensitive' };
+      } else if (ownerName) {
+        where.ownerName = { contains: ownerName as string, mode: 'insensitive' };
+      }
     if (cpu) {
       const cpuList = (cpu as string).split(',').map(s => s.trim()).filter(Boolean);
       if (cpuList.length > 1) {
@@ -640,7 +660,7 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
 router.get('/filter-options', authenticate, async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const notNull = { not: null };
-    const [cpus, rams, osTypes, storages, screenSizes, resolutions, panelTypes, printerTypes, colors] = await Promise.all([
+    const [cpus, rams, osTypes, storages, screenSizes, resolutions, panelTypes, printerTypes, colors, brands, departments, locations, companies] = await Promise.all([
       prisma.asset.findMany({ distinct: ['cpu'], where: { cpu: notNull }, select: { cpu: true }, orderBy: { cpu: 'asc' } }),
       prisma.asset.findMany({ distinct: ['ram'], where: { ram: notNull }, select: { ram: true }, orderBy: { ram: 'asc' } }),
       prisma.asset.findMany({ distinct: ['osType'], where: { osType: notNull }, select: { osType: true }, orderBy: { osType: 'asc' } }),
@@ -650,6 +670,10 @@ router.get('/filter-options', authenticate, async (_req: Request, res: Response,
       prisma.monitorDetail.findMany({ distinct: ['panelType'], where: { panelType: notNull }, select: { panelType: true }, orderBy: { panelType: 'asc' } }),
       prisma.printerDetail.findMany({ distinct: ['printerType'], where: { printerType: notNull }, select: { printerType: true }, orderBy: { printerType: 'asc' } }),
       prisma.printerDetail.findMany({ distinct: ['isColor'], where: { isColor: { not: null } }, select: { isColor: true } }),
+      prisma.asset.findMany({ distinct: ['brand'], where: { brand: notNull }, select: { brand: true }, orderBy: { brand: 'asc' } }),
+      prisma.asset.findMany({ distinct: ['departmentId'], where: { departmentId: notNull }, select: { departmentId: true }, orderBy: { departmentId: 'asc' } }),
+      prisma.asset.findMany({ distinct: ['location'], where: { location: notNull }, select: { location: true }, orderBy: { location: 'asc' } }),
+      prisma.asset.findMany({ distinct: ['company'], where: { company: notNull }, select: { company: true }, orderBy: { company: 'asc' } }),
     ]);
     res.json({
       cpu: cpus.map(r => r.cpu).filter(c => c && c.trim()),
@@ -661,6 +685,10 @@ router.get('/filter-options', authenticate, async (_req: Request, res: Response,
       panelType: panelTypes.map(r => r.panelType).filter(c => c && c.trim()),
       printerType: printerTypes.map(r => r.printerType).filter(c => c && c.trim()),
       isColor: colors.map(r => r.isColor).filter(c => c !== null),
+      brand: brands.map(r => r.brand).filter(c => c && c.trim()),
+      departmentId: departments.map(r => r.departmentId).filter(c => c && c.trim()),
+      location: locations.map(r => r.location).filter(c => c && c.trim()),
+      company: companies.map(r => r.company).filter(c => c && c.trim()),
     });
   } catch (err) { next(err); }
 });
@@ -794,6 +822,13 @@ router.get('/options/os-types', authenticate, async (_req: Request, res: Respons
     const existing = new Set(rows.map((r) => r.osType).filter((v): v is string => v !== null));
     defaults.forEach((d) => existing.add(d));
     res.json(Array.from(existing).sort((a, b) => a.localeCompare(b)));
+  } catch (err) { next(err); }
+});
+
+router.get('/options/brands', authenticate, async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const rows = await prisma.asset.findMany({ where: { brand: { not: null } }, distinct: ['brand'], select: { brand: true }, orderBy: { brand: 'asc' } });
+    res.json(rows.map((r) => r.brand).filter((v): v is string => v !== null && v !== ''));
   } catch (err) { next(err); }
 });
 
@@ -2117,14 +2152,52 @@ router.get('/glpi-spec', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), asyn
   } catch (err) { next(err); }
 });
 
+// Get global audit log / history for all assets
+router.get('/global-history', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    const [history, total] = await Promise.all([
+      prisma.assetHistory.findMany({
+        include: {
+          asset: { select: { assetCode: true, assetName: true } },
+          actor: { select: { id: true, displayName: true, email: true } },
+          owner: { select: { id: true, displayName: true, email: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip: offset,
+      }),
+      prisma.assetHistory.count(),
+    ]);
+
+    res.json({
+      data: history,
+      pagination: {
+        total,
+        limit,
+        offset,
+        hasMore: offset + limit < total,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/:id', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
     const asset = await prisma.asset.findUnique({
       where: { id },
       include: {
-        assetHistory: { orderBy: { createdAt: 'desc' }, take: 50 },
-        pmRuns: { orderBy: { completedAt: 'desc' }, take: 20, include: { plan: true, performer: true } },
+        assetHistory: { 
+          orderBy: { createdAt: 'desc' }, 
+          take: 50,
+          include: { actor: { select: { displayName: true, email: true } } }
+        },
+        pmRuns: { orderBy: { completedAt: 'desc' }, take: 20, include: { plan: true, performer: true, answers: { include: { item: true } } } },
         category: true,
         documents: { orderBy: { createdAt: 'desc' } },
       },
@@ -2278,6 +2351,11 @@ router.put('/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req
 
     const data = normalizeAssetPayload(assetData);
 
+    // Auto-clear ownerName if status becomes Retired or Disposed
+    if (data.status && (data.status === 'Retired' || data.status === 'Disposed')) {
+      data.ownerName = null;
+    }
+
     // Check for duplicates (excluding current asset)
     const duplicateErrors = await checkDuplicateAssets(data, id);
     if (duplicateErrors.length > 0) {
@@ -2314,7 +2392,30 @@ router.put('/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req
 router.delete('/:id', authenticate, authorize('SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
-    await prisma.asset.delete({ where: { id } });
+    await prisma.$transaction(async (tx) => {
+      // 1. Delete PM runs and answers
+      const pmRuns = await tx.pMRun.findMany({ where: { assetId: id }, select: { id: true } });
+      const pmRunIds = pmRuns.map(r => r.id);
+      if (pmRunIds.length > 0) {
+        await tx.pMRunAnswer.deleteMany({ where: { runId: { in: pmRunIds } } });
+        await tx.pMRun.deleteMany({ where: { id: { in: pmRunIds } } });
+      }
+
+      // 2. Delete asset history
+      await tx.assetHistory.deleteMany({ where: { assetId: id } });
+
+      // 3. Set borrow request item assetId to null
+      await tx.borrowRequestItem.updateMany({ where: { assetId: id }, data: { assetId: null } });
+
+      // 4. Delete donation items
+      await tx.donationItem.deleteMany({ where: { assetId: id } });
+
+      // 5. Delete maintenance records
+      await tx.maintenanceRecord.deleteMany({ where: { assetId: id } });
+
+      // 6. Delete asset
+      await tx.asset.delete({ where: { id } });
+    });
     res.json({ message: 'ลบทรัพย์สินเรียบร้อย' });
   } catch (err) { next(err); }
 });
@@ -2332,6 +2433,8 @@ router.post('/bulk-delete', authenticate, authorize('SUPERADMIN'), async (req: R
       }
       await tx.assetHistory.deleteMany({ where: { assetId: { in: ids } } });
       await tx.borrowRequestItem.updateMany({ where: { assetId: { in: ids } }, data: { assetId: null } });
+      await tx.donationItem.deleteMany({ where: { assetId: { in: ids } } });
+      await tx.maintenanceRecord.deleteMany({ where: { assetId: { in: ids } } });
       return tx.asset.deleteMany({ where: { id: { in: ids } } });
     });
     res.json({ message: `ลบ ${result.count} รายการเรียบร้อย` });
@@ -2351,6 +2454,8 @@ router.post('/bulk-delete-by-type', authenticate, authorize('SUPERADMIN'), async
       }
       await tx.assetHistory.deleteMany({ where: { asset: { type } } });
       await tx.borrowRequestItem.updateMany({ where: { asset: { type } }, data: { assetId: null } });
+      await tx.donationItem.deleteMany({ where: { asset: { type } } });
+      await tx.maintenanceRecord.deleteMany({ where: { asset: { type } } });
       return tx.asset.deleteMany({ where: { type } });
     });
     res.json({ message: `ลบ ${result.count} รายการจากประเภท ${type} เรียบร้อย`, count: result.count });
@@ -2367,6 +2472,12 @@ router.post('/bulk-update', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), a
     for (const key of allowed) {
       if (data[key] !== undefined) updateData[key] = data[key];
     }
+    
+    // Auto-clear ownerName if status is Retired or Disposed in bulk update
+    if (updateData.status && (updateData.status === 'Retired' || updateData.status === 'Disposed')) {
+      updateData.ownerName = null;
+    }
+
     if (Object.keys(updateData).length === 0) throw new AppError('No valid fields to update', 400);
     const result = await prisma.asset.updateMany({ where: { id: { in: ids } }, data: updateData });
     res.json({ message: `อัปเดต ${result.count} รายการเรียบร้อย` });
@@ -2580,7 +2691,7 @@ router.get('/:id/history', authenticate, async (req: Request, res: Response, nex
         where: { assetId: id },
         include: { 
           asset: { select: { assetCode: true, assetName: true } },
-          actor: { select: { id: true, name: true, email: true } },
+          actor: { select: { id: true, displayName: true, email: true } },
         },
         orderBy: { createdAt: 'desc' },
         take: limit,

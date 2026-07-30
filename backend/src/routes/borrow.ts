@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { authenticate, authorize } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { createNotification } from '../services/notification';
@@ -226,11 +226,11 @@ router.post('/requests', authenticate, validate(borrowRequestSchema), async (req
       itemsTable: '',
       items: itemsPayload,
     };
-    for (const admin of admins) {
+    await Promise.all(admins.map(async (admin) => {
       if (admin.email) {
         await createNotification('borrow_request_pending', 'EMAIL', admin.email, payload);
       }
-    }
+    }));
     
     // Notify via LINE Broadcast/Multicast (only once)
     await createNotification('borrow_request_pending', 'LINE', 'broadcast', payload);
@@ -704,7 +704,7 @@ router.post('/extensions', authenticate, validate(extensionSchema), async (req: 
         link: '/borrow/extension-queue',
       })),
     });
-    for (const admin of admins) {
+    await Promise.all(admins.map(async (admin) => {
       if (admin.email) {
         await createNotification('extension_pending', 'EMAIL', admin.email, {
           requestNo: borrowRequest.requestNo,
@@ -721,7 +721,22 @@ router.post('/extensions', authenticate, validate(extensionSchema), async (req: 
             : '-',
         });
       }
-    }
+    }));
+
+    await createNotification('extension_pending', 'LINE', 'broadcast', {
+      requestNo: borrowRequest.requestNo,
+      requester: user?.displayName || req.user!.adUsername,
+      department: user?.department || '-',
+      purpose: borrowRequest.purpose || '-',
+      extraDays: String(extraDays),
+      reason: reason || '-',
+      oldDueDate: extension.items[0]?.oldDueDate
+        ? new Date(extension.items[0].oldDueDate).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })
+        : '-',
+      newDueDate: extension.items[0]?.requestedDueDate
+        ? new Date(extension.items[0].requestedDueDate).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })
+        : '-',
+    });
 
     res.status(201).json(extension);
   } catch (err) { next(err); }
@@ -881,6 +896,47 @@ router.post('/items/:itemId/reminder', authenticate, authorize('IT_ADMIN', 'SUPE
     });
 
     res.json({ message: 'ส่งแจ้งเตือนรายการเกินกำหนดเรียบร้อย' });
+  } catch (err) { next(err); }
+});
+
+// ── User: Cancel own pending request ──
+router.delete('/requests/:id', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const request = await prisma.borrowRequest.findUnique({
+      where: { id },
+      include: { requester: true, items: { include: { asset: true, inventoryItem: true } } },
+    });
+    if (!request) throw new AppError('ไม่พบคำขอยืม', 404);
+    if (request.requesterUserId !== req.user!.userId && !['IT_ADMIN', 'SUPERADMIN'].includes(req.user!.role)) {
+      throw new AppError('ไม่มีสิทธิ์ยกเลิกคำขอนี้');
+    }
+    if (request.status !== 'Pending') throw new AppError('ไม่สามารถยกเลิกคำขอที่ดำเนินการแล้ว');
+
+    await prisma.$transaction(async (tx) => {
+      await tx.borrowRequestItem.updateMany({
+        where: { requestId: id },
+        data: { itemStatus: 'Cancelled' },
+      });
+      await tx.borrowRequest.update({
+        where: { id },
+        data: { status: 'Cancelled' },
+      });
+    });
+
+    // Notify IT admins about cancellation
+    const admins = await prisma.appUser.findMany({ where: { role: { in: ['IT_ADMIN', 'SUPERADMIN'] } } });
+    await prisma.appNotification.createMany({
+      data: admins.map(admin => ({
+        userId: admin.id,
+        title: 'คำขอยืมถูกยกเลิก',
+        message: `คำขอยืมเลขที่ ${request.requestNo} ถูกยกเลิกโดย ${request.requester.displayName || req.user!.adUsername}`,
+        type: 'BORROW',
+        link: '/borrow/approval-queue',
+      })),
+    });
+
+    res.json({ message: 'ยกเลิกคำขอยืมเรียบร้อย' });
   } catch (err) { next(err); }
 });
 

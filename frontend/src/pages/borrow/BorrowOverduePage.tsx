@@ -10,6 +10,8 @@ import WarningIcon from '@mui/icons-material/Warning';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import SendIcon from '@mui/icons-material/Send';
 import { borrowAPI } from '../../services/api';
+import { formatDate } from '../../utils/dateUtils';
+
 
 interface OverdueItem {
   id: number;
@@ -211,7 +213,7 @@ export default function BorrowOverduePage() {
                     <TableCell>{item.borrowerName}</TableCell>
                     <TableCell>{item.asset?.assetCode || item.inventoryItem?.name || '-'}</TableCell>
                     <TableCell>{item.asset?.serialNo || (item.inventoryItem ? `${item.quantity} ${item.inventoryItem.unit}` : '-')}</TableCell>
-                    <TableCell>{new Date(item.dueDate).toLocaleDateString('th-TH')}</TableCell>
+                    <TableCell>{formatDate(item.dueDate)}</TableCell>
                     <TableCell align="center">
                       <Chip
                         label={`${item.daysOverdue} วัน`}
@@ -294,10 +296,10 @@ export default function BorrowOverduePage() {
                   สถานะการยืม
                 </Typography>
                 <Typography variant="body2">
-                  ยืมเมื่อ: {new Date(selectedItem.borrowDate).toLocaleDateString('th-TH')}
+                  ยืมเมื่อ: {formatDate(selectedItem.borrowDate)}
                 </Typography>
                 <Typography variant="body2" color="error" fontWeight={600}>
-                  กำหนดคืน: {new Date(selectedItem.dueDate).toLocaleDateString('th-TH')}
+                  กำหนดคืน: {formatDate(selectedItem.dueDate)}
                 </Typography>
                 <Typography variant="body2" color="error" fontWeight={600}>
                   เกินกำหนด: {selectedItem.daysOverdue} วัน

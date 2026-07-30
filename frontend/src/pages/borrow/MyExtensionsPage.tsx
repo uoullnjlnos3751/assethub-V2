@@ -11,6 +11,8 @@ import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import { borrowAPI } from '../../services/api';
 import StatusChip from '../../components/StatusChip';
 import EmptyState from '../../components/EmptyState';
+import { formatDate } from '../../utils/dateUtils';
+
 
 interface MyExtension {
   id: number;
@@ -111,7 +113,7 @@ export default function MyExtensionsPage() {
                         </Box>
                         <Box>
                           <Typography variant="caption" color="text.secondary" fontWeight={600}>กำหนดคืนเดิม</Typography>
-                          <Typography fontWeight={600}>{new Date(item.oldDueDate).toLocaleDateString('th-TH')}</Typography>
+                          <Typography fontWeight={600}>{formatDate(item.oldDueDate)}</Typography>
                         </Box>
                         <Box>
                           <Typography variant="caption" color="text.secondary" fontWeight={600}>ขอขยาย</Typography>
@@ -120,7 +122,7 @@ export default function MyExtensionsPage() {
                         <Box>
                           <Typography variant="caption" color="text.secondary" fontWeight={600}>กำหนดคืนใหม่</Typography>
                           <Typography fontWeight={600} color={isApproved ? 'success.main' : 'text.secondary'}>
-                            {new Date(item.requestedDueDate).toLocaleDateString('th-TH')}
+                            {formatDate(item.requestedDueDate)}
                           </Typography>
                         </Box>
                       </Box>

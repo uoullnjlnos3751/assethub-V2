@@ -11,6 +11,8 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import ExtensionIcon from '@mui/icons-material/Extension';
 import { borrowAPI } from '../../services/api';
+import { formatDate } from '../../utils/dateUtils';
+
 
 interface Extension {
   id: number;
@@ -231,7 +233,7 @@ export default function ExtensionQueuePage() {
                     <TableCell>{ext.requester?.displayName || ext.requester?.adUsername}</TableCell>
                     <TableCell>{ext.assetCode}</TableCell>
                     <TableCell>{ext.serialNo}</TableCell>
-                    <TableCell>{new Date(ext.currentDueDate).toLocaleDateString('th-TH')}</TableCell>
+                    <TableCell>{formatDate(ext.currentDueDate)}</TableCell>
                     <TableCell align="center">
                       <Chip
                         label={`+${ext.requestedExtraDays}`}
@@ -329,7 +331,7 @@ export default function ExtensionQueuePage() {
                   วันกำหนดคืนเดิม
                 </Typography>
                 <Typography>
-                  {new Date(detailDialog.extension.currentDueDate).toLocaleDateString('th-TH')}
+                  {formatDate(detailDialog.extension.currentDueDate)}
                 </Typography>
               </Box>
 
@@ -413,7 +415,7 @@ export default function ExtensionQueuePage() {
                   size="small"
                 />
                 <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-                  (กำหนดคืนเดิม: {new Date(dialog.extension.currentDueDate).toLocaleDateString('th-TH')})
+                  (กำหนดคืนเดิม: {formatDate(dialog.extension.currentDueDate)})
                 </Typography>
               </Typography>
 

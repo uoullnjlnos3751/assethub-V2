@@ -16,6 +16,8 @@ import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import { borrowAPI } from '../../services/api';
 import StatusChip from '../../components/StatusChip';
 import { useToast } from '../../contexts/ToastContext';
+import { formatDate } from '../../utils/dateUtils';
+
 
 const conditions = [
   { value: 'Normal', label: 'ปกติ' },
@@ -138,7 +140,7 @@ function RequestRow({ group, onReturn, defaultOpen = false }: { group: RequestGr
         <TableCell>
           {earliestDueDate ? (
             <Typography variant="body2" sx={{ fontWeight: isOverdue ? 700 : 'inherit', color: isOverdue ? 'error.main' : 'inherit' }}>
-              {new Date(earliestDueDate).toLocaleDateString('th-TH')}
+              {formatDate(earliestDueDate)}
               {isOverdue && ' ⚠️'}
             </Typography>
           ) : (
@@ -212,10 +214,10 @@ function RequestRow({ group, onReturn, defaultOpen = false }: { group: RequestGr
                           <TableCell sx={{ fontWeight: 600, fontSize: '0.85rem' }}>{item.assetCode}</TableCell>
                           <TableCell sx={{ fontSize: '0.85rem' }}>{item.isQuantityBased ? '-' : (item.serialNo || '-')}</TableCell>
                           <TableCell sx={{ fontSize: '0.85rem' }}>{item.brand} {item.model}</TableCell>
-                          <TableCell sx={{ fontSize: '0.85rem' }}>{new Date(item.borrowDate).toLocaleDateString('th-TH')}</TableCell>
+                          <TableCell sx={{ fontSize: '0.85rem' }}>{formatDate(item.borrowDate)}</TableCell>
                           <TableCell sx={{ color: isItemOverdue ? 'error.main' : 'inherit', fontWeight: isItemOverdue ? 700 : 'inherit', fontSize: '0.85rem' }}>
                             {item.dueDate ? (
-                              <>{new Date(item.dueDate).toLocaleDateString('th-TH')}
+                              <>{formatDate(item.dueDate)}
                               {isItemOverdue && ' ⚠️'}</>
                             ) : (
                               '-'

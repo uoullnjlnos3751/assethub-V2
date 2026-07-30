@@ -10,6 +10,8 @@ import HandymanIcon from '@mui/icons-material/Handyman';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import { borrowAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { formatDate } from '../../utils/dateUtils';
+
 
 interface Request {
   id: number;
@@ -216,7 +218,7 @@ export default function CheckoutPage() {
                         {request.items.map(item => item.isQuantityBased ? item.inventoryItem?.name : `${item.asset?.brand || ''} ${item.asset?.model || ''}`.trim()).filter(Boolean).join(', ')}
                       </Typography>
                     </TableCell>
-                    <TableCell>{new Date(request.createdAt).toLocaleDateString('th-TH')}</TableCell>
+                    <TableCell>{formatDate(request.createdAt)}</TableCell>
                     <TableCell align="right">
                       <Button
                         size="small"
@@ -386,7 +388,7 @@ export default function CheckoutPage() {
                   </Grid>
                   <Grid item xs={6}>
                     <Typography variant="caption" color="text.secondary" display="block">วันที่ขอ</Typography>
-                    <Typography variant="body2" fontWeight={600}>{new Date(dialog.request.createdAt).toLocaleDateString('th-TH')}</Typography>
+                    <Typography variant="body2" fontWeight={600}>{formatDate(dialog.request.createdAt)}</Typography>
                   </Grid>
                   <Grid item xs={12}>
                     <Typography variant="caption" color="text.secondary" display="block">วัตถุประสงค์</Typography>

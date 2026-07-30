@@ -23,6 +23,8 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import { donationAPI } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
+import { formatDate } from '../../utils/dateUtils';
+
 
 const statusConfig: Record<string, { label: string; color: 'warning' | 'success' | 'default' }> = {
   PENDING:   { label: 'รอส่งมอบ',    color: 'warning' },
@@ -329,7 +331,7 @@ export default function DonationDetailPage() {
         <Grid item xs={6} sm={3} md={3}>
           <InfoCard icon={<CalendarTodayIcon sx={{ fontSize: 18 }} />} label="วันที่บริจาค" color="#f59e0b">
             <Typography variant="body1" fontWeight={600}>
-              {new Date(donation.donationDate).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}
+              {formatDate(donation.donationDate)}
             </Typography>
           </InfoCard>
         </Grid>
@@ -509,7 +511,7 @@ export default function DonationDetailPage() {
             </Grid>
             <Grid item xs={6}>
               <Typography variant="caption" fontWeight={600} display="block">วันที่บริจาค</Typography>
-              <Typography variant="body1" fontWeight={600}>{new Date(donation.donationDate).toLocaleDateString('th-TH')}</Typography>
+              <Typography variant="body1" fontWeight={600}>{formatDate(donation.donationDate)}</Typography>
               {donation.approvalRef && (
                 <>
                   <Typography variant="caption" fontWeight={600} display="block" sx={{ mt: 1 }}>เลขที่อนุมัติ</Typography>

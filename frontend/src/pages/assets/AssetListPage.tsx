@@ -70,7 +70,8 @@ import { useToast } from '../../contexts/ToastContext';
 import StatusChip from '../../components/StatusChip';
 import LoadingSkeleton from '../../components/LoadingSkeleton';
 import EmptyState from '../../components/EmptyState';
-
+import BulkUpdateDialog from './components/BulkUpdateDialog';
+import { ASSET_STATUSES, getStatusMeta } from '../../config/statusConfig';
 type ColumnConfig = {
   field: string;
   label: string;
@@ -80,7 +81,7 @@ type ColumnConfig = {
 const COLUMN_PREF_KEY = 'assethub.assetList.columns.v3';
 
 const defaultColumnConfig: ColumnConfig[] = [
-  { field: 'hasImage', label: '📷', visible: true },
+  { field: 'hasImage', label: 'รูป', visible: true },
   { field: 'assetName', label: 'ชื่อทรัพย์สิน', visible: true },
   { field: 'serialNo', label: 'Serial No.', visible: true },
   { field: 'type', label: 'ประเภท', visible: true },
@@ -199,12 +200,12 @@ export default function AssetListPage() {
   const { user } = useAuth();
   const toast = useToast();
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [searchParams] = useSearchParams();
   const [assets, setAssets] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(searchParams.get('search') || '');
   const [status, setStatus] = useState(searchParams.get('status') || '');
   const [type, setType] = useState(searchParams.get('type') || '');
   const typeGroup = searchParams.get('typeGroup') || '';
@@ -223,6 +224,11 @@ export default function AssetListPage() {
   const [extendDays, setExtendDays] = useState(3);
   const [extendReason, setExtendReason] = useState('');
   const [categoryStats, setCategoryStats] = useState<{ total: number; byStatus: { status: string; _count: number }[] } | null>(null);
+  
+  // Bulk update states
+  const [rowSelectionModel, setRowSelectionModel] = useState<any[]>([]);
+  const [bulkUpdateOpen, setBulkUpdateOpen] = useState(false);
+
   const navigate = useNavigate();
   const isAdmin = user?.role === 'IT_ADMIN' || user?.role === 'SUPERADMIN';
   const isAvailableOnlyView = !typeGroup && user?.role === 'USER';
@@ -240,21 +246,27 @@ export default function AssetListPage() {
     }
   }, [typeGroup, isAvailableOnlyView]);
 
-
   useEffect(() => {
     localStorage.setItem(COLUMN_PREF_KEY, JSON.stringify(columnConfig));
   }, [columnConfig]);
 
-  const fetchAssets = async () => {
+  const fetchAssets = async (overrideSearch?: string) => {
     setLoading(true);
     try {
+      const qSerialNo = searchParams.get('serialNo');
+      const qLocation = searchParams.get('location');
+      const qCompany = searchParams.has('company') ? searchParams.get('company') : null;
+      const qType = searchParams.has('type') ? searchParams.get('type') : null;
+
       const res = await assetAPI.list({
-        search,
+        search: overrideSearch !== undefined ? overrideSearch : search,
         status: status || undefined,
-        type: type || undefined,
+        type: qType !== null ? (qType === '' ? '__EMPTY__' : qType) : (type || undefined),
         typeGroup: !type && typeGroup ? typeGroup : undefined,
         categoryId: selectedCategoryId || undefined,
-        company: company || undefined,
+        company: qCompany !== null ? (qCompany === '' ? '__EMPTY__' : qCompany) : (company || undefined),
+        serialNo: qSerialNo !== null ? (qSerialNo === '' ? '__EMPTY__' : qSerialNo) : undefined,
+        location: qLocation !== null ? (qLocation === '' ? '__EMPTY__' : qLocation) : undefined,
         page: page + 1,
         limit: pageSize,
       });
@@ -283,6 +295,15 @@ export default function AssetListPage() {
   }, [assets, selectedCategoryId]);
 
   useEffect(() => { fetchAssets(); }, [page, pageSize, status, type, typeGroup, selectedCategoryId, company]);
+
+  const urlSearch = searchParams.get('search');
+  useEffect(() => {
+    if (urlSearch !== null) {
+      setSearch(urlSearch);
+      setPage(0);
+      fetchAssets(urlSearch);
+    }
+  }, [urlSearch]);
 
   const handleSearch = () => { setPage(0); fetchAssets(); };
 
@@ -334,7 +355,7 @@ export default function AssetListPage() {
     id: textColumn('id', 'ID', 90),
     hasImage: {
       field: 'hasImage',
-      headerName: '📷',
+      headerName: 'รูป',
       width: 50,
       sortable: false,
       filterable: false,
@@ -342,30 +363,28 @@ export default function AssetListPage() {
         <Box sx={{ display: 'flex', justifyContent: 'center' }}>
           {row.image ? (
             <Box
+              component="img"
+              src={row.image}
+              alt=""
               sx={{
                 width: 28,
                 height: 28,
                 borderRadius: 1.5,
-                bgcolor: alpha(theme.palette.success.main, 0.1),
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: theme.palette.success.main,
+                objectFit: 'cover',
+                boxShadow: (theme) => `0 0 0 1px ${alpha(theme.palette.success.main, 0.3)}`,
               }}
-            >
-              <ImageIcon fontSize="small" sx={{ fontSize: 16 }} />
-            </Box>
+            />
           ) : (
             <Box
               sx={{
                 width: 28,
                 height: 28,
                 borderRadius: 1.5,
-                bgcolor: alpha(theme.palette.grey[500], 0.08),
+                bgcolor: (theme) => alpha(theme.palette.grey[500], 0.08),
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: theme.palette.grey[400],
+                color: (theme) => theme.palette.grey[400],
               }}
             >
               <ImageOffIcon fontSize="small" sx={{ fontSize: 16 }} />
@@ -375,7 +394,26 @@ export default function AssetListPage() {
       ),
     },
     assetCode: textColumn('assetCode', 'เลขครุภัณฑ์', 140),
-    assetName: textColumn('assetName', 'ชื่อทรัพย์สิน', 180),
+    assetName: {
+      ...textColumn('assetName', 'ชื่อทรัพย์สิน', 180),
+      renderCell: ({ row }) => {
+        const isConsumable = ['toner', 'ink', 'cartridge', 'battery', 'adapter', 'charger', 'consumable'].some(t => row.type?.toLowerCase().includes(t));
+        const lowStock = isConsumable && row.consumableDetail && row.consumableDetail.stockQuantity <= row.consumableDetail.minimumStock;
+        
+        return (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="body2" noWrap sx={{ fontWeight: lowStock ? 700 : 400 }}>
+              {row.assetName}
+            </Typography>
+            {lowStock && (
+              <Tooltip title={`สต็อกใกล้หมด: ${row.consumableDetail.stockQuantity} (Min: ${row.consumableDetail.minimumStock})`}>
+                <WarningAmberIcon sx={{ fontSize: 16, color: 'error.main' }} />
+              </Tooltip>
+            )}
+          </Box>
+        );
+      }
+    },
     serialNo: textColumn('serialNo', 'Serial No.', 140),
     type: textColumn('type', 'ประเภท', 120),
     brand: textColumn('brand', 'ยี่ห้อ', 120),
@@ -527,36 +565,136 @@ export default function AssetListPage() {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, gap: 2, flexWrap: 'wrap' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3, gap: 2, flexWrap: 'wrap' }}>
         <Box>
-          <Typography variant="h4" fontWeight={700}>
+          <Typography variant="h4" fontWeight={800} sx={{ letterSpacing: '-0.02em', mb: 0.5 }}>
             {isAvailableOnlyView ? 'รายการอุปกรณ์พร้อมยืม' : typeGroupLabels[typeGroup] || 'ทะเบียนทรัพย์สิน'}
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            {isAvailableOnlyView ? 'เลือกอุปกรณ์ที่ต้องการยืม' : `ทั้งหมด ${total} รายการ`}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="body2" color="text.secondary" fontWeight={500}>
+              {isAvailableOnlyView ? 'เลือกอุปกรณ์ที่ต้องการยืมเพื่อส่งคำขอ' : `จัดการและติดตามทรัพย์สินทั้งหมดในระบบ`}
+            </Typography>
+            {!isAvailableOnlyView && (
+              <Chip 
+                label={`${total} รายการ`} 
+                size="small" 
+                sx={{ 
+                  height: 20, 
+                  fontSize: '0.7rem', 
+                  fontWeight: 700, 
+                  bgcolor: alpha(theme.palette.primary.main, 0.1),
+                  color: theme.palette.primary.main
+                }} 
+              />
+            )}
+          </Box>
         </Box>
-        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: isMobile ? 2 : 0, width: isMobile ? '100%' : 'auto' }}>
+        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: isMobile ? 1 : 0, width: isMobile ? '100%' : 'auto' }}>
           {isAdmin && (
-            <IconButton onClick={(e) => handleMenuOpen(e, { isHeaderMenu: true })} sx={{ display: { xs: 'flex', sm: 'none' }, ml: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+            <IconButton 
+              onClick={(e) => handleMenuOpen(e, { isHeaderMenu: true })} 
+              sx={{ 
+                display: { xs: 'flex', sm: 'none' }, 
+                ml: 'auto', 
+                border: '1px solid', 
+                borderColor: 'divider', 
+                borderRadius: '8px' 
+              }}
+            >
               <SettingsIcon />
             </IconButton>
           )}
-          {isAdmin && <Box sx={{ display: { xs: 'none', sm: 'block' } }}><ImportAssetsButton /></Box>}
-          {isAdmin && <Box sx={{ display: { xs: 'none', sm: 'block' } }}><ExportAssetsButton /></Box>}
-          {isAdmin && <Button variant="outlined" startIcon={<TableViewIcon />} sx={{ display: { xs: 'none', sm: 'flex' } }} onClick={() => setColumnDialogOpen(true)}>จัดคอลัมน์</Button>}
-          {isAdmin && <Button variant="contained" startIcon={<AddIcon />} sx={{ flex: isMobile ? 1 : 'none' }} onClick={() => navigate('/assets/new' + (typeGroup ? `?typeGroup=${typeGroup}` : ''))}>เพิ่มทรัพย์สิน</Button>}
+          <Box sx={{ display: { xs: 'none', sm: 'flex' }, gap: 1 }}>
+            {isAdmin && <ImportAssetsButton />}
+            {isAdmin && <ExportAssetsButton />}
+            {isAdmin && (
+              <Button 
+                variant="outlined" 
+                startIcon={<TableViewIcon />} 
+                onClick={() => setColumnDialogOpen(true)}
+                sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600 }}
+              >
+                ตั้งค่าคอลัมน์
+              </Button>
+            )}
+          </Box>
+          {isAdmin && (
+            <Button 
+              variant="contained" 
+              startIcon={<AddIcon />} 
+              sx={{ 
+                flex: isMobile ? 1 : 'none', 
+                borderRadius: '10px', 
+                textTransform: 'none', 
+                fontWeight: 600,
+                boxShadow: theme.shadows[2]
+              }} 
+              onClick={() => navigate('/assets/new' + (typeGroup ? `?typeGroup=${typeGroup}` : ''))}
+            >
+              เพิ่มทรัพย์สินใหม่
+            </Button>
+          )}
         </Box>
       </Box>
+
+      {/* ── KPI stat strip (5 interactive cards above filter, admin only, non-user) ── */}
+      {!isAvailableOnlyView && categoryStats && (
+        <Box sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(5, 1fr)' },
+          gap: 1.5,
+          mb: 2,
+        }}>
+          {[
+            { label: 'ทรัพย์สินทั้งหมด', value: categoryStats.total, color: theme.palette.primary.main, status: '' },
+            { label: 'พร้อมใช้งาน', value: categoryStats.byStatus.find((b) => b.status === 'Available')?._count ?? 0, color: theme.palette.success.main, status: 'Available' },
+            { label: 'ใช้งานประจำ', value: categoryStats.byStatus.find((b) => b.status === 'InUse')?._count ?? 0, color: (theme.palette as any).info?.main || '#0288d1', status: 'InUse' },
+            { label: 'กำลังยืม', value: categoryStats.byStatus.find((b) => b.status === 'Borrowed')?._count ?? 0, color: theme.palette.warning.main, status: 'Borrowed' },
+            { label: 'ซ่อมบำรุง', value: categoryStats.byStatus.find((b) => b.status === 'Maintenance')?._count ?? 0, color: theme.palette.error.main, status: 'Maintenance' },
+          ].map((kpi) => {
+            const isActive = status === kpi.status;
+            return (
+              <Box
+                key={kpi.label}
+                onClick={() => { setStatus(kpi.status); setPage(0); }}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.5,
+                  p: 1.5,
+                  bgcolor: isActive ? alpha(kpi.color, 0.05) : theme.palette.background.paper,
+                  border: `1px solid ${isActive ? kpi.color : theme.palette.divider}`,
+                  borderRadius: 2,
+                  cursor: 'pointer',
+                  transition: 'all .2s ease',
+                  boxShadow: isActive ? `0 4px 14px ${alpha(kpi.color, 0.15)}` : 'none',
+                  '&:hover': {
+                    borderColor: kpi.color,
+                    boxShadow: `0 4px 14px ${alpha(kpi.color, 0.12)}`,
+                  },
+                }}
+              >
+                <Box sx={{
+                  width: 40, height: 40, borderRadius: 1.5,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  bgcolor: alpha(kpi.color, 0.10), flexShrink: 0,
+                }}>
+                  <Typography sx={{ fontSize: '1.1rem', fontWeight: 800, color: kpi.color }}>{kpi.value}</Typography>
+                </Box>
+                <Typography sx={{ fontSize: '0.78rem', fontWeight: isActive ? 700 : 500, color: isActive ? kpi.color : theme.palette.text.secondary, lineHeight: 1.2 }}>{kpi.label}</Typography>
+              </Box>
+            );
+          })}
+        </Box>
+      )}
 
       <Card sx={{
         p: 2,
         mb: 2,
-        background: 'rgba(255, 255, 255, 0.7)',
-        backdropFilter: 'blur(20px)',
-        border: '1px solid rgba(0, 0, 0, 0.05)',
-        borderRadius: '12px',
-        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
+        bgcolor: theme.palette.background.paper,
+        border: `1px solid ${theme.palette.divider}`,
+        borderRadius: 2,
+        boxShadow: theme.shadows[1],
       }}>
         <Box sx={{ display: 'flex', gap: 1.5, flexDirection: isMobile ? 'column' : 'row', flexWrap: 'wrap', alignItems: 'center' }}>
           <TextField
@@ -565,7 +703,7 @@ export default function AssetListPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            sx={{ minWidth: 280, width: isMobile ? '100%' : 'auto', flex: 1 }}
+            sx={{ minWidth: 240, width: isMobile ? '100%' : 'auto', flex: 1 }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -574,7 +712,7 @@ export default function AssetListPage() {
               ),
             }}
           />
-          <FormControl size="small" sx={{ minWidth: 160, width: isMobile ? '100%' : 'auto' }}>
+          <FormControl size="small" sx={{ minWidth: 140, width: isMobile ? '100%' : 'auto' }}>
             <InputLabel>ประเภท</InputLabel>
             <Select value={type} label="ประเภท" onChange={(e) => { setType(e.target.value); setPage(0); }}>
               <MenuItem value="">ทั้งหมด</MenuItem>
@@ -583,7 +721,7 @@ export default function AssetListPage() {
               ))}
             </Select>
           </FormControl>
-          <FormControl size="small" sx={{ minWidth: 160, width: isMobile ? '100%' : 'auto' }}>
+          <FormControl size="small" sx={{ minWidth: 140, width: isMobile ? '100%' : 'auto' }}>
             <InputLabel>บริษัท (Company)</InputLabel>
             <Select value={company} label="บริษัท (Company)" onChange={(e) => { setCompany(e.target.value); setPage(0); }}>
               <MenuItem value="">ทั้งหมด</MenuItem>
@@ -592,62 +730,29 @@ export default function AssetListPage() {
               ))}
             </Select>
           </FormControl>
+          <FormControl size="small" sx={{ minWidth: 140, width: isMobile ? '100%' : 'auto' }}>
+            <InputLabel>สถานะ</InputLabel>
+            <Select value={status} label="สถานะ" onChange={(e) => { setStatus(e.target.value); setPage(0); }}>
+              <MenuItem value="">ทั้งหมด</MenuItem>
+              {Object.entries(statusLabels).map(([val, lbl]) => (
+                <MenuItem key={val} value={val}>{lbl}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           <Button variant="contained" startIcon={<SearchIcon />} sx={{ width: isMobile ? '100%' : 'auto', borderRadius: '8px', textTransform: 'none' }} onClick={handleSearch}>ค้นหา</Button>
+          <Button variant="outlined" startIcon={<RestartAltIcon />} sx={{ width: isMobile ? '100%' : 'auto', borderRadius: '8px', textTransform: 'none' }} onClick={() => { setSearch(''); setStatus(''); setType(''); setCompany(''); setPage(0); fetchAssets(); }}>ล้าง</Button>
+          {isAdmin && rowSelectionModel.length > 0 && (
+            <Button 
+              variant="contained" 
+              color="secondary" 
+              startIcon={<EditIcon />} 
+              sx={{ width: isMobile ? '100%' : 'auto', borderRadius: '8px', textTransform: 'none' }}
+              onClick={() => setBulkUpdateOpen(true)}
+            >
+              แก้ไขที่เลือก ({rowSelectionModel.length})
+            </Button>
+          )}
         </Box>
-
-        {/* Unified Status Filters & Stats Ribbon */}
-        {!isAvailableOnlyView && (
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1.5, pt: 1.5, borderTop: '1px solid rgba(0,0,0,0.05)', alignItems: 'center' }}>
-            <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ mr: 0.5, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>สถานะ:</Typography>
-            {[
-              { value: '',            label: 'ทั้งหมด',      color: '#6366F1', bg: alpha('#6366F1', 0.08), dot: '#6366F1' },
-              { value: 'Available',   label: 'พร้อมใช้งาน',   color: '#34c759', bg: alpha('#34c759', 0.08), dot: '#34c759' },
-              { value: 'InUse',       label: 'ใช้งานประจำ',   color: '#0071e3', bg: alpha('#0071e3', 0.08), dot: '#0071e3' },
-              { value: 'Borrowed',    label: 'กำลังยืม',     color: '#5856d6', bg: alpha('#5856d6', 0.08), dot: '#5856d6' },
-              { value: 'Maintenance', label: 'ซ่อมบำรุง',    color: '#ff9500', bg: alpha('#ff9500', 0.08), dot: '#ff9500' },
-              { value: 'Retired',     label: 'ปลดระวาง',    color: '#8e8e93', bg: alpha('#8e8e93', 0.08), dot: '#8e8e93' },
-              { value: 'Lost',        label: 'สูญหาย',      color: '#ff3b30', bg: alpha('#ff3b30', 0.08), dot: '#ff3b30' },
-            ].map((opt) => {
-              const count = opt.value === ''
-                ? total
-                : (categoryStats?.byStatus.find((b) => b.status === opt.value)?._count ?? 0);
-              const isActive = status === opt.value;
-              return (
-                <Button
-                  key={opt.value}
-                  onClick={() => { setStatus(opt.value); setPage(0); }}
-                  size="small"
-                  sx={{
-                    py: 0.25,
-                    px: 1.25,
-                    borderRadius: '20px',
-                    textTransform: 'none',
-                    fontSize: '0.72rem',
-                    fontWeight: isActive ? 700 : 500,
-                    color: isActive ? opt.color : 'text.secondary',
-                    bgcolor: isActive ? opt.bg : 'transparent',
-                    border: '1px solid',
-                    borderColor: isActive ? opt.dot : 'rgba(0, 0, 0, 0.08)',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 0.75,
-                    minWidth: 'auto',
-                    height: 28,
-                    '&:hover': {
-                      bgcolor: opt.bg,
-                      borderColor: opt.dot,
-                      color: opt.color
-                    }
-                  }}
-                >
-                  <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: opt.dot, flexShrink: 0 }} />
-                  <span>{opt.label}</span>
-                  <span style={{ opacity: 0.8, fontWeight: 700 }}>({count})</span>
-                </Button>
-              );
-            })}
-          </Box>
-        )}
       </Card>
       
       {/* Category Filter Chips — for user available-view */}
@@ -699,58 +804,6 @@ export default function AssetListPage() {
                 </Button>
               )}
             </Box>
-
-            {/* Stats row */}
-            {categoryStats && (
-              <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: 2.5, pt: 2.5, borderTop: `1px solid ${theme.palette.divider}` }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 1, bgcolor: alpha(theme.palette.success.main, 0.08), borderRadius: 2 }}>
-                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'success.main' }} />
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" fontWeight={600}>พร้อมใช้</Typography>
-                    <Typography variant="body2" fontWeight={700}>{categoryStats.byStatus.find(s => s.status === 'Available')?._count || 0}</Typography>
-                  </Box>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 1, bgcolor: alpha(theme.palette.warning.main, 0.08), borderRadius: 2 }}>
-                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'warning.main' }} />
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" fontWeight={600}>กำลังยืม</Typography>
-                    <Typography variant="body2" fontWeight={700}>{categoryStats.byStatus.find(s => s.status === 'Borrowed')?._count || 0}</Typography>
-                  </Box>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 1, bgcolor: alpha(theme.palette.info.main, 0.08), borderRadius: 2 }}>
-                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'info.main' }} />
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" fontWeight={600}>ใช้งานประจำ</Typography>
-                    <Typography variant="body2" fontWeight={700}>{categoryStats.byStatus.find(s => s.status === 'InUse')?._count || 0}</Typography>
-                  </Box>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 1, bgcolor: alpha(theme.palette.warning.dark, 0.08), borderRadius: 2 }}>
-                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#f59e0b' }} />
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" fontWeight={600}>ซ่อมบำรุง</Typography>
-                    <Typography variant="body2" fontWeight={700}>{categoryStats.byStatus.find(s => s.status === 'Maintenance')?._count || 0}</Typography>
-                  </Box>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 1, bgcolor: alpha(theme.palette.grey[500], 0.08), borderRadius: 2 }}>
-                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'grey.400' }} />
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" fontWeight={600}>ปลดระวาง</Typography>
-                    <Typography variant="body2" fontWeight={700}>{categoryStats.byStatus.find(s => s.status === 'Retired')?._count || 0}</Typography>
-                  </Box>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 1, bgcolor: alpha(theme.palette.error.main, 0.08), borderRadius: 2 }}>
-                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'error.main' }} />
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" fontWeight={600}>สูญหาย</Typography>
-                    <Typography variant="body2" fontWeight={700}>{categoryStats.byStatus.find(s => s.status === 'Lost')?._count || 0}</Typography>
-                  </Box>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 1, bgcolor: alpha(theme.palette.primary.main, 0.08), borderRadius: 2 }}>
-                  <Typography variant="caption" color="text.secondary" fontWeight={600}>รวม</Typography>
-                  <Typography variant="body2" fontWeight={700} color="primary.main">{categoryStats.total}</Typography>
-                </Box>
-              </Box>
-            )}
           </CardContent>
         </Card>
       )}
@@ -1027,6 +1080,17 @@ export default function AssetListPage() {
             autoHeight
             disableRowSelectionOnClick
             disableColumnFilter
+            checkboxSelection={isAdmin}
+            rowSelectionModel={rowSelectionModel}
+            onRowSelectionModelChange={(newSelection) => {
+              setRowSelectionModel([...newSelection]);
+            }}
+            onRowDoubleClick={(params) => navigate(`/assets/${params.id}`)}
+            sx={{
+              '& .MuiDataGrid-row': {
+                cursor: 'pointer',
+              }
+            }}
           />
         )
       )}
@@ -1111,6 +1175,9 @@ export default function AssetListPage() {
                     <ShoppingCartIcon fontSize="small" sx={{ mr: 1, color: 'warning.main' }} /> ส่งมอบ/Check-out
                   </MenuItem>
                 )}
+                <MenuItem onClick={() => { handleMenuClose(); navigate(`/assets/${menuAnchor.row.id}/print-qr`); }}>
+                  <PrintIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} /> พิมพ์ QR Code
+                </MenuItem>
                 {user?.role === 'SUPERADMIN' && (
                   <MenuItem onClick={() => { handleMenuClose(); handleDelete(menuAnchor.row.id); }} sx={{ color: 'error.main' }}>
                     <DeleteIcon fontSize="small" sx={{ mr: 1 }} /> ลบทรัพย์สิน
@@ -1122,6 +1189,18 @@ export default function AssetListPage() {
           )
         )}
       </Menu>
+
+      <BulkUpdateDialog 
+        open={bulkUpdateOpen}
+        onClose={() => setBulkUpdateOpen(false)}
+        assetIds={rowSelectionModel}
+        onSuccess={() => {
+          setBulkUpdateOpen(false);
+          setRowSelectionModel([]);
+          fetchAssets();
+          toast.success('อัปเดตข้อมูลสำเร็จ');
+        }}
+      />
     </Box>
   );
 }

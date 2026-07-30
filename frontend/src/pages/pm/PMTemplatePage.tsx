@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { pmAPI } from '../../services/api';
+import { Modal } from './components/Modal';
 
 /* ─────────────────────────────────────────────────────────────
    Types
 ───────────────────────────────────────────────────────────────── */
-type ItemType = 'boolean' | 'text' | 'rating' | 'select';
+type ItemType = 'boolean' | 'text' | 'rating' | 'select' | 'monitor_array' | 'printer_array' | 'select_physical' | 'select_speed' | 'select_result';
 
 interface TemplateItem {
   id?: number;
@@ -28,13 +29,18 @@ const TYPE_LABELS: Record<ItemType, { label: string; icon: string; desc: string 
   boolean: { label: 'ใช่ / ไม่ใช่ / N/A', icon: '☑️', desc: 'ตอบ Yes / No / N/A' },
   text:    { label: 'ข้อความ', icon: '📝', desc: 'กรอกข้อความอิสระ' },
   rating:  { label: 'คะแนนดาว', icon: '⭐', desc: 'ให้คะแนน 1–5 ดาว' },
-  select:  { label: 'เลือกรายการ', icon: '📋', desc: 'Dropdown เลือกรายการ' },
+  select:  { label: 'เลือกรายการ (แบบกำหนดเอง)', icon: '📋', desc: 'Dropdown เลือกรายการ' },
+  monitor_array: { label: 'บันทึกจอมอนิเตอร์', icon: '🖥️', desc: 'เพิ่มข้อมูลจอมอนิเตอร์ (หลายจอได้)' },
+  printer_array: { label: 'บันทึกเครื่องพิมพ์', icon: '🖨️', desc: 'เพิ่มข้อมูลเครื่องพิมพ์ (หลายเครื่องได้)' },
+  select_physical: { label: 'Dropdown: สภาพอุปกรณ์ทางกายภาพ', icon: '🛠️', desc: 'สภาพปกติ / ชำรุดเล็กน้อย / ชำรุดรอซ่อม / หมดสภาพ' },
+  select_speed: { label: 'Dropdown: ประสิทธิภาพความเร็วเครื่อง', icon: '⚡', desc: 'เร็วปกติ / เริ่มหน่วงหนืด / ช้ามาก' },
+  select_result: { label: 'Dropdown: สรุปผลการตรวจ PM', icon: '🎯', desc: 'ผ่านเกณฑ์ / แก้ไขเรียบร้อย / ไม่ผ่านเกณฑ์' }
 };
 
 const DEFAULT_GROUPS = ['user', 'os', 'security', 'agent', 'hardware', 'result', 'other'];
 const GROUP_LABELS: Record<string, string> = {
   user: '👤 ข้อมูลผู้ใช้', os: '🪟 OS & Software', security: '🔒 ความปลอดภัย',
-  agent: '🛠 Agent/Tools', hardware: '🖥 Hardware', result: '⭐ ผลประเมิน', other: '📌 อื่นๆ',
+  agent: '🛠 Agent/Tools', hardware: '🖥 Hardware', result: '⭐ ผลการประเมิน', other: '📌 อื่นๆ',
 };
 
 const DEFAULT_ITEMS: TemplateItem[] = [
@@ -52,33 +58,15 @@ const DEFAULT_ITEMS: TemplateItem[] = [
   { key: 'pc_audit', label: 'PC Audit (Hardware spec)', type: 'boolean', group: 'agent', required: true, order: 12 },
   { key: 'hw_info', label: 'HW Info (Serial, Service Tag)', type: 'boolean', group: 'agent', required: true, order: 13 },
   { key: 'cleaning', label: 'ทำความสะอาดอุปกรณ์', type: 'boolean', group: 'hardware', required: true, order: 14 },
-  { key: 'printer', label: 'ตรวจสอบ Printer Local', type: 'boolean', group: 'hardware', required: false, order: 15 },
+  { key: 'printer', label: 'ตรวจสอบ Printer Local', type: 'printer_array', group: 'hardware', required: false, order: 15 },
   { key: 'ups', label: 'ตรวจสอบ UPS', type: 'boolean', group: 'hardware', required: false, order: 16 },
-  { key: 'monitor', label: 'ตรวจสอบจอ Monitor (1 & 2)', type: 'boolean', group: 'hardware', required: false, order: 17 },
+  { key: 'monitor', label: 'บันทึกข้อมูลจอมอนิเตอร์', type: 'monitor_array', group: 'hardware', required: false, order: 17 },
   { key: 'issue_note', label: 'ปัญหาที่พบ / ข้อเสนอแนะ', type: 'text', group: 'result', required: false, order: 18 },
-  { key: 'satisfaction', label: 'ความพึงพอใจผู้ใช้ (1–5 ดาว)', type: 'rating', group: 'result', required: false, order: 19 },
+  { key: 'satisfaction', label: 'ประเมินคุณภาพและประสิทธิภาพโดยรวมของเครื่อง (1-5 ดาว)', type: 'rating', group: 'result', required: false, order: 19 },
   { key: 'staff_name', label: 'เจ้าหน้าที่ผู้ทำ PM', type: 'text', group: 'result', required: true, order: 20 },
 ];
 
-/* ─────────────────────────────────────────────────────────────
-   Modal
-───────────────────────────────────────────────────────────────── */
-function Modal({ open, onClose, title, children, maxWidth = 600 }: {
-  open: boolean; onClose: () => void; title: string; children: React.ReactNode; maxWidth?: number;
-}) {
-  if (!open) return null;
-  return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.5)', zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth, boxShadow: '0 20px 60px rgba(0,0,0,.2)', overflow: 'hidden', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #f1f5f9', flexShrink: 0 }}>
-          <span style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>{title}</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#94a3b8', padding: '2px 6px' }}>✕</button>
-        </div>
-        <div style={{ overflowY: 'auto', flex: 1 }}>{children}</div>
-      </div>
-    </div>
-  );
-}
+
 
 /* ─────────────────────────────────────────────────────────────
    Main Page
@@ -242,7 +230,6 @@ export default function PMTemplatePage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 14 }}>
             {templates.map((t: any) => {
               const itemCount = t.templateItems?.length || 0;
-              const boolCount = t.templateItems?.filter((i: any) => i.type === 'boolean').length || 0;
               return (
                 <div className="pmt-card" key={t.id}>
                   <div style={{ height: 4, background: '#0ea5e9' }} />
@@ -369,7 +356,7 @@ export default function PMTemplatePage() {
                     value={item.group}
                     onChange={e => updateItem(idx, 'group', e.target.value)}
                   >
-                    {DEFAULT_GROUPS.map(g => <option key={g} value={g}>{GROUP_LABELS[g]?.replace(/^[^\s]+ /, '') || g}</option>)}
+                    {DEFAULT_GROUPS.map(g => <option key={g} value={g}>{GROUP_LABELS[g] || g}</option>)}
                   </select>
 
                   {/* Required */}
