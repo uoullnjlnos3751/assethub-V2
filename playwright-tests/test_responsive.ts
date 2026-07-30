@@ -38,13 +38,21 @@ interface TestResult {
   screenshotPath: string;
 }
 
-// Generate an admin token to bypass login
+// Generate an admin token to bypass login.
+// Payload shape must match AuthUser (backend/src/middleware/auth.ts) exactly
+// — authenticate() decodes this straight into req.user, and
+// AuthController.me() reads req.user.userId specifically. The previous
+// version used `id`/`username`/role: 'ADMIN', none of which match AuthUser
+// (userId/adUsername, role one of USER|IT_ADMIN|SUPERADMIN) or the actual
+// AppUser table — GET /auth/me would 401 regardless of how the token got to
+// the browser, so this bypass could not have been working before either.
 function generateAdminToken(): string {
   const payload = {
-    id: 1, // Assumed admin user ID
-    username: 'admin',
+    userId: 1, // Must be a real AppUser.id in the target database
+    adUsername: 'admin',
     displayName: 'Admin User',
-    role: 'ADMIN',
+    role: 'SUPERADMIN',
+    email: null,
     department: 'IT',
     company: 'TRR',
   };
@@ -63,10 +71,22 @@ async function runTests() {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext();
 
-  // Inject token to bypass authentication
-  await context.addInitScript((tokenVal) => {
-    window.localStorage.setItem('token', tokenVal);
-  }, token);
+  // Inject the session cookie to bypass the login form. Auth now rides on an
+  // httpOnly cookie (assethub_session — see setAuthCookie in
+  // backend/src/middleware/auth.ts) instead of a token the frontend read
+  // from localStorage, so context.addCookies() is the correct way to
+  // pre-authenticate a Playwright context: it sets the cookie the same way
+  // a Set-Cookie response header would, including httpOnly, which
+  // addInitScript + localStorage could never simulate correctly anyway.
+  await context.addCookies([
+    {
+      name: 'assethub_session',
+      value: token,
+      url: BASE_URL,
+      httpOnly: true,
+      sameSite: 'Lax',
+    },
+  ]);
 
   const page = await context.newPage();
 

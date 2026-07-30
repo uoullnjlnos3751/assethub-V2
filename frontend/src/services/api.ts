@@ -13,20 +13,34 @@ const baseURL = import.meta.env.VITE_API_URL || '/api';
 export const api = axios.create({
   baseURL,
   headers: { 'Content-Type': 'application/json' },
+  // Auth now rides on an httpOnly cookie (assethub_session) instead of a
+  // token read from localStorage — withCredentials makes axios send it. No
+  // request interceptor is needed to attach anything; the browser does it.
+  withCredentials: true,
 });
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
+// GET /auth/me is called on every app load to ask "is there a valid session
+// cookie?" (see AuthContext). A 401 there just means "not logged in yet" —
+// normal, not an error — so it must not trigger the redirect-to-login below
+// (which would fire on the login page itself) or the global error toast.
+// The other /auth endpoints are excluded for the same reason: LoginPage
+// already shows its own error for a failed login/expiry check.
+const SILENT_401_PATHS = ['/auth/me', '/auth/login', '/auth/check-expiry', '/auth/logout'];
 
 api.interceptors.response.use(
   (res) => res,
   (err: AxiosError) => {
+    const isSilent401 =
+      err.response?.status === 401 &&
+      SILENT_401_PATHS.some((p) => err.config?.url?.includes(p));
+
+    if (isSilent401) {
+      return Promise.reject(err);
+    }
+
     if (err.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      // The session cookie is missing/expired. There is nothing left to
+      // clear client-side (no token is ever stored), so just leave the page.
       window.location.href = '/login';
       return Promise.reject(err);
     }
@@ -55,6 +69,9 @@ export const authAPI = {
   me: () => api.get('/auth/me'),
   publicSettings: () => api.get('/auth/settings'),
   changePassword: (data: { currentPassword: string; newPassword: string }) => api.post('/auth/change-password', data),
+  // Clears the httpOnly session cookie server-side — client-side JS cannot
+  // touch an httpOnly cookie itself.
+  logout: () => api.post('/auth/logout'),
 };
 
 // Assets
@@ -254,11 +271,13 @@ export const systemBackupAPI = {
   create: () => api.post('/backup'),
   delete: (filename: string) => api.delete(`/backup/${filename}`),
   download: (filename: string) => {
-    const token = localStorage.getItem('token');
-    // For download, we can't use api.get because of blob handling easily in browser download prompt
-    // We'll create a link and click it, appending the token
-    const url = `/api/backup/${filename}/download?token=${token}`;
-    window.open(url, '_blank');
+    // window.open navigates the browser directly rather than going through
+    // axios, so this can't attach an Authorization header — it used to work
+    // around that by putting the token in the URL. That's no longer needed:
+    // this is a same-origin GET (nginx serves /api/ and the frontend from
+    // the same host), so the httpOnly session cookie rides along
+    // automatically, the same as it would for a plain <a href> download.
+    window.open(`/api/backup/${filename}/download`, '_blank');
   },
   restore: (filename: string) => api.post(`/backup/${filename}/restore`),
 };

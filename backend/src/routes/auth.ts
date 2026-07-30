@@ -19,6 +19,9 @@ router.post('/login', loginLimiter, validate(loginSchema), AuthController.login)
 // ── Get Current User Details ──
 router.get('/me', authenticate, AuthController.me);
 
+// ── Logout ── (clears the httpOnly session cookie; see AuthController.logout)
+router.post('/logout', AuthController.logout);
+
 // ── Change Password (Local users only) ──
 router.post('/change-password', authenticate, async (req, res, next) => {
   try {

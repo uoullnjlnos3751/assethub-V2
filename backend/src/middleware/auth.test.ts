@@ -27,6 +27,31 @@ describe('authenticate middleware', () => {
     const err = next.mock.calls[0][0] as AppError;
     expect(err.status).toBe(401);
   });
+
+  // Browser auth now rides on an httpOnly cookie (see setAuthCookie in
+  // ./auth.ts) instead of a token the frontend attaches itself, with the
+  // Authorization header kept as a fallback for non-browser clients. This
+  // covers the cookie branch the way the test above covers the header
+  // branch — both should be rejected the same way for an invalid token.
+  it('reads the token from the session cookie when no Authorization header is present', () => {
+    const next = vi.fn();
+    authenticate(mockReq({ cookie: 'assethub_session=invalid-token' }), mockRes(), next);
+    expect(next).toHaveBeenCalledOnce();
+    const err = next.mock.calls[0][0] as AppError;
+    expect(err.status).toBe(401);
+  });
+
+  it('prefers the Authorization header over the cookie when both are present', () => {
+    const next = vi.fn();
+    authenticate(
+      mockReq({ authorization: 'Bearer invalid-token', cookie: 'assethub_session=also-invalid' }),
+      mockRes(),
+      next
+    );
+    expect(next).toHaveBeenCalledOnce();
+    const err = next.mock.calls[0][0] as AppError;
+    expect(err.status).toBe(401);
+  });
 });
 
 describe('authorize middleware', () => {

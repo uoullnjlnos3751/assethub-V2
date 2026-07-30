@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthService } from '../services/auth.service';
 import { AppError } from '../middleware/errorHandler';
+import { setAuthCookie, clearAuthCookie } from '../middleware/auth';
 import type { LoginInput } from '../types';
 
 export class AuthController {
@@ -18,10 +19,26 @@ export class AuthController {
     try {
       const { username, password } = req.body;
       const result = await AuthService.login(username, password);
+      // The browser SPA no longer reads result.token — it authenticates via
+      // this httpOnly cookie instead, so a stolen XSS payload can't read the
+      // token out of JS-accessible storage. The token stays in the JSON body
+      // too, for any non-browser client (scripts, other integrations) that
+      // authenticates with a Bearer header instead of a cookie.
+      setAuthCookie(req, res, result.token);
       res.json(result);
     } catch (err) {
       next(err);
     }
+  }
+
+  // Client-side JS cannot clear an httpOnly cookie (that's the point of
+  // httpOnly), so logout has to be a real request the server handles by
+  // clearing it. Always succeeds, even with no/an already-invalid session —
+  // the goal is just "make sure this browser has no session cookie after
+  // this call returns".
+  static async logout(req: Request, res: Response) {
+    clearAuthCookie(req, res);
+    res.json({ message: 'ออกจากระบบเรียบร้อยแล้ว' });
   }
 
   static async me(req: Request, res: Response, next: NextFunction) {
