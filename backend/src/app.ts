@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import authRoutes from './routes/auth';
 import assetRoutes from './routes/assets';
+import assetMasterDataRoutes from './routes/assetMasterData';
 import borrowRoutes from './routes/borrow';
 import pmRoutes from './routes/pm';
 import pmSwHubRoutes from './routes/pmSwHub';
@@ -117,6 +118,13 @@ export function createApp() {
   app.use('/uploads', uploadsRoutes);
   app.use('/api/auth', authLimiter, authRoutes);
   app.use('/api/', apiLimiter);
+  // Must be registered before assetRoutes: these are fixed segments
+  // (/device-types, /locations, ...) split out of assets.ts, and assetRoutes
+  // has a GET /:id that would otherwise swallow them — Express tries
+  // same-path routers in registration order, so this has to go first for
+  // e.g. GET /api/assets/device-types to reach the right handler instead of
+  // being parsed as "get asset with id 'device-types'".
+  app.use('/api/assets', assetMasterDataRoutes);
   app.use('/api/assets', assetRoutes);
   app.use('/api/borrow', borrowRoutes);
   app.use('/api/pm', pmRoutes);
