@@ -1,7 +1,32 @@
 node_modules/
+node_modules_old/
 dist/
 .env
 .env.local
+.env.docker.prod
 *.log
 .DS_Store
-backend/prisma/migrations/
+Thumbs.db
+
+# Database dumps / backups — never commit, may contain real user data
+*.sql
+*.dump
+*.pg_dump
+# ...except tracked Prisma migration history, which must stay in git
+!backend/prisma/migrations/**/*.sql
+
+# Archives produced by ad-hoc migration/backup work
+*.zip
+
+# Process managers / local runtime state
+.pm2/
+*.pid.txt
+
+# Recovery/backup artifacts left by editors or restore scripts
+*.recovered
+
+# Scratch space for one-off debug/check/test scripts — put throwaway
+# scripts here instead of backend/src/ or backend/ root so they never
+# get committed by accident
+backend/scratch/
+scratch/

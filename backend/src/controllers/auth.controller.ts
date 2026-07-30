@@ -38,7 +38,7 @@ export class AuthController {
 
   static async settings(_req: Request, res: Response, next: NextFunction) {
     try {
-      const { prisma } = await import('../index');
+      const { prisma } = await import('../lib/prisma');
       let settings = await prisma.notificationSetting.findFirst();
       if (!settings) {
         settings = await prisma.notificationSetting.create({ data: {} });

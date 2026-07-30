@@ -1,0 +1,14 @@
+CREATE TABLE IF NOT EXISTS "device_types" (
+  "id" SERIAL PRIMARY KEY,
+  "name" TEXT NOT NULL UNIQUE,
+  "description" TEXT,
+  "isActive" BOOLEAN NOT NULL DEFAULT true,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO "device_types" ("name")
+SELECT DISTINCT "type"
+FROM "assets"
+WHERE "type" IS NOT NULL AND TRIM("type") <> ''
+ON CONFLICT ("name") DO NOTHING;

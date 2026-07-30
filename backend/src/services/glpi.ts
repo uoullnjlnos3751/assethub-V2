@@ -1,4 +1,4 @@
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 const GLPI_BASE_URL = process.env.GLPI_API_URL || 'http://10.100.77.229/glpi/apirest.php';
 const USER_TOKEN = process.env.GLPI_USER_TOKEN || '';
 const APP_TOKEN = process.env.GLPI_APP_TOKEN || '';
