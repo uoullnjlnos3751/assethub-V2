@@ -15,6 +15,22 @@ $newColor = if ($currentColor -eq "blue") { "green" } else { "blue" }
 Write-Host "Current active environment is: $currentColor" -ForegroundColor Cyan
 Write-Host "Deploying new environment to: $newColor" -ForegroundColor Green
 
+# Load backend/.env into the current shell so docker-compose pass-through vars
+# (NODE_ENV, CORS_ORIGIN, CORS_ALLOWED_HOSTNAMES, FRONTEND_URL) are forwarded
+# to the container. Without this they resolve to empty string and override env_file.
+Write-Host "Loading backend/.env into shell environment..." -ForegroundColor Yellow
+Get-Content "backend\.env" | ForEach-Object {
+    $line = $_.Trim()
+    if ($line -and -not $line.StartsWith('#')) {
+        $idx = $line.IndexOf('=')
+        if ($idx -gt 0) {
+            $key = $line.Substring(0, $idx).Trim()
+            $val = $line.Substring($idx + 1).Trim().Trim('"')
+            [System.Environment]::SetEnvironmentVariable($key, $val, 'Process')
+        }
+    }
+}
+
 # 2. Start the new environment
 Write-Host "Starting $newColor stack..." -ForegroundColor Yellow
 docker compose -p assethub-$newColor -f docker-compose.app.yml up -d --build
