@@ -46,8 +46,8 @@ export default function ProfilePage() {
       showToast('รหัสผ่านใหม่และยืนยันรหัสผ่านไม่ตรงกัน', 'err');
       return;
     }
-    if (newPassword.length < 4) {
-      showToast('รหัสผ่านใหม่ต้องมีอย่างน้อย 4 ตัวอักษร', 'err');
+    if (newPassword.length < 8) {
+      showToast('รหัสผ่านใหม่ต้องมีอย่างน้อย 8 ตัวอักษร', 'err');
       return;
     }
     setLoading(true);
@@ -272,8 +272,8 @@ export default function ProfilePage() {
                   value={newPassword}
                   onChange={e => setNewPassword(e.target.value)}
                   required
-                  minLength={4}
-                  placeholder="กรอกรหัสผ่านใหม่ (อย่างน้อย 4 ตัว)"
+                  minLength={8}
+                  placeholder="กรอกรหัสผ่านใหม่ (อย่างน้อย 8 ตัว)"
                   style={{ width: '100%', padding: '10px 40px 10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: '0.9rem', boxSizing: 'border-box' }}
                 />
                 <button type="button" onClick={() => setShowNew(!showNew)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>

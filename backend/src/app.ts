@@ -61,6 +61,31 @@ if (isProduction() && explicitAllowedOrigins.size === 0 && allowedOriginHostname
 export function createApp() {
   const app = express();
 
+  // The app sits behind nginx (see nginx/nginx.conf), so req.ip and req.secure
+  // are the proxy's, not the client's, unless we trust the proxy's
+  // X-Forwarded-* headers. Without this, express-rate-limit sees every
+  // request as coming from nginx's IP — loginLimiter's 15-per-15-min budget
+  // would be shared by the whole office instead of applied per client.
+  // `1` trusts exactly one hop, matching the single nginx in front of this
+  // container. TRUST_PROXY_HOPS overrides it if the topology changes (e.g.
+  // an additional load balancer in front of nginx).
+  app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS ?? 1));
+
+  // Baseline security headers. Written by hand rather than pulling in the
+  // `helmet` package, since adding a dependency here would also need
+  // package-lock.json regenerated via `npm install` — do that if the project
+  // wants helmet's fuller header set (CSP, COEP, etc.) later.
+  app.use((_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'no-referrer-when-downgrade');
+    res.removeHeader('X-Powered-By');
+    if (isProduction()) {
+      res.setHeader('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');
+    }
+    next();
+  });
+
   app.use(cors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);

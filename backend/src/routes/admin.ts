@@ -155,8 +155,8 @@ router.post('/users/local', authenticate, authorize('SUPERADMIN'), async (req: R
     if (!username || !password || !displayName) {
       throw new AppError('กรุณากรอกชื่อผู้ใช้ รหัสผ่าน และชื่อแสดงผลให้ครบถ้วน');
     }
-    if (password.length < 4) {
-      throw new AppError('รหัสผ่านต้องมีความยาวอย่างน้อย 4 ตัวอักษร');
+    if (password.length < 8) {
+      throw new AppError('รหัสผ่านต้องมีความยาวอย่างน้อย 8 ตัวอักษร');
     }
     const result = await AuthService.createLocalUser(username, password, displayName, role);
     res.status(201).json(result);
@@ -167,8 +167,8 @@ router.put('/users/:id/local-password', authenticate, authorize('SUPERADMIN'), a
   try {
     const id = parseInt(req.params.id);
     const { password } = req.body;
-    if (!password || password.length < 4) {
-      throw new AppError('รหัสผ่านต้องมีความยาวอย่างน้อย 4 ตัวอักษร');
+    if (!password || password.length < 8) {
+      throw new AppError('รหัสผ่านต้องมีความยาวอย่างน้อย 8 ตัวอักษร');
     }
     const user = await prisma.appUser.findUnique({ where: { id } });
     if (!user) throw new AppError('ไม่พบผู้ใช้', 404);

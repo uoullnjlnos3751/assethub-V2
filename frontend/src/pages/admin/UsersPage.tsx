@@ -132,8 +132,8 @@ export default function UsersPage() {
         alert('กรุณากรอก Username, ชื่อ - นามสกุล และรหัสผ่าน');
         return;
       }
-      if (manualPassword.length < 4) {
-        alert('รหัสผ่านต้องมีความยาวอย่างน้อย 4 ตัวอักษร');
+      if (manualPassword.length < 8) {
+        alert('รหัสผ่านต้องมีความยาวอย่างน้อย 8 ตัวอักษร');
         return;
       }
     }
@@ -163,8 +163,8 @@ export default function UsersPage() {
   };
 
   const handleSetPassword = async () => {
-    if (!newPassword || newPassword.length < 4) {
-      alert('รหัสผ่านต้องมีความยาวอย่างน้อย 4 ตัวอักษร');
+    if (!newPassword || newPassword.length < 8) {
+      alert('รหัสผ่านต้องมีความยาวอย่างน้อย 8 ตัวอักษร');
       return;
     }
     setSaving(true);
@@ -579,7 +579,7 @@ export default function UsersPage() {
                 fullWidth
                 label="รหัสผ่าน *"
                 type="password"
-                placeholder="อย่างน้อย 4 ตัวอักษร"
+                placeholder="อย่างน้อย 8 ตัวอักษร"
                 variant="outlined"
                 value={manualPassword}
                 onChange={(e) => setManualPassword(e.target.value)}

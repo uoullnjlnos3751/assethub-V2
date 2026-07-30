@@ -3,7 +3,7 @@ FROM node:20-alpine AS builder
 RUN apk add --no-cache openssl
 WORKDIR /app
 COPY package*.json ./
-RUN npm config set registry http://registry.npmjs.org/ && npm config set fetch-retries 10 && npm config set fetch-retry-mintimeout 20000 && npm config set fetch-retry-maxtimeout 120000
+RUN npm config set registry https://registry.npmjs.org/ && npm config set fetch-retries 10 && npm config set fetch-retry-mintimeout 20000 && npm config set fetch-retry-maxtimeout 120000
 RUN for i in 1 2 3 4 5; do npm install --no-audit --no-fund && break || sleep 5; done
 COPY prisma ./prisma/
 RUN npx prisma generate
@@ -16,7 +16,7 @@ FROM node:20-alpine AS production
 RUN apk add --no-cache openssl postgresql-client
 WORKDIR /app
 COPY package*.json ./
-RUN npm config set registry http://registry.npmjs.org/ && npm config set fetch-retries 10 && npm config set fetch-retry-mintimeout 20000 && npm config set fetch-retry-maxtimeout 120000
+RUN npm config set registry https://registry.npmjs.org/ && npm config set fetch-retries 10 && npm config set fetch-retry-mintimeout 20000 && npm config set fetch-retry-maxtimeout 120000
 RUN for i in 1 2 3 4 5; do npm install --only=production --no-audit --no-fund && break || sleep 5; done
 COPY --from=builder /app/prisma ./prisma/
 COPY --from=builder /app/dist ./dist/

@@ -16,7 +16,12 @@ router.get('/', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: R
 });
 
 // GET /api/settings/:key - Fetch specific setting
-router.get('/:key', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+// Same role as the list endpoint above. This was authenticate-only, so any
+// signed-in USER could read any SystemSetting by key while the list required
+// IT_ADMIN — an inconsistent gap. The only caller (PMDeviceArrayInput, which
+// reads PM_DISPLAY_FORMAT) lives on IT_ADMIN-gated PM pages, so tightening it
+// does not affect the USER role.
+router.get('/:key', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { key } = req.params;
     const setting = await prisma.systemSetting.findUnique({ where: { key } });

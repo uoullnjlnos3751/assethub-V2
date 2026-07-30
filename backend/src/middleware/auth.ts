@@ -24,7 +24,12 @@ declare global {
 }
 
 export function generateToken(user: AuthUser): string {
-  return jwt.sign(user, getJwtSecret(), { expiresIn: '24h' });
+  // JWT_EXPIRES_IN was documented in .env.example but never read here — every
+  // token was hardcoded to 24h regardless of the env value. Wired it up;
+  // 24h remains the default so existing deployments see no change unless
+  // they set the variable.
+  const expiresIn = (process.env.JWT_EXPIRES_IN || '24h') as jwt.SignOptions['expiresIn'];
+  return jwt.sign(user, getJwtSecret(), { expiresIn });
 }
 
 export function authenticate(req: Request, _res: Response, next: NextFunction) {
