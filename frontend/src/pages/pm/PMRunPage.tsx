@@ -5,6 +5,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import * as XLSX from 'xlsx';
 import { Html5Qrcode } from 'html5-qrcode';
 import { PMDeviceArrayInput } from './components/PMDeviceArrayInput';
+import { PMRunModal } from './components/PMRunModal';
+import { PMRunStarRating } from './components/PMRunStarRating';
 
 /* ─────────────────────────────────────────────────────────────
    Types & Constants
@@ -43,47 +45,6 @@ const GROUP_INFO: Record<string, { label: string; icon: string }> = {
   hardware: { label: 'Hardware & Peripheral', icon: '🖥' },
   result:   { label: 'ผลการประเมิน', icon: '⭐' },
 };
-
-/* ─────────────────────────────────────────────────────────────
-   Modal
-───────────────────────────────────────────────────────────────── */
-function Modal({ open, onClose, title, children, maxWidth = 640 }: {
-  open: boolean; onClose: () => void; title: string; children: React.ReactNode; maxWidth?: number;
-}) {
-  if (!open) return null;
-  return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(29,29,31,.35)', backdropFilter: 'blur(12px)', zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth, boxShadow: '0 30px 70px rgba(0,0,0,.15)', overflow: 'hidden', maxHeight: '92vh', display: 'flex', flexDirection: 'column', border: '1px solid rgba(255,255,255,0.7)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', borderBottom: '1px solid #e5e5ea', flexShrink: 0 }}>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#1d1d1f' }}>{title}</span>
-          <button onClick={onClose} style={{ background: '#f5f5f7', border: 'none', borderRadius: '50%', width: 28, height: 28, fontSize: 13, cursor: 'pointer', color: '#86868b', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>✕</button>
-        </div>
-        <div style={{ overflowY: 'auto', flex: 1, backgroundColor: '#f5f5f7' }}>{children}</div>
-      </div>
-    </div>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────
-   Stars
-───────────────────────────────────────────────────────────────── */
-function StarRating({ value, onChange, disabled }: { value: number; onChange: (v: number) => void; disabled?: boolean }) {
-  return (
-    <div style={{ display: 'flex', gap: 4 }}>
-      {[1, 2, 3, 4, 5].map(n => (
-        <span key={n} 
-          onClick={() => !disabled && onChange(n)} 
-          style={{ 
-            fontSize: 24, 
-            cursor: disabled ? 'default' : 'pointer', 
-            color: n <= value ? '#ff9500' : '#d2d2d7', 
-            transition: 'color .1s' 
-          }}
-        >★</span>
-      ))}
-    </div>
-  );
-}
 
 /* ─────────────────────────────────────────────────────────────
    Main Page
@@ -810,7 +771,7 @@ export default function PMRunPage() {
       </div>
 
       {/* ── PM Checklist Modal ── */}
-      <Modal open={pmModal.open} onClose={() => setPMModal({ open: false, run: null, readOnly: false })} maxWidth={760}
+      <PMRunModal open={pmModal.open} onClose={() => setPMModal({ open: false, run: null, readOnly: false })} maxWidth={760}
         title={`${pmModal.readOnly || pmModal.run?.status === 'COMPLETED' ? '👁️ รายละเอียดข้อมูล' : '🔧 บันทึกข้อมูล'} PM: ${pmModal.run?.asset?.assetName || pmModal.run?.asset?.assetCode || ''} — ${pmModal.run?.asset?.brand || ''} ${pmModal.run?.asset?.model || ''}`}
       >
         {pmModal.run && (() => {
@@ -982,7 +943,7 @@ export default function PMRunPage() {
                               )}
                               {item.type?.toLowerCase() === 'rating' && (
                                 <div style={{ marginTop: 8 }}>
-                                  <StarRating value={parseInt(answers[item.key] || '0')} onChange={v => setAnswers(p => ({ ...p, [item.key]: String(v) }))} disabled={isReadOnly} />
+                                  <PMRunStarRating value={parseInt(answers[item.key] || '0')} onChange={v => setAnswers(p => ({ ...p, [item.key]: String(v) }))} disabled={isReadOnly} />
                                 </div>
                               )}
                             </div>
@@ -1105,10 +1066,10 @@ export default function PMRunPage() {
             </div>
           );
         })()}
-      </Modal>
+      </PMRunModal>
 
       {/* ── Bulk PM Checklist Modal ── */}
-      <Modal open={bulkPMModal.open} onClose={() => setBulkPMModal({ open: false, templateId: null })} maxWidth={760}
+      <PMRunModal open={bulkPMModal.open} onClose={() => setBulkPMModal({ open: false, templateId: null })} maxWidth={760}
         title={`🔧 บันทึก PM แบบกลุ่ม (${selectedRunIds.length} รายการ)`}
       >
         {selectedRunIds.length > 0 && (() => {
@@ -1173,7 +1134,7 @@ export default function PMRunPage() {
                               )}
                               {item.type?.toLowerCase() === 'rating' && (
                                 <div style={{ marginTop: 8 }}>
-                                  <StarRating value={parseInt(answers[item.key] || '0')} onChange={v => setAnswers(p => ({ ...p, [item.key]: String(v) }))} />
+                                  <PMRunStarRating value={parseInt(answers[item.key] || '0')} onChange={v => setAnswers(p => ({ ...p, [item.key]: String(v) }))} />
                                 </div>
                               )}
                             </div>
@@ -1280,17 +1241,17 @@ export default function PMRunPage() {
             </div>
           );
         })()}
-      </Modal>
+      </PMRunModal>
 
       {/* ── QR Scanner Modal ── */}
-      <Modal open={qrModalOpen} onClose={() => setQrModalOpen(false)} title="📷 สแกน QR Code เพื่อค้นหาทรัพย์สิน" maxWidth={480}>
+      <PMRunModal open={qrModalOpen} onClose={() => setQrModalOpen(false)} title="📷 สแกน QR Code เพื่อค้นหาทรัพย์สิน" maxWidth={480}>
         <div style={{ padding: 24, textAlign: 'center' }}>
           <div id="qr-reader" style={{ width: '100%', overflow: 'hidden', borderRadius: 12, background: '#000', minHeight: 300 }}></div>
           <div style={{ marginTop: 16, fontSize: 13, color: '#86868b', lineHeight: 1.5 }}>
             วาง QR Code ให้อยู่ในตำแหน่งกรอบของกล้องเพื่อทำการสแกนโดยอัตโนมัติ
           </div>
         </div>
-      </Modal>
+      </PMRunModal>
 
       {toast && <div className="pmr-toast">{toast}</div>}
     </>
