@@ -12,6 +12,7 @@ import {
 } from '@mui/icons-material';
 import { systemBackupAPI } from '../../services/api';
 import { formatDateTime } from '../../utils/dateUtils';
+import { useAuth } from '../../contexts/AuthContext';
 
 
 interface BackupFile {
@@ -21,6 +22,13 @@ interface BackupFile {
 }
 
 export default function BackupPage() {
+  const { user } = useAuth();
+  // Restore/delete overwrite or remove a full database backup — the backend
+  // now requires SUPERADMIN for both (backup.ts), matching every other
+  // destructive admin action. This route still admits IT_ADMIN for viewing
+  // and creating backups, so hide just these two actions rather than the
+  // whole page.
+  const canDestroy = user?.role === 'SUPERADMIN';
   const [backups, setBackups] = useState<BackupFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -157,20 +165,24 @@ export default function BackupPage() {
                       >
                         <DownloadIcon />
                       </IconButton>
-                      <IconButton 
-                        color="warning" 
-                        onClick={() => setConfirmDialog({ open: true, action: 'restore', filename: b.filename })}
-                        title="กู้คืนข้อมูล"
-                      >
-                        <RestoreIcon />
-                      </IconButton>
-                      <IconButton 
-                        color="error" 
-                        onClick={() => setConfirmDialog({ open: true, action: 'delete', filename: b.filename })}
-                        title="ลบ"
-                      >
-                        <DeleteIcon />
-                      </IconButton>
+                      {canDestroy && (
+                        <>
+                          <IconButton
+                            color="warning"
+                            onClick={() => setConfirmDialog({ open: true, action: 'restore', filename: b.filename })}
+                            title="กู้คืนข้อมูล"
+                          >
+                            <RestoreIcon />
+                          </IconButton>
+                          <IconButton
+                            color="error"
+                            onClick={() => setConfirmDialog({ open: true, action: 'delete', filename: b.filename })}
+                            title="ลบ"
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))
