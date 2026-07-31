@@ -157,27 +157,13 @@ export default function Layout() {
     } catch (err) {}
   };
 
-  // ── Section grouping for sidebar visual clarity ─────────────────────
-  const getSectionLabel = (label: string): string | null => {
-    if (label === 'แดชบอร์ด') return 'ภาพรวมระบบ';
-    if (label === 'ทะเบียนทรัพย์สิน IT') return 'จัดการทรัพย์สิน';
-    if (label === 'ระบบจัดการคลัง') return null;
-    if (label === 'ระบบยืม-คืน') return 'Service Desk';
-    if (label === 'ซ่อมบำรุง & PM') return 'งานซ่อมบำรุง';
-    if (label === 'รายงานระบบ') return 'สรุปและรายงาน';
-    if (label === 'ตั้งค่าผู้ดูแลระบบ') return 'ผู้ดูแลระบบ';
-    return null;
-  };
-
   const renderNav = () => {
     const items: React.ReactNode[] = [];
     let prevSection = '';
 
     filteredNav.forEach((entry) => {
-      const sectionLabel = 'children' in entry
-        ? getSectionLabel((entry as NavGroup).label)
-        : getSectionLabel((entry as NavItem).label);
-
+      // Section headings are data-driven from nav.tsx (entry.section field)
+      const sectionLabel = entry.section ?? null;
       if (sectionLabel && sectionLabel !== prevSection) {
         items.push(<SidebarSection key={`sec-${sectionLabel}`}>{sectionLabel}</SidebarSection>);
         prevSection = sectionLabel;
@@ -197,10 +183,10 @@ export default function Layout() {
                   py: '7px',
                   px: '12px',
                   my: '1px',
-                  '&:hover': { bgcolor: '#f9fafb' },
+                  '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.04) },
                 }}
               >
-                <ListItemIcon sx={{ minWidth: 30, color: isOpen ? '#f59e0b' : '#6b7280' }}>
+                <ListItemIcon sx={{ minWidth: 30, color: isOpen ? theme.palette.warning.main : theme.palette.text.secondary }}>
                   {group.icon}
                 </ListItemIcon>
                 <ListItemText
@@ -208,12 +194,12 @@ export default function Layout() {
                   primaryTypographyProps={{
                     fontSize: '0.8125rem',
                     fontWeight: 500,
-                    color: isOpen ? '#111827' : '#374151',
+                    color: theme.palette.text.primary,
                   }}
                 />
                 {isOpen
-                  ? <ExpandLess sx={{ fontSize: 16, color: '#9ca3af' }} />
-                  : <ExpandMore sx={{ fontSize: 16, color: '#9ca3af' }} />}
+                  ? <ExpandLess sx={{ fontSize: 16, color: theme.palette.text.secondary }} />
+                  : <ExpandMore sx={{ fontSize: 16, color: theme.palette.text.secondary }} />}
               </ListItemButton>
             </ListItem>
 
@@ -226,13 +212,13 @@ export default function Layout() {
                       if (child.roles) return child.roles.includes(user?.role || '');
                       return true;
                     })
-                    .map((child, idx) => {
+                    .map((child) => {
                       if (child.isHeader) {
                         headerCount++;
                         return (
                           <Box key={`header-${child.label}`} sx={{ width: '100%' }}>
                             {headerCount > 1 && (
-                              <Divider sx={{ mx: '16px', my: '6px', borderColor: '#f3f4f6' }} />
+                              <Divider sx={{ mx: '16px', my: '6px', borderColor: theme.palette.divider }} />
                             )}
                             <Typography
                               variant="caption"
@@ -243,7 +229,7 @@ export default function Layout() {
                                 pb: '3px',
                                 fontSize: '9px',
                                 fontWeight: 700,
-                                color: '#9ca3af',
+                                color: theme.palette.text.secondary,
                                 textTransform: 'uppercase',
                                 letterSpacing: '0.08em',
                                 lineHeight: 1,
@@ -270,11 +256,11 @@ export default function Layout() {
                               my: '1px',
                               borderRadius: '7px',
                               '&.Mui-selected': {
-                                bgcolor: theme.palette.mode === 'dark' ? 'rgba(0, 113, 227, 0.15)' : 'rgba(0, 113, 227, 0.08)',
+                                bgcolor: alpha(theme.palette.primary.main, 0.1),
                                 color: theme.palette.primary.main,
-                                '&:hover': { bgcolor: theme.palette.mode === 'dark' ? 'rgba(0, 113, 227, 0.25)' : 'rgba(0, 113, 227, 0.12)' },
+                                '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.15) },
                               },
-                              '&:hover': { bgcolor: theme.palette.mode === 'dark' ? '#2d2d2f' : '#f5f5f7' },
+                              '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.04) },
                             }}
                           >
                             <ListItemIcon sx={{ minWidth: 24, color: active ? theme.palette.primary.main : theme.palette.text.secondary }}>
@@ -315,11 +301,11 @@ export default function Layout() {
                 px: '12px',
                 my: '1px',
                 '&.Mui-selected': {
-                  bgcolor: theme.palette.mode === 'dark' ? 'rgba(0, 113, 227, 0.15)' : 'rgba(0, 113, 227, 0.08)',
+                  bgcolor: alpha(theme.palette.primary.main, 0.1),
                   color: theme.palette.primary.main,
-                  '&:hover': { bgcolor: theme.palette.mode === 'dark' ? 'rgba(0, 113, 227, 0.25)' : 'rgba(0, 113, 227, 0.12)' },
+                  '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.15) },
                 },
-                '&:hover': { bgcolor: theme.palette.mode === 'dark' ? '#2d2d2f' : '#f5f5f7' },
+                '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.04) },
               }}
             >
               <ListItemIcon sx={{ minWidth: 30, color: active ? theme.palette.primary.main : theme.palette.text.secondary }}>
@@ -589,7 +575,7 @@ export default function Layout() {
               transformOrigin={{ horizontal: 'right', vertical: 'top' }}
               anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
             >
-              <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f3f4f6' }}>
+              <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${theme.palette.divider}` }}>
                 <Typography variant="subtitle1" fontWeight={700}>การแจ้งเตือน</Typography>
                 {notifications.some(n => !n.isRead) && (
                   <Button size="small" onClick={handleMarkAllRead} sx={{ fontSize: '0.75rem' }}>
@@ -608,9 +594,9 @@ export default function Layout() {
                       key={notif.id} 
                       onClick={() => handleNotificationClick(notif)}
                       sx={{ 
-                        borderBottom: '1px solid #f3f4f6',
-                        bgcolor: notif.isRead ? 'transparent' : '#f0f9ff',
-                        '&:hover': { bgcolor: '#f9fafb' }
+                        borderBottom: `1px solid ${theme.palette.divider}`,
+                        bgcolor: notif.isRead ? 'transparent' : alpha(theme.palette.info.main, 0.06),
+                        '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.04) }
                       }}
                     >
                       <ListItemText 
@@ -628,7 +614,7 @@ export default function Layout() {
                         primaryTypographyProps={{ 
                           variant: 'subtitle2', 
                           fontWeight: notif.isRead ? 500 : 700,
-                          color: notif.isRead ? 'text.primary' : '#0369a1'
+                          color: notif.isRead ? 'text.primary' : theme.palette.info.main
                         }}
                       />
                     </ListItemButton>

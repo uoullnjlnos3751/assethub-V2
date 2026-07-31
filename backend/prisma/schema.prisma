@@ -35,6 +35,8 @@ model AppUser {
   donations          Donation[]
   maintenanceRecords MaintenanceRecord[]
   notifications      AppNotification[]
+  assignedAssets     Asset[]             @relation("AssetAssignedTo")
+  disposalsCreated   AssetDisposal[]     @relation("DisposalCreatedBy")
 
   @@index([role, isActive])
   @@index([department])
@@ -93,6 +95,18 @@ model Asset {
   storage1            String?
   storage2            String?
   image               String?
+  // ── Phase 2: ITAM lifecycle additions ──────────────────────────────
+  // FK to assigned user (replaces free-text ownerName lookup)
+  assignedToUserId    Int?
+  assignedTo          AppUser?             @relation("AssetAssignedTo", fields: [assignedToUserId], references: [id])
+  // Depreciation
+  usefulLifeYears     Int?                 // e.g. 5 for laptops, 3 for phones
+  salvageValue        Float?               // ราคาซากเมื่อหมดอายุ (บาท)
+  // Procurement
+  requesterName       String?              // ชื่อผู้ขอจัดซื้อ
+  budgetCode          String?              // รหัสงบประมาณ
+  receivedDate        DateTime?            // วันที่รับของจริง
+  // ───────────────────────────────────────────────────────────────────
   assetHistory        AssetHistory[]       @relation("AssetHistoryAsset")
   borrowRequestItems  BorrowRequestItem[]
   pmRuns              PMRun[]
@@ -110,6 +124,10 @@ model Asset {
   documents           AssetDocument[]
   maintenanceRecords  MaintenanceRecord[]
   floorPlanPins       FloorPlanPin[]
+  // Phase 2
+  disposals           AssetDisposal[]
+  linkedParent        AssetLink[]          @relation("LinkChild")
+  linkedChildren      AssetLink[]          @relation("LinkParent")
 
   @@index([status, departmentId, location])
   @@index([type, brand])
@@ -267,6 +285,57 @@ model AssetDocument {
   @@index([assetId])
   @@map("asset_documents")
 }
+
+// ── Phase 2: ITAM lifecycle additions ──────────────────────────────────────
+
+// CMDB parent-child relationships (e.g. โน้ตบุ๊ก ↔ dock, คอม ↔ จอ)
+model AssetLink {
+  id          Int      @id @default(autoincrement())
+  parentId    Int
+  childId     Int
+  linkType    String   @default("COMPONENT")  // COMPONENT | CONNECTED | DEPENDS_ON
+  note        String?
+  createdAt   DateTime @default(now())
+
+  parent      Asset    @relation("LinkParent", fields: [parentId], references: [id], onDelete: Cascade)
+  child       Asset    @relation("LinkChild",  fields: [childId],  references: [id], onDelete: Cascade)
+
+  @@unique([parentId, childId])
+  @@index([parentId])
+  @@index([childId])
+  @@map("asset_links")
+}
+
+// การจำหน่ายทรัพย์สินออก (บริจาค / ขาย / ทำลาย / คืน vendor)
+model AssetDisposal {
+  id             Int             @id @default(autoincrement())
+  assetId        Int
+  asset          Asset           @relation(fields: [assetId], references: [id])
+  method         DisposalMethod
+  disposalDate   DateTime
+  approvedBy     String?         // ชื่อผู้อนุมัติ / เลขที่คำสั่ง
+  approvalRef    String?         // เอกสารอ้างอิง
+  saleValue      Float?          // ราคาขาย (ถ้าวิธีคือ SELL)
+  recipientName  String?         // ผู้รับบริจาค/ซื้อ
+  notes          String?
+  createdById    Int
+  createdBy      AppUser         @relation("DisposalCreatedBy", fields: [createdById], references: [id])
+  createdAt      DateTime        @default(now())
+
+  @@index([assetId])
+  @@index([disposalDate])
+  @@map("asset_disposals")
+}
+
+enum DisposalMethod {
+  DONATE    // บริจาค
+  SELL      // ขายซาก
+  DESTROY   // ทำลาย/e-waste
+  RETURN    // คืน vendor / leasing
+  TRANSFER  // โอนย้ายภายใน
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 model InventoryItem {
   id                Int                    @id @default(autoincrement())
@@ -753,6 +822,80 @@ model ScheduledJob {
 
   @@map("scheduled_jobs")
 }
+
+// ── Phase 3: License & Contract management ──────────────────────────────────
+
+model SoftwareLicense {
+  id              Int                   @id @default(autoincrement())
+  name            String                // ชื่อซอฟต์แวร์ เช่น "Microsoft 365 Business"
+  vendor          String?
+  licenseType     String                @default("PERPETUAL") // PERPETUAL | SUBSCRIPTION | OEM | VOLUME
+  totalSeats      Int                   @default(1)           // จำนวนสิทธิ์รวม
+  licenseKey      String?               // serial / activation key (เข้ารหัสในอนาคต)
+  purchaseDate    DateTime?
+  expiryDate      DateTime?             // null = ไม่มีวันหมดอายุ (perpetual)
+  purchasePrice   Float?
+  poNumber        String?
+  notes           String?
+  isActive        Boolean               @default(true)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  assignments     LicenseAssignment[]
+
+  @@index([expiryDate])
+  @@map("software_licenses")
+}
+
+model LicenseAssignment {
+  id          Int              @id @default(autoincrement())
+  licenseId   Int
+  license     SoftwareLicense  @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+  assetId     Int?
+  userId      Int?
+  assignedAt  DateTime         @default(now())
+  note        String?
+
+  @@unique([licenseId, assetId])
+  @@unique([licenseId, userId])
+  @@index([licenseId])
+  @@map("license_assignments")
+}
+
+// สัญญาและ warranty (MA, leasing, ประกัน)
+model Contract {
+  id            Int              @id @default(autoincrement())
+  title         String           // ชื่อสัญญา
+  contractNo    String?          @unique
+  contractType  String           @default("WARRANTY") // WARRANTY | MA | LEASE | INSURANCE | SUPPORT
+  vendor        String?
+  startDate     DateTime
+  endDate       DateTime         // วันหมดสัญญา — ระบบจะแจ้งเตือน 30/60/90 วันก่อน
+  value         Float?           // มูลค่าสัญญา (บาท)
+  poNumber      String?
+  notes         String?
+  isActive      Boolean          @default(true)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  assets        ContractAsset[]
+
+  @@index([endDate, isActive])
+  @@map("contracts")
+}
+
+// asset ที่อยู่ภายใต้สัญญา (one contract → many assets)
+model ContractAsset {
+  id         Int      @id @default(autoincrement())
+  contractId Int
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  assetId    Int
+
+  @@unique([contractId, assetId])
+  @@index([contractId])
+  @@index([assetId])
+  @@map("contract_assets")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 enum DonationStatus {
   PENDING

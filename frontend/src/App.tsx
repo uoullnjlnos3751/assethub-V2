@@ -55,6 +55,8 @@ const NotificationLogsPage = lazy(() => import('./pages/admin/NotificationLogsPa
 const BackupPage = lazy(() => import('./pages/admin/BackupPage'));
 const MasterDataManagementPage = lazy(() => import('./pages/admin/MasterDataManagementPage'));
 const AssetHistoryPage = lazy(() => import('./pages/assets/AssetHistoryPage'));
+const ContractsPage = lazy(() => import('./pages/contracts/ContractsPage'));
+const LicensesPage = lazy(() => import('./pages/licenses/LicensesPage'));
 
 // System Settings
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
@@ -137,6 +139,9 @@ export default function App() {
           <Route path="admin/flowcharts" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><FlowchartsPage /></ProtectedRoute>} />
           
           <Route path="assets/:id/history" element={<AssetHistoryPage />} />
+          {/* Contracts & Licenses (Phase 3) */}
+          <Route path="contracts" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><ContractsPage /></ProtectedRoute>} />
+          <Route path="licenses" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><LicensesPage /></ProtectedRoute>} />
           <Route path="profile" element={<ProfilePage />} />
           {/* Donations */}
           <Route path="donations" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><DonationListPage /></ProtectedRoute>} />

@@ -378,3 +378,30 @@ export const maintenanceAPI = {
   getById: (id: number) => api.get(`/maintenance/${id}`),
   reportAll: (params?: any) => api.get('/maintenance/report/all', { params }),
 };
+
+// Contracts (Phase 3)
+export const contractAPI = {
+  list: (params?: { type?: string; active?: boolean; expiringSoon?: boolean }) => api.get('/contracts', { params }),
+  get: (id: number) => api.get(`/contracts/${id}`),
+  create: (data: any) => api.post('/contracts', data),
+  update: (id: number, data: any) => api.put(`/contracts/${id}`, data),
+  delete: (id: number) => api.delete(`/contracts/${id}`),
+};
+
+// Software Licenses (Phase 3)
+export const licenseAPI = {
+  list: (params?: { active?: boolean; expiringSoon?: boolean }) => api.get('/licenses', { params }),
+  get: (id: number) => api.get(`/licenses/${id}`),
+  create: (data: any) => api.post('/licenses', data),
+  update: (id: number, data: any) => api.put(`/licenses/${id}`, data),
+  delete: (id: number) => api.delete(`/licenses/${id}`),
+  assign: (id: number, data: { assetId?: number; userId?: number; note?: string }) => api.post(`/licenses/${id}/assign`, data),
+  unassign: (assignmentId: number) => api.delete(`/licenses/assignments/${assignmentId}`),
+};
+
+// Asset Disposals (Phase 2)
+export const disposalAPI = {
+  list: (params?: { method?: string }) => api.get('/disposals', { params }),
+  create: (data: any) => api.post('/disposals', data),
+  delete: (id: number) => api.delete(`/disposals/${id}`),
+};
