@@ -1,12 +1,8 @@
 import React from 'react';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import DevicesIcon from '@mui/icons-material/Devices';
-import ComputerIcon from '@mui/icons-material/Computer';
-import DesktopWindowsIcon from '@mui/icons-material/DesktopWindows';
 import PrintIcon from '@mui/icons-material/Print';
 import BadgeIcon from '@mui/icons-material/Badge';
-import PhoneAndroidIcon from '@mui/icons-material/PhoneAndroid';
-import RouterIcon from '@mui/icons-material/Router';
 import CableIcon from '@mui/icons-material/Cable';
 import ScienceIcon from '@mui/icons-material/Science';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
@@ -23,7 +19,6 @@ import AddBoxIcon from '@mui/icons-material/AddBox';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import CategoryIcon from '@mui/icons-material/Category';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
-import StoreIcon from '@mui/icons-material/Store';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ImportExportIcon from '@mui/icons-material/ImportExport';
 import ErrorIcon from '@mui/icons-material/Error';
@@ -37,6 +32,7 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import DomainIcon from '@mui/icons-material/Domain';
 import DatabaseIcon from '@mui/icons-material/Storage';
 import VolunteerActivismIcon from '@mui/icons-material/VolunteerActivism';
+import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import GavelIcon from '@mui/icons-material/Gavel';
 import KeyIcon from '@mui/icons-material/Key';
@@ -80,13 +76,6 @@ export const adminNav: NavEntry[] = [
     section: 'จัดการทรัพย์สิน',
     children: [
       { label: 'ทะเบียนทั้งหมด', path: '/assets', icon: <DevicesIcon fontSize="small" /> },
-      { label: 'คอมพิวเตอร์', path: '/assets?typeGroup=computers', icon: <ComputerIcon fontSize="small" /> },
-      { label: 'จอภาพ', path: '/assets?typeGroup=monitors', icon: <DesktopWindowsIcon fontSize="small" /> },
-      { label: 'เครื่องพิมพ์', path: '/assets?typeGroup=printers', icon: <PrintIcon fontSize="small" /> },
-      { label: 'อุปกรณ์เครือข่าย', path: '/assets?typeGroup=network', icon: <RouterIcon fontSize="small" /> },
-      { label: 'อุปกรณ์สื่อสาร', path: '/assets?typeGroup=phonesTablets', icon: <PhoneAndroidIcon fontSize="small" /> },
-      { label: 'อุปกรณ์ต่อพ่วง', path: '/assets?typeGroup=devices', icon: <DevicesIcon fontSize="small" /> },
-      { label: 'Rack & Infra', path: '/assets?typeGroup=rack', icon: <HandymanIcon fontSize="small" /> },
       { label: 'นำเข้า/ส่งออก ข้อมูล', path: '/assets/import-export', icon: <ImportExportIcon fontSize="small" />, roles: ['SUPERADMIN', 'IT_ADMIN'] },
       { label: 'พิมพ์ QR สติ๊กเกอร์', path: '/assets/print-qr', icon: <PrintIcon fontSize="small" />, roles: ['SUPERADMIN', 'IT_ADMIN'] },
     ],
@@ -115,22 +104,18 @@ export const adminNav: NavEntry[] = [
     ],
   },
   {
-    label: 'PM ทรัพย์สิน IT',
+    label: 'PM ทรัพย์สิน',
     icon: <BuildCircleIcon fontSize="small" />,
     section: 'งานซ่อมบำรุง',
     children: [
+      { label: 'อุปกรณ์ IT', isHeader: true },
       { label: 'ภาพรวม PM', path: '/pm', icon: <DashboardIcon fontSize="small" /> },
       { label: 'กำหนดการ PM', path: '/pm/schedule', icon: <CalendarTodayIcon fontSize="small" /> },
       { label: 'แผน PM', path: '/pm/plans', icon: <AssignmentIcon fontSize="small" /> },
       { label: 'ทำ PM ทรัพย์สิน', path: '/pm/runs', icon: <PlayArrowIcon fontSize="small" /> },
       { label: 'แผนผังชั้น PM', path: '/pm/floorplan', icon: <LocationOnIcon fontSize="small" /> },
       { label: 'Checklist Template', path: '/pm/templates', icon: <DescriptionIcon fontSize="small" /> },
-    ],
-  },
-  {
-    label: 'PM ตู้ Switch/Hub',
-    icon: <RouterIcon fontSize="small" />,
-    children: [
+      { label: 'ตู้ Switch/Hub', isHeader: true },
       { label: 'ภาพรวม Hub Room', path: '/pm/sw-hub', icon: <DashboardIcon fontSize="small" /> },
       { label: 'แผน Hub Room', path: '/pm/sw-hub/plans', icon: <AssignmentIcon fontSize="small" /> },
       { label: 'ตรวจ Hub Room', path: '/pm/sw-hub/new', icon: <PlayArrowIcon fontSize="small" /> },
@@ -138,10 +123,13 @@ export const adminNav: NavEntry[] = [
     ],
   },
   {
-    label: 'จำหน่ายออก/บริจาค',
-    path: '/donations',
-    icon: <VolunteerActivismIcon fontSize="small" />,
+    label: 'จำหน่ายทรัพย์สินออก',
+    icon: <DeleteSweepIcon fontSize="small" />,
     section: 'จำหน่ายทรัพย์สินออก',
+    children: [
+      { label: 'จำหน่ายออก/บริจาค', path: '/donations', icon: <VolunteerActivismIcon fontSize="small" /> },
+      { label: 'บันทึกการจำหน่ายทรัพย์สิน', path: '/disposals', icon: <DeleteSweepIcon fontSize="small" /> },
+    ],
   },
   {
     label: 'License & สัญญา',
@@ -161,7 +149,7 @@ export const adminNav: NavEntry[] = [
       { label: 'รายงานยืม-คืน', path: '/reports/borrow', icon: <ReceiptLongIcon fontSize="small" /> },
       { label: 'รายงาน PM', path: '/reports/pm', icon: <AssessmentIcon fontSize="small" /> },
       { label: 'รายงานซ่อมบำรุง', path: '/reports/maintenance', icon: <BuildCircleIcon fontSize="small" /> },
-      { label: 'ตรวจสอบทรัพย์สินพนักงาน', path: '/reports/user-clearance', icon: <BadgeIcon fontSize="small" /> },
+      { label: 'ตรวจสอบทรัพย์สินพนักงาน', path: '/reports/user-clearance', icon: <BadgeIcon fontSize="small" />, roles: ['SUPERADMIN', 'IT_ADMIN'] },
     ],
   },
   {
@@ -171,11 +159,7 @@ export const adminNav: NavEntry[] = [
     roles: ['SUPERADMIN', 'IT_ADMIN'],
     children: [
       { label: 'จัดการหมวดหมู่', path: '/categories', icon: <CategoryIcon fontSize="small" /> },
-      { label: 'ประเภทอุปกรณ์', path: '/assets/device-types', icon: <DevicesIcon fontSize="small" /> },
-      { label: 'ที่ตั้งทรัพย์สิน', path: '/assets/locations', icon: <LocationOnIcon fontSize="small" /> },
-      { label: 'Vendor', path: '/assets/vendors', icon: <StoreIcon fontSize="small" /> },
-      { label: 'สถานะทรัพย์สิน', path: '/assets/statuses', icon: <CheckCircleOutlineIcon fontSize="small" /> },
-      { label: 'แผนก/บริษัท/ที่ตั้ง', path: '/admin/master-data', icon: <DomainIcon fontSize="small" /> },
+      { label: 'ประเภท/สถานที่/ผู้จำหน่าย/สถานะ/บริษัท/แผนก', path: '/admin/master-data', icon: <DomainIcon fontSize="small" /> },
     ],
   },
   {
