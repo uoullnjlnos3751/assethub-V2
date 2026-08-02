@@ -115,7 +115,22 @@ const ALLOWED_ASSET_FIELDS = new Set([
   'snComputer', 'storage1', 'storage2', 'createdAt', 'updatedAt',
   'oldAssetCode', 'budget', 'image', 'categoryId',
   'memoryType', 'ramOnboard', 'ramType', 'ramSpeed', 'ramMaxSupported', 'ramAvailableSlots', 'ramUpgradeable',
+  'assignedToUserId',
 ]);
+
+// Resolve ownerName -> AppUser.id via exact, whitespace/case-normalized match.
+// Returns null when there's no match or the match is ambiguous (never guesses).
+const resolveAssignedToUserId = async (ownerName?: string | null): Promise<number | null> => {
+  const trimmed = ownerName ? String(ownerName).trim() : '';
+  if (!trimmed) return null;
+  const rows = await prisma.$queryRaw<{ id: number }[]>`
+    SELECT id FROM app_users
+    WHERE "displayName" IS NOT NULL
+      AND upper(trim(regexp_replace("displayName", '\s+', ' ', 'g'))) = upper(trim(regexp_replace(${trimmed}, '\s+', ' ', 'g')))
+    LIMIT 2
+  `;
+  return rows.length === 1 ? rows[0].id : null;
+};
 
 const normalizeAssetPayload = (data: any, isCreate = false) => {
   const purchaseDate = parseDate(data.purchaseDate);
@@ -483,14 +498,23 @@ const ASSET_TYPE_GROUPS: Record<string, string[]> = {
 
 router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { search, status, department, location, type, typeGroup, categoryId, cpu, ram, warrantyStatus, warrantyExpiringInDays, ownerName, exactOwnerName, screenSize, resolution, panelType, printerType, isColor, ipAddress, storage, osType, company, serialNo, page = '1', limit = '50' } = req.query;
+    const { search, status, department, location, type, typeGroup, categoryId, cpu, ram, warrantyStatus, warrantyExpiringInDays, ownerName, exactOwnerName, screenSize, resolution, panelType, printerType, isColor, ipAddress, storage, osType, company, serialNo, purchaseDateFrom, purchaseDateTo, page = '1', limit = '50' } = req.query;
     const pageNum = parseInt(page as string);
     const parsedLimit = parseInt(limit as string);
     const limitNum = parsedLimit === 10000 ? 10000 : Math.min(parsedLimit, 100);
     const skip = (pageNum - 1) * limitNum;
 
     const where: any = {};
-    if (status) where.status = status as string;
+    if (status) {
+      // Comma-separated list -> multi-status filter (same convention as cpu/ram/storage below)
+      const statusList = (status as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (statusList.length > 0) where.status = { in: statusList };
+    }
+    if (purchaseDateFrom || purchaseDateTo) {
+      where.purchaseDate = {};
+      if (purchaseDateFrom) where.purchaseDate.gte = new Date(purchaseDateFrom as string);
+      if (purchaseDateTo) where.purchaseDate.lte = new Date(purchaseDateTo as string);
+    }
     if (department) where.departmentId = department as string;
     if (location === '__EMPTY__') {
       where.OR = [...(where.OR || []), { location: null }, { location: '' }];
@@ -1898,6 +1922,10 @@ router.post('/upsert', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async 
       existing = await prisma.asset.findFirst({ where: { serialNo: validSerialNo } });
     }
 
+    if (data.ownerName !== undefined && data.ownerName !== existing?.ownerName && data.assignedToUserId === undefined) {
+      data.assignedToUserId = await resolveAssignedToUserId(data.ownerName);
+    }
+
     // Check for duplicates
     const duplicateErrors = await checkDuplicateAssets(data, existing?.id);
     if (duplicateErrors.length > 0) {
@@ -1964,7 +1992,11 @@ router.post('/', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: 
     }
 
     const data = normalizeAssetPayload(assetData);
-    
+
+    if (data.ownerName && data.assignedToUserId === undefined) {
+      data.assignedToUserId = await resolveAssignedToUserId(data.ownerName);
+    }
+
     // Check for duplicates
     const duplicateErrors = await checkDuplicateAssets(data);
     if (duplicateErrors.length > 0) {
@@ -2015,6 +2047,10 @@ router.put('/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req
     // Auto-clear ownerName if status becomes Retired or Disposed
     if (data.status && (data.status === 'Retired' || data.status === 'Disposed')) {
       data.ownerName = null;
+    }
+
+    if (data.ownerName !== undefined && data.ownerName !== old.ownerName && data.assignedToUserId === undefined) {
+      data.assignedToUserId = await resolveAssignedToUserId(data.ownerName);
     }
 
     // Check for duplicates (excluding current asset)
