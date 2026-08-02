@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   AppBar, Box, Drawer, IconButton, List, ListItem, ListItemButton,
   ListItemIcon, ListItemText, Toolbar, Typography, Button, Avatar, Menu, MenuItem,
   Divider, Collapse, alpha, useTheme, Badge, TextField, InputAdornment, Tooltip,
-  useMediaQuery, BottomNavigation, BottomNavigationAction, Paper
+  useMediaQuery, BottomNavigation, BottomNavigationAction, Paper, Popper, ClickAwayListener,
+  CircularProgress
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import SearchIcon from '@mui/icons-material/Search';
@@ -24,7 +25,7 @@ import { useAppTheme } from '../contexts/ThemeContext';
 import Breadcrumbs from '../components/Breadcrumbs';
 import PageTransition from '../components/PageTransition';
 import QRScannerModal from '../components/QRScannerModal';
-import { notificationAPI } from '../services/api';
+import { notificationAPI, assetAPI } from '../services/api';
 import { adminNav, NavGroup, NavItem, userNavItems } from '../navigation/nav';
 
 // ── Sidebar width matching ITSM HTML (210px) ───────────────────────────────
@@ -64,6 +65,10 @@ export default function Layout() {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchSuggestions, setSearchSuggestions] = useState<any[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchAnchorRef = useRef<HTMLFormElement>(null);
   const [qrOpen, setQrOpen] = useState(false);
   const [anchorElNotif, setAnchorElNotif] = useState<null | HTMLElement>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -74,17 +79,51 @@ export default function Layout() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
+      setSearchOpen(false);
       navigate(`/assets?search=${encodeURIComponent(searchQuery.trim())}`);
     }
   };
 
+  const goToSuggestion = (assetId: number) => {
+    setSearchOpen(false);
+    setSearchQuery('');
+    navigate(`/assets/${assetId}`);
+  };
+
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (q.length < 2) {
+      setSearchSuggestions([]);
+      setSearchOpen(false);
+      return;
+    }
+    setSearchLoading(true);
+    const timer = setTimeout(() => {
+      assetAPI.list({ search: q, limit: 8 })
+        .then(res => {
+          setSearchSuggestions(res.data?.data || []);
+          setSearchOpen(true);
+        })
+        .catch(() => setSearchSuggestions([]))
+        .finally(() => setSearchLoading(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   const isAdmin = user?.role === 'IT_ADMIN' || user?.role === 'SUPERADMIN';
+  const isViewer = user?.role === 'VIEWER';
+
+  // VIEWER = read-only executive access: dashboard, license/contract, reports only
+  const viewerVisiblePaths = new Set(['/dashboard', '/contracts', '/licenses']);
+  const viewerVisibleLabels = new Set(['License & สัญญา', 'รายงานระบบ']);
 
   const filteredNav = isAdmin
     ? adminNav.filter(entry => {
         if (entry.roles) return entry.roles.includes(user?.role || '');
         return true;
       })
+    : isViewer
+    ? adminNav.filter(entry => viewerVisiblePaths.has(('path' in entry && entry.path) || '') || viewerVisibleLabels.has(entry.label))
     : userNavItems;
 
   const isActive = (path: string) => {
@@ -471,14 +510,17 @@ export default function Layout() {
 
            {/* Global Search Bar */}
            <Box sx={{ flex: 1, display: { xs: 'none', sm: 'flex' }, justifyContent: 'center', px: 2 }}>
-             <form onSubmit={handleSearch} style={{ width: '100%', maxWidth: '400px', position: 'relative' }}>
+            <ClickAwayListener onClickAway={() => setSearchOpen(false)}>
+             <form ref={searchAnchorRef} onSubmit={handleSearch} style={{ width: '100%', maxWidth: '400px', position: 'relative' }}>
                <TextField
                  fullWidth
                  size="small"
                  variant="outlined"
-                 placeholder="ค้นหาทรัพย์สิน..."
+                 placeholder="ค้นหาทรัพย์สิน (ชื่อ/รหัส/SN/ผู้ถือครอง)..."
                  value={searchQuery}
                  onChange={(e) => setSearchQuery(e.target.value)}
+                 onFocus={() => { if (searchSuggestions.length > 0) setSearchOpen(true); }}
+                 autoComplete="off"
                  sx={{
                    '& .MuiOutlinedInput-root': {
                      borderRadius: '8px',
@@ -491,12 +533,48 @@ export default function Layout() {
                  InputProps={{
                    startAdornment: (
                      <InputAdornment position="start">
-                      <SearchIcon sx={{ color: theme.palette.text.secondary, fontSize: 20 }} />
+                      {searchLoading
+                        ? <CircularProgress size={16} sx={{ color: theme.palette.text.secondary }} />
+                        : <SearchIcon sx={{ color: theme.palette.text.secondary, fontSize: 20 }} />}
                      </InputAdornment>
                    ),
                  }}
                />
+               <Popper
+                 open={searchOpen}
+                 anchorEl={searchAnchorRef.current}
+                 placement="bottom-start"
+                 style={{ width: searchAnchorRef.current?.offsetWidth, zIndex: 1300 }}
+               >
+                 <Paper elevation={4} sx={{ mt: 0.5, borderRadius: '8px', overflow: 'hidden', border: `1px solid ${theme.palette.divider}` }}>
+                   {searchSuggestions.length === 0 ? (
+                     <Box sx={{ px: 2, py: 1.5, fontSize: 13, color: theme.palette.text.secondary }}>
+                       ไม่พบทรัพย์สินที่ตรงกับ "{searchQuery.trim()}"
+                     </Box>
+                   ) : (
+                     <List dense disablePadding>
+                       {searchSuggestions.map((a: any) => (
+                         <ListItemButton key={a.id} onClick={() => goToSuggestion(a.id)} sx={{ py: 1 }}>
+                           <ListItemText
+                             primary={a.assetName || a.assetCode || a.serialNo}
+                             secondary={[a.assetCode, a.serialNo, a.ownerName].filter(Boolean).join(' · ')}
+                             primaryTypographyProps={{ fontSize: 13, fontWeight: 600 }}
+                             secondaryTypographyProps={{ fontSize: 12 }}
+                           />
+                         </ListItemButton>
+                       ))}
+                       <ListItemButton onClick={() => { setSearchOpen(false); navigate(`/assets?search=${encodeURIComponent(searchQuery.trim())}`); }} sx={{ py: 1, justifyContent: 'center' }}>
+                         <ListItemText
+                           primary={`ดูผลการค้นหาทั้งหมดสำหรับ "${searchQuery.trim()}"`}
+                           primaryTypographyProps={{ fontSize: 12.5, fontWeight: 600, color: theme.palette.primary.main, textAlign: 'center' }}
+                         />
+                       </ListItemButton>
+                     </List>
+                   )}
+                 </Paper>
+               </Popper>
              </form>
+            </ClickAwayListener>
            </Box>
 
            <Box sx={{ flex: 1, display: { xs: 'flex', sm: 'none' } }} />
@@ -684,7 +762,7 @@ export default function Layout() {
                   {user?.displayName}
                 </Typography>
                 <Typography sx={{ fontSize: '11px', color: theme.palette.text.secondary, mt: '2px' }}>
-                  {user?.role === 'SUPERADMIN' ? 'ผู้ดูแลระบบสูงสุด' : user?.role === 'IT_ADMIN' ? 'IT Admin' : 'ผู้ใช้'}
+                  {user?.role === 'SUPERADMIN' ? 'ผู้ดูแลระบบสูงสุด' : user?.role === 'IT_ADMIN' ? 'IT Admin' : user?.role === 'VIEWER' ? 'ผู้บริหาร (อ่านอย่างเดียว)' : 'ผู้ใช้'}
                 </Typography>
               </Box>
               <MenuItem
@@ -750,6 +828,7 @@ export default function Layout() {
         component="main"
         sx={{
           flexGrow: 1,
+          minWidth: 0,
           p: { xs: 2, md: '24px' },
           width: { md: `calc(100% - ${drawerWidth}px)` },
           mt: `${appBarHeight}px`,
