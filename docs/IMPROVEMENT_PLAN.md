@@ -39,32 +39,37 @@
 ## แผนดำเนินการ (เรียงตามลำดับ ความเสี่ยงต่ำ→สูง / คุ้มก่อน)
 
 ### Phase 1 — จัดระเบียบเมนู + เก็บกวาด (ทำทันที, ไม่แตะ DB)
-1. ปรับ `nav.tsx` ใหม่ตาม lifecycle: ภาพรวม → ทรัพย์สิน → คลัง → ยืม-คืน → ซ่อมบำรุง/PM → จำหน่ายออก (บริจาค) → รายงาน → ตั้งค่า
-2. ย้าย section label เข้า data (เลิก hack `getSectionLabel` ใน Sidebar)
-3. ยุบเมนูซ้ำ, ย้าย นำเข้า/ส่งออก + พิมพ์ QR มาไว้กลุ่มทรัพย์สิน
-4. ลบไฟล์ขยะ (C4)
+1. ✅ ปรับ `nav.tsx` ใหม่ตาม lifecycle: ภาพรวม → ทรัพย์สิน → คลัง → ยืม-คืน → ซ่อมบำรุง/PM → จำหน่ายออก (บริจาค) → รายงาน → ตั้งค่า
+2. ✅ ย้าย section label เข้า data (เลิก hack `getSectionLabel` ใน Sidebar)
+3. ✅ ยุบเมนูซ้ำ, ย้าย นำเข้า/ส่งออก + พิมพ์ QR มาไว้กลุ่มทรัพย์สิน
+4. ✅ ลบไฟล์ขยะ (C4) — `AssetDetailPage.tsx.recovered`, `layouts/components/Sidebar.tsx` ลบแล้ว, `api.test.ts` ย้ายไป `src/app.test.ts` (2026-08-01)
 
 ### Phase 2 — ความถูกต้องข้อมูล ITAM (schema เพิ่มแบบ additive, มี migration)
-1. `Asset.assignedToUserId` FK → AppUser (เก็บ `ownerName` ไว้เป็น fallback) + backfill จับคู่ชื่อ
-2. ตาราง `AssetDisposal` (วิธีจำหน่าย: บริจาค/ขาย/ทำลาย/คืน vendor, วันที่, ผู้อนุมัติ, มูลค่า, เอกสาร) — บริจาคเดิมกลายเป็น disposal ประเภทหนึ่ง
-3. ฟิลด์ค่าเสื่อม: `usefulLifeYears`, `salvageValue` + คำนวณ book value ในรายงาน/dashboard
-4. ตาราง `AssetLink` (parent-child) แทน heuristic ชื่อเจ้าของ
+1. ✅ `Asset.assignedToUserId` FK → AppUser (เก็บ `ownerName` ไว้เป็น fallback) + backfill จับคู่ชื่อแบบ exact-match เท่านั้น (18/753 จับคู่ได้ — ที่เหลือไม่มีบัญชี AppUser ในระบบ) + auto-resolve ทุกครั้งที่สร้าง/แก้ไข ownerName (2026-08-01)
+2. ✅ ตาราง `AssetDisposal` + หน้า UI `/disposals` (บันทึกจำหน่าย: บริจาค/ขาย/ทำลาย/คืน vendor/โอนย้าย) — อยู่คู่กับ donation flow เดิม ยังไม่ได้ย้ายของเดิมมาเป็น disposal ประเภทหนึ่งตามแผนเต็มรูปแบบ
+3. ✅ ฟิลด์ค่าเสื่อม: `usefulLifeYears`, `salvageValue` (มีใน schema) — ❌ ยังไม่มีการคำนวณ book value แสดงในรายงาน/dashboard
+4. ✅ ตาราง `AssetLink` + backend route `/api/asset-links` (ที่ยังไม่มีมาก่อน) + panel UI ในแท็บ "อุปกรณ์ที่เชื่อมโยง" ของ AssetDetailPage — heuristic ชื่อเจ้าของเดิมยังคงอยู่คู่กันเป็นข้อมูลเสริม
 
 ### Phase 3 — License & Contract (โมดูลใหม่)
-1. `SoftwareLicense` (ชื่อ, ประเภท, จำนวนสิทธิ์, วันหมดอายุ, ราคา) + `LicenseAssignment` ผูกกับ asset/user
-2. `Contract` (vendor, ประเภท MA/เช่า/ประกัน, วันเริ่ม-สิ้นสุด, มูลค่า, ทรัพย์สินที่ครอบคลุม) + แจ้งเตือนหมดอายุผ่าน notification เดิม
-3. หน้า UI + รายงาน + การ์ดบน dashboard
+1. ✅ `SoftwareLicense` + `LicenseAssignment`
+2. ✅ `Contract` + `ContractAsset` — แก้ bug ที่พบระหว่างตรวจสอบ: `ContractAsset` ไม่มี relation ไปยัง `Asset` ใน schema (มีแค่ FK column) ทำให้ route include ไม่ผ่าน type-check (2026-08-01)
+3. ✅ หน้า UI + การ์ดบน dashboard
 
 ### Phase 4 — UI/UX ยกเครื่อง
-1. มาตรฐานเดียว: MUI theme + icon ชุดเดียว — ทยอย refactor หน้า inline-style (เริ่ม PMRun family)
-2. Header: global search (ค้น asset code/serial/ชื่อ) + ปุ่มสแกน QR
-3. Dashboard เพิ่มมุมผู้บริหาร: มูลค่ารวม/ค่าเสื่อม, warranty/contract ใกล้หมด, งบซ่อมสะสม
-4. เพิ่ม role `VIEWER` (อ่านรายงาน/dashboard อย่างเดียว) สำหรับผู้บริหาร
+1. ❌ ยังไม่ทำ — มาตรฐาน MUI เดียว/รวม icon ชุดเดียว, refactor หน้า inline-style (PMRun family) ยังเป็น scope ใหญ่ที่ต้องออกแบบก่อนแตะ
+2. ✅ Header global search: dropdown แนะนำผลแบบ autocomplete (ค้น assetCode/serial/ชื่อ/ผู้ถือครอง, debounce 300ms, คลิกไปหน้า detail หรือดูผลทั้งหมด) — ทดสอบผ่าน browser จริงแล้ว (2026-08-01)
+3. ✅ Dashboard มุมผู้บริหาร (contract/license summary) — ทำไปแล้วในรอบก่อน
+4. ✅ เพิ่ม role `VIEWER` ครบ: schema enum + migration + backend authorize() (dashboard/reports/contracts/licenses แบบ read-only) + frontend routes/nav filter/Users page role picker (2026-08-01)
 
 ### Phase 5 — โครงสร้างระยะยาว
-1. รวม UX ของ PM 2 ระบบให้หน้าตา/flow เดียวกัน (ยังแยกข้อมูล)
-2. แตกไฟล์ใหญ่ที่เหลือ (AssetDetailPage, AssetListPage, DashboardPage)
-3. ค่อยๆ ผูก FK master data (department, vendor, location) แบบ dual-write ก่อนตัด string
+1. ❌ ยังไม่ทำ — รวม UX ของ PM 2 ระบบ
+2. ❌ ยังไม่ทำ — แตกไฟล์ใหญ่ (AssetDetailPage 1,637 บรรทัด, AssetListPage 1,206, DashboardPage 928)
+3. ❌ ยังไม่ทำ — ผูก FK master data (department/vendor/location) แบบ dual-write
+
+## หมายเหตุจากรอบตรวจสอบ 2026-08-01
+- **สำคัญ:** พบว่า commit ทั้งหมดตั้งแต่ 27 ก.ค. (รวมถึง cookie-based auth migration, security headers, ITAM lifecycle รอบนี้) **ยังไม่ได้ deploy ขึ้น production เลย** — image ของ `assethub-blue-backend`/`frontend` build ไว้ตั้งแต่ 27 ก.ค. ต้อง build+deploy ใหม่ทั้งหมดถึงจะได้โค้ดปัจจุบันจริง
+- **สำคัญ:** พบ stack คู่ขนานที่ไม่ได้ตั้งใจ — pm2 (`assethub-api`/`assethub-web` พอร์ต 4000/5173) รันจากซอร์สโค้ดเดียวกันแต่ต่อฐานข้อมูล PostgreSQL คนละตัว (native Windows service พอร์ต 5432, ข้อมูลเก่ากว่า docker DB ~10 วัน และหยุด sync ตั้งแต่ 21 ก.ค.) โค้ดที่รันอยู่เก่ากว่า docker เสียอีก (ไม่มี cookie auth) ควรตัดสินใจว่าจะปิด stack นี้หรือใช้งานอะไรต่อ
+- Migration `20260731000000_itam_lifecycle_phase2_3` ถูก apply เข้า production DB จริงแล้วในรอบนี้ (ก่อนหน้านี้มีแค่ไฟล์ migration ในโค้ด แต่ไม่เคยรันจริง)
 
 ## หมายเหตุความเสี่ยง
 - Phase 2-3 มี migration — DB user production สร้าง shadow DB ไม่ได้ ต้องใช้วิธีเขียน SQL เอง + `prisma migrate resolve --applied` เหมือนรอบ FloorPlan
