@@ -7,6 +7,7 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { PMDeviceArrayInput } from './components/PMDeviceArrayInput';
 import { PMRunModal } from './components/PMRunModal';
 import { PMRunStarRating } from './components/PMRunStarRating';
+import { getRatingCategory, RATING_RUBRIC, suggestRating } from './components/pmRatingRubric';
 
 /* ─────────────────────────────────────────────────────────────
    Types & Constants
@@ -941,11 +942,35 @@ export default function PMRunPage() {
                                   disabled={isReadOnly || item.key === 'staff_name'}
                                 />
                               )}
-                              {item.type?.toLowerCase() === 'rating' && (
-                                <div style={{ marginTop: 8 }}>
-                                  <PMRunStarRating value={parseInt(answers[item.key] || '0')} onChange={v => setAnswers(p => ({ ...p, [item.key]: String(v) }))} disabled={isReadOnly} />
-                                </div>
-                              )}
+                              {item.type?.toLowerCase() === 'rating' && (() => {
+                                const rubric = RATING_RUBRIC[getRatingCategory(pmModal.run.asset?.type)];
+                                const stars = ['⭐⭐⭐⭐⭐', '⭐⭐⭐⭐', '⭐⭐⭐', '⭐⭐', '⭐'];
+                                const current = parseInt(answers[item.key] || '0');
+                                const suggested = suggestRating(answers);
+                                return (
+                                  <div style={{ marginTop: 8 }}>
+                                    <PMRunStarRating value={current} onChange={v => setAnswers(p => ({ ...p, [item.key]: String(v) }))} disabled={isReadOnly} />
+                                    {!isReadOnly && suggested != null && suggested !== current && (
+                                      <div style={{ marginTop: 6, fontSize: 12, color: '#0f172a', background: '#eff6ff', padding: '8px 12px', borderRadius: 8, border: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <span>🤖 แนะนำจากผลตรวจเช็คลิสต์: <strong>{suggested} ดาว</strong></span>
+                                        <button type="button" onClick={() => setAnswers(p => ({ ...p, [item.key]: String(suggested) }))}
+                                          style={{ marginLeft: 'auto', border: '1px solid #0071e3', background: '#fff', color: '#0071e3', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                                        >ใช้ค่านี้</button>
+                                      </div>
+                                    )}
+                                    <div style={{ marginTop: 8, fontSize: 11, color: '#86868b', background: '#f5f5f7', padding: '10px 14px', borderRadius: 8, border: '1px solid #e5e5ea' }}>
+                                      <div style={{ fontWeight: 600, marginBottom: 4, color: '#515154' }}>💡 เกณฑ์การประเมินเพื่อช่วย IT Admin ตัดสินใจ:</div>
+                                      {rubric.map((desc, i) => (
+                                        <div key={i}>
+                                          <span style={{ color: '#ff9500', letterSpacing: '2px' }}>{stars[i]}</span>
+                                          <span style={{ opacity: 0 }}>{'⭐'.repeat(i)}</span>
+                                          {' '}({5 - i}) - {desc}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              })()}
                             </div>
                             {item.type?.toLowerCase() === 'boolean' && (
                               <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
@@ -1132,11 +1157,37 @@ export default function PMRunPage() {
                                   disabled={item.key === 'staff_name'}
                                 />
                               )}
-                              {item.type?.toLowerCase() === 'rating' && (
-                                <div style={{ marginTop: 8 }}>
-                                  <PMRunStarRating value={parseInt(answers[item.key] || '0')} onChange={v => setAnswers(p => ({ ...p, [item.key]: String(v) }))} />
-                                </div>
-                              )}
+                              {item.type?.toLowerCase() === 'rating' && (() => {
+                                // Bulk mode may span mixed asset types — rubric uses the first
+                                // selected asset's category as a reasonable default, not a hard rule.
+                                const rubric = RATING_RUBRIC[getRatingCategory(firstRun.asset?.type)];
+                                const stars = ['⭐⭐⭐⭐⭐', '⭐⭐⭐⭐', '⭐⭐⭐', '⭐⭐', '⭐'];
+                                const current = parseInt(answers[item.key] || '0');
+                                const suggested = suggestRating(answers);
+                                return (
+                                  <div style={{ marginTop: 8 }}>
+                                    <PMRunStarRating value={current} onChange={v => setAnswers(p => ({ ...p, [item.key]: String(v) }))} />
+                                    {suggested != null && suggested !== current && (
+                                      <div style={{ marginTop: 6, fontSize: 12, color: '#0f172a', background: '#eff6ff', padding: '8px 12px', borderRadius: 8, border: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <span>🤖 แนะนำจากผลตรวจเช็คลิสต์: <strong>{suggested} ดาว</strong></span>
+                                        <button type="button" onClick={() => setAnswers(p => ({ ...p, [item.key]: String(suggested) }))}
+                                          style={{ marginLeft: 'auto', border: '1px solid #0071e3', background: '#fff', color: '#0071e3', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                                        >ใช้ค่านี้</button>
+                                      </div>
+                                    )}
+                                    <div style={{ marginTop: 8, fontSize: 11, color: '#86868b', background: '#f5f5f7', padding: '10px 14px', borderRadius: 8, border: '1px solid #e5e5ea' }}>
+                                      <div style={{ fontWeight: 600, marginBottom: 4, color: '#515154' }}>💡 เกณฑ์การประเมินเพื่อช่วย IT Admin ตัดสินใจ:</div>
+                                      {rubric.map((desc, i) => (
+                                        <div key={i}>
+                                          <span style={{ color: '#ff9500', letterSpacing: '2px' }}>{stars[i]}</span>
+                                          <span style={{ opacity: 0 }}>{'⭐'.repeat(i)}</span>
+                                          {' '}({5 - i}) - {desc}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              })()}
                             </div>
                             {item.type?.toLowerCase() === 'boolean' && (
                               <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>

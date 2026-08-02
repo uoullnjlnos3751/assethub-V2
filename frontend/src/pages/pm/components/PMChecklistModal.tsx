@@ -7,6 +7,7 @@ import { PMDeviceArrayInput } from './PMDeviceArrayInput';
 import { DEFAULT_CHECKLIST, GROUP_INFO } from './constants';
 import { StarRating } from './StarRating';
 import imageCompression from 'browser-image-compression';
+import { getRatingCategory, RATING_RUBRIC, suggestRating } from './pmRatingRubric';
 
 interface PMChecklistModalProps {
   open: boolean;
@@ -708,21 +709,42 @@ export const PMChecklistModal: React.FC<PMChecklistModalProps> = ({ open, onClos
                         />
                       )}
                           
-                          {item.type?.toLowerCase() === 'rating' && (
-                            <div>
-                              <StarRating value={parseInt(answers[item.key] || '0')} onChange={(v) => setAnswers((p) => ({ ...p, [item.key]: String(v) }))} />
-                              <div style={{ marginTop: 8, fontSize: 12, color: '#64748b', background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-                                <div style={{ fontWeight: 600, marginBottom: 4, color: '#475569' }}>💡 เกณฑ์การประเมินเพื่อช่วย IT Admin ตัดสินใจ:</div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 4 }}>
-                                  <div><span style={{ color: '#fbbf24', letterSpacing: '2px' }}>⭐⭐⭐⭐⭐</span> (5) - รวดเร็วมาก ไม่มีปัญหาจุกจิก สภาพสมบูรณ์ 100%</div>
-                                  <div><span style={{ color: '#fbbf24', letterSpacing: '2px' }}>⭐⭐⭐⭐</span><span style={{ opacity: 0 }}>⭐</span> (4) - ทำงานได้ดี มีหน่วงเล็กน้อยเวลาเปิดหลายโปรแกรม</div>
-                                  <div><span style={{ color: '#fbbf24', letterSpacing: '2px' }}>⭐⭐⭐</span><span style={{ opacity: 0 }}>⭐⭐</span> (3) - ปานกลาง ช้าบ้างตามอายุการใช้งาน แต่ยังทำงานได้</div>
-                                  <div><span style={{ color: '#fbbf24', letterSpacing: '2px' }}>⭐⭐</span><span style={{ opacity: 0 }}>⭐⭐⭐</span> (2) - ช้ามาก มีอาการค้างบ่อยครั้ง กระทบต่อการทำงาน</div>
-                                  <div><span style={{ color: '#fbbf24', letterSpacing: '2px' }}>⭐</span><span style={{ opacity: 0 }}>⭐⭐⭐⭐</span> (1) - มีปัญหาหนัก ชำรุด หรือช้าจนทำงานไม่ได้ (พิจารณาเปลี่ยน)</div>
+                          {item.type?.toLowerCase() === 'rating' && (() => {
+                            const category = getRatingCategory(run.asset?.type);
+                            const rubric = RATING_RUBRIC[category];
+                            const stars = ['⭐⭐⭐⭐⭐', '⭐⭐⭐⭐', '⭐⭐⭐', '⭐⭐', '⭐'];
+                            const suggested = suggestRating(answers);
+                            const current = parseInt(answers[item.key] || '0');
+                            return (
+                              <div>
+                                <StarRating value={current} onChange={(v) => setAnswers((p) => ({ ...p, [item.key]: String(v) }))} />
+                                {!isDoneRun && suggested != null && suggested !== current && (
+                                  <div style={{ marginTop: 6, fontSize: 12.5, color: '#0f172a', background: '#eff6ff', padding: '8px 12px', borderRadius: 8, border: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span>🤖 แนะนำจากผลตรวจเช็คลิสต์: <strong>{suggested} ดาว</strong></span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setAnswers((p: Record<string, any>) => ({ ...p, [item.key]: String(suggested) }))}
+                                      style={{ marginLeft: 'auto', border: '1px solid #3b82f6', background: '#fff', color: '#3b82f6', borderRadius: 6, padding: '3px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                                    >
+                                      ใช้ค่านี้
+                                    </button>
+                                  </div>
+                                )}
+                                <div style={{ marginTop: 8, fontSize: 12, color: '#64748b', background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                                  <div style={{ fontWeight: 600, marginBottom: 4, color: '#475569' }}>💡 เกณฑ์การประเมินเพื่อช่วย IT Admin ตัดสินใจ:</div>
+                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 4 }}>
+                                    {rubric.map((desc, i) => (
+                                      <div key={i}>
+                                        <span style={{ color: '#fbbf24', letterSpacing: '2px' }}>{stars[i]}</span>
+                                        <span style={{ opacity: 0 }}>{'⭐'.repeat(i)}</span>
+                                        {' '}({5 - i}) - {desc}
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          )}
+                            );
+                          })()}
                           
                           {['select', 'select_physical', 'select_speed', 'select_result'].includes(item.type?.toLowerCase()) && (
                             <div>
