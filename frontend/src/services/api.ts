@@ -8,7 +8,7 @@ export function dispatchApiError(err: unknown): void {
   window.dispatchEvent(new CustomEvent(API_ERROR_EVENT, { detail: { message, error: err } }));
 }
 
-const baseURL = import.meta.env.VITE_API_URL || '/api';
+export const baseURL = import.meta.env.VITE_API_URL || '/api';
 
 export const api = axios.create({
   baseURL,
@@ -57,10 +57,8 @@ export const notificationAPI = {
 
 export default api;
 
-// AI Chatbot
-export const aiAPI = {
-  chat: (messages: any[]) => api.post('/ai/chat', { messages }),
-};
+// AI Chatbot — streamed via SSE, consumed directly with fetch in Chatbot.tsx
+// rather than through the axios instance (see baseURL export above).
 
 // Auth
 export const authAPI = {

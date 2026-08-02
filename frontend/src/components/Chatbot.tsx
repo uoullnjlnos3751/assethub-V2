@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { aiAPI } from '../services/api';
+import { baseURL } from '../services/api';
 
 interface Message {
   role: 'user' | 'ai';
@@ -13,6 +13,8 @@ export const Chatbot: React.FC = () => {
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [awaitingResponse, setAwaitingResponse] = useState(false);
+  const [toolStatus, setToolStatus] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -21,7 +23,7 @@ export const Chatbot: React.FC = () => {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, isOpen]);
+  }, [messages, isOpen, toolStatus]);
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -31,15 +33,71 @@ export const Chatbot: React.FC = () => {
     setMessages(newMessages);
     setInput('');
     setIsLoading(true);
+    setAwaitingResponse(true);
+    setToolStatus(null);
+
+    // A streamed placeholder bubble that fills in as tokens arrive, instead of
+    // one long wait — function-calling round trips to Gemini can take 20-40s.
+    let started = false;
 
     try {
-      const res = await aiAPI.chat(newMessages);
-      setMessages((prev) => [...prev, { role: 'ai', text: res.data.text }]);
+      const res = await fetch(`${baseURL}/ai/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ messages: newMessages }),
+      });
+
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const events = buffer.split('\n\n');
+        buffer = events.pop() || '';
+
+        for (const evt of events) {
+          const line = evt.split('\n').find((l) => l.startsWith('data: '));
+          if (!line) continue;
+          const data = JSON.parse(line.slice(6));
+
+          if (data.type === 'tool') {
+            setToolStatus('🔍 กำลังค้นหาข้อมูลทรัพย์สิน...');
+          } else if (data.type === 'chunk') {
+            setToolStatus(null);
+            if (!started) {
+              started = true;
+              setAwaitingResponse(false);
+              setMessages((prev) => [...prev, { role: 'ai', text: data.text }]);
+            } else {
+              setMessages((prev) => {
+                const next = [...prev];
+                next[next.length - 1] = { role: 'ai', text: next[next.length - 1].text + data.text };
+                return next;
+              });
+            }
+          } else if (data.type === 'error') {
+            setToolStatus(null);
+            setAwaitingResponse(false);
+            setMessages((prev) => [...prev, { role: 'ai', text: data.message || 'ขออภัยครับ เกิดข้อผิดพลาดในการเชื่อมต่อระบบ AI' }]);
+          }
+        }
+      }
     } catch (error) {
       console.error(error);
-      setMessages((prev) => [...prev, { role: 'ai', text: 'ขออภัยครับ เกิดข้อผิดพลาดในการเชื่อมต่อระบบ AI' }]);
+      setToolStatus(null);
+      setAwaitingResponse(false);
+      if (!started) setMessages((prev) => [...prev, { role: 'ai', text: 'ขออภัยครับ เกิดข้อผิดพลาดในการเชื่อมต่อระบบ AI' }]);
     } finally {
       setIsLoading(false);
+      setAwaitingResponse(false);
+      setToolStatus(null);
     }
   };
 
@@ -113,7 +171,7 @@ export const Chatbot: React.FC = () => {
                 </div>
               </div>
             ))}
-            {isLoading && (
+            {awaitingResponse && (
               <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
                 <div style={{
                   padding: '10px 14px',
@@ -123,7 +181,7 @@ export const Chatbot: React.FC = () => {
                   fontSize: 14,
                   color: '#64748b',
                 }}>
-                  กำลังคิด... 💬
+                  {toolStatus || 'กำลังคิด... 💬'}
                 </div>
               </div>
             )}
