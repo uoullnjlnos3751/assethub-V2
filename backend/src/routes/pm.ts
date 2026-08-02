@@ -1040,6 +1040,24 @@ router.get('/runs/adhoc-search', authenticate, authorize('IT_ADMIN', 'SUPERADMIN
   } catch (err) { next(err); }
 });
 
+// Checked from the asset detail page's PM tab before offering "start PM" / "continue PM" —
+// tells the caller whether this asset already has a PM run for the current year.
+router.get('/runs/adhoc-check/:assetId', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const assetId = parseInt(req.params.assetId);
+    const asset = await prisma.asset.findUnique({ where: { id: assetId } });
+    if (!asset) throw new AppError('ไม่พบทรัพย์สิน', 404);
+
+    const year = new Date().getFullYear();
+    const existingRun = await prisma.pMRun.findFirst({
+      where: { assetId, year },
+      select: { id: true, status: true },
+    });
+
+    res.json({ eligible: true, existingRun });
+  } catch (err) { next(err); }
+});
+
 router.post('/runs/adhoc', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { assetId, templateId } = req.body;
