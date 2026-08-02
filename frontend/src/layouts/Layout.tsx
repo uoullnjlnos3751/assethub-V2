@@ -25,7 +25,7 @@ import { useAppTheme } from '../contexts/ThemeContext';
 import Breadcrumbs from '../components/Breadcrumbs';
 import PageTransition from '../components/PageTransition';
 import QRScannerModal from '../components/QRScannerModal';
-import { notificationAPI, assetAPI } from '../services/api';
+import { notificationAPI, assetAPI, presenceAPI } from '../services/api';
 import { adminNav, NavGroup, NavItem, userNavItems } from '../navigation/nav';
 
 // ── Sidebar width matching ITSM HTML (210px) ───────────────────────────────
@@ -89,6 +89,17 @@ export default function Layout() {
     setSearchQuery('');
     navigate(`/assets/${assetId}`);
   };
+
+  // Presence heartbeat — powers the "ทีมงานออนไลน์ตอนนี้" panel on the admin
+  // dashboard. Fires on mount, on every route change, and every 25s while the
+  // tab stays open on one page (backend treats anyone unseen for 90s as offline).
+  useEffect(() => {
+    if (!user) return;
+    const ping = () => { presenceAPI.heartbeat(location.pathname).catch(() => {}); };
+    ping();
+    const interval = setInterval(ping, 25000);
+    return () => clearInterval(interval);
+  }, [user, location.pathname]);
 
   useEffect(() => {
     const q = searchQuery.trim();

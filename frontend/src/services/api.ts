@@ -60,6 +60,12 @@ export default api;
 // AI Chatbot — streamed via SSE, consumed directly with fetch in Chatbot.tsx
 // rather than through the axios instance (see baseURL export above).
 
+// Presence — "who's online right now, doing what" for the admin dashboard
+export const presenceAPI = {
+  heartbeat: (path: string) => api.post('/presence/heartbeat', { path }),
+  online: () => api.get('/presence/online'),
+};
+
 // Auth
 export const authAPI = {
   login: (username: string, password: string) => api.post('/auth/login', { username, password }),

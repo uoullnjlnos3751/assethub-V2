@@ -24,6 +24,7 @@ import backupRoutes from './routes/backup';
 import settingsRoutes from './routes/settings';
 import uploadsRoutes from './routes/uploads';
 import aiRoutes from './routes/ai';
+import presenceRoutes from './routes/presence';
 import floorplanRoutes from './routes/floorplan';
 import { errorHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
@@ -150,6 +151,7 @@ export function createApp() {
   app.use('/api/backup', backupRoutes);
   app.use('/api/settings', settingsRoutes);
   app.use('/api/ai', aiRoutes);
+  app.use('/api/presence', presenceRoutes);
   app.use('/api/floorplans', floorplanRoutes);
 
   app.get('/api/health', (_req, res) => {

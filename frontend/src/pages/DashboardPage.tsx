@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box, Typography, LinearProgress, Divider, alpha, useTheme, Chip,
+  Box, Typography, LinearProgress, Divider, alpha, useTheme, Chip, Avatar,
 } from '@mui/material';
 import {
   BarChart, Bar, Cell, ResponsiveContainer, PieChart, Pie,
@@ -11,11 +11,11 @@ import {
   LayoutDashboard, Boxes, ShoppingCart, Wrench, AlertTriangle,
   CheckCircle2, Clock, TrendingUp, Shield, ClipboardList, Zap,
   RotateCcw, FileText, PackageX, Activity, ArrowUpRight, BellRing,
-  Key,
+  Key, Users,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { dashboardAPI, contractAPI, licenseAPI } from '../services/api';
+import { dashboardAPI, contractAPI, licenseAPI, presenceAPI } from '../services/api';
 import LoadingSkeleton from '../components/LoadingSkeleton';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -222,6 +222,7 @@ export default function DashboardPage() {
   const [activityData, setActivityData] = useState<any>(null);
   const [contractList, setContractList] = useState<any[]>([]);
   const [licenseList, setLicenseList] = useState<any[]>([]);
+  const [onlineNow, setOnlineNow] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -258,6 +259,16 @@ export default function DashboardPage() {
     } else {
       setLoading(false);
     }
+  }, [user]);
+
+  // Team presence — refreshed on its own faster cadence than the rest of the
+  // dashboard data, since "who's online" is only useful if it's actually current.
+  useEffect(() => {
+    if (!(user?.role === 'IT_ADMIN' || user?.role === 'SUPERADMIN' || user?.role === 'VIEWER')) return;
+    const load = () => { presenceAPI.online().then(r => setOnlineNow(r.data || [])).catch(() => {}); };
+    load();
+    const interval = setInterval(load, 15000);
+    return () => clearInterval(interval);
   }, [user]);
 
   if (loading) return <LoadingSkeleton type="page" />;
@@ -469,6 +480,57 @@ export default function DashboardPage() {
           accent={theme.palette.success.main}
           onClick={() => navigate('/pm/runs')}
         />
+      </Box>
+
+      {/* ── ทีมงานออนไลน์ตอนนี้ ────────────────────────────────────── */}
+      <Box sx={{ mb: 2 }}>
+      <SectionCard title="ทีมงานออนไลน์ตอนนี้" icon={Users}>
+        {onlineNow.length > 0 ? (
+          <Box sx={{ display: 'flex', gap: 1.25, overflowX: 'auto', pb: 0.5 }}>
+            {onlineNow.map((p) => {
+              const initial = (p.displayName || p.adUsername || '?').charAt(0).toUpperCase();
+              const roleColor = p.role === 'SUPERADMIN' ? theme.palette.error.main
+                : p.role === 'IT_ADMIN' ? theme.palette.primary.main
+                : theme.palette.info?.main || '#0288d1';
+              return (
+                <Box key={p.userId} sx={{
+                  minWidth: 210, flex: '0 0 auto',
+                  display: 'flex', alignItems: 'center', gap: 1.25,
+                  bgcolor: alpha(roleColor, 0.06),
+                  border: `1px solid ${alpha(roleColor, 0.2)}`,
+                  borderRadius: 3, p: 1.25,
+                }}>
+                  <Box sx={{ position: 'relative', flexShrink: 0 }}>
+                    <Avatar src={p.avatarUrl || undefined} sx={{ width: 36, height: 36, bgcolor: roleColor, fontSize: '0.85rem', fontWeight: 700 }}>
+                      {!p.avatarUrl && initial}
+                    </Avatar>
+                    <Box sx={{
+                      position: 'absolute', bottom: -1, right: -1, width: 10, height: 10, borderRadius: '50%',
+                      bgcolor: theme.palette.success.main, border: `2px solid ${theme.palette.background.paper}`,
+                      '@keyframes presencePulse': {
+                        '0%': { boxShadow: `0 0 0 0 ${alpha(theme.palette.success.main, 0.5)}` },
+                        '70%': { boxShadow: `0 0 0 5px ${alpha(theme.palette.success.main, 0)}` },
+                        '100%': { boxShadow: `0 0 0 0 ${alpha(theme.palette.success.main, 0)}` },
+                      },
+                      animation: 'presencePulse 2s infinite',
+                    }} />
+                  </Box>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: theme.palette.text.primary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {p.displayName || p.adUsername}
+                    </Typography>
+                    <Typography sx={{ fontSize: '0.68rem', color: theme.palette.text.secondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {p.activity}
+                    </Typography>
+                  </Box>
+                </Box>
+              );
+            })}
+          </Box>
+        ) : (
+          <Typography sx={{ fontSize: '0.78rem', color: theme.palette.text.secondary, py: 1 }}>ยังไม่มีใครออนไลน์อยู่ตอนนี้</Typography>
+        )}
+      </SectionCard>
       </Box>
 
       {/* ── Row 2: Donut + Trend bar chart ───────────────────────── */}
