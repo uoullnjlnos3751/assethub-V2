@@ -225,7 +225,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user?.role === 'IT_ADMIN' || user?.role === 'SUPERADMIN') {
+    if (user?.role === 'IT_ADMIN' || user?.role === 'SUPERADMIN' || user?.role === 'VIEWER') {
       const year = new Date().getFullYear();
       Promise.all([
         dashboardAPI.assetSummary(),

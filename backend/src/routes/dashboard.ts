@@ -4,7 +4,7 @@ import { authenticate, authorize } from '../middleware/auth';
 
 const router = Router();
 
-router.get('/asset-summary', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+router.get('/asset-summary', authenticate, authorize('IT_ADMIN', 'SUPERADMIN', 'VIEWER'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const [byStatus, byDepartment, byCompany, byType, byLocation, total, byCategory] = await Promise.all([
       prisma.asset.groupBy({ by: ['status'], _count: true }),
@@ -26,7 +26,7 @@ router.get('/asset-summary', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), 
   } catch (err) { next(err); }
 });
 
-router.get('/data-health', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+router.get('/data-health', authenticate, authorize('IT_ADMIN', 'SUPERADMIN', 'VIEWER'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const [missingSerial, missingLocation, missingCompany, missingType, outdatedOSCount] = await Promise.all([
       prisma.asset.count({ where: { OR: [{ serialNo: '' }, { serialNo: '-' }] } }),
@@ -49,7 +49,7 @@ router.get('/data-health', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), as
   } catch (err) { next(err); }
 });
 
-router.get('/borrow-summary', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+router.get('/borrow-summary', authenticate, authorize('IT_ADMIN', 'SUPERADMIN', 'VIEWER'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const [byStatus, total, overdue, activeItems] = await Promise.all([
       prisma.borrowRequest.groupBy({ by: ['status'], _count: true }),
@@ -66,7 +66,7 @@ router.get('/borrow-summary', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'),
   } catch (err) { next(err); }
 });
 
-router.get('/borrow-trend', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+router.get('/borrow-trend', authenticate, authorize('IT_ADMIN', 'SUPERADMIN', 'VIEWER'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const year = parseInt(_req.query.year as string) || new Date().getFullYear();
     const start = new Date(year, 0, 1);
@@ -92,7 +92,7 @@ router.get('/borrow-trend', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), a
   } catch (err) { next(err); }
 });
 
-router.get('/pm-summary', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/pm-summary', authenticate, authorize('IT_ADMIN', 'SUPERADMIN', 'VIEWER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const currentYear = parseInt(req.query.year as string) || new Date().getFullYear();
     const runs = await prisma.pMRun.findMany({
@@ -135,7 +135,7 @@ router.get('/pm-summary', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), asy
   } catch (err) { next(err); }
 });
 
-router.get('/recent-activity', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+router.get('/recent-activity', authenticate, authorize('IT_ADMIN', 'SUPERADMIN', 'VIEWER'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const [recentRequests, recentReturns] = await Promise.all([
       prisma.borrowRequest.findMany({
@@ -153,7 +153,7 @@ router.get('/recent-activity', authenticate, authorize('IT_ADMIN', 'SUPERADMIN')
   } catch (err) { next(err); }
 });
 
-router.get('/proactive-alerts', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+router.get('/proactive-alerts', authenticate, authorize('IT_ADMIN', 'SUPERADMIN', 'VIEWER'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const now = new Date();
     const nextWeek = new Date();
@@ -190,7 +190,7 @@ router.get('/proactive-alerts', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'
 });
 
 
-router.get('/warranty-expiring', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/warranty-expiring', authenticate, authorize('IT_ADMIN', 'SUPERADMIN', 'VIEWER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const days = parseInt(req.query.days as string) || 30;
     const now = new Date();

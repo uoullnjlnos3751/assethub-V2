@@ -6,7 +6,7 @@ import { AppError } from '../middleware/errorHandler';
 const router = Router();
 
 // ── GET /api/contracts ──────────────────────────────────────────────────────
-router.get('/', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req, res, next) => {
+router.get('/', authenticate, authorize('IT_ADMIN', 'SUPERADMIN', 'VIEWER'), async (req, res, next) => {
   try {
     const { type, active, expiringSoon } = req.query;
     const where: any = {};
@@ -30,7 +30,7 @@ router.get('/', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req, r
 });
 
 // ── GET /api/contracts/:id ──────────────────────────────────────────────────
-router.get('/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req, res, next) => {
+router.get('/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN', 'VIEWER'), async (req, res, next) => {
   try {
     const id = parseInt(req.params.id);
     const contract = await prisma.contract.findUnique({

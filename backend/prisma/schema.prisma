@@ -128,6 +128,7 @@ model Asset {
   disposals           AssetDisposal[]
   linkedParent        AssetLink[]          @relation("LinkChild")
   linkedChildren      AssetLink[]          @relation("LinkParent")
+  contractAssets      ContractAsset[]
 
   @@index([status, departmentId, location])
   @@index([type, brand])
@@ -888,6 +889,7 @@ model ContractAsset {
   contractId Int
   contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
   assetId    Int
+  asset      Asset    @relation(fields: [assetId], references: [id], onDelete: Restrict)
 
   @@unique([contractId, assetId])
   @@index([contractId])
@@ -953,6 +955,7 @@ enum UserRole {
   SUPERADMIN
   IT_ADMIN
   USER
+  VIEWER
 }
 
 enum AuthType {

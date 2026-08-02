@@ -14,8 +14,8 @@ import {
 import { adminAPI } from '../../services/api';
 import debounce from 'lodash/debounce';
 
-const roleColors: Record<string, string> = { SUPERADMIN: 'error', IT_ADMIN: 'warning', USER: 'default' };
-const roleLabels: Record<string, string> = { SUPERADMIN: 'SuperAdmin', IT_ADMIN: 'IT Admin', USER: 'ผู้ใช้' };
+const roleColors: Record<string, string> = { SUPERADMIN: 'error', IT_ADMIN: 'warning', USER: 'default', VIEWER: 'info' };
+const roleLabels: Record<string, string> = { SUPERADMIN: 'SuperAdmin', IT_ADMIN: 'IT Admin', USER: 'ผู้ใช้', VIEWER: 'ผู้บริหาร (อ่านอย่างเดียว)' };
 
 export default function UsersPage() {
   const [users, setUsers] = useState<any[]>([]);
@@ -448,6 +448,7 @@ export default function UsersPage() {
             <InputLabel>บทบาท</InputLabel>
             <Select value={newRole} label="บทบาท" onChange={(e) => setNewRole(e.target.value)}>
               <MenuItem value="USER">ผู้ใช้ (User)</MenuItem>
+              <MenuItem value="VIEWER">ผู้บริหาร (อ่านอย่างเดียว)</MenuItem>
               <MenuItem value="IT_ADMIN">IT Admin</MenuItem>
               <MenuItem value="SUPERADMIN">SuperAdmin</MenuItem>
             </Select>
@@ -554,6 +555,7 @@ export default function UsersPage() {
                       onChange={(e) => setAssignedRole(e.target.value)}
                     >
                       <MenuItem value="USER">ผู้ใช้ (User)</MenuItem>
+                      <MenuItem value="VIEWER">ผู้บริหาร (อ่านอย่างเดียว)</MenuItem>
                       <MenuItem value="IT_ADMIN">IT Admin</MenuItem>
                       <MenuItem value="SUPERADMIN">SuperAdmin</MenuItem>
                     </Select>
@@ -622,6 +624,7 @@ export default function UsersPage() {
                   onChange={(e) => setManualRole(e.target.value)}
                 >
                   <MenuItem value="USER">ผู้ใช้ (User)</MenuItem>
+                  <MenuItem value="VIEWER">ผู้บริหาร (อ่านอย่างเดียว)</MenuItem>
                   <MenuItem value="IT_ADMIN">IT Admin</MenuItem>
                   <MenuItem value="SUPERADMIN">SuperAdmin</MenuItem>
                 </Select>
