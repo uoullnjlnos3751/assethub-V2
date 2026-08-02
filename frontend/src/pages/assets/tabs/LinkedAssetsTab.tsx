@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Card, Typography, Grid, CircularProgress, Chip, Button } from '@mui/material';
+import { Box, Card, Typography, Grid, CircularProgress, Chip, Button, Divider } from '@mui/material';
 import { assetAPI } from '../../../services/api';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../../contexts/AuthContext';
 import MonitorIcon from '@mui/icons-material/Monitor';
 import LaptopIcon from '@mui/icons-material/Laptop';
 import DevicesIcon from '@mui/icons-material/Devices';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import AssetLinksPanel from '../components/AssetLinksPanel';
 
 interface LinkedAssetsTabProps {
   asset: any;
@@ -15,6 +17,8 @@ export default function LinkedAssetsTab({ asset }: LinkedAssetsTabProps) {
   const [linkedAssets, setLinkedAssets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const canEdit = user?.role === 'IT_ADMIN' || user?.role === 'SUPERADMIN';
 
   useEffect(() => {
     const fetchLinked = async () => {
@@ -38,28 +42,6 @@ export default function LinkedAssetsTab({ asset }: LinkedAssetsTabProps) {
     fetchLinked();
   }, [asset]);
 
-  if (loading) {
-    return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>;
-  }
-
-  if (!asset?.ownerName) {
-    return (
-      <Box sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>
-        <Typography variant="h6">ไม่มีข้อมูลผู้ถือครอง</Typography>
-        <Typography variant="body2">ไม่สามารถระบุอุปกรณ์ที่เชื่อมโยงได้เนื่องจากทรัพย์สินนี้ไม่มีผู้ถือครอง</Typography>
-      </Box>
-    );
-  }
-
-  if (linkedAssets.length === 0) {
-    return (
-      <Box sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>
-        <Typography variant="h6">ไม่พบอุปกรณ์อื่นที่เชื่อมโยง</Typography>
-        <Typography variant="body2">ผู้ถือครอง '{asset.ownerName}' ไม่มีอุปกรณ์อื่นในระบบ</Typography>
-      </Box>
-    );
-  }
-
   const getIcon = (type: string) => {
     const t = type.toLowerCase();
     if (t.includes('คอมพิวเตอร์') || t.includes('pc') || t.includes('notebook') || t.includes('laptop') || t.includes('desktop')) return <LaptopIcon />;
@@ -67,8 +49,28 @@ export default function LinkedAssetsTab({ asset }: LinkedAssetsTabProps) {
     return <DevicesIcon />;
   };
 
-  return (
-    <Box sx={{ p: 2 }}>
+  const renderByOwnerSection = () => {
+    if (loading) {
+      return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>;
+    }
+    if (!asset?.ownerName) {
+      return (
+        <Box sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>
+          <Typography variant="h6">ไม่มีข้อมูลผู้ถือครอง</Typography>
+          <Typography variant="body2">ไม่สามารถระบุอุปกรณ์ที่เชื่อมโยงได้เนื่องจากทรัพย์สินนี้ไม่มีผู้ถือครอง</Typography>
+        </Box>
+      );
+    }
+    if (linkedAssets.length === 0) {
+      return (
+        <Box sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>
+          <Typography variant="h6">ไม่พบอุปกรณ์อื่นที่เชื่อมโยง</Typography>
+          <Typography variant="body2">ผู้ถือครอง '{asset.ownerName}' ไม่มีอุปกรณ์อื่นในระบบ</Typography>
+        </Box>
+      );
+    }
+    return (
+      <Box>
       <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
         อุปกรณ์อื่นๆ ที่ถือครองโดย {asset.ownerName}
       </Typography>
@@ -109,6 +111,15 @@ export default function LinkedAssetsTab({ asset }: LinkedAssetsTabProps) {
           </Grid>
         ))}
       </Grid>
+      </Box>
+    );
+  };
+
+  return (
+    <Box sx={{ p: 2 }}>
+      <AssetLinksPanel assetId={asset.id} canEdit={canEdit} />
+      <Divider sx={{ my: 2 }} />
+      {renderByOwnerSection()}
     </Box>
   );
 }

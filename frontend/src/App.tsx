@@ -34,6 +34,7 @@ const PrintQRPage = lazy(() => import('./pages/assets/PrintQRPage'));
 const DonationListPage = lazy(() => import('./pages/donations/DonationListPage'));
 const DonationFormPage = lazy(() => import('./pages/donations/DonationFormPage'));
 const DonationDetailPage = lazy(() => import('./pages/donations/DonationDetailPage'));
+const DisposalsPage = lazy(() => import('./pages/disposals/DisposalsPage'));
 const InventoryPage = lazy(() => import('./pages/inventory/InventoryPage'));
 const CategoryPage = lazy(() => import('./pages/categories/CategoryPage'));
 const BorrowOverduePage = lazy(() => import('./pages/borrow/BorrowOverduePage'));
@@ -124,10 +125,10 @@ export default function App() {
           <Route path="pm/templates" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><PMTemplatePage /></ProtectedRoute>} />
           {/* Reports */}
           <Route path="reports" element={<Navigate to="/reports/assets" replace />} />
-          <Route path="reports/assets" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><ReportAssetsPage /></ProtectedRoute>} />
-          <Route path="reports/borrow" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><ReportBorrowPage /></ProtectedRoute>} />
-          <Route path="reports/pm" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><ReportPMPage /></ProtectedRoute>} />
-          <Route path="reports/maintenance" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><ReportMaintenancePage /></ProtectedRoute>} />
+          <Route path="reports/assets" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN', 'VIEWER']}><ReportAssetsPage /></ProtectedRoute>} />
+          <Route path="reports/borrow" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN', 'VIEWER']}><ReportBorrowPage /></ProtectedRoute>} />
+          <Route path="reports/pm" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN', 'VIEWER']}><ReportPMPage /></ProtectedRoute>} />
+          <Route path="reports/maintenance" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN', 'VIEWER']}><ReportMaintenancePage /></ProtectedRoute>} />
           <Route path="reports/user-clearance" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><EmployeeClearancePage /></ProtectedRoute>} />
           {/* Admin */}
           <Route path="admin/users" element={<ProtectedRoute roles={['SUPERADMIN']}><UsersPage /></ProtectedRoute>} />
@@ -147,6 +148,7 @@ export default function App() {
           <Route path="donations" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><DonationListPage /></ProtectedRoute>} />
           <Route path="donations/new" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><DonationFormPage /></ProtectedRoute>} />
           <Route path="donations/:id" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><DonationDetailPage /></ProtectedRoute>} />
+          <Route path="disposals" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><DisposalsPage /></ProtectedRoute>} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" />} />
       </Routes>

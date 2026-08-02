@@ -17,6 +17,7 @@ import donationRoutes from './routes/donation';
 import contractRoutes from './routes/contracts';
 import licenseRoutes from './routes/licenses';
 import disposalRoutes from './routes/disposals';
+import assetLinkRoutes from './routes/assetLinks';
 import maintenanceRoutes from './routes/maintenance';
 import notificationsRoutes from './routes/notifications';
 import backupRoutes from './routes/backup';
@@ -143,6 +144,7 @@ export function createApp() {
   app.use('/api/contracts', contractRoutes);
   app.use('/api/licenses', licenseRoutes);
   app.use('/api/disposals', disposalRoutes);
+  app.use('/api/asset-links', assetLinkRoutes);
   app.use('/api/maintenance', maintenanceRoutes);
   app.use('/api/notifications', notificationsRoutes);
   app.use('/api/backup', backupRoutes);

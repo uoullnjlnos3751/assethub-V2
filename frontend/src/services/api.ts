@@ -405,3 +405,10 @@ export const disposalAPI = {
   create: (data: any) => api.post('/disposals', data),
   delete: (id: number) => api.delete(`/disposals/${id}`),
 };
+
+// Asset Links / CMDB parent-child (Phase 2)
+export const assetLinkAPI = {
+  byAsset: (assetId: number) => api.get(`/asset-links/by-asset/${assetId}`),
+  create: (data: { parentId: number; childId: number; linkType?: string; note?: string }) => api.post('/asset-links', data),
+  delete: (id: number) => api.delete(`/asset-links/${id}`),
+};
