@@ -400,7 +400,7 @@ export default function PMRunPage() {
     if (!window.confirm('คุณแน่ใจหรือไม่ว่าต้องการลบงาน PM นี้?')) return;
     try {
       await pmAPI.deleteRun(id);
-      loadRuns(); // Refresh the list
+      fetchData(); // Refresh the list
     } catch (err: any) {
       alert(err.response?.data?.message || err.message || 'เกิดข้อผิดพลาดในการลบงาน PM');
     }
@@ -414,7 +414,7 @@ export default function PMRunPage() {
     try {
       await pmAPI.updateRunNotes(noteModal.run.id, noteModal.value);
       setNoteModal({ open: false, run: null, value: '' });
-      loadRuns();
+      fetchData();
     } catch (err: any) {
       alert(err.response?.data?.message || err.message || 'เกิดข้อผิดพลาดในการบันทึกโน้ต');
     } finally {
