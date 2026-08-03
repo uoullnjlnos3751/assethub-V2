@@ -684,6 +684,7 @@ model PMRun {
   performedAt DateTime?
   completedAt DateTime?
   photoUrl    String?
+  notes       String?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt @default(now())
   answers     PMRunAnswer[]

@@ -200,6 +200,7 @@ export const pmAPI = {
   runs: (params?: any) => api.get('/pm/runs', { params }),
   performRun: (runId: number, data: any) => api.post(`/pm/runs/${runId}/perform`, data),
   deleteRun: (id: number) => api.delete(`/pm/runs/${id}`),
+  updateRunNotes: (id: number, notes: string) => api.patch(`/pm/runs/${id}/notes`, { notes }),
   dashboard: (params?: any) => api.get('/pm/dashboard', { params }),
   uploadPMPhoto: (runId: number, formData: FormData) => {
     return api.post(`/pm/runs/${runId}/upload`, formData, {

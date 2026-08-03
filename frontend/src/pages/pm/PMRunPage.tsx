@@ -81,6 +81,8 @@ export default function PMRunPage() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [fetchingGLPI, setFetchingGLPI] = useState(false);
   const [glpiSpec, setGlpiSpec] = useState<any>(null);
+  const [noteModal, setNoteModal] = useState<{ open: boolean; run: any; value: string }>({ open: false, run: null, value: '' });
+  const [savingNote, setSavingNote] = useState(false);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2800); };
 
@@ -404,6 +406,22 @@ export default function PMRunPage() {
     }
   };
 
+  /* ── Note (freeform remark, e.g. reschedule reason for overdue PM) ── */
+  const openNoteModal = (run: any) => setNoteModal({ open: true, run, value: run.notes || '' });
+  const handleSaveNote = async () => {
+    if (!noteModal.run) return;
+    setSavingNote(true);
+    try {
+      await pmAPI.updateRunNotes(noteModal.run.id, noteModal.value);
+      setNoteModal({ open: false, run: null, value: '' });
+      loadRuns();
+    } catch (err: any) {
+      alert(err.response?.data?.message || err.message || 'เกิดข้อผิดพลาดในการบันทึกโน้ต');
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
   /* ── Export Excel ── */
   const handleExport = async () => {
     setExporting(true);
@@ -685,6 +703,12 @@ export default function PMRunPage() {
                           <div style={{ color: isOverdue ? '#ff3b30' : '#86868b', marginTop: 2 }}>
                              📅 สิ้นสุด {r.plan?.endDate ? new Date(r.plan.endDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' }) : '—'}
                           </div>
+                          {r.notes && (
+                            <div title={r.notes} style={{ marginTop: 4, fontSize: 10, color: '#0071e3', display: 'flex', alignItems: 'flex-start', gap: 4, maxWidth: 220 }}>
+                              <span>📝</span>
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.notes}</span>
+                            </div>
+                          )}
                         </td>
                         <td style={{ padding: '8px 12px', fontSize: 11, color: '#515154' }}>
                           {r.asset?.type || '—'}
@@ -703,6 +727,15 @@ export default function PMRunPage() {
                               disabled={!r.plan?.template?.templateItems?.length}
                             >
                               ✏️
+                            </button>
+                            <button
+                              title={r.notes ? 'แก้ไขโน้ต' : 'เพิ่มโน้ต (เช่น เจ้าของเครื่องไม่ว่าง จะนัดทำ PM วันไหน)'}
+                              type="button"
+                              className="pmr-icon-btn"
+                              style={{ width: 28, height: 28, fontSize: 12, background: r.notes ? '#eff5fc' : '#f5f5f7', color: r.notes ? '#0071e3' : '#86868b' }}
+                              onClick={() => openNoteModal(r)}
+                            >
+                              📝
                             </button>
                             <button title="ลบข้อมูล" type="button" className="pmr-icon-btn" style={{ width: 28, height: 28, fontSize: 12, background: '#fff0f0', color: '#ff3b30' }} onClick={() => handleDeleteRun(r.id)}>
                               🗑
@@ -1301,6 +1334,31 @@ export default function PMRunPage() {
           <div style={{ marginTop: 16, fontSize: 13, color: '#86868b', lineHeight: 1.5 }}>
             วาง QR Code ให้อยู่ในตำแหน่งกรอบของกล้องเพื่อทำการสแกนโดยอัตโนมัติ
           </div>
+        </div>
+      </PMRunModal>
+
+      {/* ── Note Modal (e.g. owner busy, reschedule reason for overdue PM) ── */}
+      <PMRunModal open={noteModal.open} onClose={() => setNoteModal({ open: false, run: null, value: '' })} title="📝 โน้ตงาน PM" maxWidth={480}>
+        <div style={{ padding: 24 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#1d1d1f', marginBottom: 4 }}>
+            {noteModal.run?.asset?.assetCode || 'ไม่มีรหัส'} / {noteModal.run?.asset?.assetName || 'ไม่มีชื่ออุปกรณ์'}
+          </div>
+          <div style={{ fontSize: 11, color: '#86868b', marginBottom: 12 }}>
+            บันทึกเหตุผล/แผนนัดหมาย เช่น "เจ้าของเครื่องไม่ว่าง จะนัดทำ PM วันที่ 10 ส.ค."
+          </div>
+          <textarea
+            autoFocus
+            style={{ width: '100%', border: '1px solid #d2d2d7', borderRadius: 8, padding: '10px 14px', fontSize: 12, fontFamily: 'inherit', minHeight: 100, resize: 'vertical', outline: 'none', color: '#1d1d1f' }}
+            placeholder="ระบุรายละเอียด..."
+            value={noteModal.value}
+            onChange={e => setNoteModal(p => ({ ...p, value: e.target.value }))}
+          />
+        </div>
+        <div style={{ padding: '16px 24px', borderTop: '1px solid #e5e5ea', display: 'flex', justifyContent: 'flex-end', gap: 10, background: '#fff' }}>
+          <button type="button" className="pmr-btn pmr-btn-outline" onClick={() => setNoteModal({ open: false, run: null, value: '' })}>ยกเลิก</button>
+          <button type="button" className="pmr-btn pmr-btn-primary" onClick={handleSaveNote} disabled={savingNote}>
+            {savingNote ? '⏳ กำลังบันทึก...' : '✅ บันทึกโน้ต'}
+          </button>
         </div>
       </PMRunModal>
 

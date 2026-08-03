@@ -904,6 +904,20 @@ router.delete('/runs/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), as
   } catch (err) { next(err); }
 });
 
+// Freeform remark on a PM run (e.g. "owner busy, will reschedule to <date>")
+// kept separate from /perform so staff can leave a note without touching the
+// checklist/status.
+router.patch('/runs/:id/notes', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const notes = typeof req.body.notes === 'string' ? req.body.notes.trim() : '';
+    const run = await prisma.pMRun.findUnique({ where: { id } });
+    if (!run) throw new AppError('ไม่พบงาน PM', 404);
+    const updated = await prisma.pMRun.update({ where: { id }, data: { notes: notes || null } });
+    res.json(updated);
+  } catch (err) { next(err); }
+});
+
 // ── Helpers for PM Components ──
 router.post('/upload-temp', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), pmPhotoUpload.single('file'), (req: Request, res: Response, next: NextFunction) => {
   try {
