@@ -300,7 +300,7 @@ export default function PMRunPage() {
       const items = getChecklistItems(run);
       const answerList = items.filter((item: any) => item.id).map((item: any) => {
         let val = answers[item.key] !== undefined ? String(answers[item.key]) : '';
-        const shouldSaveNote = (val === 'no' || val === 'na') || (val === 'yes' && ['windows_version', 'office_check', 'antivirus'].includes(item.key));
+        const shouldSaveNote = (val === 'no' || val === 'na') || (val === 'yes' && ['windows_version', 'office_check', 'antivirus', 'ip_phone'].includes(item.key));
         if (shouldSaveNote && answers[`${item.key}_note`]) {
           val = `${val}::${answers[`${item.key}_note`]}`;
         }
@@ -310,20 +310,20 @@ export default function PMRunPage() {
         showToast('❌ แผน PM นี้ยังไม่มี Checklist Template');
         return;
       }
-      await pmAPI.performRun(run.id, { answers: answerList, status: nextStatus });
-      
+      const res = await pmAPI.performRun(run.id, { answers: answerList, status: nextStatus });
+      const updatedRun = res.data;
+      setRuns(prev => prev.map(r => r.id === updatedRun.id ? updatedRun : r));
+
       // Clear draft on success
       localStorage.removeItem(`pm_draft_${run.id}`);
 
       if (nextStatus === 'IN_PROGRESS') {
         showToast(`✅ บันทึกร่าง PM สำหรับ ${run.asset?.assetName || run.asset?.assetCode} สำเร็จ`);
         setPMModal({ open: false, run: null });
-        fetchData();
         return;
       }
       showToast(`✅ บันทึก PM สำหรับ ${run.asset?.assetName || run.asset?.assetCode} สำเร็จ`);
       setPMModal({ open: false, run: null });
-      fetchData();
     } catch (err: any) {
       showToast(`❌ ${err.response?.data?.error || 'บันทึกไม่สำเร็จ'}`);
     } finally { setSaving(false); }
@@ -340,7 +340,7 @@ export default function PMRunPage() {
       const items = getChecklistItems(firstRun);
       const answerList = items.filter((item: any) => item.id).map((item: any) => {
         let val = answers[item.key] !== undefined ? String(answers[item.key]) : '';
-        const shouldSaveNote = (val === 'no' || val === 'na') || (val === 'yes' && ['windows_version', 'office_check', 'antivirus'].includes(item.key));
+        const shouldSaveNote = (val === 'no' || val === 'na') || (val === 'yes' && ['windows_version', 'office_check', 'antivirus', 'ip_phone'].includes(item.key));
         if (shouldSaveNote && answers[`${item.key}_note`]) {
           val = `${val}::${answers[`${item.key}_note`]}`;
         }
@@ -351,15 +351,17 @@ export default function PMRunPage() {
         return;
       }
 
-      await pmAPI.bulkPerformRun({ runIds: selectedRunIds, answers: answerList });
+      const res = await pmAPI.bulkPerformRun({ runIds: selectedRunIds, answers: answerList });
+      const updatedRuns: any[] = res.data?.runs || [];
+      const updatedById = new Map(updatedRuns.map(r => [r.id, r]));
+      setRuns(prev => prev.map(r => updatedById.has(r.id) ? updatedById.get(r.id) : r));
       showToast(`✅ บันทึก PM แบบกลุ่ม ${selectedRunIds.length} รายการสำเร็จ`);
-      
+
       // Clean up drafts
       selectedRunIds.forEach(id => localStorage.removeItem(`pm_draft_${id}`));
-      
+
       setBulkPMModal({ open: false, templateId: null });
       setSelectedRunIds([]);
-      fetchData();
     } catch (err: any) {
       showToast(`❌ ${err.response?.data?.error || 'บันทึกไม่สำเร็จ'}`);
     } finally { setSaving(false); }
@@ -400,7 +402,7 @@ export default function PMRunPage() {
     if (!window.confirm('คุณแน่ใจหรือไม่ว่าต้องการลบงาน PM นี้?')) return;
     try {
       await pmAPI.deleteRun(id);
-      fetchData(); // Refresh the list
+      setRuns(prev => prev.filter(r => r.id !== id));
     } catch (err: any) {
       alert(err.response?.data?.message || err.message || 'เกิดข้อผิดพลาดในการลบงาน PM');
     }
@@ -412,9 +414,10 @@ export default function PMRunPage() {
     if (!noteModal.run) return;
     setSavingNote(true);
     try {
-      await pmAPI.updateRunNotes(noteModal.run.id, noteModal.value);
+      const res = await pmAPI.updateRunNotes(noteModal.run.id, noteModal.value);
+      const notes = res.data.notes;
+      setRuns(prev => prev.map(r => r.id === noteModal.run.id ? { ...r, notes } : r));
       setNoteModal({ open: false, run: null, value: '' });
-      fetchData();
     } catch (err: any) {
       alert(err.response?.data?.message || err.message || 'เกิดข้อผิดพลาดในการบันทึกโน้ต');
     } finally {

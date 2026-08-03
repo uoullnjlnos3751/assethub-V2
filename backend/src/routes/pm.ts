@@ -11,6 +11,25 @@ import multer from 'multer';
 
 const router = Router();
 
+// Shared with GET /runs so a single perform/bulk-perform response can patch
+// the frontend's run list in place instead of forcing a full refetch.
+const RUN_INCLUDE = {
+  asset: {
+    select: {
+      id: true, assetCode: true, assetName: true, brand: true, model: true,
+      serialNo: true, ownerName: true, type: true, company: true,
+      departmentId: true, location: true, status: true, age: true
+    }
+  },
+  performer: { select: { id: true, displayName: true, adUsername: true } },
+  plan: {
+    include: {
+      template: { include: { templateItems: { orderBy: { order: 'asc' as const } } } },
+    },
+  },
+  answers: { include: { item: true } },
+} as const;
+
 const PM_UPLOAD_DIR = path.join(__dirname, '..', '..', 'uploads', 'pm');
 fs.mkdirSync(PM_UPLOAD_DIR, { recursive: true });
 
@@ -462,22 +481,7 @@ router.get('/runs', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (re
 
     const runs = await prisma.pMRun.findMany({
       where,
-      include: {
-        asset: {
-          select: {
-            id: true, assetCode: true, assetName: true, brand: true, model: true,
-            serialNo: true, ownerName: true, type: true, company: true,
-            departmentId: true, location: true, status: true, age: true
-          }
-        },
-        performer: { select: { id: true, displayName: true, adUsername: true } },
-        plan: {
-          include: {
-            template: { include: { templateItems: { orderBy: { order: 'asc' } } } },
-          },
-        },
-        answers: { include: { item: true } },
-      },
+      include: RUN_INCLUDE,
       orderBy: { performedAt: { sort: 'desc', nulls: 'last' } },
     });
     res.json(runs);
@@ -758,7 +762,8 @@ router.post('/runs/:id/perform', authenticate, authorize('IT_ADMIN', 'SUPERADMIN
       });
     });
 
-    res.json({ message: nextStatus === 'COMPLETED' ? 'บันทึกผล PM เรียบร้อย' : 'บันทึกร่าง PM เรียบร้อย' });
+    const updated = await prisma.pMRun.findUnique({ where: { id: runId }, include: RUN_INCLUDE });
+    res.json(updated);
   } catch (err) { next(err); }
 });
 
@@ -864,7 +869,8 @@ router.post('/runs/bulk-perform', authenticate, authorize('IT_ADMIN', 'SUPERADMI
       }
     });
 
-    res.json({ message: `บันทึกผล PM แบบกลุ่มสำเร็จทั้งหมด ${validRuns.length} รายการ` });
+    const updated = await prisma.pMRun.findMany({ where: { id: { in: validRuns.map((r) => r.id) } }, include: RUN_INCLUDE });
+    res.json({ message: `บันทึกผล PM แบบกลุ่มสำเร็จทั้งหมด ${validRuns.length} รายการ`, runs: updated });
   } catch (err) { next(err); }
 });
 
