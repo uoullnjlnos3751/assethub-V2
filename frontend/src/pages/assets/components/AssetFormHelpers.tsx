@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Card, Switch, Typography } from '@mui/material';
+import { Box, Card, Switch, Typography, useTheme, alpha } from '@mui/material';
 
 // Extracted from AssetFormPage.tsx as pure code motion (no behavior change)
 // — that file had grown to 2533 lines. These four are self-contained: no
@@ -27,13 +27,15 @@ export function getTypeIcon(type: string): string {
 export function SectionCard({ title, sub, barColor, children }: {
   title: string; sub?: string; barColor?: string; children: React.ReactNode;
 }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   return (
     <Card sx={{
-      background: 'rgba(255, 255, 255, 0.68)',
-      border: '1px solid rgba(255, 255, 255, 0.88)',
+      background: isDark ? alpha(theme.palette.background.paper, 0.72) : alpha('#ffffff', 0.72),
+      border: `1px solid ${alpha(theme.palette.primary.main, isDark ? 0.22 : 0.14)}`,
       backdropFilter: 'blur(22px)',
       borderRadius: '14px',
-      boxShadow: '0 4px 24px rgba(99, 102, 241, 0.07), 0 1px 3px rgba(0, 0, 0, 0.04)',
+      boxShadow: `0 4px 24px ${alpha(theme.palette.primary.main, 0.08)}, 0 1px 3px rgba(0, 0, 0, 0.04)`,
       p: { xs: 2.5, sm: 3 },
       mb: 2.5,
       position: 'relative',
@@ -45,13 +47,13 @@ export function SectionCard({ title, sub, barColor, children }: {
         gap: 1.5,
         mb: 3,
         pb: 1.5,
-        borderBottom: '1px solid rgba(99, 102, 241, 0.07)'
+        borderBottom: `1px solid ${alpha(theme.palette.primary.main, 0.08)}`
       }}>
         <Box sx={{
           width: 3.5,
           height: 16,
           borderRadius: '2px',
-          background: barColor || 'linear-gradient(180deg,#4f46e5,#7c3aed)'
+          background: barColor || `linear-gradient(180deg, ${theme.palette.primary.light}, ${theme.palette.primary.dark})`
         }} />
         <Typography variant="subtitle2" fontWeight={700} color="text.primary" sx={{ fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
           {title}
@@ -71,17 +73,18 @@ export function SectionCard({ title, sub, barColor, children }: {
 export function ToggleWrap({ label, desc, checked, onChange }: {
   label: string; desc?: string; checked: boolean; onChange: (v: boolean) => void;
 }) {
+  const theme = useTheme();
   return (
     <Box sx={{
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
       p: 1.5,
-      bgcolor: 'rgba(248, 247, 255, 0.65)',
-      border: '1px solid rgba(99, 102, 241, 0.09)',
+      bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.08 : 0.045),
+      border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
       borderRadius: 2,
       transition: 'background 0.15s',
-      '&:hover': { bgcolor: 'rgba(99, 102, 241, 0.04)' }
+      '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.08) }
     }}>
       <Box>
         <Typography variant="body2" fontWeight={500} color="text.primary">

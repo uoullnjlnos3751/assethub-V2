@@ -1447,7 +1447,7 @@ export default function AssetListPage() {
                     <ShoppingCartIcon fontSize="small" sx={{ mr: 1, color: 'warning.main' }} /> ส่งมอบ/Check-out
                   </MenuItem>
                 )}
-                <MenuItem onClick={() => { handleMenuClose(); navigate(`/assets/${menuAnchor.row.id}/print-qr`); }}>
+                <MenuItem onClick={() => { handleMenuClose(); navigate(`/assets/print-qr?ids=${menuAnchor.row.id}`); }}>
                   <PrintIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} /> พิมพ์ QR Code
                 </MenuItem>
                 {user?.role === 'SUPERADMIN' && (

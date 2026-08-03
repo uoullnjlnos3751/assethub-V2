@@ -22,6 +22,7 @@ import {
   Avatar,
   Chip,
   alpha,
+  useTheme,
   Autocomplete,
   Accordion,
   AccordionSummary,
@@ -82,6 +83,7 @@ const typeGroupCategoryMap: Record<string, string> = {
 export default function AssetFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const theme = useTheme();
   const [searchParams] = useSearchParams();
   const typeGroupFromUrl = searchParams.get('typeGroup') || '';
   const [form, setForm] = useState<Record<string, any>>(initialData);
@@ -523,9 +525,9 @@ export default function AssetFormPage() {
   return (
     <Box sx={{ position: 'relative', minHeight: '80vh', pb: 10 }}>
       {/* Background Orbs */}
-      <Box sx={{ position: 'fixed', borderRadius: '50%', filter: 'blur(80px)', pointerEvents: 'none', zIndex: 0, width: 420, height: 420, bgcolor: 'rgba(99,102,241,.08)', top: -140, left: -100 }} />
-      <Box sx={{ position: 'fixed', borderRadius: '50%', filter: 'blur(80px)', pointerEvents: 'none', zIndex: 0, width: 300, height: 300, bgcolor: 'rgba(139,92,246,.07)', bottom: -80, right: -60 }} />
-      <Box sx={{ position: 'fixed', inset: 0, backgroundImage: 'radial-gradient(circle,rgba(99,102,241,.08) 1px,transparent 1px)', backgroundSize: '28px 28px', pointerEvents: 'none', zIndex: 0 }} />
+      <Box sx={{ position: 'fixed', borderRadius: '50%', filter: 'blur(80px)', pointerEvents: 'none', zIndex: 0, width: 420, height: 420, bgcolor: alpha(theme.palette.primary.main, .08), top: -140, left: -100 }} />
+      <Box sx={{ position: 'fixed', borderRadius: '50%', filter: 'blur(80px)', pointerEvents: 'none', zIndex: 0, width: 300, height: 300, bgcolor: alpha(theme.palette.info.main, .07), bottom: -80, right: -60 }} />
+      <Box sx={{ position: 'fixed', inset: 0, backgroundImage: `radial-gradient(circle,${alpha(theme.palette.primary.main, .08)} 1px,transparent 1px)`, backgroundSize: '28px 28px', pointerEvents: 'none', zIndex: 0 }} />
 
       <Container maxWidth="md" sx={{ position: 'relative', zIndex: 1, pt: 1 }}>
         <Box sx={{ mb: 4 }}>
@@ -552,11 +554,11 @@ export default function AssetFormPage() {
 
         {/* Page header */}
         <Card sx={{
-          background: 'rgba(255, 255, 255, 0.65)',
-          border: '1px solid rgba(255, 255, 255, 0.85)',
+          background: alpha(theme.palette.background.paper, 0.72),
+          border: `1px solid ${alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.22 : 0.14)}`,
           backdropFilter: 'blur(20px)',
           borderRadius: '14px',
-          boxShadow: '0 4px 24px rgba(99, 102, 241, 0.07), 0 1px 3px rgba(0, 0, 0, 0.04)',
+          boxShadow: `0 4px 24px ${alpha(theme.palette.primary.main, 0.08)}, 0 1px 3px rgba(0, 0, 0, 0.04)`,
           p: 1,
           mb: 2.5
         }}>
@@ -565,9 +567,9 @@ export default function AssetFormPage() {
               width: 46,
               height: 46,
               borderRadius: '12px',
-              background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+              background: `linear-gradient(135deg, ${theme.palette.primary.light}, ${theme.palette.primary.dark})`,
               fontSize: '22px',
-              boxShadow: '0 4px 14px rgba(99, 102, 241, 0.3)',
+              boxShadow: `0 4px 14px ${alpha(theme.palette.primary.main, 0.3)}`,
               flexShrink: 0
             }}>
               {icon}
@@ -578,7 +580,7 @@ export default function AssetFormPage() {
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mt: 0.5 }}>
                 {form.assetCode && (
-                  <Chip label={form.assetCode} size="small" sx={{ fontFamily: 'monospace', fontWeight: 700, height: 20, bgcolor: 'rgba(99,102,241,.09)', color: 'primary.dark' }} />
+                  <Chip label={form.assetCode} size="small" sx={{ fontFamily: 'monospace', fontWeight: 700, height: 20, bgcolor: alpha(theme.palette.primary.main, .09), color: 'primary.dark' }} />
                 )}
                 {(form.brand || form.model) && (
                   <Typography variant="caption" color="text.secondary">
@@ -756,11 +758,11 @@ export default function AssetFormPage() {
                         fontSize: '0.75rem',
                         py: 0.5,
                         borderRadius: '8px',
-                        borderColor: '#0071e3',
-                        color: '#0071e3',
+                        borderColor: theme.palette.primary.main,
+                        color: theme.palette.primary.main,
                         '&:hover': {
-                          borderColor: '#0077ed',
-                          bgcolor: 'rgba(0, 113, 227, 0.04)'
+                          borderColor: theme.palette.primary.dark,
+                          bgcolor: alpha(theme.palette.primary.main, 0.04)
                         }
                       }}
                     >
@@ -772,9 +774,9 @@ export default function AssetFormPage() {
                       defaultExpanded={true}
                       sx={{
                         mt: 1,
-                        border: '1px solid rgba(0, 113, 227, 0.15)',
+                        border: `1px solid ${alpha(theme.palette.primary.main, 0.15)}`,
                         borderRadius: '10px !important',
-                        bgcolor: 'rgba(0, 113, 227, 0.02)',
+                        bgcolor: alpha(theme.palette.primary.main, 0.02),
                         boxShadow: 'none',
                         overflow: 'hidden',
                         '&:before': { display: 'none' }
@@ -782,8 +784,8 @@ export default function AssetFormPage() {
                     >
                       <AccordionSummary
                         expandIcon={<ExpandMoreIcon sx={{ fontSize: 18, color: 'primary.main' }} />}
-                        sx={{ 
-                          bgcolor: 'rgba(0, 113, 227, 0.05)', 
+                        sx={{
+                          bgcolor: alpha(theme.palette.primary.main, 0.05),
                           p: '0 8px',
                           minHeight: '36px !important',
                           '& .MuiAccordionSummary-content': { 
@@ -811,8 +813,8 @@ export default function AssetFormPage() {
                             py: 0.25,
                             px: 1,
                             borderRadius: '5px',
-                            bgcolor: '#0071e3',
-                            '&:hover': { bgcolor: '#0077ed' },
+                            bgcolor: theme.palette.primary.main,
+                            '&:hover': { bgcolor: theme.palette.primary.dark },
                             textTransform: 'none',
                             ml: 'auto',
                             mr: 1
@@ -2383,10 +2385,10 @@ export default function AssetFormPage() {
             sx={{
               borderRadius: '10px',
               fontWeight: 600,
-              background: 'linear-gradient(135deg,#4f46e5,#7c3aed)',
-              boxShadow: '0 3px 12px rgba(99, 102, 241, 0.28)',
+              background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
+              boxShadow: `0 3px 12px ${alpha(theme.palette.primary.main, 0.28)}`,
               '&:hover': {
-                background: 'linear-gradient(135deg,#4338ca,#6d28d9)',
+                background: `linear-gradient(135deg, ${theme.palette.primary.dark}, ${theme.palette.primary.dark})`,
               }
             }}
           >
