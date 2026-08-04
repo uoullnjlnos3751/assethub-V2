@@ -12,12 +12,12 @@ interface StatusChipProps {
 }
 
 /**
- * Themed status badge. Renders a soft-tinted pill with a colored icon + label.
- * Pulls label / icon / color from the central `statusConfig` so every page
- * renders the same status identically — and respects the active MUI theme
- * (light/dark). Replaces the previous hardcoded-hex local map.
+ * Themed status badge. Renders a soft-tinted pill (radius 999) with a colored
+ * icon + label. Pulls label / icon / color from the central `statusConfig` so
+ * every page renders the same status identically — and respects the active
+ * MUI theme (light/dark). Replaces the previous hardcoded-hex local map.
  */
-export default function StatusChip({ status, customLabel, iconSize = 13, sx }: StatusChipProps) {
+export default function StatusChip({ status, customLabel, iconSize = 12, sx }: StatusChipProps) {
   const theme = useTheme();
   const meta = getStatusMeta(status, theme, customLabel);
   const Icon = meta.Icon;
@@ -27,20 +27,19 @@ export default function StatusChip({ status, customLabel, iconSize = 13, sx }: S
       sx={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 0.75,
-        px: 1.25,
-        py: 0.4,
-        borderRadius: 1.5,
+        gap: 0.6,
+        px: 1.15,
+        py: 0.35,
+        borderRadius: 999,
         bgcolor: meta.bg,
-        border: `1px solid ${meta.border}`,
         ...sx,
       }}
     >
-      <Icon size={iconSize} strokeWidth={2.2} color={meta.color} />
+      <Icon size={iconSize} strokeWidth={2.4} color={meta.color} />
       <Typography
         sx={{
-          fontSize: '0.78rem',
-          fontWeight: 600,
+          fontSize: '0.72rem',
+          fontWeight: 700,
           color: meta.color,
           lineHeight: 1.2,
           whiteSpace: 'nowrap',

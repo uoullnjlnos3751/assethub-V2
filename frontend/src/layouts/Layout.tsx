@@ -229,7 +229,7 @@ export default function Layout() {
               <ListItemButton
                 onClick={() => toggleGroup(group.label)}
                 sx={{
-                  borderRadius: '7px',
+                  borderRadius: '9px',
                   mx: '8px',
                   py: '7px',
                   px: '12px',
@@ -237,7 +237,7 @@ export default function Layout() {
                   '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.04) },
                 }}
               >
-                <ListItemIcon sx={{ minWidth: 30, color: isOpen ? theme.palette.warning.main : theme.palette.text.secondary }}>
+                <ListItemIcon sx={{ minWidth: 30, color: isOpen ? theme.palette.primary.main : theme.palette.text.secondary }}>
                   {group.icon}
                 </ListItemIcon>
                 <ListItemText
@@ -305,7 +305,7 @@ export default function Layout() {
                               py: '6.5px',
                               mx: '8px',
                               my: '1px',
-                              borderRadius: '7px',
+                              borderRadius: '9px',
                               '&.Mui-selected': {
                                 bgcolor: alpha(theme.palette.primary.main, 0.1),
                                 color: theme.palette.primary.main,
@@ -321,7 +321,7 @@ export default function Layout() {
                               primary={child.label}
                               primaryTypographyProps={{
                                 fontSize: '0.76rem',
-                                fontWeight: active ? 600 : 400,
+                                fontWeight: active ? 700 : 400,
                                 color: active ? theme.palette.primary.main : theme.palette.text.primary,
                                 whiteSpace: 'nowrap',
                                 overflow: 'hidden',
@@ -346,7 +346,7 @@ export default function Layout() {
               selected={active}
               onClick={() => { navigate(item.path || ''); setMobileOpen(false); }}
               sx={{
-                borderRadius: '7px',
+                borderRadius: '9px',
                 mx: '8px',
                 py: '7px',
                 px: '12px',
@@ -366,7 +366,7 @@ export default function Layout() {
                 primary={item.label}
                 primaryTypographyProps={{
                   fontSize: '0.8125rem',
-                  fontWeight: active ? 600 : 500,
+                  fontWeight: active ? 700 : 500,
                   color: active ? theme.palette.primary.main : theme.palette.text.primary,
                 }}
               />
@@ -400,8 +400,9 @@ export default function Layout() {
           <Box sx={{
             width: 34,
             height: 34,
-            borderRadius: '8px',
-            background: theme.palette.warning.main,
+            borderRadius: '10px',
+            background: `linear-gradient(150deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+            boxShadow: `0 6px 16px -6px ${theme.palette.primary.main}`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -442,7 +443,7 @@ export default function Layout() {
         <Avatar sx={{
           width: 32,
           height: 32,
-          background: `linear-gradient(135deg, ${theme.palette.warning.main}, ${theme.palette.primary.main})`,
+          background: `linear-gradient(150deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
           fontSize: '11px',
           fontWeight: 500,
           flexShrink: 0,

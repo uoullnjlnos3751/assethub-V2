@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, Typography, Box, Avatar, alpha } from '@mui/material';
+import { Card, Typography, Box, Avatar, alpha, useTheme } from '@mui/material';
 import {
   Timeline,
   TimelineItem,
@@ -31,6 +31,7 @@ const HISTORY_ICON: Record<string, React.ElementType> = {
 
 /* ─── History tab (MUI Lab Timeline) ──────────────────────────── */
 export function HistoryTab({ asset }: { asset: any }) {
+  const theme = useTheme();
   const history = asset.assetHistory || [];
   if (history.length === 0) return (
     <Card sx={{ p: 4, textAlign: 'center' }}>
@@ -66,14 +67,14 @@ export function HistoryTab({ asset }: { asset: any }) {
                 <TimelineDot color={dotColor} variant="outlined" sx={{ p: '6px' }}>
                   <ActionIcon sx={{ fontSize: 14 }} />
                 </TimelineDot>
-                {i < history.length - 1 && <TimelineConnector sx={{ bgcolor: alpha('#9ca3af', 0.2) }} />}
+                {i < history.length - 1 && <TimelineConnector sx={{ bgcolor: theme.palette.divider }} />}
               </TimelineSeparator>
               <TimelineContent sx={{ pb: 3, pr: 0 }}>
                 <Typography variant="body2" fontWeight={700} color="text.primary">
                   {label}
                 </Typography>
                 {detail && (
-                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.25, lineHeight: 1.5, bgcolor: alpha('#9ca3af', 0.05), p: 1, borderRadius: 1 }}>
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.25, lineHeight: 1.5, bgcolor: alpha(theme.palette.text.secondary, 0.06), p: 1, borderRadius: 1 }}>
                     {detail}
                   </Typography>
                 )}

@@ -10,18 +10,18 @@ export function SectionCard({ title, icon: Icon, action, actionLabel, children }
   return (
     <Box sx={{
       bgcolor: theme.palette.background.paper,
-      border: '1px solid #e2e8f0',
-      borderRadius: 4,
+      border: `1px solid ${theme.palette.divider}`,
+      borderRadius: '14px',
       p: 2.5,
       height: '100%',
       display: 'flex',
       flexDirection: 'column',
-      boxShadow: '0 4px 15px rgba(0,0,0,0.015)',
+      boxShadow: theme.palette.mode === 'dark' ? '0 6px 18px rgba(0,0,0,0.35)' : '0 6px 18px rgba(16,24,40,.06)',
     }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
           <Icon size={18} strokeWidth={2.2} color={theme.palette.primary.main} />
-          <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a' }}>{title}</Typography>
+          <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color: theme.palette.text.primary }}>{title}</Typography>
         </Box>
         {action && actionLabel && (
           <Box onClick={action} sx={{
