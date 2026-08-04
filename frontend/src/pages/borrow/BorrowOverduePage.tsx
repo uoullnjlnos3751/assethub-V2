@@ -3,6 +3,7 @@ import {
   Box, Typography, Card, CardContent, Chip, CircularProgress, Alert, Grid,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Button,
   InputAdornment, TextField, Dialog, DialogTitle, DialogContent, DialogActions,
+  useTheme, alpha,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
@@ -27,6 +28,7 @@ interface OverdueItem {
 }
 
 export default function BorrowOverduePage() {
+  const theme = useTheme();
   const [items, setItems] = useState<OverdueItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<OverdueItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -183,7 +185,7 @@ export default function BorrowOverduePage() {
         <TableContainer>
           <Table>
             <TableHead>
-              <TableRow sx={{ backgroundColor: 'rgba(211, 47, 47, 0.1)' }}>
+              <TableRow sx={{ backgroundColor: alpha(theme.palette.error.main, 0.1) }}>
                 <TableCell>เลขที่</TableCell>
                 <TableCell>ผู้ยืม</TableCell>
                 <TableCell>รหัส</TableCell>
@@ -207,7 +209,7 @@ export default function BorrowOverduePage() {
                   <TableRow
                     key={item.id}
                     hover
-                    sx={{ backgroundColor: 'rgba(211, 47, 47, 0.05)' }}
+                    sx={{ backgroundColor: alpha(theme.palette.error.main, 0.05) }}
                   >
                     <TableCell sx={{ fontWeight: 600 }}>{item.requestNo}</TableCell>
                     <TableCell>{item.borrowerName}</TableCell>

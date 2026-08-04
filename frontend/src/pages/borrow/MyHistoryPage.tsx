@@ -3,7 +3,7 @@ import {
   Box, Typography, Chip, CircularProgress, Card, CardContent, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, Button, Grid, InputAdornment, TextField,
   Dialog, DialogTitle, DialogContent, DialogActions, Divider,
-  useMediaQuery, useTheme,
+  useMediaQuery, useTheme, alpha,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
@@ -199,9 +199,9 @@ export default function MyHistoryPage() {
               <Box
                 key={item.id}
                 sx={{
-                  backgroundColor: '#fff',
+                  bgcolor: 'background.paper',
                   borderRadius: '14px',
-                  border: '1px solid #e2e8f0',
+                  border: `1px solid ${theme.palette.divider}`,
                   boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
                   p: '16px',
                   mb: '12px',
@@ -283,7 +283,7 @@ export default function MyHistoryPage() {
           <TableContainer>
             <Table>
               <TableHead>
-                <TableRow sx={{ backgroundColor: 'rgba(37, 99, 235, 0.05)' }}>
+                <TableRow sx={{ backgroundColor: alpha(theme.palette.primary.main, 0.05) }}>
                   <TableCell>รหัส</TableCell>
                   <TableCell>Serial</TableCell>
                   <TableCell>ยี่ห้อ/รุ่น</TableCell>

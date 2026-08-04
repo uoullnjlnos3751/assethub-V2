@@ -1,42 +1,54 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { borrowAPI, adminAPI } from '../../services/api';
+import { borrowAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatDate } from '../../utils/dateUtils';
-import { useTheme, useMediaQuery } from '@mui/material';
-
-
-const statusMeta: Record<string, { label: string; color: string; bg: string }> = {
-  Pending:          { label: 'รออนุมัติ',    color: '#d97706', bg: '#fffbeb' },
-  Approved:         { label: 'อนุมัติแล้ว',  color: '#0284c7', bg: '#f0f9ff' },
-  CheckedOut:       { label: 'กำลังยืม',     color: '#16a34a', bg: '#f0fdf4' },
-  Returned:         { label: 'คืนแล้ว',       color: '#6b7280', bg: '#f9fafb' },
-  Rejected:         { label: 'ไม่อนุมัติ',   color: '#dc2626', bg: '#fef2f2' },
-  PartiallyReturned:{ label: 'คืนบางส่วน',   color: '#7c3aed', bg: '#f5f3ff' },
-  Cancelled:        { label: 'ยกเลิกแล้ว',   color: '#6b7280', bg: '#f3f4f6' },
-};
+import {
+  Box, Typography, Card, Button, IconButton, Chip, Dialog, DialogTitle, DialogContent, DialogActions,
+  TextField, Snackbar, Alert, CircularProgress, Pagination, alpha, useTheme, useMediaQuery,
+} from '@mui/material';
+import StatusChip from '../../components/StatusChip';
+import AddIcon from '@mui/icons-material/Add';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import Inventory2Icon from '@mui/icons-material/Inventory2';
+import ErrorIcon from '@mui/icons-material/Error';
+import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
+import MoveToInboxIcon from '@mui/icons-material/MoveToInbox';
+import InboxIcon from '@mui/icons-material/Inbox';
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import MoreTimeIcon from '@mui/icons-material/MoreTime';
+import AssignmentReturnIcon from '@mui/icons-material/AssignmentReturn';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import HistoryIcon from '@mui/icons-material/History';
+import CloseIcon from '@mui/icons-material/Close';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import SendIcon from '@mui/icons-material/Send';
 
 function getDaysLeft(dueDate: string | null): number | null {
   if (!dueDate) return null;
   return Math.ceil((new Date(dueDate).getTime() - Date.now()) / 86400000);
 }
 
-
 function DueBar({ dueDate }: { dueDate: string }) {
+  const theme = useTheme();
   const days = getDaysLeft(dueDate);
   if (days === null) return null;
   const total = 30;
   const pct = Math.max(0, Math.min(100, (days / total) * 100));
-  const color = days < 0 ? '#dc2626' : days <= 3 ? '#f59e0b' : days <= 7 ? '#f97316' : '#16a34a';
+  const color = days < 0 ? theme.palette.error.main : days <= 3 ? theme.palette.warning.main : days <= 7 ? theme.palette.warning.light : theme.palette.success.main;
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-      <div style={{ flex: 1, height: 6, background: '#e2e8f0', borderRadius: 3, overflow: 'hidden' }}>
-        <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 3 }} />
-      </div>
-      <span style={{ fontSize: '0.72rem', fontWeight: 700, color, whiteSpace: 'nowrap' }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+      <Box sx={{ flex: 1, height: 6, bgcolor: 'action.hover', borderRadius: 3, overflow: 'hidden' }}>
+        <Box sx={{ width: `${pct}%`, height: '100%', bgcolor: color, borderRadius: 3 }} />
+      </Box>
+      <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color, whiteSpace: 'nowrap' }}>
         {days < 0 ? `เกิน ${Math.abs(days)} วัน` : `เหลือ ${days} วัน`}
-      </span>
-    </div>
+      </Typography>
+    </Box>
   );
 }
 
@@ -67,13 +79,8 @@ export default function MyItemsPage() {
   const [extReason, setExtReason] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
-  const [isDark, setIsDark] = useState(false);
   const [expandedReq, setExpandedReq] = useState<number | null>(null);
   const isAdmin = user?.role && ['IT_ADMIN', 'SUPERADMIN'].includes(user.role);
-
-  useEffect(() => {
-    adminAPI.settings().then((res: any) => setIsDark(res.data?.darkMode || false)).catch(() => {});
-  }, []);
 
   const showToast = useCallback((msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); }, []);
 
@@ -147,427 +154,353 @@ export default function MyItemsPage() {
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
 
-  const C = {
-    pageBg:      isDark ? '#0f172a' : '#f1f5f9',
-    cardBg:      isDark ? '#1e293b' : '#fff',
-    cardBorder:  isDark ? '#334155' : '#e2e8f0',
-    text:        isDark ? '#e2e8f0' : '#0f172a',
-    textDim:     isDark ? '#94a3b8' : '#64748b',
-    textMuted:   isDark ? '#64748b' : '#94a3b8',
-    border:      isDark ? '#334155' : '#e2e8f0',
-    inputBg:     isDark ? '#0f172a' : '#fff',
-    inputBorder: isDark ? '#475569' : '#e2e8f0',
-    hoverBg:     isDark ? '#334155' : '#f8fafc',
-    tabActive:   isDark ? '#38bdf8' : '#0284c7',
-    statBg:      isDark ? '#1e293b' : '#fff',
-    sectionBg:   isDark ? '#0f172a' : '#f8fafc',
-    badgeBg:     isDark ? '#334155' : '#f1f5f9',
-    badgeText:   isDark ? '#cbd5e1' : '#94a3b8',
-    overlay:     'rgba(0,0,0,0.5)',
-    modalBg:     isDark ? '#1e293b' : '#fff',
-    modalText:   isDark ? '#e2e8f0' : '#0f172a',
-    modalDim:    isDark ? '#94a3b8' : '#64748b',
-    btnPrimary:  isDark ? '#0e7490' : '#0ea5e9',
-    btnDanger:   '#dc2626',
-    btnCancel:   isDark ? '#334155' : '#f1f5f9',
-    btnCancelTxt: isDark ? '#e2e8f0' : '#334155',
-    toastBg:     isDark ? '#334155' : '#1e293b',
-  };
-
   if (loading) return (
-    <div style={{ background: C.pageBg, minHeight: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-      <div style={{ textAlign: 'center', color: C.textDim }}>
-        <div style={{ fontSize: '2.5rem', marginBottom: 8 }}>⏳</div>
-        <div style={{ fontWeight: 600 }}>กำลังโหลด...</div>
-      </div>
-    </div>
+    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+      <Box sx={{ textAlign: 'center', color: 'text.secondary' }}>
+        <CircularProgress size={32} sx={{ mb: 1 }} />
+        <div>กำลังโหลด...</div>
+      </Box>
+    </Box>
   );
 
   return (
-    <div style={{ background: C.pageBg, minHeight: '100vh', paddingBottom: 48 }}>
-      <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 16px' }}>
-        {toast && (
-          <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 9999, background: C.toastBg, color: '#fff', padding: '12px 20px', borderRadius: 10, fontWeight: 600, boxShadow: '0 4px 20px rgba(0,0,0,0.3)', fontSize: '0.9rem' }}>
-            {toast}
-          </div>
-        )}
+    <Box sx={{ maxWidth: 900, mx: 'auto', pb: 6 }}>
+      <Snackbar open={!!toast} autoHideDuration={3000} onClose={() => setToast('')} anchorOrigin={{ vertical: 'top', horizontal: 'right' }}>
+        <Alert severity={toast.startsWith('❌') ? 'error' : toast.startsWith('⚠') ? 'warning' : 'success'} onClose={() => setToast('')} sx={{ fontWeight: 600 }}>
+          {toast}
+        </Alert>
+      </Snackbar>
 
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12, paddingTop: 28 }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: C.text }}>รายการของฉัน</h2>
-            <p style={{ margin: '2px 0 0', color: C.textDim, fontSize: '0.85rem' }}>ติดตามสถานะยืม-คืน ส่งคืน หรือขอต่อเวลา</p>
-          </div>
-          <button onClick={() => navigate('/borrow/new')}
-            style={{ background: C.btnPrimary, color: '#fff', border: 'none', borderRadius: 10, padding: '10px 22px', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 8px rgba(14,165,233,0.3)' }}>
-            + ยืมใหม่
-          </button>
-        </div>
+      {/* Header */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.5, flexWrap: 'wrap', gap: 1.5 }}>
+        <Box>
+          <Typography variant="h5" fontWeight={800} color="text.primary">รายการของฉัน</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>ติดตามสถานะยืม-คืน ส่งคืน หรือขอต่อเวลา</Typography>
+        </Box>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('/borrow/new')}>
+          ยืมใหม่
+        </Button>
+      </Box>
 
-        {/* Error */}
-        {error && (
-          <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 12, padding: '14px 20px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ fontSize: '1.4rem' }}>❌</span>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 700, color: '#991b1b', fontSize: '0.95rem' }}>เกิดข้อผิดพลาด</div>
-              <div style={{ color: '#b91c1c', fontSize: '0.82rem', marginTop: 2 }}>{error}</div>
-            </div>
-            <button onClick={fetchData} style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}>
-              🔄 ลองใหม่
-            </button>
-          </div>
-        )}
+      {/* Error */}
+      {error && (
+        <Alert severity="error" icon={<ErrorOutlineIcon />} sx={{ mb: 2.5, borderRadius: '12px' }}
+          action={<Button color="error" size="small" startIcon={<RefreshIcon />} onClick={fetchData}>ลองใหม่</Button>}>
+          <Box sx={{ fontWeight: 700 }}>เกิดข้อผิดพลาด</Box>
+          <Box sx={{ fontSize: '0.82rem' }}>{error}</Box>
+        </Alert>
+      )}
 
-        {/* Summary cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 20 }}>
-          {[
-            { label: 'กำลังยืม',    value: countBy('CheckedOut'),  icon: '📦', color: '#16a34a', bg: isDark ? '#052e16' : '#f0fdf4' },
-            { label: 'เกินกำหนด',   value: overdueCount,           icon: '🔴', color: '#dc2626', bg: isDark ? '#450a0a' : '#fef2f2' },
-            { label: 'รออนุมัติ',   value: countBy('Pending'),     icon: '⏳', color: '#d97706', bg: isDark ? '#451a03' : '#fffbeb' },
-            { label: 'คืนแล้ว',     value: countBy('Returned'),    icon: '📥', color: '#6b7280', bg: isDark ? '#1e293b' : '#f9fafb' },
-          ].map(s => (
-            <div key={s.label} style={{ background: C.statBg, borderRadius: 14, padding: isMobile ? '12px' : '14px 16px', border: `1px solid ${C.cardBorder}`, display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12 }}>
-              <div style={{ width: isMobile ? 32 : 40, height: isMobile ? 32 : 40, borderRadius: 10, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: isMobile ? '1rem' : '1.2rem' }}>{s.icon}</div>
-              <div>
-                <div style={{ fontSize: isMobile ? '1.3rem' : '1.5rem', fontWeight: 800, color: s.color, lineHeight: 1.2 }}>{s.value}</div>
-                <div style={{ fontSize: '0.72rem', color: C.textMuted, fontWeight: 600 }}>{s.label}</div>
-              </div>
-            </div>
-          ))}
-        </div>
+      {/* Summary cards */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(150px, 1fr))', gap: 1.5, mb: 2.5 }}>
+        {[
+          { label: 'กำลังยืม',  value: countBy('CheckedOut'), Icon: Inventory2Icon,     color: theme.palette.success.main },
+          { label: 'เกินกำหนด', value: overdueCount,          Icon: ErrorIcon,          color: theme.palette.error.main },
+          { label: 'รออนุมัติ', value: countBy('Pending'),    Icon: HourglassEmptyIcon, color: theme.palette.warning.main },
+          { label: 'คืนแล้ว',   value: countBy('Returned'),   Icon: MoveToInboxIcon,    color: theme.palette.text.secondary },
+        ].map(s => (
+          <Card key={s.label} sx={{ p: isMobile ? 1.5 : '14px 16px', display: 'flex', alignItems: 'center', gap: isMobile ? 1 : 1.5 }}>
+            <Box sx={{ width: isMobile ? 32 : 40, height: isMobile ? 32 : 40, borderRadius: '10px', bgcolor: alpha(s.color, 0.12), display: 'flex', alignItems: 'center', justifyContent: 'center', color: s.color }}>
+              <s.Icon sx={{ fontSize: isMobile ? 18 : 22 }} />
+            </Box>
+            <Box>
+              <Typography sx={{ fontSize: isMobile ? '1.3rem' : '1.5rem', fontWeight: 800, color: s.color, lineHeight: 1.2 }}>{s.value}</Typography>
+              <Typography sx={{ fontSize: '0.72rem', color: 'text.disabled', fontWeight: 600 }}>{s.label}</Typography>
+            </Box>
+          </Card>
+        ))}
+      </Box>
 
-        {/* Tabs */}
-        <div style={{ display: 'flex', gap: 4, background: isDark ? '#1e293b' : '#e2e8f0', borderRadius: 12, padding: 4, marginBottom: 20, overflowX: 'auto', scrollbarWidth: 'none' }}>
-          {TABS.map((t, i) => {
-            const cnt = i === 3 ? requests.length : countBy(t.filter);
-            return (
-              <button key={t.label} onClick={() => { setActiveTab(i); setPage(1); setExpandedReq(null); }} style={{
-                flex: 1, border: 'none', padding: isMobile ? '10px 12px' : '8px 14px', cursor: 'pointer', borderRadius: 10, whiteSpace: 'nowrap',
-                fontWeight: activeTab === i ? 700 : 600, fontSize: '0.85rem',
-                background: activeTab === i ? (isDark ? '#0f172a' : '#fff') : 'transparent',
-                color: activeTab === i ? C.tabActive : C.textDim,
-                boxShadow: activeTab === i ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+      {/* Tabs */}
+      <Box sx={{ display: 'flex', gap: 0.5, bgcolor: 'action.hover', borderRadius: '12px', p: 0.5, mb: 2.5, overflowX: 'auto', scrollbarWidth: 'none' }}>
+        {TABS.map((t, i) => {
+          const cnt = i === 3 ? requests.length : countBy(t.filter);
+          const active = activeTab === i;
+          return (
+            <Box
+              key={t.label}
+              component="button"
+              onClick={() => { setActiveTab(i); setPage(1); setExpandedReq(null); }}
+              sx={{
+                flex: 1, border: 'none', p: isMobile ? '10px 12px' : '8px 14px', cursor: 'pointer', borderRadius: '10px', whiteSpace: 'nowrap',
+                fontWeight: active ? 700 : 600, fontSize: '0.85rem', fontFamily: 'inherit',
+                bgcolor: active ? 'background.paper' : 'transparent',
+                color: active ? 'primary.main' : 'text.secondary',
+                boxShadow: active ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
                 transition: 'all 0.15s',
               }}>
-                {t.label}
-                {cnt > 0 && <span style={{ marginLeft: 4, opacity: 0.7, fontSize: '0.75rem' }}>({cnt})</span>}
-              </button>
-            );
-          })}
-        </div>
+              {t.label}
+              {cnt > 0 && <Box component="span" sx={{ ml: 0.5, opacity: 0.7, fontSize: '0.75rem' }}>({cnt})</Box>}
+            </Box>
+          );
+        })}
+      </Box>
 
-        {/* Content */}
-        {paged.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '80px 20px', color: C.textMuted }}>
-            <div style={{ fontSize: '3rem', marginBottom: 16 }}>{activeTab === 0 ? '📭' : '📋'}</div>
-            <div style={{ fontWeight: 600, fontSize: '1rem', marginBottom: 4 }}>ไม่มีรายการในสถานะนี้</div>
-            <p style={{ fontSize: '0.85rem', margin: '0 0 20px', color: C.textDim }}>
-              {activeTab === 0 ? 'คุณยังไม่มีรายการที่กำลังยืมอยู่ ไปยืมอุปกรณ์กันเลย!' : 'ไม่มีประวัติรายการในสถานะนี้'}
-            </p>
-            <button onClick={() => navigate('/borrow/new')}
-              style={{ background: C.btnPrimary, color: '#fff', border: 'none', borderRadius: 10, padding: '10px 24px', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem' }}>
-              + เริ่มยืมอุปกรณ์
-            </button>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {paged.map((req) => {
-              const sm = statusMeta[req.status] || statusMeta['Pending'];
-              const checkedOutItems = (req.items || []).filter((i: any) => i.itemStatus === 'CheckedOut');
-              const hasOverdue = checkedOutItems.some((i: any) => { const d = getDaysLeft(i.dueDate); return d !== null && d < 0; });
-              const hasUrgent = checkedOutItems.some((i: any) => { const d = getDaysLeft(i.dueDate); return d !== null && d >= 0 && d <= 3; });
-              const pendingExt = req.extensions?.find((e: any) => e.status === 'Pending');
-              const isExpanded = expandedReq === req.id;
-              const borderColor = hasOverdue ? '#dc2626' : hasUrgent ? '#f59e0b' : C.cardBorder;
+      {/* Content */}
+      {paged.length === 0 ? (
+        <Box sx={{ textAlign: 'center', py: 10, px: 2.5, color: 'text.disabled' }}>
+          {activeTab === 0 ? <InboxIcon sx={{ fontSize: 48, mb: 2, opacity: 0.5 }} /> : <AssignmentIcon sx={{ fontSize: 48, mb: 2, opacity: 0.5 }} />}
+          <Typography sx={{ fontWeight: 600, fontSize: '1rem', mb: 0.5 }}>ไม่มีรายการในสถานะนี้</Typography>
+          <Typography sx={{ fontSize: '0.85rem', mb: 2.5, color: 'text.secondary' }}>
+            {activeTab === 0 ? 'คุณยังไม่มีรายการที่กำลังยืมอยู่ ไปยืมอุปกรณ์กันเลย!' : 'ไม่มีประวัติรายการในสถานะนี้'}
+          </Typography>
+          <Button variant="contained" onClick={() => navigate('/borrow/new')}>เริ่มยืมอุปกรณ์</Button>
+        </Box>
+      ) : (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          {paged.map((req) => {
+            const checkedOutItems = (req.items || []).filter((i: any) => i.itemStatus === 'CheckedOut');
+            const hasOverdue = checkedOutItems.some((i: any) => { const d = getDaysLeft(i.dueDate); return d !== null && d < 0; });
+            const hasUrgent = checkedOutItems.some((i: any) => { const d = getDaysLeft(i.dueDate); return d !== null && d >= 0 && d <= 3; });
+            const pendingExt = req.extensions?.find((e: any) => e.status === 'Pending');
+            const isExpanded = expandedReq === req.id;
+            const borderColor = hasOverdue ? theme.palette.error.main : hasUrgent ? theme.palette.warning.main : theme.palette.divider;
 
-              return (
-                <div key={req.id} style={{
-                  background: C.cardBg, borderRadius: 14,
-                  border: `1px solid ${borderColor}`,
-                  borderLeft: `2px solid ${borderColor}`,
-                  overflow: 'hidden', transition: 'all 0.15s',
-                  cursor: 'pointer',
-                }} onClick={() => setExpandedReq(isExpanded ? null : req.id)}>
-                  {/* Compact header */}
-                  <div style={{ padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                      <span style={{ fontWeight: 700, fontSize: '0.85rem', color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{req.requestNo}</span>
-                      <span style={{ background: sm.bg, color: sm.color, border: `1px solid ${sm.color}30`, borderRadius: 20, padding: '1px 8px', fontSize: '0.7rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                        {sm.label}
-                      </span>
-                      {hasOverdue && <span style={{ color: '#dc2626', fontSize: '0.78rem', fontWeight: 700, whiteSpace: 'nowrap' }}>🔴 เกินกำหนด</span>}
-                      {hasUrgent && !hasOverdue && <span style={{ color: '#d97706', fontSize: '0.78rem', fontWeight: 600, whiteSpace: 'nowrap' }}>⚠ ใกล้ครบกำหนด</span>}
-                      {pendingExt && <span style={{ color: '#d97706', fontSize: '0.75rem', fontWeight: 600, whiteSpace: 'nowrap' }}>⏳ รออนุมัติต่อเวลา</span>}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                      <span style={{ fontSize: '0.75rem', color: C.textMuted }}>{formatDate(req.createdAt)}</span>
-                      <span style={{ color: C.textMuted, fontSize: '0.8rem', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'none' }}>▾</span>
-                    </div>
-                  </div>
+            return (
+              <Card key={req.id} sx={{
+                borderRadius: '14px',
+                border: `1px solid ${borderColor}`,
+                borderLeft: `3px solid ${borderColor}`,
+                overflow: 'hidden', transition: 'all 0.15s',
+                cursor: 'pointer',
+              }} onClick={() => setExpandedReq(isExpanded ? null : req.id)}>
+                {/* Compact header */}
+                <Box sx={{ p: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1.25 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, flexWrap: 'wrap' }}>
+                    <Typography sx={{ fontWeight: 700, fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{req.requestNo}</Typography>
+                    <StatusChip status={req.status} />
+                    {hasOverdue && <Typography sx={{ color: 'error.main', fontSize: '0.78rem', fontWeight: 700, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 0.25 }}><ErrorIcon sx={{ fontSize: 14 }} /> เกินกำหนด</Typography>}
+                    {hasUrgent && !hasOverdue && <Typography sx={{ color: 'warning.main', fontSize: '0.78rem', fontWeight: 600, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 0.25 }}><WarningAmberIcon sx={{ fontSize: 14 }} /> ใกล้ครบกำหนด</Typography>}
+                    {pendingExt && <Typography sx={{ color: 'warning.main', fontSize: '0.75rem', fontWeight: 600, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 0.25 }}><HourglassEmptyIcon sx={{ fontSize: 13 }} /> รออนุมัติต่อเวลา</Typography>}
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
+                    <Typography sx={{ fontSize: '0.75rem', color: 'text.disabled' }}>{formatDate(req.createdAt)}</Typography>
+                    <ExpandMoreIcon sx={{ fontSize: 18, color: 'text.disabled', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'none' }} />
+                  </Box>
+                </Box>
 
-                  {/* Expanded detail */}
-                  {isExpanded && (
-                    <div style={{ borderTop: `1px solid ${C.border}` }} onClick={e => e.stopPropagation()}>
-                      {/* Purpose */}
-                      <div style={{ padding: '12px 18px', background: C.sectionBg, display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 8 : 20, flexWrap: 'wrap', borderBottom: `1px solid ${C.border}`, fontSize: '0.85rem' }}>
-                        <div><span style={{ color: C.textMuted }}>วัตถุประสงค์: </span><span style={{ color: C.text, fontWeight: 600 }}>{req.purpose || '-'}</span></div>
-                        {checkedOutItems.length > 0 && checkedOutItems[0]?.dueDate && (
-                          <div><span style={{ color: C.textMuted }}>กำหนดคืน: </span><span style={{ color: hasOverdue ? '#dc2626' : C.text, fontWeight: 700 }}>{formatDate(checkedOutItems[0].dueDate)}</span></div>
-                        )}
-                      </div>
+                {/* Expanded detail */}
+                {isExpanded && (
+                  <Box sx={{ borderTop: `1px solid ${theme.palette.divider}` }} onClick={e => e.stopPropagation()}>
+                    {/* Purpose */}
+                    <Box sx={{ p: '12px 18px', bgcolor: 'action.hover', display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 1 : 2.5, flexWrap: 'wrap', borderBottom: `1px solid ${theme.palette.divider}`, fontSize: '0.85rem' }}>
+                      <Box><Box component="span" sx={{ color: 'text.disabled' }}>วัตถุประสงค์: </Box><Box component="span" sx={{ fontWeight: 600 }}>{req.purpose || '-'}</Box></Box>
+                      {checkedOutItems.length > 0 && checkedOutItems[0]?.dueDate && (
+                        <Box><Box component="span" sx={{ color: 'text.disabled' }}>กำหนดคืน: </Box><Box component="span" sx={{ fontWeight: 700, color: hasOverdue ? 'error.main' : 'text.primary' }}>{formatDate(checkedOutItems[0].dueDate)}</Box></Box>
+                      )}
+                    </Box>
 
-                      {/* Items */}
-                      <div style={{ padding: '12px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {(req.items || []).map((item: any) => {
-                          const isCheckedOut = item.itemStatus === 'CheckedOut';
-                          const daysLeft = getDaysLeft(item.dueDate);
-                          const isOverdue = isCheckedOut && daysLeft !== null && daysLeft < 0;
-                          const isUrgent = isCheckedOut && daysLeft !== null && daysLeft >= 0 && daysLeft <= 3;
-                          let urgencyClass = 'normal';
-                          if (isOverdue) urgencyClass = 'overdue';
-                          else if (isUrgent) urgencyClass = 'urgent';
+                    {/* Items */}
+                    <Box sx={{ p: '12px 18px', display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+                      {(req.items || []).map((item: any) => {
+                        const isCheckedOut = item.itemStatus === 'CheckedOut';
+                        const daysLeft = getDaysLeft(item.dueDate);
+                        const isOverdue = isCheckedOut && daysLeft !== null && daysLeft < 0;
+                        const isUrgent = isCheckedOut && daysLeft !== null && daysLeft >= 0 && daysLeft <= 3;
 
+                        return (
+                          <Box key={item.id} sx={{
+                            p: '12px 14px', borderRadius: '10px',
+                            border: `1px solid ${isOverdue ? alpha(theme.palette.error.main, 0.4) : isUrgent ? alpha(theme.palette.warning.main, 0.4) : theme.palette.divider}`,
+                            bgcolor: isOverdue ? alpha(theme.palette.error.main, 0.06) : isUrgent ? alpha(theme.palette.warning.main, 0.06) : 'action.hover',
+                          }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 1 }}>
+                              <Box sx={{ flex: 1, minWidth: 0 }}>
+                                <Typography sx={{ fontWeight: 700, fontSize: '0.9rem' }}>
+                                  {item.asset?.assetName || item.inventoryItem?.name || item.asset?.assetCode || `Item #${item.id}`}
+                                </Typography>
+                                <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary', mt: 0.125 }}>
+                                  {item.asset?.assetCode && <Box component="span" sx={{ fontFamily: 'monospace' }}>{item.asset.assetCode}</Box>}
+                                  {item.asset?.brand && <span> · {item.asset.brand} {item.asset.model}</span>}
+                                  {item.isQuantityBased && <span>จำนวน {item.quantity} {item.inventoryItem?.unit}</span>}
+                                </Typography>
+                              </Box>
+                              <StatusChip status={item.itemStatus} />
+                            </Box>
+
+                            {/* Due date bar */}
+                            {isCheckedOut && item.dueDate && <DueBar dueDate={item.dueDate} />}
+
+                            {/* Actions */}
+                            <Box sx={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(120px, auto))', gap: 1, mt: 1.5 }}>
+                              {!item.isQuantityBased && item.assetId && (
+                                <Button size="small" variant="outlined" color="inherit" startIcon={<VisibilityIcon sx={{ fontSize: 16 }} />}
+                                  onClick={() => navigate('/assets/' + item.assetId)}>
+                                  ดูรายละเอียด
+                                </Button>
+                              )}
+                              {isCheckedOut && (
+                                <>
+                                  <Button size="small" variant="outlined" color="info" startIcon={<MoreTimeIcon sx={{ fontSize: 16 }} />}
+                                    disabled={!!pendingExt}
+                                    title="ขยายวันยืม"
+                                    onClick={() => { setExtDialog({ open: true, req }); setExtDays('3'); setExtReason(''); }}>
+                                    ขอต่อเวลา
+                                  </Button>
+                                  {isAdmin && (
+                                    <Button size="small" variant="outlined" color="error" startIcon={<AssignmentReturnIcon sx={{ fontSize: 16 }} />}
+                                      title="ดำเนินการคืน (IT)"
+                                      onClick={() => navigate(`/borrow/return?itemId=${item.id}`)}>
+                                      คืน (IT)
+                                    </Button>
+                                  )}
+                                </>
+                              )}
+                              {item.itemStatus === 'Returned' && item.returnDate && (
+                                <Typography sx={{ fontSize: '0.75rem', color: 'text.disabled', py: '5px', textAlign: isMobile ? 'center' : 'left', display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: isMobile ? 'center' : 'flex-start' }}>
+                                  <CheckCircleIcon sx={{ fontSize: 14, color: 'success.main' }} /> คืนแล้ว {formatDate(item.returnDate)}
+                                </Typography>
+                              )}
+                            </Box>
+                          </Box>
+                        );
+                      })}
+                    </Box>
+
+                    {/* Extension history */}
+                    {req.extensions && req.extensions.length > 0 && (
+                      <Box sx={{ mx: 2.25, mb: 1.5, p: '10px 14px', bgcolor: 'action.hover', borderRadius: '10px', border: `1px solid ${theme.palette.divider}` }}>
+                        <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: 'text.secondary', mb: 0.75, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <HistoryIcon sx={{ fontSize: 14 }} /> ประวัติขอต่อเวลา
+                        </Typography>
+                        {req.extensions.map((ext: any) => {
+                          const dotColor = ext.status === 'Approved' ? theme.palette.success.main : ext.status === 'Pending' ? theme.palette.warning.main : theme.palette.error.main;
                           return (
-                            <div key={item.id} style={{
-                              padding: '12px 14px', borderRadius: 10,
-                              border: `1px solid ${urgencyClass === 'overdue' ? '#fca5a5' : urgencyClass === 'urgent' ? '#fcd34d' : C.border}`,
-                              background: urgencyClass === 'overdue' ? (isDark ? '#450a0a' : '#fef2f2') : urgencyClass === 'urgent' ? (isDark ? '#451a03' : '#fffbeb') : C.sectionBg,
-                            }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: C.text }}>
-                                    {item.asset?.assetName || item.inventoryItem?.name || item.asset?.assetCode || `Item #${item.id}`}
-                                  </div>
-                                  <div style={{ fontSize: '0.75rem', color: C.textDim, marginTop: 1 }}>
-                                    {item.asset?.assetCode && <span style={{ fontFamily: 'monospace' }}>{item.asset.assetCode}</span>}
-                                    {item.asset?.brand && <span> · {item.asset.brand} {item.asset.model}</span>}
-                                    {item.isQuantityBased && <span>จำนวน {item.quantity} {item.inventoryItem?.unit}</span>}
-                                  </div>
-                                </div>
-                                <span style={{
-                                  padding: '2px 10px', borderRadius: 20, fontSize: '0.7rem', fontWeight: 700, whiteSpace: 'nowrap',
-                                  background: item.itemStatus === 'CheckedOut' ? '#f0fdf4' : item.itemStatus === 'Returned' ? '#f9fafb' : '#f0f9ff',
-                                  color: item.itemStatus === 'CheckedOut' ? '#16a34a' : item.itemStatus === 'Returned' ? '#6b7280' : '#0284c7',
-                                  border: `1px solid ${item.itemStatus === 'CheckedOut' ? '#bbf7d0' : item.itemStatus === 'Returned' ? '#e5e7eb' : '#bae6fd'}`,
-                                }}>
-                                  {item.itemStatus === 'CheckedOut' ? 'กำลังยืม' : item.itemStatus === 'Returned' ? 'คืนแล้ว' : item.itemStatus}
-                                </span>
-                              </div>
-
-                              {/* Due date bar */}
-                              {isCheckedOut && item.dueDate && <DueBar dueDate={item.dueDate} />}
-
-                              {/* Actions */}
-                              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(120px, auto))', gap: 8, marginTop: 12 }}>
-                                {!item.isQuantityBased && item.assetId && (
-                                  <button onClick={() => navigate('/assets/' + item.assetId)}
-                                    style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${C.border}`, background: 'transparent', color: C.textDim, fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}>
-                                    🔍 ดูรายละเอียด
-                                  </button>
-                                )}
-                                {isCheckedOut && (
-                                  <>
-                                    <button onClick={() => {
-                                      setExtDialog({ open: true, req });
-                                      setExtDays('3'); setExtReason('');
-                                    }}
-                                      disabled={!!pendingExt}
-                                      title="ขยายวันยืม"
-                                      style={{
-                                        padding: '8px 12px', borderRadius: 8, fontSize: '0.8rem', fontWeight: 800, cursor: pendingExt ? 'not-allowed' : 'pointer',
-                                        background: pendingExt ? (isDark ? '#1e293b' : '#f1f5f9') : (isDark ? '#0c4a6e' : '#f0f9ff'),
-                                        color: pendingExt ? (isDark ? '#475569' : '#94a3b8') : (isDark ? '#38bdf8' : '#0284c7'),
-                                        border: `1px solid ${pendingExt ? (isDark ? '#334155' : '#e2e8f0') : (isDark ? '#0e7490' : '#bae6fd')}`,
-                                      }}>
-                                      ⏰ ขอต่อเวลา
-                                    </button>
-                                    {isAdmin && (
-                                      <button onClick={() => navigate(`/borrow/return?itemId=${item.id}`)}
-                                        title="ดำเนินการคืน (IT)"
-                                        style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}>
-                                        ↩ คืน (IT)
-                                      </button>
-                                    )}
-                                  </>
-                                )}
-                                {item.itemStatus === 'Returned' && item.returnDate && (
-                                  <span style={{ fontSize: '0.75rem', color: C.textMuted, padding: '5px 0', textAlign: isMobile ? 'center' : 'left' }}>
-                                    ✅ คืนแล้ว {formatDate(item.returnDate)}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
+                            <Box key={ext.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: '3px', fontSize: '0.78rem', borderBottom: `1px dashed ${theme.palette.divider}` }}>
+                              <Box sx={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, bgcolor: dotColor }} />
+                              <span>ขอต่อ +{ext.items?.[0]?.extraDays || 0} วัน</span>
+                              {ext.status === 'Approved' && <Box component="span" sx={{ color: 'success.main', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.25 }}><CheckCircleIcon sx={{ fontSize: 13 }} /> อนุมัติ</Box>}
+                              {ext.status === 'Pending' && <Box component="span" sx={{ color: 'warning.main', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.25 }}><HourglassEmptyIcon sx={{ fontSize: 13 }} /> รออนุมัติ</Box>}
+                              {ext.status === 'Rejected' && <Box component="span" sx={{ color: 'error.main', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.25 }}><ErrorOutlineIcon sx={{ fontSize: 13 }} /> ปฏิเสธ</Box>}
+                              <Typography component="span" sx={{ fontSize: '0.7rem', color: 'text.disabled' }}>({formatDate(ext.createdAt)})</Typography>
+                            </Box>
                           );
                         })}
-                      </div>
+                      </Box>
+                    )}
 
-                      {/* Extension history */}
-                      {req.extensions && req.extensions.length > 0 && (
-                        <div style={{ margin: '0 18px 12px', padding: '10px 14px', background: C.sectionBg, borderRadius: 10, border: `1px solid ${C.border}` }}>
-                          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: C.textDim, marginBottom: 6 }}>📋 ประวัติขอต่อเวลา</div>
-                          {req.extensions.map((ext: any) => (
-                            <div key={ext.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0', fontSize: '0.78rem', color: C.text, borderBottom: `1px dashed ${C.border}` }}>
-                              <span style={{
-                                width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                                background: ext.status === 'Approved' ? '#16a34a' : ext.status === 'Pending' ? '#d97706' : '#dc2626',
-                              }} />
-                              <span>ขอต่อ +{ext.items?.[0]?.extraDays || 0} วัน</span>
-                              {ext.status === 'Approved' && <span style={{ color: '#16a34a', fontWeight: 600 }}>✅ อนุมัติ</span>}
-                              {ext.status === 'Pending' && <span style={{ color: '#d97706', fontWeight: 600 }}>⏳ รออนุมัติ</span>}
-                              {ext.status === 'Rejected' && <span style={{ color: '#dc2626', fontWeight: 600 }}>❌ ปฏิเสธ</span>}
-                              <span style={{ fontSize: '0.7rem', color: C.textMuted }}>({formatDate(ext.createdAt)})</span>
-                            </div>
-                          ))}
-                        </div>
+                    {/* Footer actions */}
+                    <Box sx={{ p: '12px 18px', borderTop: `1px solid ${theme.palette.divider}`, display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 1.25, flexWrap: 'wrap' }}>
+                      {req.status === 'Pending' && (
+                        <Button size="small" variant="outlined" color="error" startIcon={<CloseIcon sx={{ fontSize: 16 }} />}
+                          onClick={() => setCancelDialog({ open: true, id: req.id })}
+                          sx={{ flex: isMobile ? 1 : undefined }}>
+                          ยกเลิกคำขอ
+                        </Button>
                       )}
-
-                      {/* Footer actions */}
-                      <div style={{ padding: '12px 18px', borderTop: `1px solid ${C.border}`, display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 10, flexWrap: 'wrap' }}>
-                        {req.status === 'Pending' && (
-                          <button onClick={() => setCancelDialog({ open: true, id: req.id })}
-                            style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', flex: isMobile ? 1 : undefined }}>
-                            ✕ ยกเลิกคำขอ
-                          </button>
-                        )}
-                        {req.status === 'CheckedOut' && checkedOutItems.length > 0 && isAdmin && (
-                          <button onClick={() => navigate(`/borrow/return?requestId=${req.id}`)}
-                            style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', flex: isMobile ? 1 : undefined }}>
-                            ↩ คืนทั้งหมด ({checkedOutItems.length} รายการ)
-                          </button>
-                        )}
-                        {req.approvals?.[0] && (
-                          <span style={{ fontSize: '0.75rem', color: C.textMuted, padding: '6px 0', textAlign: isMobile ? 'center' : 'left', width: isMobile ? '100%' : 'auto' }}>
-                            {req.approvals[0].action === 'Rejected' ? 'ปฏิเสธ' : 'อนุมัติ'} โดย {req.approvals[0].approver?.displayName || req.approvals[0].approver?.adUsername || 'ระบบ'} เมื่อ {formatDate(req.approvals[0].actedAt)}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Rejected reason */}
-                      {req.status === 'Rejected' && req.approvals?.find((a: any) => a.action === 'Rejected') && (
-                        <div style={{ margin: '0 18px 12px', padding: '10px 14px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8 }}>
-                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#dc2626' }}>เหตุผลที่ไม่อนุมัติ</div>
-                          <div style={{ fontSize: '0.82rem', color: '#991b1b' }}>
-                            {req.approvals.find((a: any) => a.action === 'Rejected')?.note || 'ไม่ระบุเหตุผล'}
-                          </div>
-                        </div>
+                      {req.status === 'CheckedOut' && checkedOutItems.length > 0 && isAdmin && (
+                        <Button size="small" variant="outlined" color="error" startIcon={<AssignmentReturnIcon sx={{ fontSize: 16 }} />}
+                          onClick={() => navigate(`/borrow/return?requestId=${req.id}`)}
+                          sx={{ flex: isMobile ? 1 : undefined }}>
+                          คืนทั้งหมด ({checkedOutItems.length} รายการ)
+                        </Button>
                       )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+                      {req.approvals?.[0] && (
+                        <Typography sx={{ fontSize: '0.75rem', color: 'text.disabled', py: '6px', textAlign: isMobile ? 'center' : 'left', width: isMobile ? '100%' : 'auto' }}>
+                          {req.approvals[0].action === 'Rejected' ? 'ปฏิเสธ' : 'อนุมัติ'} โดย {req.approvals[0].approver?.displayName || req.approvals[0].approver?.adUsername || 'ระบบ'} เมื่อ {formatDate(req.approvals[0].actedAt)}
+                        </Typography>
+                      )}
+                    </Box>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 24 }}>
-            <button disabled={safePage <= 1} onClick={() => setPage(safePage - 1)}
-              style={{ padding: '7px 14px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.cardBg, color: safePage <= 1 ? C.textMuted : C.text, fontSize: '0.82rem', fontWeight: 600, cursor: safePage <= 1 ? 'not-allowed' : 'pointer' }}>
-              ← ก่อนหน้า
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-              <button key={p} onClick={() => setPage(p)}
-                style={{
-                  width: 34, height: 34, borderRadius: 8,
-                  background: p === safePage ? C.tabActive : 'transparent',
-                  color: p === safePage ? '#fff' : C.text,
-                  border: p === safePage ? 'none' : `1px solid ${C.border}`,
-                  fontWeight: p === safePage ? 700 : 500, fontSize: '0.82rem', cursor: 'pointer',
-                }}>
-                {p}
-              </button>
+                    {/* Rejected reason */}
+                    {req.status === 'Rejected' && req.approvals?.find((a: any) => a.action === 'Rejected') && (
+                      <Box sx={{ mx: 2.25, mb: 1.5, p: '10px 14px', bgcolor: alpha(theme.palette.error.main, 0.06), border: `1px solid ${alpha(theme.palette.error.main, 0.3)}`, borderRadius: '8px' }}>
+                        <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: 'error.main' }}>เหตุผลที่ไม่อนุมัติ</Typography>
+                        <Typography sx={{ fontSize: '0.82rem', color: 'error.dark' }}>
+                          {req.approvals.find((a: any) => a.action === 'Rejected')?.note || 'ไม่ระบุเหตุผล'}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+                )}
+              </Card>
+            );
+          })}
+        </Box>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+          <Pagination count={totalPages} page={safePage} onChange={(_, p) => setPage(p)} shape="rounded" color="primary" />
+        </Box>
+      )}
+
+      {/* Cancel Dialog */}
+      <Dialog open={cancelDialog.open} onClose={() => setCancelDialog({ open: false, id: null })} maxWidth="xs" fullWidth>
+        <DialogContent sx={{ textAlign: 'center', pt: 3.5 }}>
+          <DeleteOutlineIcon sx={{ fontSize: 44, color: 'error.main', mb: 1 }} />
+          <Typography variant="h6" sx={{ mb: 1 }}>ยืนยันยกเลิก</Typography>
+          <Typography color="text.secondary" sx={{ fontSize: '0.85rem' }}>
+            ยกเลิกคำขอยืมนี้? การดำเนินการนี้ไม่สามารถย้อนกลับได้
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2.5, gap: 1 }}>
+          <Button fullWidth variant="outlined" color="inherit" disabled={submitting} onClick={() => setCancelDialog({ open: false, id: null })}>กลับ</Button>
+          <Button fullWidth variant="contained" color="error" disabled={submitting} onClick={() => handleCancel(cancelDialog.id!)}>
+            {submitting ? 'กำลังยกเลิก...' : 'ยืนยัน'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Extension Dialog */}
+      <Dialog open={extDialog.open} onClose={() => setExtDialog({ open: false, req: null })} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <MoreTimeIcon color="primary" /> ขอต่อเวลา
+        </DialogTitle>
+        <DialogContent>
+          <Typography color="text.secondary" sx={{ fontSize: '0.82rem', mb: 2 }}>
+            คำขอ: <Box component="strong" sx={{ color: 'text.primary' }}>{extDialog.req?.requestNo}</Box>
+          </Typography>
+
+          {extDialog.req && (
+            <Box sx={{ mb: 2, p: '10px 14px', bgcolor: 'action.hover', borderRadius: '8px', border: `1px solid ${theme.palette.divider}` }}>
+              <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: 'text.secondary', mb: 0.75, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Inventory2Icon sx={{ fontSize: 14 }} /> รายการที่ขอต่อ:
+              </Typography>
+              {extDialog.req.items?.filter((i: any) => i.itemStatus === 'CheckedOut').map((item: any) => (
+                <Box key={item.id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: '4px', borderBottom: `1px dashed ${theme.palette.divider}`, fontSize: '0.82rem' }}>
+                  <span>{item.asset?.assetName || item.asset?.assetCode || item.inventoryItem?.name || `Item #${item.id}`}</span>
+                  {item.dueDate && <Typography component="span" sx={{ color: 'text.secondary', fontSize: '0.72rem' }}>กำหนด {formatDate(item.dueDate)}</Typography>}
+                </Box>
+              ))}
+            </Box>
+          )}
+
+          <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: 'text.secondary', mb: 0.75 }}>จำนวนวันที่ขอต่อ</Typography>
+          <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+            {[3, 7, 14].map(d => (
+              <Chip
+                key={d}
+                label={`${d} วัน`}
+                onClick={() => setExtDays(String(d))}
+                color={extDays === String(d) ? 'primary' : 'default'}
+                variant={extDays === String(d) ? 'filled' : 'outlined'}
+                sx={{ flex: 1, fontWeight: 700 }}
+              />
             ))}
-            <button disabled={safePage >= totalPages} onClick={() => setPage(safePage + 1)}
-              style={{ padding: '7px 14px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.cardBg, color: safePage >= totalPages ? C.textMuted : C.text, fontSize: '0.82rem', fontWeight: 600, cursor: safePage >= totalPages ? 'not-allowed' : 'pointer' }}>
-              ถัดไป →
-            </button>
-          </div>
-        )}
+          </Box>
+          <TextField
+            fullWidth size="small" type="number" inputProps={{ min: 1, max: 30 }}
+            value={extDays} onChange={e => setExtDays(e.target.value)}
+            placeholder="ระบุจำนวนวัน (1-30)"
+            sx={{ mb: 2 }}
+          />
 
-        {/* Cancel Dialog */}
-        {cancelDialog.open && (
-          <div style={{ position: 'fixed', inset: 0, background: C.overlay, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
-            onClick={() => setCancelDialog({ open: false, id: null })}>
-            <div onClick={e => e.stopPropagation()} style={{ background: C.modalBg, borderRadius: 16, padding: 28, maxWidth: 380, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
-              <div style={{ fontSize: '2.5rem', textAlign: 'center', marginBottom: 12 }}>🗑️</div>
-              <h3 style={{ margin: '0 0 8px', textAlign: 'center', color: C.modalText, fontSize: '1.1rem' }}>ยืนยันยกเลิก</h3>
-              <p style={{ margin: '0 0 24px', textAlign: 'center', color: C.modalDim, fontSize: '0.85rem' }}>
-                ยกเลิกคำขอยืมนี้? การดำเนินการนี้ไม่สามารถย้อนกลับได้
-              </p>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button onClick={() => setCancelDialog({ open: false, id: null })} disabled={submitting}
-                  style={{ flex: 1, padding: '10px', borderRadius: 8, border: 'none', background: C.btnCancel, color: C.btnCancelTxt, fontWeight: 700, cursor: 'pointer' }}>
-                  กลับ
-                </button>
-                <button onClick={() => handleCancel(cancelDialog.id!)} disabled={submitting}
-                  style={{ flex: 1, padding: '10px', borderRadius: 8, border: 'none', background: '#dc2626', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>
-                  {submitting ? 'กำลังยกเลิก...' : 'ยืนยัน'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Extension Dialog */}
-        {extDialog.open && (
-          <div style={{ position: 'fixed', inset: 0, background: C.overlay, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
-            onClick={() => setExtDialog({ open: false, req: null })}>
-            <div onClick={e => e.stopPropagation()} style={{ background: C.modalBg, borderRadius: 16, padding: 28, maxWidth: 440, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
-              <h3 style={{ margin: '0 0 4px', color: C.modalText, fontSize: '1.1rem' }}>⏰ ขอต่อเวลา</h3>
-              <p style={{ margin: '0 0 16px', color: C.modalDim, fontSize: '0.82rem' }}>
-                คำขอ: <strong style={{ color: C.modalText }}>{extDialog.req?.requestNo}</strong>
-              </p>
-
-              {extDialog.req && (
-                <div style={{ marginBottom: 16, padding: '10px 14px', background: C.sectionBg, borderRadius: 8, border: `1px solid ${C.border}` }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: C.textDim, marginBottom: 6 }}>📦 รายการที่ขอต่อ:</div>
-                  {extDialog.req.items?.filter((i: any) => i.itemStatus === 'CheckedOut').map((item: any) => (
-                    <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: `1px dashed ${C.border}`, fontSize: '0.82rem', color: C.text }}>
-                      <span>{item.asset?.assetName || item.asset?.assetCode || item.inventoryItem?.name || `Item #${item.id}`}</span>
-                      {item.dueDate && <span style={{ color: C.textDim, fontSize: '0.72rem' }}>กำหนด {formatDate(item.dueDate)}</span>}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div style={{ marginBottom: 14 }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: C.textDim, marginBottom: 6 }}>จำนวนวันที่ขอต่อ</label>
-                <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                  {[3, 7, 14].map(d => (
-                    <button key={d} onClick={() => setExtDays(String(d))}
-                      style={{ flex: 1, padding: '8px', borderRadius: 8, border: extDays === String(d) ? `2px solid ${C.tabActive}` : `1px solid ${C.border}`, background: extDays === String(d) ? (isDark ? '#0c4a6e' : '#f0f9ff') : 'transparent', color: extDays === String(d) ? C.tabActive : C.text, fontWeight: 700, cursor: 'pointer', fontSize: '0.82rem' }}>
-                      {d} วัน
-                    </button>
-                  ))}
-                </div>
-                <input type="number" min={1} max={30} value={extDays} onChange={e => setExtDays(e.target.value)}
-                  placeholder="ระบุจำนวนวัน (1-30)"
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: `1px solid ${C.inputBorder}`, background: C.inputBg, color: C.text, fontSize: '0.85rem', boxSizing: 'border-box', outline: 'none' }} />
-              </div>
-
-              <div style={{ marginBottom: 20 }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: C.textDim, marginBottom: 6 }}>เหตุผลที่ขอต่อ *</label>
-                <textarea value={extReason} onChange={e => setExtReason(e.target.value)} rows={3}
-                  placeholder="ระบุเหตุผล เช่น งานยังไม่เสร็จ ต้องใช้ต่อ"
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: `1px solid ${C.inputBorder}`, background: C.inputBg, color: C.text, fontSize: '0.85rem', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none' }} />
-              </div>
-
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button onClick={() => setExtDialog({ open: false, req: null })} disabled={submitting}
-                  style={{ flex: 1, padding: '10px', borderRadius: 8, border: 'none', background: C.btnCancel, color: C.btnCancelTxt, fontWeight: 700, cursor: 'pointer' }}>
-                  ยกเลิก
-                </button>
-                <button onClick={handleExtend} disabled={submitting}
-                  style={{ flex: 1, padding: '10px', borderRadius: 8, border: 'none', background: C.btnPrimary, color: '#fff', fontWeight: 700, cursor: 'pointer' }}>
-                  {submitting ? 'กำลังส่ง...' : '📤 ส่งคำขอ'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-      </div>
-    </div>
+          <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: 'text.secondary', mb: 0.75 }}>เหตุผลที่ขอต่อ *</Typography>
+          <TextField
+            fullWidth multiline rows={3}
+            value={extReason} onChange={e => setExtReason(e.target.value)}
+            placeholder="ระบุเหตุผล เช่น งานยังไม่เสร็จ ต้องใช้ต่อ"
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 2.5, gap: 1 }}>
+          <Button fullWidth variant="outlined" color="inherit" disabled={submitting} onClick={() => setExtDialog({ open: false, req: null })}>ยกเลิก</Button>
+          <Button fullWidth variant="contained" disabled={submitting} startIcon={submitting ? undefined : <SendIcon sx={{ fontSize: 16 }} />} onClick={handleExtend}>
+            {submitting ? 'กำลังส่ง...' : 'ส่งคำขอ'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 }

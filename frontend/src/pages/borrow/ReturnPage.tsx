@@ -102,7 +102,7 @@ function RequestRow({ group, onReturn, defaultOpen = false }: { group: RequestGr
       <TableRow
         sx={{
           '& > *': { borderBottom: 'unset' },
-          bgcolor: isOverdue ? alpha('#EF4444', 0.04) : 'inherit',
+          bgcolor: isOverdue ? alpha(theme.palette.error.main, 0.04) : 'inherit',
           borderLeft: isOverdue ? `2px solid ${theme.palette.error.main}` : '2px solid transparent',
         }}
       >
@@ -175,7 +175,7 @@ function RequestRow({ group, onReturn, defaultOpen = false }: { group: RequestGr
       <TableRow>
         <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={9}>
           <Collapse in={open} timeout="auto" unmountOnExit>
-            <Box sx={{ p: 2.5, bgcolor: '#F8FAFC', borderRadius: '0 0 12px 12px' }}>
+            <Box sx={{ p: 2.5, bgcolor: 'action.hover', borderRadius: '0 0 12px 12px' }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography variant="subtitle2" fontWeight={700}>รายการทรัพย์สินในคำขอนี้</Typography>
                 {group.pendingCount > 0 && (
@@ -187,7 +187,7 @@ function RequestRow({ group, onReturn, defaultOpen = false }: { group: RequestGr
               <TableContainer component={Paper} sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 2 }}>
                 <Table size="small">
                   <TableHead>
-                    <TableRow sx={{ bgcolor: '#F1F5F9' }}>
+                    <TableRow sx={{ bgcolor: 'action.hover' }}>
                       <TableCell padding="checkbox" />
                       <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>รหัสทรัพย์สิน</TableCell>
                       <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>Serial No.</TableCell>
@@ -201,7 +201,7 @@ function RequestRow({ group, onReturn, defaultOpen = false }: { group: RequestGr
                     {group.items.map((item) => {
                       const isItemOverdue = item.dueDate && new Date(item.dueDate) < new Date() && item.itemStatus === 'CheckedOut';
                       return (
-                        <TableRow key={item.id} sx={{ bgcolor: isItemOverdue ? alpha('#EF4444', 0.05) : 'inherit' }}>
+                        <TableRow key={item.id} sx={{ bgcolor: isItemOverdue ? alpha(theme.palette.error.main, 0.05) : 'inherit' }}>
                           <TableCell padding="checkbox">
                             {item.itemStatus === 'CheckedOut' && (
                               <Checkbox
@@ -576,7 +576,7 @@ export default function ReturnPage() {
       <TableContainer component={Card}>
         <Table>
           <TableHead>
-            <TableRow sx={{ bgcolor: '#F8FAFC' }}>
+            <TableRow sx={{ bgcolor: 'action.hover' }}>
               <TableCell sx={{ width: 50 }} />
               <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>เลขที่คำขอ</TableCell>
               <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>ผู้ยืม</TableCell>
@@ -623,7 +623,7 @@ export default function ReturnPage() {
               รายการที่จะคืน ({dialog.items.length} รายการ)
             </Typography>
             {dialog.items.map(item => (
-              <Box key={item.id} sx={{ display: 'flex', justifyContent: 'space-between', py: 1, px: 1.5, bgcolor: '#F8FAFC', borderRadius: 1, mb: 0.5 }}>
+              <Box key={item.id} sx={{ display: 'flex', justifyContent: 'space-between', py: 1, px: 1.5, bgcolor: 'action.hover', borderRadius: 1, mb: 0.5 }}>
                 <Typography fontWeight={600}>{item.assetCode}</Typography>
                 <Typography variant="body2" color="text.secondary">{item.isQuantityBased ? `${item.inventoryQty} ${item.inventoryUnit}` : `${item.brand} ${item.model}`}</Typography>
               </Box>

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Box, Typography, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   Chip, CircularProgress, Alert, Card, CardContent, Grid, Divider, Table, TableBody,
-  TableCell, TableContainer, TableHead, TableRow, InputAdornment,
+  TableCell, TableContainer, TableHead, TableRow, InputAdornment, useTheme, alpha,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
@@ -32,6 +32,7 @@ interface Extension {
 }
 
 export default function ExtensionQueuePage() {
+  const theme = useTheme();
   const [extensions, setExtensions] = useState<Extension[]>([]);
   const [filteredExtensions, setFilteredExtensions] = useState<Extension[]>([]);
   const [loading, setLoading] = useState(true);
@@ -206,7 +207,7 @@ export default function ExtensionQueuePage() {
         <TableContainer>
           <Table>
             <TableHead>
-              <TableRow sx={{ backgroundColor: 'rgba(37, 99, 235, 0.05)' }}>
+              <TableRow sx={{ backgroundColor: alpha(theme.palette.primary.main, 0.05) }}>
                 <TableCell>คำขอที่</TableCell>
                 <TableCell>ผู้ขอ</TableCell>
                 <TableCell>รหัส</TableCell>
@@ -395,7 +396,7 @@ export default function ExtensionQueuePage() {
         <DialogContent dividers>
           {dialog.extension && (
             <Box sx={{ pt: 1 }}>
-              <Box sx={{ mb: 2, p: 2, bgcolor: '#F8FAFC', borderRadius: 2 }}>
+              <Box sx={{ mb: 2, p: 2, bgcolor: 'action.hover', borderRadius: 2 }}>
                 <Typography variant="body2" sx={{ mb: 0.5 }}>
                   คำขอ: <strong>{dialog.extension.requestNo}</strong>
                 </Typography>
