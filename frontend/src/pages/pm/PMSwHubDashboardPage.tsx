@@ -1,7 +1,40 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { pmSwHubService, PMSwHub, PMSwHubItem } from '../../services/pmSwHub';
+import {
+  Box,
+  Typography,
+  Button,
+  Card,
+  Paper,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  TableContainer,
+  Chip,
+  Alert,
+  LinearProgress,
+} from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import HubIcon from '@mui/icons-material/Hub';
+import ShieldIcon from '@mui/icons-material/Shield';
+import SettingsIcon from '@mui/icons-material/Settings';
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import AddIcon from '@mui/icons-material/Add';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import BuildIcon from '@mui/icons-material/Build';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import BusinessIcon from '@mui/icons-material/Business';
+import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
+import FolderOpenIcon from '@mui/icons-material/FolderOpen';
+import CloseIcon from '@mui/icons-material/Close';
+import PrintIcon from '@mui/icons-material/Print';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { pmSwHubService, PMSwHub, PMSwHubItem } from '../../services/pmSwHub';
 import { formatDate } from '../../utils/dateUtils';
 
 const FLOORS = [22, 23, 24, 25, 26, 27];
@@ -11,10 +44,8 @@ function fmtDate(d: string | null | Date) {
   return formatDate(d as string);
 }
 
-function statusTone(status: string) {
-  return status === 'Pass'
-    ? { bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0', label: 'ผ่าน' }
-    : { bg: '#fff5f5', color: '#dc2626', border: '#fecaca', label: 'พบปัญหา' };
+function statusTone(status: string): { color: 'success' | 'error'; label: string } {
+  return status === 'Pass' ? { color: 'success', label: 'ผ่าน' } : { color: 'error', label: 'พบปัญหา' };
 }
 
 /* ─── Floor status per latest record ─── */
@@ -28,7 +59,12 @@ interface FloorStatus {
   record: PMSwHub | null;
 }
 
-/* ─── PDF Print helper ─── */
+/* ─── PDF Print helper ───
+   Generates a standalone, self-contained HTML document opened in its own
+   window for printing — this is not part of the React tree the app
+   renders, so it deliberately stays plain HTML/inline-CSS rather than MUI;
+   there's nothing to "retheme" here since it's a portable print artifact,
+   not a themed screen. */
 function printRecordReport(record: PMSwHub) {
   const thaiDate = (d: string) => {
     const dt = new Date(d);
@@ -287,10 +323,10 @@ export default function PMSwHubDashboardPage() {
         const key = `${dt.getFullYear()}-${dt.getMonth()}`;
         if (!months[key]) {
           const monthsThai = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
-          months[key] = { 
-            name: `${monthsThai[dt.getMonth()]} ${dt.getFullYear() + 543}`, 
-            pass: 0, 
-            fail: 0 
+          months[key] = {
+            name: `${monthsThai[dt.getMonth()]} ${dt.getFullYear() + 543}`,
+            pass: 0,
+            fail: 0
           };
         }
         if (record.status === 'Pass') months[key].pass++;
@@ -325,403 +361,322 @@ export default function PMSwHubDashboardPage() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, gap: 10, color: '#0ea5e9', fontSize: 14 }}>
-        ⏳ กำลังโหลดข้อมูล PM SW/Hub Room...
-      </div>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, gap: 1.25, color: 'primary.main', fontSize: 14 }}>
+        กำลังโหลดข้อมูล PM SW/Hub Room...
+      </Box>
     );
   }
 
-  const floorStatusStyle = (status: FloorStatus['status'], isSelected: boolean) => {
-    if (status === 'pass') return {
-      bg: isSelected ? '#dcfce7' : '#f0fdf4',
-      border: isSelected ? '#16a34a' : '#bbf7d0',
-      titleColor: '#15803d',
-      badgeBg: '#16a34a',
-      badgeText: '✓ ผ่าน',
-      icon: '✅',
-      glow: isSelected ? '0 0 0 3px rgba(22,163,74,0.2)' : 'none',
-    };
-    if (status === 'fail') return {
-      bg: isSelected ? '#fee2e2' : '#fff5f5',
-      border: isSelected ? '#dc2626' : '#fecaca',
-      titleColor: '#b91c1c',
-      badgeBg: '#dc2626',
-      badgeText: '✗ พบปัญหา',
-      icon: '⚠️',
-      glow: isSelected ? '0 0 0 3px rgba(220,38,38,0.2)' : 'none',
-    };
-    return {
-      bg: isSelected ? '#f1f5f9' : '#f8fafc',
-      border: isSelected ? '#94a3b8' : '#e2e8f0',
-      titleColor: '#475569',
-      badgeBg: '#94a3b8',
-      badgeText: 'ยังไม่ตรวจ',
-      icon: '⬜',
-      glow: isSelected ? '0 0 0 3px rgba(148,163,184,0.2)' : 'none',
-    };
+  const floorStatusTone = (status: FloorStatus['status']): { color: 'success' | 'error' | 'default'; Icon: React.ElementType; label: string } => {
+    if (status === 'pass') return { color: 'success', Icon: CheckCircleIcon, label: 'ผ่าน' };
+    if (status === 'fail') return { color: 'error', Icon: WarningAmberIcon, label: 'พบปัญหา' };
+    return { color: 'default', Icon: RadioButtonUncheckedIcon, label: 'ยังไม่ตรวจ' };
   };
 
+  const kpis: { Icon: React.ElementType; label: string; val: number | string; color: 'info' | 'success' | 'error' | 'warning' }[] = [
+    { Icon: AssignmentIcon, label: 'บันทึกทั้งหมด', val: stats.total, color: 'info' },
+    { Icon: CheckCircleIcon, label: 'ผ่าน', val: stats.passed, color: 'success' },
+    { Icon: WarningAmberIcon, label: 'พบปัญหา', val: stats.failed, color: 'error' },
+    { Icon: BuildIcon, label: 'ปัญหาค้างแก้', val: stats.openIssues, color: 'warning' },
+    { Icon: TrendingUpIcon, label: 'อัตราผ่าน', val: `${stats.passRate}%`, color: stats.passRate >= 90 ? 'success' : 'warning' },
+  ];
+
   return (
-    <>
-      <style>{`
-        .pmd-root { font-family: 'Sarabun', sans-serif; }
-        .pmd-btn { display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Sarabun',sans-serif;transition:all .15s;border:1px solid transparent;white-space:nowrap; }
-        .pmd-btn-primary { background:#0ea5e9;border-color:#0284c7;color:#fff; }
-        .pmd-btn-primary:hover { background:#0284c7; }
-        .pmd-btn-outline { background:#fff;border-color:#e2e8f0;color:#475569; }
-        .pmd-btn-outline:hover { border-color:#0ea5e9;color:#0ea5e9; }
-        .pmd-btn-pdf { background:#fff;border-color:#fca5a5;color:#dc2626; }
-        .pmd-btn-pdf:hover { background:#fff5f5; }
-        .pmd-card { background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden; }
-        .pmd-table { width:100%;border-collapse:collapse;font-size:12px; }
-        .pmd-table th { padding:10px 14px;text-align:left;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;background:#f8fafc;border-bottom:1px solid #e2e8f0;white-space:nowrap; }
-        .pmd-table td { padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#334155; }
-        .pmd-table tr:hover td { background:#f8fafc; }
-        .pmd-layout { display:grid;grid-template-columns:minmax(0,1.2fr) minmax(320px,.8fr);gap:18px;align-items:start; }
-        @media (max-width:960px) { .pmd-layout { grid-template-columns:1fr; } }
-        .floor-card { border-radius:12px;padding:16px;cursor:pointer;transition:all .2s;border:2px solid; }
-        .floor-card:hover { transform:translateY(-2px); }
-        .floor-progress { height:6px;border-radius:99px;background:#e2e8f0;overflow:hidden;margin-top:8px; }
-        .floor-progress-bar { height:100%;border-radius:99px; }
-        .floor-detail-panel { border-radius:12px;padding:18px;border:1px solid #e2e8f0;background:#fff;animation:fadeUp .2s ease; }
-        @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
-        .legend-item { display:flex;align-items:center;gap:6px;font-size:11px;color:#475569; }
-        .legend-dot { width:10px;height:10px;border-radius:50%; }
-      `}</style>
+    <Box>
+      {/* Header */}
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5, mb: 2.5 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box sx={{ width: 40, height: 40, borderRadius: 2.5, bgcolor: (t) => alpha(t.palette.primary.main, t.palette.mode === 'dark' ? 0.16 : 0.08), border: '1px solid', borderColor: 'primary.main', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <HubIcon color="primary" />
+          </Box>
+          <Box>
+            <Typography sx={{ fontSize: 17, fontWeight: 800 }}>PM SW/Hub Room</Typography>
+            <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 0.25 }}>ศูนย์ติดตามการตรวจห้อง Network / Hub Room ปี {year + 543}</Typography>
+          </Box>
+        </Box>
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          <Button variant="outlined" startIcon={<ShieldIcon />} onClick={() => navigate('/pm')}>PM ทรัพย์สิน</Button>
+          <Button variant="outlined" startIcon={<SettingsIcon />} onClick={() => navigate('/pm/sw-hub/template')}>Template</Button>
+          <Button variant="outlined" startIcon={<AssignmentIcon />} onClick={() => navigate('/pm/sw-hub/plans')}>แผน SW/Hub</Button>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('/pm/sw-hub/new')}>ตรวจ SW/Hub Room</Button>
+        </Box>
+      </Box>
 
-      <div className="pmd-root">
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 10, background: '#f0f9ff', border: '1.5px solid #bae6fd', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>🖧</div>
-            <div>
-              <div style={{ fontSize: 17, fontWeight: 800, color: '#0f172a' }}>PM SW/Hub Room</div>
-              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>ศูนย์ติดตามการตรวจห้อง Network / Hub Room ปี {year + 543}</div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button className="pmd-btn pmd-btn-outline" onClick={() => navigate('/pm')}>🛡 PM ทรัพย์สิน</button>
-            <button className="pmd-btn pmd-btn-outline" onClick={() => navigate('/pm/sw-hub/template')}>⚙️ Template</button>
-            <button className="pmd-btn pmd-btn-outline" onClick={() => navigate('/pm/sw-hub/plans')}>📋 แผน SW/Hub</button>
-            <button className="pmd-btn pmd-btn-primary" onClick={() => navigate('/pm/sw-hub/new')}>＋ ตรวจ SW/Hub Room</button>
-          </div>
-        </div>
+      {error && <Alert severity="error" sx={{ mb: 2.5 }}>{error}</Alert>}
 
-        {error && (
-          <div className="pmd-card" style={{ padding: '12px 16px', marginBottom: 18, background: '#fff5f5', borderColor: '#fecaca', color: '#dc2626', fontSize: 12, fontWeight: 700 }}>
-            ⚠️ {error}
-          </div>
-        )}
+      {/* KPI Cards */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 1.5, mb: 2.5 }}>
+        {kpis.map((s) => (
+          <Card key={s.label} variant="outlined" sx={{ p: '14px 16px', display: 'flex', alignItems: 'center', gap: 1.5, bgcolor: (t) => alpha(t.palette[s.color].main, t.palette.mode === 'dark' ? 0.16 : 0.08), borderColor: `${s.color}.main` }}>
+            <s.Icon sx={{ fontSize: 26, color: `${s.color}.main` }} />
+            <Box>
+              <Typography sx={{ fontSize: 24, fontWeight: 800, color: `${s.color}.main`, lineHeight: 1 }}>{s.val}</Typography>
+              <Typography sx={{ fontSize: 10, color: 'text.secondary', mt: 0.25 }}>{s.label}</Typography>
+            </Box>
+          </Card>
+        ))}
+      </Box>
 
-        {/* KPI Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 12, marginBottom: 18 }}>
-          {[
-            { icon: '📋', label: 'บันทึกทั้งหมด', val: stats.total, color: '#0ea5e9', bg: '#f0f9ff', border: '#bae6fd' },
-            { icon: '✅', label: 'ผ่าน', val: stats.passed, color: '#10b981', bg: '#f0fdf4', border: '#bbf7d0' },
-            { icon: '⚠️', label: 'พบปัญหา', val: stats.failed, color: '#ef4444', bg: '#fff5f5', border: '#fecaca' },
-            { icon: '🛠', label: 'ปัญหาค้างแก้', val: stats.openIssues, color: '#f59e0b', bg: '#fffbeb', border: '#fde68a' },
-            { icon: '📊', label: 'อัตราผ่าน', val: `${stats.passRate}%`, color: stats.passRate >= 90 ? '#10b981' : '#f59e0b', bg: '#f8fafc', border: '#e2e8f0' },
-          ].map((s) => (
-            <div key={s.label} style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 26 }}>{s.icon}</span>
-              <div>
-                <div style={{ fontSize: 24, fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.val}</div>
-                <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>{s.label}</div>
-              </div>
-            </div>
-          ))}
-        </div>
+      {/* ═══ FLOOR MAP VISUAL ═══ */}
+      <Card variant="outlined" sx={{ mb: 2.5 }}>
+        <Box sx={{ p: '14px 18px', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+          <Box>
+            <Typography sx={{ fontSize: 13, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 0.75 }}><BusinessIcon sx={{ fontSize: 16 }} /> แผนผังสถานะ Hub Room รายชั้น</Typography>
+            <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 0.25 }}>สถานะจากการตรวจล่าสุดของแต่ละชั้น — คลิกเพื่อดูรายละเอียด</Typography>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, fontSize: 11, color: 'text.secondary' }}><Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'success.main' }} /> ผ่าน</Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, fontSize: 11, color: 'text.secondary' }}><Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'error.main' }} /> พบปัญหา</Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, fontSize: 11, color: 'text.secondary' }}><Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'text.disabled' }} /> ยังไม่ตรวจ</Box>
+          </Box>
+        </Box>
+        <Box sx={{ p: '16px 18px' }}>
+          {/* Floor cards grid */}
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 1.5, mb: 2 }}>
+            {floorMap.map(f => {
+              const isSelected = selectedFloor === f.floor;
+              const tone = floorStatusTone(f.status);
+              const total = f.passCount + f.failCount;
+              const passPct = total > 0 ? Math.round((f.passCount / total) * 100) : 0;
 
-        {/* ═══════════════════════════════════════════════
-            FLOOR MAP VISUAL (Feature 4)
-        ═══════════════════════════════════════════════ */}
-        <div className="pmd-card" style={{ marginBottom: 18 }}>
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>🏢 แผนผังสถานะ Hub Room รายชั้น</div>
-              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>สถานะจากการตรวจล่าสุดของแต่ละชั้น — คลิกเพื่อดูรายละเอียด</div>
-            </div>
-            <div style={{ display: 'flex', gap: 16 }}>
-              <div className="legend-item"><div className="legend-dot" style={{ background: '#16a34a' }} /> ผ่าน</div>
-              <div className="legend-item"><div className="legend-dot" style={{ background: '#dc2626' }} /> พบปัญหา</div>
-              <div className="legend-item"><div className="legend-dot" style={{ background: '#cbd5e1' }} /> ยังไม่ตรวจ</div>
-            </div>
-          </div>
-          <div style={{ padding: '16px 18px' }}>
-            {/* Floor cards grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 12, marginBottom: 16 }}>
-              {floorMap.map(f => {
-                const isSelected = selectedFloor === f.floor;
-                const s = floorStatusStyle(f.status, isSelected);
-                const total = f.passCount + f.failCount;
-                const passPct = total > 0 ? Math.round((f.passCount / total) * 100) : 0;
-
-                return (
-                  <div
-                    key={f.floor}
-                    className="floor-card"
-                    style={{ background: s.bg, borderColor: s.border, boxShadow: s.glow }}
-                    onClick={() => setSelectedFloor(isSelected ? null : f.floor)}
-                  >
-                    {/* Floor number + status icon */}
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                      <div>
-                        <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em' }}>Floor</div>
-                        <div style={{ fontSize: 28, fontWeight: 900, color: s.titleColor, lineHeight: 1 }}>{f.floor}</div>
-                        {f.floor === 27 && (
-                          <span style={{ fontSize: 9, background: '#fef08a', color: '#854d0e', border: '1px solid #fde047', borderRadius: 4, padding: '1px 5px', fontWeight: 700 }}>Critical</span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: 22 }}>{s.icon}</div>
-                    </div>
-
-                    {/* Progress bar (pass/fail ratio) */}
-                    {f.status !== 'none' && total > 0 && (
-                      <>
-                        <div className="floor-progress">
-                          <div className="floor-progress-bar" style={{ width: `${passPct}%`, background: f.status === 'pass' ? '#10b981' : '#ef4444' }} />
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 10, color: '#64748b' }}>
-                          <span>✓ {f.passCount}</span>
-                          <span style={{ color: '#94a3b8' }}>{passPct}%</span>
-                          <span style={{ color: '#ef4444' }}>✗ {f.failCount}</span>
-                        </div>
-                      </>
-                    )}
-
-                    {/* Status badge */}
-                    <div style={{ marginTop: 8 }}>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: s.badgeBg, borderRadius: 99, padding: '2px 8px' }}>
-                        {s.badgeText}
-                      </span>
-                    </div>
-
-                    {/* Last date */}
-                    {f.lastDate && (
-                      <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 5 }}>
-                        ตรวจล่าสุด: {fmtDate(f.lastDate)}
-                      </div>
-                    )}
-                    {f.status === 'none' && (
-                      <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 8 }}>
-                        ยังไม่มีบันทึกการตรวจ
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Selected floor detail panel */}
-            {selectedFloor && (
-              <div className="floor-detail-panel">
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>
-                    📂 ประวัติการตรวจ — Floor {selectedFloor}
-                    <span style={{ fontSize: 11, fontWeight: 400, color: '#94a3b8', marginLeft: 8 }}>5 รายการล่าสุด</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button className="pmd-btn pmd-btn-outline" style={{ fontSize: 11 }}
-                      onClick={() => navigate(`/pm/sw-hub/new?floor=F${selectedFloor}`)}>
-                      ＋ ตรวจชั้น {selectedFloor}
-                    </button>
-                    <button className="pmd-btn pmd-btn-outline" style={{ fontSize: 11 }} onClick={() => setSelectedFloor(null)}>
-                      ✕ ปิด
-                    </button>
-                  </div>
-                </div>
-
-                {selectedFloorRecords.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '24px 0', color: '#94a3b8', fontSize: 12 }}>
-                    ยังไม่มีบันทึกการตรวจสำหรับชั้นนี้
-                  </div>
-                ) : (
-                  <div style={{ overflowX: 'auto' }}>
-                    <table className="pmd-table">
-                      <thead>
-                        <tr>
-                          {['Form ID', 'ผู้ตรวจ', 'รอบ', 'วันที่', 'ผ่าน', 'ไม่ผ่าน', 'สถานะ', 'PDF'].map(h => <th key={h}>{h}</th>)}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selectedFloorRecords.map(record => {
-                          const tone = statusTone(record.status);
-                          const pCount = record.items.filter(i => i.status === 'pass').length;
-                          const fCount = record.items.filter(i => i.status === 'fail').length;
-                          return (
-                            <tr key={record.id}>
-                              <td style={{ fontWeight: 600 }}>
-                                <a href="#!" onClick={e => { e.preventDefault(); navigate(`/pm/sw-hub/new?recordId=${record.id}`); }}
-                                  style={{ color: '#0ea5e9', textDecoration: 'none' }}>
-                                  {record.formId}
-                                </a>
-                              </td>
-                              <td>{record.technician || '—'}</td>
-                              <td>{record.period}</td>
-                              <td>{fmtDate(record.date)}</td>
-                              <td><span style={{ color: '#16a34a', fontWeight: 700 }}>{pCount}</span></td>
-                              <td><span style={{ color: fCount > 0 ? '#dc2626' : '#94a3b8', fontWeight: 700 }}>{fCount}</span></td>
-                              <td>
-                                <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 9px', borderRadius: 99, fontSize: 10, fontWeight: 700, background: tone.bg, color: tone.color, border: `1px solid ${tone.border}` }}>
-                                  {tone.label}
-                                </span>
-                              </td>
-                              <td>
-                                {/* ═══ PDF EXPORT BUTTON (Feature 5) ═══ */}
-                                <button
-                                  className="pmd-btn pmd-btn-pdf"
-                                  style={{ padding: '4px 10px', fontSize: 11 }}
-                                  title="ส่งออกใบรายงาน PDF"
-                                  onClick={() => printRecordReport(record)}
-                                >
-                                  🖨️ PDF
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-        {/* END FLOOR MAP */}
-
-        {/* Chart + Issues */}
-        <div className="pmd-layout">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-            {/* Chart */}
-            <div className="pmd-card" style={{ padding: '14px 18px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>แนวโน้มผลตรวจรายเดือน</div>
-                <div style={{ fontSize: 11, color: '#94a3b8' }}>Pass / Fail</div>
-              </div>
-              <div style={{ height: 250 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="swPass" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.28} />
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="swFail" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.24} />
-                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b' }} dy={8} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b' }} />
-                    <CartesianGrid vertical={false} stroke="#e2e8f0" strokeDasharray="3 3" />
-                    <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', boxShadow: '0 8px 24px rgba(15,23,42,.12)', fontSize: 12 }} />
-                    <Area type="monotone" dataKey="pass" name="ผ่าน" stroke="#10b981" strokeWidth={2} fill="url(#swPass)" />
-                    <Area type="monotone" dataKey="fail" name="พบปัญหา" stroke="#ef4444" strokeWidth={2} fill="url(#swFail)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Latest Records */}
-            <div className="pmd-card">
-              <div style={{ padding: '14px 18px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>บันทึกตรวจล่าสุด</div>
-                <button className="pmd-btn pmd-btn-outline" onClick={() => navigate('/pm/sw-hub/new')}>＋ เพิ่มบันทึก</button>
-              </div>
-              <div style={{ overflowX: 'auto' }}>
-                <table className="pmd-table">
-                  <thead>
-                    <tr>{['Form ID', 'ชั้น', 'รอบ', 'ผู้ตรวจ', 'วันที่', 'สถานะ', 'PDF'].map(h => <th key={h}>{h}</th>)}</tr>
-                  </thead>
-                  <tbody>
-                    {latestRecords.length > 0 ? latestRecords.map((record) => {
-                      const tone = statusTone(record.status);
-                      return (
-                        <tr key={record.id}>
-                          <td style={{ fontWeight: 600 }}>
-                            <a href="#!" onClick={e => { e.preventDefault(); navigate(`/pm/sw-hub/new?recordId=${record.id}`); }}
-                              style={{ color: '#0ea5e9', textDecoration: 'none', cursor: 'pointer' }}>
-                              {record.formId}
-                            </a>
-                          </td>
-                          <td>
-                            <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0ea5e9', fontWeight: 700, padding: 0, fontSize: 12 }}
-                              onClick={() => setSelectedFloor(parseInt(record.floor.replace('F', '')))}>
-                              {record.floor}
-                            </button>
-                          </td>
-                          <td>{record.period}</td>
-                          <td>{record.technician || '—'}</td>
-                          <td>{fmtDate(record.date)}</td>
-                          <td>
-                            <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 9px', borderRadius: 99, fontSize: 10, fontWeight: 700, background: tone.bg, color: tone.color, border: `1px solid ${tone.border}` }}>
-                              {tone.label}
-                            </span>
-                          </td>
-                          <td>
-                            <button className="pmd-btn pmd-btn-pdf" style={{ padding: '4px 10px', fontSize: 11 }}
-                              onClick={() => printRecordReport(record)}>
-                              🖨️ PDF
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    }) : (
-                      <tr><td colSpan={7} style={{ textAlign: 'center', color: '#94a3b8', padding: 36 }}>ยังไม่มีบันทึกตรวจ SW/Hub Room</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          {/* Open Issues */}
-          <div className="pmd-card">
-            <div style={{ padding: '14px 18px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>ปัญหาที่รอแก้ไข</div>
-              <span style={{ fontSize: 10, background: '#fffbeb', color: '#b45309', padding: '2px 8px', borderRadius: 99, border: '1px solid #fde68a', fontWeight: 700 }}>
-                {openIssues.length} รายการ
-              </span>
-            </div>
-            <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {openIssues.length > 0 ? (showAllIssues ? openIssues : openIssues.slice(0, 8)).map((issue) => (
-                <div key={issue.id} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px', background: '#fff' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
-                    <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>{issue.checkItem}</div>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: '#64748b', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1px 6px', borderRadius: 6, whiteSpace: 'nowrap' }}>
-                      {issue.category}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 11, color: '#475569', lineHeight: 1.5 }}>{issue.note || 'ไม่มีหมายเหตุเพิ่มเติม'}</div>
-                  <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 8 }}>
-                    <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0ea5e9', fontSize: 10, padding: 0 }}
-                      onClick={() => setSelectedFloor(parseInt(issue.floor.replace('F', '')))}>
-                      {issue.floor}
-                    </button>
-                    {' '}· {fmtDate(issue.date)} · {issue.formId}
-                  </div>
-                </div>
-              )) : (
-                <div style={{ textAlign: 'center', padding: '36px 12px', color: '#64748b', fontSize: 12 }}>
-                  ✅ ไม่มีปัญหาค้างแก้ไขในรอบนี้
-                </div>
-              )}
-              {openIssues.length > 8 && (
-                <button
-                  type="button"
-                  onClick={() => setShowAllIssues(p => !p)}
-                  style={{
-                    background: 'none', border: 'none', cursor: 'pointer', color: '#0ea5e9', fontSize: 11, fontWeight: 700, alignSelf: 'center', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4
+              return (
+                <Card
+                  key={f.floor}
+                  variant="outlined"
+                  onClick={() => setSelectedFloor(isSelected ? null : f.floor)}
+                  sx={{
+                    p: 2, cursor: 'pointer', transition: 'all .2s',
+                    bgcolor: (t) => tone.color === 'default' ? 'action.hover' : alpha(t.palette[tone.color].main, isSelected ? 0.16 : 0.08),
+                    borderColor: tone.color === 'default' ? 'divider' : `${tone.color}.main`,
+                    borderWidth: isSelected ? 2 : 1,
+                    '&:hover': { transform: 'translateY(-2px)' },
                   }}
                 >
-                  {showAllIssues ? '🔼 แสดงน้อยลง' : `🔽 แสดงทั้งหมด (${openIssues.length} รายการ)`}
-                </button>
+                  <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                    <Box>
+                      <Typography sx={{ fontSize: 11, color: 'text.secondary', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em' }}>Floor</Typography>
+                      <Typography sx={{ fontSize: 28, fontWeight: 900, color: tone.color === 'default' ? 'text.secondary' : `${tone.color}.main`, lineHeight: 1 }}>{f.floor}</Typography>
+                      {f.floor === 27 && (
+                        <Chip size="small" label="Critical" color="warning" sx={{ height: 16, fontSize: 9, fontWeight: 700, mt: 0.5 }} />
+                      )}
+                    </Box>
+                    <tone.Icon sx={{ fontSize: 22, color: tone.color === 'default' ? 'text.disabled' : `${tone.color}.main` }} />
+                  </Box>
+
+                  {f.status !== 'none' && total > 0 && (
+                    <>
+                      <LinearProgress variant="determinate" value={passPct} color={f.status === 'pass' ? 'success' : 'error'} sx={{ height: 6, borderRadius: 99, mt: 1 }} />
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.75, fontSize: 10, color: 'text.secondary' }}>
+                        <span>✓ {f.passCount}</span>
+                        <Box component="span" sx={{ color: 'text.disabled' }}>{passPct}%</Box>
+                        <Box component="span" sx={{ color: 'error.main' }}>✗ {f.failCount}</Box>
+                      </Box>
+                    </>
+                  )}
+
+                  <Box sx={{ mt: 1 }}>
+                    <Chip size="small" label={tone.label} color={tone.color === 'default' ? undefined : tone.color} sx={{ fontSize: 10, fontWeight: 700, height: 20 }} />
+                  </Box>
+
+                  {f.lastDate && (
+                    <Typography sx={{ fontSize: 10, color: 'text.secondary', mt: 0.75 }}>
+                      ตรวจล่าสุด: {fmtDate(f.lastDate)}
+                    </Typography>
+                  )}
+                  {f.status === 'none' && (
+                    <Typography sx={{ fontSize: 10, color: 'text.secondary', mt: 1 }}>
+                      ยังไม่มีบันทึกการตรวจ
+                    </Typography>
+                  )}
+                </Card>
+              );
+            })}
+          </Box>
+
+          {/* Selected floor detail panel */}
+          {selectedFloor && (
+            <Paper variant="outlined" sx={{ p: 2.25 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.75, flexWrap: 'wrap', gap: 1 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                  <FolderOpenIcon sx={{ fontSize: 16 }} /> ประวัติการตรวจ — Floor {selectedFloor}
+                  <Box component="span" sx={{ fontSize: 11, fontWeight: 400, color: 'text.secondary', ml: 1 }}>5 รายการล่าสุด</Box>
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Button size="small" variant="outlined" startIcon={<AddIcon />} onClick={() => navigate(`/pm/sw-hub/new?floor=F${selectedFloor}`)}>
+                    ตรวจชั้น {selectedFloor}
+                  </Button>
+                  <Button size="small" variant="outlined" startIcon={<CloseIcon />} onClick={() => setSelectedFloor(null)}>ปิด</Button>
+                </Box>
+              </Box>
+
+              {selectedFloorRecords.length === 0 ? (
+                <Box sx={{ textAlign: 'center', py: 3, color: 'text.secondary', fontSize: 12 }}>
+                  ยังไม่มีบันทึกการตรวจสำหรับชั้นนี้
+                </Box>
+              ) : (
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow sx={{ bgcolor: 'action.hover' }}>
+                        {['Form ID', 'ผู้ตรวจ', 'รอบ', 'วันที่', 'ผ่าน', 'ไม่ผ่าน', 'สถานะ', 'PDF'].map(h => <TableCell key={h} sx={{ fontSize: 10, fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase' }}>{h}</TableCell>)}
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {selectedFloorRecords.map(record => {
+                        const tone = statusTone(record.status);
+                        const pCount = record.items.filter(i => i.status === 'pass').length;
+                        const fCount = record.items.filter(i => i.status === 'fail').length;
+                        return (
+                          <TableRow key={record.id} hover>
+                            <TableCell sx={{ fontWeight: 600 }}>
+                              <Box component="span" sx={{ color: 'primary.main', cursor: 'pointer' }} onClick={() => navigate(`/pm/sw-hub/new?recordId=${record.id}`)}>
+                                {record.formId}
+                              </Box>
+                            </TableCell>
+                            <TableCell>{record.technician || '—'}</TableCell>
+                            <TableCell>{record.period}</TableCell>
+                            <TableCell>{fmtDate(record.date)}</TableCell>
+                            <TableCell><Box component="span" sx={{ color: 'success.main', fontWeight: 700 }}>{pCount}</Box></TableCell>
+                            <TableCell><Box component="span" sx={{ color: fCount > 0 ? 'error.main' : 'text.disabled', fontWeight: 700 }}>{fCount}</Box></TableCell>
+                            <TableCell><Chip size="small" label={tone.label} color={tone.color} sx={{ fontSize: 10, fontWeight: 700, height: 20 }} /></TableCell>
+                            <TableCell>
+                              <Button size="small" variant="outlined" color="error" startIcon={<PrintIcon sx={{ fontSize: 14 }} />} onClick={() => printRecordReport(record)}>
+                                PDF
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
               )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
+            </Paper>
+          )}
+        </Box>
+      </Card>
+      {/* END FLOOR MAP */}
+
+      {/* Chart + Issues */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(0,1.2fr) minmax(320px,.8fr)' }, gap: 2.25, alignItems: 'start' }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.25 }}>
+          {/* Chart */}
+          <Card variant="outlined" sx={{ p: '14px 18px' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.75 }}>
+              <Typography sx={{ fontSize: 13, fontWeight: 800 }}>แนวโน้มผลตรวจรายเดือน</Typography>
+              <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>Pass / Fail</Typography>
+            </Box>
+            <Box sx={{ height: 250 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="swPass" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.28} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="swFail" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.24} />
+                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b' }} dy={8} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b' }} />
+                  <CartesianGrid vertical={false} stroke="#e2e8f0" strokeDasharray="3 3" />
+                  <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', boxShadow: '0 8px 24px rgba(15,23,42,.12)', fontSize: 12 }} />
+                  <Area type="monotone" dataKey="pass" name="ผ่าน" stroke="#10b981" strokeWidth={2} fill="url(#swPass)" />
+                  <Area type="monotone" dataKey="fail" name="พบปัญหา" stroke="#ef4444" strokeWidth={2} fill="url(#swFail)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </Box>
+          </Card>
+
+          {/* Latest Records */}
+          <Card variant="outlined">
+            <Box sx={{ p: '14px 18px', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+              <Typography sx={{ fontSize: 13, fontWeight: 800 }}>บันทึกตรวจล่าสุด</Typography>
+              <Button size="small" variant="outlined" startIcon={<AddIcon />} onClick={() => navigate('/pm/sw-hub/new')}>เพิ่มบันทึก</Button>
+            </Box>
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow sx={{ bgcolor: 'action.hover' }}>
+                    {['Form ID', 'ชั้น', 'รอบ', 'ผู้ตรวจ', 'วันที่', 'สถานะ', 'PDF'].map(h => <TableCell key={h} sx={{ fontSize: 10, fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase' }}>{h}</TableCell>)}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {latestRecords.length > 0 ? latestRecords.map((record) => {
+                    const tone = statusTone(record.status);
+                    return (
+                      <TableRow key={record.id} hover>
+                        <TableCell sx={{ fontWeight: 600 }}>
+                          <Box component="span" sx={{ color: 'primary.main', cursor: 'pointer' }} onClick={() => navigate(`/pm/sw-hub/new?recordId=${record.id}`)}>
+                            {record.formId}
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box component="span" sx={{ color: 'primary.main', fontWeight: 700, cursor: 'pointer' }} onClick={() => setSelectedFloor(parseInt(record.floor.replace('F', '')))}>
+                            {record.floor}
+                          </Box>
+                        </TableCell>
+                        <TableCell>{record.period}</TableCell>
+                        <TableCell>{record.technician || '—'}</TableCell>
+                        <TableCell>{fmtDate(record.date)}</TableCell>
+                        <TableCell><Chip size="small" label={tone.label} color={tone.color} sx={{ fontSize: 10, fontWeight: 700, height: 20 }} /></TableCell>
+                        <TableCell>
+                          <Button size="small" variant="outlined" color="error" startIcon={<PrintIcon sx={{ fontSize: 14 }} />} onClick={() => printRecordReport(record)}>
+                            PDF
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  }) : (
+                    <TableRow><TableCell colSpan={7} sx={{ textAlign: 'center', color: 'text.secondary', py: 4.5 }}>ยังไม่มีบันทึกตรวจ SW/Hub Room</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Card>
+        </Box>
+
+        {/* Open Issues */}
+        <Card variant="outlined">
+          <Box sx={{ p: '14px 18px', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 800 }}>ปัญหาที่รอแก้ไข</Typography>
+            <Chip size="small" label={`${openIssues.length} รายการ`} color="warning" variant="outlined" sx={{ fontWeight: 700 }} />
+          </Box>
+          <Box sx={{ p: 1.75, display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+            {openIssues.length > 0 ? (showAllIssues ? openIssues : openIssues.slice(0, 8)).map((issue) => (
+              <Paper key={issue.id} variant="outlined" sx={{ p: '12px 14px' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, mb: 0.75 }}>
+                  <Typography sx={{ fontSize: 12, fontWeight: 800 }}>{issue.checkItem}</Typography>
+                  <Chip size="small" label={issue.category} variant="outlined" sx={{ fontSize: 10, fontWeight: 700, height: 20, whiteSpace: 'nowrap' }} />
+                </Box>
+                <Typography sx={{ fontSize: 11, color: 'text.secondary', lineHeight: 1.5 }}>{issue.note || 'ไม่มีหมายเหตุเพิ่มเติม'}</Typography>
+                <Box sx={{ fontSize: 10, color: 'text.secondary', mt: 1 }}>
+                  <Box component="span" sx={{ color: 'primary.main', cursor: 'pointer' }} onClick={() => setSelectedFloor(parseInt(issue.floor.replace('F', '')))}>
+                    {issue.floor}
+                  </Box>
+                  {' '}· {fmtDate(issue.date)} · {issue.formId}
+                </Box>
+              </Paper>
+            )) : (
+              <Box sx={{ textAlign: 'center', py: 4.5, px: 1.5, color: 'text.secondary', fontSize: 12 }}>
+                ไม่มีปัญหาค้างแก้ไขในรอบนี้
+              </Box>
+            )}
+            {openIssues.length > 8 && (
+              <Button
+                size="small"
+                onClick={() => setShowAllIssues(p => !p)}
+                startIcon={showAllIssues ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                sx={{ alignSelf: 'center', mt: 0.5 }}
+              >
+                {showAllIssues ? 'แสดงน้อยลง' : `แสดงทั้งหมด (${openIssues.length} รายการ)`}
+              </Button>
+            )}
+          </Box>
+        </Card>
+      </Box>
+    </Box>
   );
 }

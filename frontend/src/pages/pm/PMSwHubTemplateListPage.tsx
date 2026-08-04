@@ -1,6 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Box, Typography, Button, IconButton, Card, Chip } from '@mui/material';
+import { alpha } from '@mui/material/styles';
+import AddIcon from '@mui/icons-material/Add';
+import DescriptionIcon from '@mui/icons-material/Description';
+import ArticleIcon from '@mui/icons-material/Article';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import ChecklistIcon from '@mui/icons-material/Checklist';
+import ToggleOnIcon from '@mui/icons-material/ToggleOn';
 import { pmSwHubTemplateService, PMSwHubTemplate } from '../../services/pmSwHub';
+import { Modal } from './components/Modal';
 
 export default function PMSwHubTemplateListPage() {
   const navigate = useNavigate();
@@ -39,104 +50,87 @@ export default function PMSwHubTemplateListPage() {
   };
 
   if (loading) {
-    return <div style={{ textAlign: 'center', padding: 40, color: '#0ea5e9' }}>⏳ กำลังโหลด...</div>;
+    return <Box sx={{ textAlign: 'center', p: 5, color: 'primary.main' }}>กำลังโหลด...</Box>;
   }
 
   return (
-    <>
-      <style>{`
-        .ptl-root { font-family: 'Sarabun', sans-serif; padding: 24px; max-width: 1000px; margin: 0 auto; }
-        .ptl-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; transition: box-shadow .15s; }
-        .ptl-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.06); }
-        .ptl-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid transparent; transition: all .2s; }
-        .ptl-btn-primary { background: #0ea5e9; color: #fff; }
-        .ptl-btn-outline { background: #fff; border-color: #e2e8f0; color: #475569; }
-        .ptl-btn-outline:hover { border-color: #0ea5e9; color: #0ea5e9; }
-        .ptl-badge { padding: 2px 8px; borderRadius: 99px; font-size: 10px; font-weight: 700; }
-        
-        .modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.4); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-        .modal-content { background: #fff; border-radius: 16px; padding: 24px; width: 400px; box-shadow: 0 20px 50px rgba(0,0,0,.15); }
-        .preset-opt { border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 16px; cursor: pointer; transition: all .2s; display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-        .preset-opt:hover { border-color: #0ea5e9; background: #f0f9ff; }
-      `}</style>
+    <Box sx={{ p: 3, maxWidth: 1000, mx: 'auto' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Box>
+          <Typography sx={{ fontSize: 20, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <DescriptionIcon color="primary" /> PM Template (Checklist)
+          </Typography>
+          <Typography sx={{ mt: 0.5, color: 'text.secondary', fontSize: 13 }}>สร้างและจัดการรายการตรวจสอบ PM แบบ Customize</Typography>
+        </Box>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setShowCreateModal(true)}>สร้าง Template ใหม่</Button>
+      </Box>
 
-      <div className="ptl-root">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: '#0f172a' }}>📋 PM Template (Checklist)</h2>
-            <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: 13 }}>สร้างและจัดการรายการตรวจสอบ PM แบบ Customize</p>
-          </div>
-          <button className="ptl-btn ptl-btn-primary" onClick={() => setShowCreateModal(true)}>
-            ＋ สร้าง Template ใหม่
-          </button>
-        </div>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 2 }}>
+        {templates.map(t => (
+          <Card variant="outlined" key={t.id} sx={{ overflow: 'hidden' }}>
+            <Box sx={{ height: 4, bgcolor: t.isActive ? 'success.main' : 'action.disabledBackground' }} />
+            <Box sx={{ p: 2.25 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                <Typography sx={{ fontSize: 15, fontWeight: 700 }}>{t.name}</Typography>
+                {t.isActive && <Chip size="small" label="ใช้งานอยู่" color="success" variant="outlined" sx={{ fontWeight: 700 }} />}
+              </Box>
+              <Typography sx={{ fontSize: 12, color: 'text.secondary', mb: 2, minHeight: 36 }}>{t.description || 'ไม่มีคำอธิบาย'}</Typography>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
-          {templates.map(t => (
-            <div className="ptl-card" key={t.id}>
-              <div style={{ height: 4, background: t.isActive ? '#10b981' : '#cbd5e1' }} />
-              <div style={{ padding: 18 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>{t.name}</div>
-                  {t.isActive && <span style={{ fontSize: 10, background: '#f0fdf4', color: '#16a34a', padding: '2px 8px', borderRadius: 99, border: '1px solid #bbf7d0' }}>ใช้งานอยู่</span>}
-                </div>
-                <div style={{ fontSize: 12, color: '#64748b', marginBottom: 16, minHeight: 36 }}>{t.description || 'ไม่มีคำอธิบาย'}</div>
-                
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
-                  <div style={{ fontSize: 12, color: '#475569', display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ fontSize: 16 }}>📑</span> {(t as any)._count?.items || 0} ข้อ
-                  </div>
-                  <div style={{ fontSize: 12, color: '#475569', display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ fontSize: 16 }}>🔘</span> 1 ใช่ / ไม่ใช่ / N/A
-                  </div>
-                </div>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.25 }}>
+                <Box sx={{ fontSize: 12, color: 'text.secondary', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <ChecklistIcon sx={{ fontSize: 16 }} /> {(t as any)._count?.items || 0} ข้อ
+                </Box>
+                <Box sx={{ fontSize: 12, color: 'text.secondary', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <ToggleOnIcon sx={{ fontSize: 16 }} /> ใช่ / ไม่ใช่ / N/A
+                </Box>
+              </Box>
 
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="ptl-btn ptl-btn-outline" style={{ flex: 1, justifyContent: 'center' }} onClick={() => navigate(`/pm/sw-hub/template/${t.id}`)}>
-                    🔍 Preview
-                  </button>
-                  <button className="ptl-btn ptl-btn-outline" style={{ flex: 1, justifyContent: 'center' }} onClick={() => navigate(`/pm/sw-hub/template/${t.id}/edit`)}>
-                    ✏️ แก้ไข
-                  </button>
-                  {!t.isActive && (
-                    <button className="ptl-btn ptl-btn-outline" style={{ color: '#ef4444' }} onClick={() => handleDelete(t.id)}>
-                      🗑️
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button size="small" variant="outlined" fullWidth startIcon={<VisibilityIcon />} onClick={() => navigate(`/pm/sw-hub/template/${t.id}`)}>Preview</Button>
+                <Button size="small" variant="outlined" fullWidth startIcon={<EditIcon />} onClick={() => navigate(`/pm/sw-hub/template/${t.id}/edit`)}>แก้ไข</Button>
+                {!t.isActive && (
+                  <IconButton size="small" color="error" onClick={() => handleDelete(t.id)}><DeleteIcon fontSize="small" /></IconButton>
+                )}
+              </Box>
+            </Box>
+          </Card>
+        ))}
+      </Box>
 
-        {showCreateModal && (
-          <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
-            <div className="modal-content" onClick={e => e.stopPropagation()}>
-              <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 700 }}>เลือกรูปแบบ Template</h3>
-              
-              <div className="preset-opt" onClick={() => handleCreate('7')}>
-                <div style={{ width: 40, height: 40, borderRadius: 10, background: '#f0f9ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>📄</div>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700 }}>แบบมาตรฐาน (7 ข้อ)</div>
-                  <div style={{ fontSize: 11, color: '#64748b' }}>รายการตรวจสอบพื้นฐานสำหรับ Hub Room</div>
-                </div>
-              </div>
+      <Modal open={showCreateModal} onClose={() => setShowCreateModal(false)} title="เลือกรูปแบบ Template" maxWidth={420}>
+        <Box sx={{ p: '16px 20px', display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          <Card
+            variant="outlined"
+            onClick={() => handleCreate('7')}
+            sx={{ p: 2, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 1.5, '&:hover': { borderColor: 'primary.main', bgcolor: (t) => alpha(t.palette.primary.main, 0.04) } }}
+          >
+            <Box sx={{ width: 40, height: 40, borderRadius: 2.5, bgcolor: (t) => alpha(t.palette.info.main, t.palette.mode === 'dark' ? 0.16 : 0.08), display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ArticleIcon color="info" />
+            </Box>
+            <Box>
+              <Typography sx={{ fontSize: 14, fontWeight: 700 }}>แบบมาตรฐาน (7 ข้อ)</Typography>
+              <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>รายการตรวจสอบพื้นฐานสำหรับ Hub Room</Typography>
+            </Box>
+          </Card>
 
-              <div className="preset-opt" onClick={() => handleCreate('9')}>
-                <div style={{ width: 40, height: 40, borderRadius: 10, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>📜</div>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700 }}>แบบเต็มรูปแบบ (9 ข้อ)</div>
-                  <div style={{ fontSize: 11, color: '#64748b' }}>เพิ่มรายการตรวจสอบระบบวิกฤต (TRR Standard)</div>
-                </div>
-              </div>
-
-              <div style={{ textAlign: 'right', marginTop: 12 }}>
-                <button className="ptl-btn ptl-btn-outline" onClick={() => setShowCreateModal(false)}>ยกเลิก</button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </>
+          <Card
+            variant="outlined"
+            onClick={() => handleCreate('9')}
+            sx={{ p: 2, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 1.5, '&:hover': { borderColor: 'primary.main', bgcolor: (t) => alpha(t.palette.primary.main, 0.04) } }}
+          >
+            <Box sx={{ width: 40, height: 40, borderRadius: 2.5, bgcolor: (t) => alpha(t.palette.success.main, t.palette.mode === 'dark' ? 0.16 : 0.08), display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <DescriptionIcon color="success" />
+            </Box>
+            <Box>
+              <Typography sx={{ fontSize: 14, fontWeight: 700 }}>แบบเต็มรูปแบบ (9 ข้อ)</Typography>
+              <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>เพิ่มรายการตรวจสอบระบบวิกฤต (TRR Standard)</Typography>
+            </Box>
+          </Card>
+        </Box>
+        <Box sx={{ p: '12px 20px', borderTop: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'flex-end' }}>
+          <Button variant="outlined" onClick={() => setShowCreateModal(false)}>ยกเลิก</Button>
+        </Box>
+      </Modal>
+    </Box>
   );
 }

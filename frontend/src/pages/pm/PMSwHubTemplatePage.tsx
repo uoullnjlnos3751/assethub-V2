@@ -1,6 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
-import { pmSwHubTemplateService, PMSwHubTemplateItem, PMSwHubTemplate } from '../../services/pmSwHub';
+import {
+  Box,
+  Typography,
+  Button,
+  IconButton,
+  TextField,
+  Select,
+  MenuItem,
+  Chip,
+  Paper,
+  FormControlLabel,
+  Checkbox,
+} from '@mui/material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import EditIcon from '@mui/icons-material/Edit';
+import AddCircleIcon from '@mui/icons-material/AddCircle';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import DeleteIcon from '@mui/icons-material/Delete';
+import SaveIcon from '@mui/icons-material/Save';
+import ChecklistIcon from '@mui/icons-material/Checklist';
+import CheckBoxIcon from '@mui/icons-material/CheckBox';
+import NotesIcon from '@mui/icons-material/Notes';
+import StarIcon from '@mui/icons-material/Star';
+import ListIcon from '@mui/icons-material/List';
+import { pmSwHubTemplateService, PMSwHubTemplateItem } from '../../services/pmSwHub';
 
 const GROUP_OPTIONS = [
   { value: 'led_status', label: 'LED สถานะ (LED Status)' },
@@ -41,11 +66,11 @@ const PRESETS = {
   ]
 };
 
-const TYPE_LABELS: Record<string, { label: string; icon: string }> = {
-  boolean: { label: 'ใช่ / ไม่ใช่ / N/A', icon: '☑️' },
-  text:    { label: 'ข้อความ', icon: '📝' },
-  rating:  { label: 'คะแนนดาว', icon: '⭐' },
-  select:  { label: 'เลือกรายการ', icon: '📋' },
+const TYPE_LABELS: Record<string, { label: string; icon: React.ElementType }> = {
+  boolean: { label: 'ใช่ / ไม่ใช่ / N/A', icon: CheckBoxIcon },
+  text:    { label: 'ข้อความ', icon: NotesIcon },
+  rating:  { label: 'คะแนนดาว', icon: StarIcon },
+  select:  { label: 'เลือกรายการ', icon: ListIcon },
 };
 
 export default function PMSwHubTemplatePage() {
@@ -53,7 +78,7 @@ export default function PMSwHubTemplatePage() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const preset = searchParams.get('preset');
-  
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState('');
@@ -154,148 +179,135 @@ export default function PMSwHubTemplatePage() {
   };
 
   if (loading) {
-    return <div style={{ textAlign: 'center', padding: 40, color: '#0ea5e9' }}>⏳ กำลังโหลด...</div>;
+    return <Box sx={{ textAlign: 'center', p: 5, color: 'primary.main' }}>กำลังโหลด...</Box>;
   }
 
   return (
-    <>
-      <style>{`
-        .pmt-root { font-family: 'Sarabun', sans-serif; background: #f8fafc; min-height: 100vh; padding: 24px; }
-        .pmt-btn { display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 7px 14px; border-radius: 8px;
-          font-size: 12px; font-weight: 600; cursor: pointer; transition: all .15s; border: 1px solid transparent; white-space: nowrap; }
-        .pmt-btn-primary { background: #0ea5e9; border-color: #0284c7; color: #fff; }
-        .pmt-btn-outline { background: #fff; border-color: #e2e8f0; color: #475569; }
-        .pmt-btn-outline:hover { border-color: #0ea5e9; color: #0ea5e9; }
-        .pmt-btn-success { background: #10b981; color: #fff; }
-        .pmt-input { border: 1px solid #e2e8f0; border-radius: 8px; padding: 7px 10px;
-          font-size: 12px; font-family: 'Sarabun', sans-serif; outline: none; color: #334155; background: #fff; }
-        .pmt-input:focus { border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,.1); }
-        .pmt-item-row { display: flex; gap: 6px; align-items: center; padding: 8px 10px; border: 1px solid #f1f5f9; border-radius: 8px; background: #fff; margin-bottom: 6px; }
-        .pmt-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,.04); max-width: 950px; margin: 0 auto; }
-        .preview-badge { background: #f1f5f9; color: #475569; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; }
-      `}</style>
+    <Box sx={{ bgcolor: 'action.hover', minHeight: '100vh', p: 3 }}>
+      <Paper variant="outlined" sx={{ maxWidth: 950, mx: 'auto', overflow: 'hidden' }}>
+        <Box sx={{ height: 4, bgcolor: isEdit ? 'primary.main' : 'success.main' }} />
 
-      <div className="pmt-root">
-        <div className="pmt-card">
-          <div style={{ height: 4, background: isEdit ? '#0ea5e9' : '#10b981' }} />
-          
-          <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <h2 style={{ margin: 0, fontSize: 18, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ cursor: 'pointer', color: '#94a3b8' }} onClick={() => navigate('/pm/sw-hub/template')}>←</span>
-                  {isEdit ? (id && id !== 'new' ? '✏️ แก้ไข Template' : '➕ สร้าง Template ใหม่') : '🔍 Preview Template'}
-                </h2>
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {isEdit ? (
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#475569', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={isActive} onChange={e => setIsActive(e.target.checked)} />
-                    เปิดใช้งานเป็นหลัก
-                  </label>
-                ) : (
-                  <button className="pmt-btn pmt-btn-outline" onClick={() => navigate(`/pm/sw-hub/template/${id}/edit`)}>
-                    ✏️ เข้าสู่โหมดแก้ไข
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 16 }}>
-              <div>
-                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 4 }}>ชื่อ Template</label>
-                {isEdit ? (
-                  <input className="pmt-input" style={{ width: '100%' }} value={name} onChange={e => setName(e.target.value)} placeholder="เช่น PM รายเดือน..." />
-                ) : (
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#1d1d1f' }}>{name}</div>
-                )}
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 4 }}>คำอธิบาย</label>
-                {isEdit ? (
-                  <input className="pmt-input" style={{ width: '100%' }} value={description} onChange={e => setDescription(e.target.value)} placeholder="รายละเอียดเพิ่มเติม..." />
-                ) : (
-                  <div style={{ fontSize: 13, color: '#475569' }}>{description || '-'}</div>
-                )}
-              </div>
-            </div>
-
-            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 16 }}>
-              <div style={{ display: 'flex', gap: 6, marginBottom: 12, justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>📑 รายการ Checklist ({items.length})</span>
-                {isEdit && <button className="pmt-btn pmt-btn-success" onClick={handleAddItem}>＋ เพิ่มรายการ</button>}
-              </div>
-
-              <div style={{ background: '#f8fafc', padding: 10, borderRadius: 10 }}>
-                {items.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8', fontSize: 13 }}>ไม่มีรายการตรวจสอบ</div>
-                ) : (
-                  items.map((item, index) => (
-                    <div className="pmt-item-row" key={index}>
-                      {isEdit && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flexShrink: 0 }}>
-                          <button onClick={() => moveItem(index, -1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 10 }}>▲</button>
-                          <span style={{ fontSize: 10, color: '#cbd5e1', textAlign: 'center' }}>{index + 1}</span>
-                          <button onClick={() => moveItem(index, 1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 10 }}>▼</button>
-                        </div>
-                      )}
-                      
-                      {isEdit ? (
-                        <>
-                          <input 
-                            className="pmt-input"
-                            style={{ width: 180, flexShrink: 0 }}
-                            value={item.group}
-                            onChange={(e) => handleChangeItem(index, 'group', e.target.value)}
-                            placeholder="หมวดหมู่..."
-                          />
-                          <input 
-                            className="pmt-input" 
-                            style={{ flex: 1, minWidth: 150 }}
-                            value={item.label}
-                            onChange={(e) => handleChangeItem(index, 'label', e.target.value)}
-                            placeholder="รายการตรวจสอบ..."
-                          />
-                          <select className="pmt-input" style={{ width: 130, flexShrink: 0, paddingRight: 20 }}
-                            value={item.type || 'boolean'}
-                            onChange={e => handleChangeItem(index, 'type', e.target.value)}
-                          >
-                            {Object.entries(TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
-                          </select>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#475569', cursor: 'pointer', flexShrink: 0 }}>
-                            <input type="checkbox" checked={item.required || false} onChange={e => handleChangeItem(index, 'required', e.target.checked)} />
-                            จำเป็น
-                          </label>
-                          <button onClick={() => handleRemoveItem(index)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 16, padding: '2px 6px' }}>🗑</button>
-                        </>
-                      ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '4px 0' }}>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b', minWidth: 20 }}>{index + 1}.</span>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 10, color: '#94a3b8', textTransform: 'uppercase' }}>{item.group}</div>
-                            <div style={{ fontSize: 13, color: '#1d1d1f' }}>{item.label}</div>
-                          </div>
-                          <div className="preview-badge">{TYPE_LABELS[item.type]?.label || item.type}</div>
-                          {item.required && <span style={{ color: '#ef4444', fontSize: 12 }}>*</span>}
-                        </div>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div style={{ padding: '16px 0 0', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button className="pmt-btn pmt-btn-outline" onClick={() => navigate('/pm/sw-hub/template')}>ย้อนกลับ</button>
-              {isEdit && (
-                <button className="pmt-btn pmt-btn-primary" onClick={handleSave} disabled={saving}>
-                  {saving ? '⏳ กำลังบันทึก...' : '💾 บันทึก Template'}
-                </button>
+        <Box sx={{ p: '20px 24px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+            <Typography sx={{ fontSize: 18, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <IconButton size="small" onClick={() => navigate('/pm/sw-hub/template')}><ArrowBackIcon fontSize="small" /></IconButton>
+              {isEdit ? (id && id !== 'new' ? 'แก้ไข Template' : 'สร้าง Template ใหม่') : 'Preview Template'}
+            </Typography>
+            <Box>
+              {isEdit ? (
+                <FormControlLabel
+                  control={<Checkbox size="small" checked={isActive} onChange={e => setIsActive(e.target.checked)} />}
+                  label={<Typography sx={{ fontSize: 13, color: 'text.secondary' }}>เปิดใช้งานเป็นหลัก</Typography>}
+                />
+              ) : (
+                <Button variant="outlined" size="small" startIcon={<EditIcon />} onClick={() => navigate(`/pm/sw-hub/template/${id}/edit`)}>
+                  เข้าสู่โหมดแก้ไข
+                </Button>
               )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
+            </Box>
+          </Box>
+
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 2 }}>
+            <Box>
+              <Typography sx={{ fontSize: 11, fontWeight: 700, color: 'text.secondary', mb: 0.5 }}>ชื่อ Template</Typography>
+              {isEdit ? (
+                <TextField fullWidth size="small" value={name} onChange={e => setName(e.target.value)} placeholder="เช่น PM รายเดือน..." />
+              ) : (
+                <Typography sx={{ fontSize: 14, fontWeight: 700 }}>{name}</Typography>
+              )}
+            </Box>
+            <Box>
+              <Typography sx={{ fontSize: 11, fontWeight: 700, color: 'text.secondary', mb: 0.5 }}>คำอธิบาย</Typography>
+              {isEdit ? (
+                <TextField fullWidth size="small" value={description} onChange={e => setDescription(e.target.value)} placeholder="รายละเอียดเพิ่มเติม..." />
+              ) : (
+                <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>{description || '-'}</Typography>
+              )}
+            </Box>
+          </Box>
+
+          <Box sx={{ borderTop: '1px solid', borderColor: 'divider', pt: 2 }}>
+            <Box sx={{ display: 'flex', gap: 0.75, mb: 1.5, justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography sx={{ fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                <ChecklistIcon sx={{ fontSize: 16 }} /> รายการ Checklist ({items.length})
+              </Typography>
+              {isEdit && <Button size="small" variant="contained" color="success" startIcon={<AddCircleIcon />} onClick={handleAddItem}>เพิ่มรายการ</Button>}
+            </Box>
+
+            <Box sx={{ bgcolor: 'action.hover', p: 1.25, borderRadius: 2 }}>
+              {items.length === 0 ? (
+                <Box sx={{ textAlign: 'center', py: 5, color: 'text.secondary', fontSize: 13 }}>ไม่มีรายการตรวจสอบ</Box>
+              ) : (
+                items.map((item, index) => (
+                  <Box
+                    key={index}
+                    sx={{ display: 'flex', gap: 0.75, alignItems: 'center', p: 1, border: '1px solid', borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper', mb: 0.75 }}
+                  >
+                    {isEdit && (
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                        <IconButton size="small" sx={{ p: 0.25 }} onClick={() => moveItem(index, -1)}><ArrowUpwardIcon sx={{ fontSize: 12 }} /></IconButton>
+                        <Typography sx={{ fontSize: 10, color: 'text.disabled' }}>{index + 1}</Typography>
+                        <IconButton size="small" sx={{ p: 0.25 }} onClick={() => moveItem(index, 1)}><ArrowDownwardIcon sx={{ fontSize: 12 }} /></IconButton>
+                      </Box>
+                    )}
+
+                    {isEdit ? (
+                      <>
+                        <TextField
+                          size="small"
+                          sx={{ width: 180, flexShrink: 0 }}
+                          value={item.group}
+                          onChange={(e) => handleChangeItem(index, 'group', e.target.value)}
+                          placeholder="หมวดหมู่..."
+                        />
+                        <TextField
+                          size="small"
+                          sx={{ flex: 1, minWidth: 150 }}
+                          value={item.label}
+                          onChange={(e) => handleChangeItem(index, 'label', e.target.value)}
+                          placeholder="รายการตรวจสอบ..."
+                        />
+                        <Select size="small" sx={{ width: 150, flexShrink: 0 }} value={item.type || 'boolean'} onChange={e => handleChangeItem(index, 'type', e.target.value)}>
+                          {Object.entries(TYPE_LABELS).map(([k, v]) => (
+                            <MenuItem key={k} value={k}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}><v.icon sx={{ fontSize: 14 }} /> {v.label}</Box>
+                            </MenuItem>
+                          ))}
+                        </Select>
+                        <FormControlLabel
+                          sx={{ flexShrink: 0, mr: 0 }}
+                          control={<Checkbox size="small" checked={item.required || false} onChange={e => handleChangeItem(index, 'required', e.target.checked)} />}
+                          label={<Typography sx={{ fontSize: 11, color: 'text.secondary' }}>จำเป็น</Typography>}
+                        />
+                        <IconButton size="small" color="error" onClick={() => handleRemoveItem(index)}><DeleteIcon fontSize="small" /></IconButton>
+                      </>
+                    ) : (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%', py: 0.5 }}>
+                        <Typography sx={{ fontSize: 12, fontWeight: 700, color: 'text.secondary', minWidth: 20 }}>{index + 1}.</Typography>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography sx={{ fontSize: 10, color: 'text.disabled', textTransform: 'uppercase' }}>{item.group}</Typography>
+                          <Typography sx={{ fontSize: 13 }}>{item.label}</Typography>
+                        </Box>
+                        <Chip size="small" label={TYPE_LABELS[item.type]?.label || item.type} sx={{ fontSize: 10, height: 20 }} />
+                        {item.required && <Box component="span" sx={{ color: 'error.main', fontSize: 12 }}>*</Box>}
+                      </Box>
+                    )}
+                  </Box>
+                ))
+              )}
+            </Box>
+          </Box>
+
+          <Box sx={{ pt: 2, borderTop: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+            <Button variant="outlined" onClick={() => navigate('/pm/sw-hub/template')}>ย้อนกลับ</Button>
+            {isEdit && (
+              <Button variant="contained" startIcon={<SaveIcon />} onClick={handleSave} disabled={saving}>
+                {saving ? 'กำลังบันทึก...' : 'บันทึก Template'}
+              </Button>
+            )}
+          </Box>
+        </Box>
+      </Paper>
+    </Box>
   );
 }
