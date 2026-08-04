@@ -115,7 +115,7 @@ const ALLOWED_ASSET_FIELDS = new Set([
   'snComputer', 'storage1', 'storage2', 'createdAt', 'updatedAt',
   'oldAssetCode', 'budget', 'image', 'categoryId',
   'memoryType', 'ramOnboard', 'ramType', 'ramSpeed', 'ramMaxSupported', 'ramAvailableSlots', 'ramUpgradeable',
-  'assignedToUserId',
+  'assignedToUserId', 'departmentRefId', 'vendorRefId', 'locationRefId',
 ]);
 
 // Resolve ownerName -> AppUser.id via exact, whitespace/case-normalized match.
@@ -128,6 +128,44 @@ const resolveAssignedToUserId = async (ownerName?: string | null): Promise<numbe
     WHERE "displayName" IS NOT NULL
       AND upper(trim(regexp_replace("displayName", '\s+', ' ', 'g'))) = upper(trim(regexp_replace(${trimmed}, '\s+', ' ', 'g')))
     LIMIT 2
+  `;
+  return rows.length === 1 ? rows[0].id : null;
+};
+
+// Resolve Asset.departmentId/vendor/location free-text -> master-table id via exact,
+// whitespace/case-normalized match. name is unique on all three master tables, so
+// (unlike resolveAssignedToUserId) there's no ambiguous-match case to guard against —
+// only "no match", which is expected to be common until master data / free-text entry
+// converge (see migration 20260804000000_asset_master_data_fk for real-world match rates).
+const resolveDepartmentRefId = async (departmentId?: string | null): Promise<number | null> => {
+  const trimmed = departmentId ? String(departmentId).trim() : '';
+  if (!trimmed) return null;
+  const rows = await prisma.$queryRaw<{ id: number }[]>`
+    SELECT id FROM departments
+    WHERE upper(trim(regexp_replace(name, '\s+', ' ', 'g'))) = upper(trim(regexp_replace(${trimmed}, '\s+', ' ', 'g')))
+    LIMIT 1
+  `;
+  return rows.length === 1 ? rows[0].id : null;
+};
+
+const resolveVendorRefId = async (vendor?: string | null): Promise<number | null> => {
+  const trimmed = vendor ? String(vendor).trim() : '';
+  if (!trimmed) return null;
+  const rows = await prisma.$queryRaw<{ id: number }[]>`
+    SELECT id FROM vendors
+    WHERE upper(trim(regexp_replace(name, '\s+', ' ', 'g'))) = upper(trim(regexp_replace(${trimmed}, '\s+', ' ', 'g')))
+    LIMIT 1
+  `;
+  return rows.length === 1 ? rows[0].id : null;
+};
+
+const resolveLocationRefId = async (location?: string | null): Promise<number | null> => {
+  const trimmed = location ? String(location).trim() : '';
+  if (!trimmed) return null;
+  const rows = await prisma.$queryRaw<{ id: number }[]>`
+    SELECT id FROM asset_locations
+    WHERE upper(trim(regexp_replace(name, '\s+', ' ', 'g'))) = upper(trim(regexp_replace(${trimmed}, '\s+', ' ', 'g')))
+    LIMIT 1
   `;
   return rows.length === 1 ? rows[0].id : null;
 };
@@ -1925,6 +1963,15 @@ router.post('/upsert', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async 
     if (data.ownerName !== undefined && data.ownerName !== existing?.ownerName && data.assignedToUserId === undefined) {
       data.assignedToUserId = await resolveAssignedToUserId(data.ownerName);
     }
+    if (data.departmentId !== undefined && data.departmentId !== existing?.departmentId && data.departmentRefId === undefined) {
+      data.departmentRefId = await resolveDepartmentRefId(data.departmentId);
+    }
+    if (data.vendor !== undefined && data.vendor !== existing?.vendor && data.vendorRefId === undefined) {
+      data.vendorRefId = await resolveVendorRefId(data.vendor);
+    }
+    if (data.location !== undefined && data.location !== existing?.location && data.locationRefId === undefined) {
+      data.locationRefId = await resolveLocationRefId(data.location);
+    }
 
     // Check for duplicates
     const duplicateErrors = await checkDuplicateAssets(data, existing?.id);
@@ -1996,6 +2043,15 @@ router.post('/', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: 
     if (data.ownerName && data.assignedToUserId === undefined) {
       data.assignedToUserId = await resolveAssignedToUserId(data.ownerName);
     }
+    if (data.departmentId && data.departmentRefId === undefined) {
+      data.departmentRefId = await resolveDepartmentRefId(data.departmentId);
+    }
+    if (data.vendor && data.vendorRefId === undefined) {
+      data.vendorRefId = await resolveVendorRefId(data.vendor);
+    }
+    if (data.location && data.locationRefId === undefined) {
+      data.locationRefId = await resolveLocationRefId(data.location);
+    }
 
     // Check for duplicates
     const duplicateErrors = await checkDuplicateAssets(data);
@@ -2051,6 +2107,15 @@ router.put('/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req
 
     if (data.ownerName !== undefined && data.ownerName !== old.ownerName && data.assignedToUserId === undefined) {
       data.assignedToUserId = await resolveAssignedToUserId(data.ownerName);
+    }
+    if (data.departmentId !== undefined && data.departmentId !== old.departmentId && data.departmentRefId === undefined) {
+      data.departmentRefId = await resolveDepartmentRefId(data.departmentId);
+    }
+    if (data.vendor !== undefined && data.vendor !== old.vendor && data.vendorRefId === undefined) {
+      data.vendorRefId = await resolveVendorRefId(data.vendor);
+    }
+    if (data.location !== undefined && data.location !== old.location && data.locationRefId === undefined) {
+      data.locationRefId = await resolveLocationRefId(data.location);
     }
 
     // Check for duplicates (excluding current asset)

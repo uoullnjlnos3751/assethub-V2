@@ -99,6 +99,14 @@ model Asset {
   // FK to assigned user (replaces free-text ownerName lookup)
   assignedToUserId    Int?
   assignedTo          AppUser?             @relation("AssetAssignedTo", fields: [assignedToUserId], references: [id])
+  // Phase 5: FK to master data (dual-write — departmentId/vendor/location string columns
+  // above stay as-is for display/fallback; these are resolved best-effort on write)
+  departmentRefId     Int?
+  departmentRef       Department?          @relation(fields: [departmentRefId], references: [id])
+  vendorRefId         Int?
+  vendorRef           Vendor?              @relation(fields: [vendorRefId], references: [id])
+  locationRefId       Int?
+  locationRef         AssetLocation?       @relation(fields: [locationRefId], references: [id])
   // Depreciation
   usefulLifeYears     Int?                 // e.g. 5 for laptops, 3 for phones
   salvageValue        Float?               // ราคาซากเมื่อหมดอายุ (บาท)
@@ -134,6 +142,9 @@ model Asset {
   @@index([type, brand])
   @@index([status, createdAt])
   @@index([departmentId])
+  @@index([departmentRefId])
+  @@index([vendorRefId])
+  @@index([locationRefId])
   @@map("assets")
 }
 
@@ -415,6 +426,8 @@ model Department {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  assets      Asset[]
+
   @@map("departments")
 }
 
@@ -461,6 +474,8 @@ model AssetLocation {
   updatedAt   DateTime @updatedAt
   company     String?
 
+  assets      Asset[]
+
   @@map("asset_locations")
 }
 
@@ -471,6 +486,8 @@ model Vendor {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  assets      Asset[]
 
   @@map("vendors")
 }
