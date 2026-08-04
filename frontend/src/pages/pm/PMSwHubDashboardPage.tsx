@@ -15,6 +15,7 @@ import {
   Chip,
   Alert,
   LinearProgress,
+  useTheme,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
@@ -256,6 +257,7 @@ function printRecordReport(record: PMSwHub) {
    Main Component
 ───────────────────────────────────────────────────────────── */
 export default function PMSwHubDashboardPage() {
+  const theme = useTheme();
   const navigate = useNavigate();
   const [data, setData] = useState<PMSwHub[]>([]);
   const [loading, setLoading] = useState(true);
@@ -571,20 +573,20 @@ export default function PMSwHubDashboardPage() {
                 <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="swPass" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.28} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                      <stop offset="5%" stopColor={theme.palette.success.main} stopOpacity={0.28} />
+                      <stop offset="95%" stopColor={theme.palette.success.main} stopOpacity={0} />
                     </linearGradient>
                     <linearGradient id="swFail" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.24} />
-                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                      <stop offset="5%" stopColor={theme.palette.error.main} stopOpacity={0.24} />
+                      <stop offset="95%" stopColor={theme.palette.error.main} stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b' }} dy={8} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b' }} />
-                  <CartesianGrid vertical={false} stroke="#e2e8f0" strokeDasharray="3 3" />
-                  <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', boxShadow: '0 8px 24px rgba(15,23,42,.12)', fontSize: 12 }} />
-                  <Area type="monotone" dataKey="pass" name="ผ่าน" stroke="#10b981" strokeWidth={2} fill="url(#swPass)" />
-                  <Area type="monotone" dataKey="fail" name="พบปัญหา" stroke="#ef4444" strokeWidth={2} fill="url(#swFail)" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: theme.palette.text.secondary }} dy={8} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: theme.palette.text.secondary }} />
+                  <CartesianGrid vertical={false} stroke={theme.palette.divider} strokeDasharray="3 3" />
+                  <Tooltip contentStyle={{ borderRadius: 8, border: `1px solid ${theme.palette.divider}`, background: theme.palette.background.paper, boxShadow: '0 8px 24px rgba(15,23,42,.12)', fontSize: 12 }} />
+                  <Area type="monotone" dataKey="pass" name="ผ่าน" stroke={theme.palette.success.main} strokeWidth={2} fill="url(#swPass)" />
+                  <Area type="monotone" dataKey="fail" name="พบปัญหา" stroke={theme.palette.error.main} strokeWidth={2} fill="url(#swFail)" />
                 </AreaChart>
               </ResponsiveContainer>
             </Box>

@@ -1,4 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import {
+  Box, Button, TextField, Select, MenuItem, InputLabel, FormControl,
+  Typography, Avatar, Chip, alpha, useTheme,
+} from '@mui/material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CancelIcon from '@mui/icons-material/Cancel';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
+import SyncIcon from '@mui/icons-material/Sync';
+import SearchIcon from '@mui/icons-material/Search';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import { pmAPI, assetAPI } from '../../../services/api';
 import { resolveMediaUrl } from '../../../utils/mediaUrl';
 import imageCompression from 'browser-image-compression';
@@ -33,7 +44,14 @@ const PRINTER_BRANDS = ['HP', 'Epson', 'Canon', 'Brother', 'FujiXerox', 'Ricoh',
 const PRINTER_TYPES = ['Laser', 'Inkjet', 'Dot Matrix', 'Thermal', 'Label', 'Other'];
 const DEFAULT_COMPANIES = ['TRRHQ', 'TRR', 'TRRCORP', 'TRRT', 'PS', 'SSEC', 'TMI', 'TRM', 'TRRL', 'TRRP', 'TRW', 'TEG', 'TRRSK'];
 
+const SOURCE_META: Record<string, { label: string; colorKey: 'success' | 'info' | 'warning' }> = {
+  glpi: { label: '🟢 จาก GLPI API', colorKey: 'success' },
+  itam: { label: '🔵 จาก ITAM DB (คลัง)', colorKey: 'info' },
+  history: { label: '🟡 จากประวัติ PM', colorKey: 'warning' },
+};
+
 export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, value, onChange, parentAsset, readOnly = false }) => {
+  const theme = useTheme();
   const [devices, setDevices] = useState<PMDeviceData[]>([]);
   const [hasAny, setHasAny] = useState<'yes' | 'no' | null>(null);
   const [previewCodes, setPreviewCodes] = useState<string[]>([]);
@@ -44,8 +62,8 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
   const labelSingular = isPrinter ? 'เครื่องพิมพ์' : 'จอมอนิเตอร์';
   const labelHeader = isPrinter ? '📠 Printer เครื่องที่' : '🖥️ Monitor จอที่';
   const buttonAdd = isPrinter ? '+ เพิ่ม Printer ตัวต่อไป' : '+ เพิ่มจอ Monitor ตัวต่อไป';
-  const buttonYes = isPrinter ? '✓ มีเครื่องพิมพ์' : '✓ มีจอมอนิเตอร์';
-  const buttonNo = isPrinter ? '✗ ไม่มีเครื่องพิมพ์' : '✗ ไม่มีจอ';
+  const buttonYes = isPrinter ? 'มีเครื่องพิมพ์' : 'มีจอมอนิเตอร์';
+  const buttonNo = isPrinter ? 'ไม่มีเครื่องพิมพ์' : 'ไม่มีจอ';
 
   const BRANDS = isPrinter ? PRINTER_BRANDS : MONITOR_BRANDS;
 
@@ -59,7 +77,7 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
         setCompanies(combined);
       }
     }).catch(() => {});
-    
+
     // Fetch display format setting
     pmAPI.getDisplayFormat?.()?.then((res: any) => {
       if (res.data && res.data.value) setDisplayFormat(res.data.value);
@@ -78,7 +96,7 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
         if (!d._assetId && d.company) {
           const comp = d.company.toUpperCase().replace(/\s/g, '');
           const hasCorrectPrefix = currentCode && (
-            isPrinter 
+            isPrinter
               ? (
                   (comp === 'TRRHQ' || comp === 'TRR' ? currentCode.startsWith('TRRHQ-PR-') : false) ||
                   (comp === 'TRRCORP' ? currentCode.startsWith('TRRCORP-P') : false) ||
@@ -100,7 +118,7 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
           }
 
           try {
-            const res = isPrinter 
+            const res = isPrinter
               ? await pmAPI.previewPrinterCode(d.company, i)
               : await pmAPI.previewMonitorCode(d.company, i);
             if (res.data && res.data.code) {
@@ -179,14 +197,14 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
         if (asset) {
           const namePart = asset.assetName || '';
           const codePart = asset.assetCode || '';
-          
+
           let formatted = displayFormat
             .replace('{AssetName}', namePart)
             .replace('{AssetCode}', codePart);
-            
+
           if (!namePart && codePart) formatted = codePart;
           else if (!namePart && !codePart) formatted = '';
-          
+
           newD[index].assetCode = formatted.trim() === '/' ? '' : formatted;
           newD[index]._assetId = asset.id;
           if (asset.brand) newD[index].brand = asset.brand;
@@ -269,7 +287,7 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
 
   const handlePhotoUpload = async (index: number, file: File) => {
     try {
-      
+
       // Compress image before upload
       const options = {
         maxSizeMB: 0.5, // limit to ~500KB
@@ -289,182 +307,233 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
   };
 
   return (
-    <div style={{ marginTop: 8 }}>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-        <button
-          type="button"
-          className={`pmr-radio ${hasAny === 'yes' ? 'sel-yes' : ''}`}
+    <Box sx={{ mt: 1 }}>
+      <Box sx={{ display: 'flex', gap: 0.75, mb: 1.5 }}>
+        <Button
+          variant={hasAny === 'yes' ? 'contained' : 'outlined'}
+          color={hasAny === 'yes' ? 'success' : 'inherit'}
+          size="small"
+          startIcon={<CheckCircleIcon sx={{ fontSize: 16 }} />}
           onClick={() => !readOnly && handleToggleYesNo('yes')}
           disabled={readOnly}
-        >{buttonYes}</button>
-        <button
-          type="button"
-          className={`pmr-radio ${hasAny === 'no' ? 'sel-no' : ''}`}
+        >{buttonYes}</Button>
+        <Button
+          variant={hasAny === 'no' ? 'contained' : 'outlined'}
+          color={hasAny === 'no' ? 'error' : 'inherit'}
+          size="small"
+          startIcon={<CancelIcon sx={{ fontSize: 16 }} />}
           onClick={() => !readOnly && handleToggleYesNo('no')}
           disabled={readOnly}
-        >{buttonNo}</button>
-      </div>
+        >{buttonNo}</Button>
+      </Box>
 
       {hasAny === 'yes' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {devices.map((d, idx) => (
-            <div key={idx} style={{ padding: 16, border: '1px solid #d2d2d7', borderRadius: 8, background: '#fff' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <span style={{ fontWeight: 600, color: '#1d1d1f' }}>{labelHeader} {idx + 1}</span>
-                  {d.source === 'glpi' && (
-                    <span style={{ background: '#def7ec', color: '#03543f', fontSize: 10, padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>🟢 จาก GLPI API</span>
-                  )}
-                  {d.source === 'itam' && (
-                    <span style={{ background: '#e1effe', color: '#1e429f', fontSize: 10, padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>🔵 จาก ITAM DB (คลัง)</span>
-                  )}
-                  {d.source === 'history' && (
-                    <span style={{ background: '#fef08a', color: '#713f12', fontSize: 10, padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>🟡 จากประวัติ PM</span>
-                  )}
-                </div>
-                {!readOnly && idx > 0 && (
-                  <button type="button" onClick={() => removeDevice(idx)} style={{ color: '#ff3b30', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12 }}>ลบเครื่องนี้</button>
-                )}
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                
-                {/* Photo Upload */}
-                <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 12 }}>
-                  {d.photoFilename ? (
-                    <img src={resolveMediaUrl(`/uploads/pm/${d.photoFilename}`)} alt={labelSingular} style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 6, border: '1px solid #ccc' }} />
-                  ) : (
-                    <div style={{ width: 60, height: 60, background: '#f5f5f7', borderRadius: 6, border: '1px dashed #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>📷</div>
-                  )}
-                  {!readOnly && (
-                    <label className="pmr-btn pmr-btn-outline" style={{ fontSize: 12, padding: '4px 8px', cursor: 'pointer', display: 'inline-block' }}>
-                      ถ่ายภาพหรืออัปโหลด
-                      <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => {
-                        if (e.target.files && e.target.files[0]) {
-                          handlePhotoUpload(idx, e.target.files[0]);
-                        }
-                      }} />
-                    </label>
-                  )}
-                </div>
-
-                {/* Fields */}
-                <div>
-                  <label style={{ display: 'block', fontSize: 10, color: '#86868b', marginBottom: 4 }}>ชื่อทรัพย์สิน / รหัสทรัพย์สิน</label>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <div style={{ flex: 1 }}>
-                      <input 
-                        type="text" 
-                        disabled={readOnly} 
-                        value={d._assetId ? (d.assetCode || '') : (d.assetCode !== undefined ? d.assetCode : (previewCodes[idx] || ''))} 
-                        placeholder={previewCodes[idx] ? `${previewCodes[idx]} (รหัสระบบอัตโนมัติ)` : 'กำลังประมวลผล...'}
-                        onChange={(e) => updateField(idx, 'assetCode', e.target.value)}
-                        style={{ 
-                          width: '100%', padding: '6px 10px', fontSize: 12, 
-                          border: '1px solid #d2d2d7', borderRadius: 6, 
-                          background: d._assetId ? '#f0fdf4' : '#fff', 
-                          color: d._assetId ? '#15803d' : '#333', 
-                          fontWeight: d._assetId ? 600 : 400 
-                        }} 
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {devices.map((d, idx) => {
+            const sourceMeta = d.source ? SOURCE_META[d.source] : null;
+            return (
+              <Box key={idx} sx={{ p: 2, border: `1px solid ${theme.palette.divider}`, borderRadius: '10px', bgcolor: theme.palette.background.paper }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                    <Typography sx={{ fontWeight: 600, fontSize: '0.875rem', color: theme.palette.text.primary }}>{labelHeader} {idx + 1}</Typography>
+                    {sourceMeta && (
+                      <Chip
+                        label={sourceMeta.label}
+                        size="small"
+                        sx={{
+                          height: 20, fontSize: '0.65rem', fontWeight: 700,
+                          bgcolor: alpha(theme.palette[sourceMeta.colorKey].main, 0.12),
+                          color: theme.palette[sourceMeta.colorKey].main,
+                        }}
                       />
-                      {d._assetId ? (
-                        <div style={{ fontSize: 10, color: '#15803d', marginTop: 4 }}>✅ เชื่อมโยงกับทรัพย์สินในระบบแล้ว (ลิงก์สำเร็จ)</div>
-                      ) : (
-                        <div style={{ fontSize: 10, color: '#86868b', marginTop: 4 }}>แสดงรหัสมาตรฐานอัตโนมัติ | พิมพ์เพื่อแก้ไขเองได้</div>
+                    )}
+                  </Box>
+                  {!readOnly && idx > 0 && (
+                    <Button
+                      size="small"
+                      color="error"
+                      startIcon={<DeleteOutlineIcon sx={{ fontSize: 16 }} />}
+                      onClick={() => removeDevice(idx)}
+                      sx={{ minHeight: 'auto', py: 0.25 }}
+                    >ลบเครื่องนี้</Button>
+                  )}
+                </Box>
+
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+
+                  {/* Photo Upload */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    {d.photoFilename ? (
+                      <Avatar
+                        variant="rounded"
+                        src={resolveMediaUrl(`/uploads/pm/${d.photoFilename}`)}
+                        alt={labelSingular}
+                        sx={{ width: 60, height: 60, borderRadius: '8px', border: `1px solid ${theme.palette.divider}` }}
+                      />
+                    ) : (
+                      <Box sx={{
+                        width: 60, height: 60, bgcolor: theme.palette.action.hover, borderRadius: '8px',
+                        border: `1px dashed ${theme.palette.divider}`, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        <PhotoCameraIcon sx={{ color: theme.palette.text.disabled, fontSize: 22 }} />
+                      </Box>
+                    )}
+                    {!readOnly && (
+                      <Button component="label" size="small" variant="outlined" sx={{ fontSize: '0.75rem' }}>
+                        ถ่ายภาพหรืออัปโหลด
+                        <input type="file" accept="image/*" hidden onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            handlePhotoUpload(idx, e.target.files[0]);
+                          }
+                        }} />
+                      </Button>
+                    )}
+                  </Box>
+
+                  {/* Fields */}
+                  <Box>
+                    <Typography variant="caption" sx={{ display: 'block', color: theme.palette.text.secondary, mb: 0.5 }}>ชื่อทรัพย์สิน / รหัสทรัพย์สิน</Typography>
+                    <Box sx={{ display: 'flex', gap: 0.75 }}>
+                      <Box sx={{ flex: 1 }}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          disabled={readOnly}
+                          value={d._assetId ? (d.assetCode || '') : (d.assetCode !== undefined ? d.assetCode : (previewCodes[idx] || ''))}
+                          placeholder={previewCodes[idx] ? `${previewCodes[idx]} (รหัสระบบอัตโนมัติ)` : 'กำลังประมวลผล...'}
+                          onChange={(e) => updateField(idx, 'assetCode', e.target.value)}
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              bgcolor: d._assetId ? alpha(theme.palette.success.main, 0.08) : undefined,
+                              color: d._assetId ? theme.palette.success.main : undefined,
+                              fontWeight: d._assetId ? 600 : 400,
+                            },
+                          }}
+                        />
+                        {d._assetId ? (
+                          <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: theme.palette.success.main }}>✅ เชื่อมโยงกับทรัพย์สินในระบบแล้ว (ลิงก์สำเร็จ)</Typography>
+                        ) : (
+                          <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: theme.palette.text.secondary }}>แสดงรหัสมาตรฐานอัตโนมัติ | พิมพ์เพื่อแก้ไขเองได้</Typography>
+                        )}
+                      </Box>
+                      {!readOnly && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<SyncIcon sx={{ fontSize: 14 }} />}
+                          onClick={() => updateField(idx, 'assetCode', previewCodes[idx] || '')}
+                          title="ใช้รหัสมาตรฐานอัตโนมัติจากระบบ"
+                          sx={{ fontSize: '0.7rem', whiteSpace: 'nowrap', px: 1 }}
+                        >
+                          ใช้รหัสระบบ
+                        </Button>
                       )}
-                    </div>
-                    {!readOnly && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          updateField(idx, 'assetCode', previewCodes[idx] || '');
-                        }}
-                        style={{
-                          padding: '0 8px', fontSize: 11, background: '#e0f2fe', color: '#0369a1',
-                          border: '1px solid #bae6fd', borderRadius: 6, cursor: 'pointer',
-                          fontWeight: 600, display: 'flex', alignItems: 'center', gap: 2
-                        }}
-                        title="ใช้รหัสมาตรฐานอัตโนมัติจากระบบ"
-                      >
-                        🔄 ใช้รหัสระบบ
-                      </button>
-                    )}
-                  </div>
-                </div>
+                    </Box>
+                  </Box>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: 10, color: '#86868b', marginBottom: 4 }}>บริษัท (Company)</label>
-                  <select disabled={readOnly} value={d.company} onChange={e => updateField(idx, 'company', e.target.value)} style={{ width: '100%', padding: '6px 10px', fontSize: 12, border: '1px solid #d2d2d7', borderRadius: 6 }}>
-                    {companies.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
+                  <FormControl size="small" fullWidth disabled={readOnly}>
+                    <InputLabel>บริษัท (Company)</InputLabel>
+                    <Select label="บริษัท (Company)" value={d.company} onChange={e => updateField(idx, 'company', e.target.value)}>
+                      {companies.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+                    </Select>
+                  </FormControl>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: 10, color: '#86868b', marginBottom: 4 }}>Serial No. <span style={{ color: '#ff3b30' }}>*</span></label>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <input type="text" disabled={readOnly} placeholder="ระบุ Serial No. (จำเป็น)" value={d.serialNo} onChange={e => updateField(idx, 'serialNo', e.target.value)} style={{ flex: 1, padding: '6px 10px', fontSize: 12, border: '1px solid #d2d2d7', borderRadius: 6 }} />
-                    {!readOnly && (
-                      <button
-                        type="button"
-                        onClick={() => handleCheckSerial(idx, d.serialNo)}
-                        style={{ padding: '0 8px', fontSize: 11, background: '#f5f5f7', border: '1px solid #d2d2d7', borderRadius: 6, cursor: 'pointer', fontWeight: 500 }}
-                      >
-                        🔍 เช็คประวัติ
-                      </button>
-                    )}
-                  </div>
-                </div>
+                  <Box>
+                    <Typography variant="caption" sx={{ display: 'block', color: theme.palette.text.secondary, mb: 0.5 }}>
+                      Serial No. <Box component="span" sx={{ color: theme.palette.error.main }}>*</Box>
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 0.75 }}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        disabled={readOnly}
+                        placeholder="ระบุ Serial No. (จำเป็น)"
+                        value={d.serialNo}
+                        onChange={e => updateField(idx, 'serialNo', e.target.value)}
+                      />
+                      {!readOnly && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<SearchIcon sx={{ fontSize: 14 }} />}
+                          onClick={() => handleCheckSerial(idx, d.serialNo)}
+                          sx={{ fontSize: '0.7rem', whiteSpace: 'nowrap', px: 1 }}
+                        >
+                          เช็คประวัติ
+                        </Button>
+                      )}
+                    </Box>
+                  </Box>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: 10, color: '#86868b', marginBottom: 4 }}>ยี่ห้อ (Brand)</label>
-                  <select disabled={readOnly} value={d.brand} onChange={e => updateField(idx, 'brand', e.target.value)} style={{ width: '100%', padding: '6px 10px', fontSize: 12, border: '1px solid #d2d2d7', borderRadius: 6 }}>
-                    <option value="">-- เลือกยี่ห้อ --</option>
-                    {BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
-                  </select>
-                </div>
+                  <FormControl size="small" fullWidth disabled={readOnly}>
+                    <InputLabel>ยี่ห้อ (Brand)</InputLabel>
+                    <Select label="ยี่ห้อ (Brand)" value={d.brand} onChange={e => updateField(idx, 'brand', e.target.value)}>
+                      <MenuItem value="">-- เลือกยี่ห้อ --</MenuItem>
+                      {BRANDS.map(b => <MenuItem key={b} value={b}>{b}</MenuItem>)}
+                    </Select>
+                  </FormControl>
 
-                {isPrinter && (
-                  <div>
-                    <label style={{ display: 'block', fontSize: 10, color: '#86868b', marginBottom: 4 }}>ประเภท (Printer Type)</label>
-                    <select disabled={readOnly} value={d.printerType || ''} onChange={e => updateField(idx, 'printerType', e.target.value)} style={{ width: '100%', padding: '6px 10px', fontSize: 12, border: '1px solid #d2d2d7', borderRadius: 6 }}>
-                      <option value="">-- เลือกประเภท --</option>
-                      {PRINTER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                  </div>
-                )}
+                  {isPrinter && (
+                    <FormControl size="small" fullWidth disabled={readOnly}>
+                      <InputLabel>ประเภท (Printer Type)</InputLabel>
+                      <Select label="ประเภท (Printer Type)" value={d.printerType || ''} onChange={e => updateField(idx, 'printerType', e.target.value)}>
+                        <MenuItem value="">-- เลือกประเภท --</MenuItem>
+                        {PRINTER_TYPES.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+                      </Select>
+                    </FormControl>
+                  )}
 
-                <div style={{ gridColumn: isPrinter ? 'span 1' : '1 / -1' }}>
-                  <label style={{ display: 'block', fontSize: 10, color: '#86868b', marginBottom: 4 }}>รุ่น (Model)</label>
-                  <input type="text" disabled={readOnly} placeholder="ระบุชื่อรุ่น" value={d.model} onChange={e => updateField(idx, 'model', e.target.value)} style={{ width: '100%', padding: '6px 10px', fontSize: 12, border: '1px solid #d2d2d7', borderRadius: 6 }} />
-                </div>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="รุ่น (Model)"
+                    disabled={readOnly}
+                    placeholder="ระบุชื่อรุ่น"
+                    value={d.model}
+                    onChange={e => updateField(idx, 'model', e.target.value)}
+                  />
 
-                {/* Readonly Info */}
-                <div style={{ gridColumn: '1 / -1', background: '#f5f5f7', padding: '8px 12px', borderRadius: 6, fontSize: 11, color: '#555' }}>
-                  <strong>ผู้ถือครอง:</strong> {parentAsset?.ownerName || '-'}{' '}
-                  <strong>แผนก:</strong> {parentAsset?.departmentId || '-'}
-                </div>
+                  {/* Readonly Info */}
+                  <Box sx={{ bgcolor: theme.palette.action.hover, p: 1.25, borderRadius: '8px', fontSize: '0.7rem', color: theme.palette.text.secondary }}>
+                    <Box component="strong" sx={{ color: theme.palette.text.primary }}>ผู้ถือครอง:</Box> {parentAsset?.ownerName || '-'}{' '}
+                    <Box component="strong" sx={{ color: theme.palette.text.primary }}>แผนก:</Box> {parentAsset?.departmentId || '-'}
+                  </Box>
 
-                {/* Monitor Specs from GLPI / DB if present */}
-                {!isPrinter && (d.screenSize || d.ports || d.hasSpeaker) && (
-                  <div style={{ gridColumn: '1 / -1', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '8px 12px', borderRadius: 6, fontSize: 11, color: '#1e40af', marginTop: -4 }}>
-                    <strong>🖥️ สเปคจอ:</strong>{' '}
-                    {d.screenSize && <span style={{ marginRight: 8 }}>📐 ขนาด {d.screenSize}</span>}
-                    {d.ports && <span style={{ marginRight: 8 }}>🔌 พอร์ต: {d.ports}</span>}
-                    {d.hasSpeaker && <span>🔊 มีลำโพงในตัว</span>}
-                  </div>
-                )}
+                  {/* Monitor Specs from GLPI / DB if present */}
+                  {!isPrinter && (d.screenSize || d.ports || d.hasSpeaker) && (
+                    <Box sx={{
+                      bgcolor: alpha(theme.palette.info.main, 0.08),
+                      border: `1px solid ${alpha(theme.palette.info.main, 0.25)}`,
+                      p: 1.25, borderRadius: '8px', fontSize: '0.7rem', color: theme.palette.info.main,
+                    }}>
+                      <Box component="strong">🖥️ สเปคจอ:</Box>{' '}
+                      {d.screenSize && <Box component="span" sx={{ mr: 1 }}>📐 ขนาด {d.screenSize}</Box>}
+                      {d.ports && <Box component="span" sx={{ mr: 1 }}>🔌 พอร์ต: {d.ports}</Box>}
+                      {d.hasSpeaker && <Box component="span">🔊 มีลำโพงในตัว</Box>}
+                    </Box>
+                  )}
 
-              </div>
-            </div>
-          ))}
+                </Box>
+              </Box>
+            );
+          })}
 
           {!readOnly && (
-            <button type="button" onClick={addDevice} style={{ padding: '8px', border: '1px dashed #d2d2d7', borderRadius: 8, background: '#fafafa', cursor: 'pointer', fontSize: 12, color: '#007aff', fontWeight: 500 }}>
+            <Button
+              onClick={addDevice}
+              variant="outlined"
+              startIcon={<AddCircleOutlineIcon sx={{ fontSize: 16 }} />}
+              sx={{
+                borderStyle: 'dashed',
+                py: 1,
+                color: theme.palette.primary.main,
+              }}
+            >
               {buttonAdd}
-            </button>
+            </Button>
           )}
-        </div>
+        </Box>
       )}
-    </div>
+    </Box>
   );
 };
