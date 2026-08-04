@@ -12,33 +12,27 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
-  Drawer,
   FormControl,
   Grid,
   IconButton,
   InputAdornment,
   InputLabel,
-  List,
-  ListItem,
   ListItemText,
+  Menu,
   MenuItem,
   Pagination,
   Popover,
   Select,
-  Skeleton,
   TextField,
   ToggleButton,
   ToggleButtonGroup,
   Tooltip,
   Typography,
-  Menu,
   alpha,
   useTheme,
   useMediaQuery,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import PageviewIcon from '@mui/icons-material/Pageview';
@@ -46,30 +40,14 @@ import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import SettingsIcon from '@mui/icons-material/Settings';
 import TableViewIcon from '@mui/icons-material/TableView';
 import GridViewIcon from '@mui/icons-material/GridView';
-import CloseIcon from '@mui/icons-material/Close';
 import DensitySmallIcon from '@mui/icons-material/DensitySmall';
 import DensityLargeIcon from '@mui/icons-material/DensityLarge';
 import BookmarkAddIcon from '@mui/icons-material/BookmarkAdd';
 import BookmarksIcon from '@mui/icons-material/Bookmarks';
-import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
-import ReturnIcon from '@mui/icons-material/AssignmentReturn';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ExtensionIcon from '@mui/icons-material/Extension';
 import SearchIcon from '@mui/icons-material/Search';
 import FilterListIcon from '@mui/icons-material/FilterList';
-import ImageOffIcon from '@mui/icons-material/ImageNotSupported';
-import Inventory2Icon from '@mui/icons-material/Inventory2';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import PersonIcon from '@mui/icons-material/Person';
-import ScheduleIcon from '@mui/icons-material/Schedule';
-import BuildIcon from '@mui/icons-material/Build';
-import ComputerIcon from '@mui/icons-material/Computer';
-import DesktopWindowsIcon from '@mui/icons-material/DesktopWindows';
-import DevicesIcon from '@mui/icons-material/Devices';
-import PrintIcon from '@mui/icons-material/Print';
-import PhoneAndroidIcon from '@mui/icons-material/PhoneAndroid';
-import RouterIcon from '@mui/icons-material/Router';
-import HandymanIcon from '@mui/icons-material/Handyman';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { assetAPI, borrowAPI, categoryAPI } from '../../services/api';
 import ExportAssetsButton from '../../components/ExportAssetsButton';
@@ -82,151 +60,24 @@ import EmptyState from '../../components/EmptyState';
 import BulkUpdateDialog from './components/BulkUpdateDialog';
 import AssetCard from './components/AssetCard';
 import { loadSavedViews, saveFilterView, deleteFilterView, SavedFilterView } from './components/savedFilterViews';
-
-type ColumnConfig = {
-  field: string;
-  label: string;
-  visible: boolean;
-};
-
-const COLUMN_PREF_KEY = 'assethub.assetList.columns.v3';
-const VIEW_MODE_KEY = 'assethub.assetList.viewMode';
-const DENSITY_KEY = 'assethub.assetList.density';
-
-const defaultColumnConfig: ColumnConfig[] = [
-  { field: 'hasImage', label: 'รูป', visible: true },
-  { field: 'assetName', label: 'ชื่อทรัพย์สิน', visible: true },
-  { field: 'serialNo', label: 'Serial No.', visible: true },
-  { field: 'type', label: 'ประเภท', visible: true },
-  { field: 'brand', label: 'ยี่ห้อ', visible: true },
-  { field: 'model', label: 'รุ่น', visible: true },
-  { field: 'status', label: 'สถานะ', visible: true },
-  { field: 'ownerName', label: 'ผู้ถือครอง', visible: true },
-  { field: 'departmentId', label: 'แผนก', visible: true },
-  { field: 'location', label: 'สถานที่ติดตั้ง/อาคาร', visible: true },
-  { field: 'floor', label: 'ชั้น', visible: true },
-  { field: 'id', label: 'ID', visible: false },
-  { field: 'assetCode', label: 'เลขครุภัณฑ์', visible: false },
-  { field: 'company', label: 'Company', visible: false },
-  { field: 'oldAssetCode', label: 'รหัสทรัพย์สินเดิม', visible: false },
-  { field: 'domainName', label: 'Domain Name', visible: false },
-  { field: 'osType', label: 'OS', visible: false },
-  { field: 'osVersion', label: 'Windows Version', visible: false },
-  { field: 'windowsLicense', label: 'Windows License', visible: false },
-  { field: 'officeLicense', label: 'MS Office', visible: false },
-  { field: 'antivirusStatus', label: 'Antivirus', visible: false },
-  { field: 'cpu', label: 'CPU', visible: false },
-  { field: 'cpuGeneration', label: 'Generation', visible: false },
-  { field: 'gpu', label: 'GPU', visible: false },
-  { field: 'ram', label: 'RAM', visible: false },
-  { field: 'ramDetail', label: 'RAM Detail', visible: false },
-  { field: 'ramSlot1', label: 'RAM Slot1', visible: false },
-  { field: 'ramSlot2', label: 'RAM Slot2', visible: false },
-  { field: 'storage1', label: 'Storage 1', visible: false },
-  { field: 'storage2', label: 'Storage 2', visible: false },
-  { field: 'snComputer', label: 'S/N Computer', visible: false },
-  { field: 'budget', label: 'งบประมาณ', visible: false },
-  { field: 'prNumber', label: 'PR No.', visible: false },
-  { field: 'poDate', label: 'PO Date', visible: false },
-  { field: 'poNumber', label: 'PO No.', visible: false },
-  { field: 'vendor', label: 'Vendor', visible: false },
-  { field: 'purchaseDate', label: 'วันที่จัดซื้อ', visible: false },
-  { field: 'age', label: 'อายุ (ปี)', visible: false },
-  { field: 'remark', label: 'หมายเหตุ', visible: false },
-  { field: 'createdAt', label: 'วันที่สร้าง', visible: false },
-  { field: 'updatedAt', label: 'วันที่แก้ไขล่าสุด', visible: false },
-];
-
-// Grouping used only for the column-picker dialog (search/quick-toggle) — does NOT
-// affect actual table column order, which stays driven by columnConfig's array order.
-const COLUMN_CATEGORIES: Record<string, string> = {
-  hasImage: 'พื้นฐาน', assetName: 'พื้นฐาน', serialNo: 'พื้นฐาน', type: 'พื้นฐาน', brand: 'พื้นฐาน', model: 'พื้นฐาน',
-  status: 'พื้นฐาน', id: 'พื้นฐาน', assetCode: 'พื้นฐาน', company: 'พื้นฐาน', oldAssetCode: 'พื้นฐาน',
-  ownerName: 'องค์กร/ตำแหน่ง', departmentId: 'องค์กร/ตำแหน่ง', location: 'องค์กร/ตำแหน่ง', floor: 'องค์กร/ตำแหน่ง',
-  domainName: 'ซอฟต์แวร์', osType: 'ซอฟต์แวร์', osVersion: 'ซอฟต์แวร์', windowsLicense: 'ซอฟต์แวร์', officeLicense: 'ซอฟต์แวร์', antivirusStatus: 'ซอฟต์แวร์',
-  cpu: 'ฮาร์ดแวร์', cpuGeneration: 'ฮาร์ดแวร์', gpu: 'ฮาร์ดแวร์', ram: 'ฮาร์ดแวร์', ramDetail: 'ฮาร์ดแวร์', ramSlot1: 'ฮาร์ดแวร์', ramSlot2: 'ฮาร์ดแวร์', storage1: 'ฮาร์ดแวร์', storage2: 'ฮาร์ดแวร์', snComputer: 'ฮาร์ดแวร์',
-  budget: 'จัดซื้อ', prNumber: 'จัดซื้อ', poDate: 'จัดซื้อ', poNumber: 'จัดซื้อ', vendor: 'จัดซื้อ', purchaseDate: 'จัดซื้อ', age: 'จัดซื้อ',
-  remark: 'อื่นๆ', createdAt: 'อื่นๆ', updatedAt: 'อื่นๆ',
-};
-
-const statusLabels: Record<string, string> = {
-  Available: 'พร้อมใช้งาน',
-  Borrowed: 'กำลังยืม',
-  InUse: 'ใช้งานประจำ',
-  Maintenance: 'ซ่อมบำรุง',
-  Retired: 'ปลดระวาง',
-  Lost: 'สูญหาย',
-};
-
-const warrantyStatusLabels: Record<string, string> = {
-  active: 'ยังไม่หมดประกัน',
-  expiringSoon: 'ใกล้หมดประกัน (30 วัน)',
-  expired: 'หมดประกันแล้ว',
-  none: 'ไม่มีประกัน',
-};
-
-const columnDefaultsByField = new Map(defaultColumnConfig.map((config) => [config.field, config]));
-
-const typeGroupLabels: Record<string, string> = {
-  computers: 'คอมพิวเตอร์',
-  monitors: 'จอภาพ',
-  devices: 'อุปกรณ์ต่อพ่วง',
-  printers: 'เครื่องพิมพ์',
-  phonesTablets: 'อุปกรณ์สื่อสาร',
-  network: 'อุปกรณ์เครือข่าย',
-  rack: 'Rack & Infrastructure',
-};
-
-const typeGroupIcons: Record<string, React.ReactNode> = {
-  computers: <ComputerIcon fontSize="small" />,
-  monitors: <DesktopWindowsIcon fontSize="small" />,
-  devices: <DevicesIcon fontSize="small" />,
-  printers: <PrintIcon fontSize="small" />,
-  phonesTablets: <PhoneAndroidIcon fontSize="small" />,
-  network: <RouterIcon fontSize="small" />,
-  rack: <HandymanIcon fontSize="small" />,
-};
-
-const typeGroupDescriptions: Record<string, string> = {
-  computers: 'คอมพิวเตอร์ตั้งโต๊ะ โน๊ตบุ๊ค และอุปกรณ์ประมวลผล',
-  monitors: 'จอภาพทุกประเภทสำหรับการทำงาน',
-  devices: 'อุปกรณ์ต่อพ่วง เมาส์ คีย์บอร์ด เว็บแคม ไมค์ ลำโพง',
-  printers: 'เครื่องพิมพ์ทุกประเภท',
-  phonesTablets: 'สมาร์ทโฟน แท็บเล็ต และอุปกรณ์สื่อสาร',
-  network: 'อุปกรณ์เครือข่าย สวิตช์ เราเตอร์ ไฟร์วอลล์',
-  rack: 'แร็คเซิร์ฟเวอร์ PDU UPS และโครงสร้างพื้นฐาน',
-};
-
-const formatDate = (value: unknown) => {
-  if (!value) return '';
-  const date = new Date(String(value));
-  if (Number.isNaN(date.getTime())) return String(value);
-  return date.toLocaleDateString('th-TH');
-};
-
-const formatDateTime = (value: unknown) => {
-  if (!value) return '';
-  const date = new Date(String(value));
-  if (Number.isNaN(date.getTime())) return String(value);
-  return date.toLocaleString('th-TH');
-};
-
-const loadColumnConfig = () => {
-  try {
-    const saved = localStorage.getItem(COLUMN_PREF_KEY);
-    if (!saved) return defaultColumnConfig;
-    const parsed = JSON.parse(saved) as ColumnConfig[];
-    const known = new Set(defaultColumnConfig.map((c) => c.field));
-    const savedFields = new Set(parsed.map((c) => c.field));
-    const orderedSaved = parsed
-      .filter((c) => known.has(c.field))
-      .map((c) => ({ ...columnDefaultsByField.get(c.field)!, visible: c.visible }));
-    const missing = defaultColumnConfig.filter((c) => !savedFields.has(c.field));
-    return [...orderedSaved, ...missing];
-  } catch {
-    return defaultColumnConfig;
-  }
-};
+import AssetQuickViewDrawer from './components/AssetQuickViewDrawer';
+import ColumnPickerDialog from './components/ColumnPickerDialog';
+import ExtendBorrowDialog from './components/ExtendBorrowDialog';
+import AssetRowActionsMenu from './components/AssetRowActionsMenu';
+import AssetKpiStrip from './components/AssetKpiStrip';
+import { assetColumnMap } from './components/assetListColumns';
+import {
+  ColumnConfig,
+  statusLabels,
+  warrantyStatusLabels,
+  typeGroupLabels,
+  typeGroupIcons,
+  typeGroupDescriptions,
+  loadColumnConfig,
+  COLUMN_PREF_KEY,
+  VIEW_MODE_KEY,
+  DENSITY_KEY,
+} from './assetListConfig';
 
 export default function AssetListPage() {
   const { user } = useAuth();
@@ -258,8 +109,6 @@ export default function AssetListPage() {
   const [menuAnchor, setMenuAnchor] = useState<{ element: null | HTMLElement; row: any }>({ element: null, row: null });
   const [myBorrowedItems, setMyBorrowedItems] = useState<any[]>([]);
   const [extendDialog, setExtendDialog] = useState<{ open: boolean; item: any }>({ open: false, item: null });
-  const [extendDays, setExtendDays] = useState(3);
-  const [extendReason, setExtendReason] = useState('');
   const [categoryStats, setCategoryStats] = useState<{ total: number; byStatus: { status: string; _count: number }[] } | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
 
@@ -395,23 +244,6 @@ export default function AssetListPage() {
     }
   }, [isAvailableOnlyView, user]);
 
-  const handleExtendSubmit = async () => {
-    if (!extendDialog.item) return;
-    try {
-      await borrowAPI.createExtension({
-        requestId: extendDialog.item.requestId,
-        itemIds: [extendDialog.item.id],
-        extraDays: extendDays,
-        reason: extendReason || 'ต้องการขยายวันยืม',
-      });
-      toast.success('ส่งคำขอขยายวันเรียบร้อย รอ IT Admin อนุมัติ');
-      setExtendDialog({ open: false, item: null });
-      setExtendReason('');
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'ไม่สามารถขยายวันได้');
-    }
-  };
-
   const handleDelete = async (id: number) => {
     if (window.confirm('ต้องการลบทรัพย์สินนี้ใช่หรือไม่?')) {
       try {
@@ -466,135 +298,10 @@ export default function AssetListPage() {
 
   const advancedFilterCount = (warrantyStatus ? 1 : 0) + (purchaseDateFrom || purchaseDateTo ? 1 : 0);
 
-  const textColumn = (field: string, headerName: string, width = 140): GridColDef => ({
-    field,
-    headerName,
-    width,
-  });
-
-  const columnMap = useMemo<Record<string, GridColDef>>(() => ({
-    id: textColumn('id', 'ID', 90),
-    hasImage: {
-      field: 'hasImage',
-      headerName: 'รูป',
-      width: 50,
-      sortable: false,
-      filterable: false,
-      renderCell: ({ row }) => (
-        <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-          {row.image ? (
-            <Box
-              component="img"
-              src={row.image}
-              alt=""
-              sx={{
-                width: 28,
-                height: 28,
-                borderRadius: 1.5,
-                objectFit: 'cover',
-                boxShadow: (theme) => `0 0 0 1px ${alpha(theme.palette.success.main, 0.3)}`,
-              }}
-            />
-          ) : (
-            <Box
-              sx={{
-                width: 28,
-                height: 28,
-                borderRadius: 1.5,
-                bgcolor: (theme) => alpha(theme.palette.grey[500], 0.08),
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: (theme) => theme.palette.grey[400],
-              }}
-            >
-              <ImageOffIcon fontSize="small" sx={{ fontSize: 16 }} />
-            </Box>
-          )}
-        </Box>
-      ),
-    },
-    assetCode: textColumn('assetCode', 'เลขครุภัณฑ์', 140),
-    assetName: {
-      ...textColumn('assetName', 'ชื่อทรัพย์สิน', 180),
-      renderCell: ({ row }) => {
-        const isConsumable = ['toner', 'ink', 'cartridge', 'battery', 'adapter', 'charger', 'consumable'].some(t => row.type?.toLowerCase().includes(t));
-        const lowStock = isConsumable && row.consumableDetail && row.consumableDetail.stockQuantity <= row.consumableDetail.minimumStock;
-
-        return (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="body2" noWrap sx={{ fontWeight: lowStock ? 700 : 400 }}>
-              {row.assetName}
-            </Typography>
-            {lowStock && (
-              <Tooltip title={`สต็อกใกล้หมด: ${row.consumableDetail.stockQuantity} (Min: ${row.consumableDetail.minimumStock})`}>
-                <Box component="span" sx={{ color: 'error.main', fontSize: 14, lineHeight: 1 }}>⚠</Box>
-              </Tooltip>
-            )}
-          </Box>
-        );
-      }
-    },
-    serialNo: textColumn('serialNo', 'Serial No.', 140),
-    type: textColumn('type', 'ประเภท', 120),
-    brand: textColumn('brand', 'ยี่ห้อ', 120),
-    model: textColumn('model', 'รุ่น', 150),
-    cpu: textColumn('cpu', 'CPU', 130),
-    cpuGeneration: textColumn('cpuGeneration', 'Generation', 120),
-    ram: textColumn('ram', 'RAM', 110),
-    ramDetail: textColumn('ramDetail', 'RAM Detail', 150),
-    ramSlot1: textColumn('ramSlot1', 'RAM Slot1', 130),
-    ramSlot2: textColumn('ramSlot2', 'RAM Slot2', 130),
-    storage1: textColumn('storage1', 'Storage 1', 130),
-    storage2: textColumn('storage2', 'Storage 2', 130),
-    osType: textColumn('osType', 'OS', 110),
-    snComputer: textColumn('snComputer', 'S/N Computer', 150),
-    osVersion: textColumn('osVersion', 'Windows', 160),
-    windowsLicense: textColumn('windowsLicense', 'Windows License', 160),
-    officeLicense: textColumn('officeLicense', 'MS Office', 150),
-    antivirusStatus: textColumn('antivirusStatus', 'Antivirus', 140),
-    domainName: textColumn('domainName', 'Domain Name', 150),
-    vendor: textColumn('vendor', 'Vendor', 150),
-    poNumber: textColumn('poNumber', 'PO No.', 130),
-    poDate: {
-      ...textColumn('poDate', 'PO Date', 130),
-      renderCell: ({ value }) => formatDate(value),
-    },
-    prNumber: textColumn('prNumber', 'PR No.', 130),
-    purchaseDate: {
-      ...textColumn('purchaseDate', 'วันที่ซื้อ', 130),
-      renderCell: ({ value }) => formatDate(value),
-    },
-    age: textColumn('age', 'อายุ (ปี)', 110),
-    ownerName: textColumn('ownerName', 'ผู้ถือครอง', 170),
-    departmentId: textColumn('departmentId', 'แผนก', 130),
-    location: textColumn('location', 'สถานที่ติดตั้ง/อาคาร', 160),
-    floor: textColumn('floor', 'ชั้น', 90),
-    company: textColumn('company', 'บริษัท', 130),
-    oldAssetCode: textColumn('oldAssetCode', 'Computer Name เดิม', 150),
-    gpu: textColumn('gpu', 'GPU', 120),
-    budget: textColumn('budget', 'งบประมาณ', 130),
-    status: {
-      field: 'status',
-      headerName: 'สถานะ',
-      width: 140,
-      renderCell: ({ value }) => <StatusChip status={value} />,
-    },
-    remark: textColumn('remark', 'หมายเหตุ', 220),
-    createdAt: {
-      ...textColumn('createdAt', 'วันที่สร้าง', 170),
-      renderCell: ({ value }) => formatDateTime(value),
-    },
-    updatedAt: {
-      ...textColumn('updatedAt', 'วันที่แก้ไขล่าสุด', 170),
-      renderCell: ({ value }) => formatDateTime(value),
-    },
-  }), []);
-
   const columns = useMemo<GridColDef[]>(() => {
     const selectedColumns = columnConfig
       .filter((config) => config.visible)
-      .map((config) => columnMap[config.field])
+      .map((config) => assetColumnMap[config.field])
       .filter(Boolean);
 
     return [
@@ -651,39 +358,7 @@ export default function AssetListPage() {
         },
       },
     ];
-  }, [columnConfig, columnMap, navigate, isAdmin]);
-
-  const visibleCount = columnConfig.filter((config) => config.visible).length;
-
-  const toggleColumn = (field: string) => {
-    setColumnConfig((current) => current.map((config) => {
-      if (config.field !== field) return config;
-      if (config.visible && visibleCount <= 1) return config;
-      return { ...config, visible: !config.visible };
-    }));
-  };
-
-  const moveColumn = (field: string, direction: 'up' | 'down') => {
-    setColumnConfig((current) => {
-      const index = current.findIndex((config) => config.field === field);
-      const targetIndex = direction === 'up' ? index - 1 : index + 1;
-      if (index < 0 || targetIndex < 0 || targetIndex >= current.length) return current;
-      const next = [...current];
-      [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
-      return next;
-    });
-  };
-
-  const resetColumns = () => setColumnConfig(defaultColumnConfig);
-
-  const columnCategoryNames = useMemo(() => Array.from(new Set(Object.values(COLUMN_CATEGORIES))), []);
-  const filteredColumnConfig = useMemo(() => {
-    const q = columnSearch.trim().toLowerCase();
-    if (!q) return columnConfig;
-    return columnConfig.filter((c) =>
-      c.label.toLowerCase().includes(q) || (COLUMN_CATEGORIES[c.field] || '').toLowerCase().includes(q)
-    );
-  }, [columnConfig, columnSearch]);
+  }, [columnConfig, navigate, isAdmin]);
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, row: any) => {
     setMenuAnchor({ element: event.currentTarget, row });
@@ -692,14 +367,6 @@ export default function AssetListPage() {
   const handleMenuClose = () => {
     setMenuAnchor({ element: null, row: null });
   };
-
-  const kpiItems = !isAvailableOnlyView && categoryStats ? [
-    { label: 'ทรัพย์สินทั้งหมด', value: categoryStats.total, color: theme.palette.primary.main, status: '', Icon: Inventory2Icon },
-    { label: 'พร้อมใช้งาน', value: categoryStats.byStatus.find((b) => b.status === 'Available')?._count ?? 0, color: theme.palette.success.main, status: 'Available', Icon: CheckCircleIcon },
-    { label: 'ใช้งานประจำ', value: categoryStats.byStatus.find((b) => b.status === 'InUse')?._count ?? 0, color: (theme.palette as any).info?.main || '#0288d1', status: 'InUse', Icon: PersonIcon },
-    { label: 'กำลังยืม', value: categoryStats.byStatus.find((b) => b.status === 'Borrowed')?._count ?? 0, color: theme.palette.warning.main, status: 'Borrowed', Icon: ScheduleIcon },
-    { label: 'ซ่อมบำรุง', value: categoryStats.byStatus.find((b) => b.status === 'Maintenance')?._count ?? 0, color: theme.palette.error.main, status: 'Maintenance', Icon: BuildIcon },
-  ] : [];
 
   const showGridView = !isAvailableOnlyView && isAdmin && !isMobile && viewMode === 'grid';
 
@@ -777,69 +444,14 @@ export default function AssetListPage() {
         </Box>
       </Box>
 
-      {/* ── KPI stat strip (5 interactive cards above filter, admin only, non-user) ── */}
-      {!isAvailableOnlyView && (
-        statsLoading ? (
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(5, 1fr)' }, gap: 1.5, mb: 2 }}>
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} variant="rectangular" height={64} sx={{ borderRadius: 2 }} />
-            ))}
-          </Box>
-        ) : categoryStats && (
-          <Box sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(5, 1fr)' },
-            gap: 1.5,
-            mb: 2,
-          }}>
-            {kpiItems.map((kpi) => {
-              const isActive = kpi.status === '' ? statuses.length === 0 : statuses.length === 1 && statuses[0] === kpi.status;
-              const activate = () => { setStatuses(kpi.status ? [kpi.status] : []); setPage(0); };
-              return (
-                <Box
-                  key={kpi.label}
-                  onClick={activate}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activate(); } }}
-                  sx={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 0.75,
-                    p: 1.5,
-                    bgcolor: isActive ? alpha(kpi.color, 0.05) : theme.palette.background.paper,
-                    border: `1px solid ${isActive ? kpi.color : theme.palette.divider}`,
-                    borderRadius: 2,
-                    cursor: 'pointer',
-                    transition: 'all .2s ease',
-                    boxShadow: isActive ? `0 4px 14px ${alpha(kpi.color, 0.15)}` : 'none',
-                    '&:hover': {
-                      borderColor: kpi.color,
-                      boxShadow: `0 4px 14px ${alpha(kpi.color, 0.12)}`,
-                    },
-                    '&:focus-visible': {
-                      outline: `2px solid ${kpi.color}`,
-                      outlineOffset: 2,
-                    },
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Box sx={{
-                      width: 28, height: 28, borderRadius: 1.5,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      bgcolor: alpha(kpi.color, 0.12), color: kpi.color, flexShrink: 0,
-                    }}>
-                      <kpi.Icon sx={{ fontSize: 16 }} />
-                    </Box>
-                    <Typography sx={{ fontSize: '1.15rem', fontWeight: 800, color: kpi.color, lineHeight: 1 }}>{kpi.value}</Typography>
-                  </Box>
-                  <Typography sx={{ fontSize: '0.75rem', fontWeight: isActive ? 700 : 500, color: isActive ? kpi.color : theme.palette.text.secondary, lineHeight: 1.2 }}>{kpi.label}</Typography>
-                </Box>
-              );
-            })}
-          </Box>
-        )
-      )}
+      <AssetKpiStrip
+        isAvailableOnlyView={isAvailableOnlyView}
+        statsLoading={statsLoading}
+        categoryStats={categoryStats}
+        statuses={statuses}
+        setStatuses={setStatuses}
+        setPage={setPage}
+      />
 
       <Card sx={{
         p: 2,
@@ -1105,7 +717,7 @@ export default function AssetListPage() {
                     <Divider />
                     <Box sx={{ display: 'flex', gap: 0.5, p: 1.5 }}>
                       <Button size="small" variant="outlined" startIcon={<PageviewIcon />} onClick={() => navigate(`/assets/${item.assetId}`)} sx={{ flex: 1 }}>รายละเอียด</Button>
-                      <Button size="small" variant="outlined" color="warning" startIcon={<ExtensionIcon />} onClick={() => { setExtendDialog({ open: true, item }); setExtendDays(3); }} sx={{ flex: 1 }}>ขยายวัน</Button>
+                      <Button size="small" variant="outlined" color="warning" startIcon={<ExtensionIcon />} onClick={() => setExtendDialog({ open: true, item })} sx={{ flex: 1 }}>ขยายวัน</Button>
                     </Box>
                   </Card>
                 </Grid>
@@ -1115,36 +727,12 @@ export default function AssetListPage() {
         </Box>
       )}
 
-      {/* Extend Dialog */}
-      <Dialog open={extendDialog.open} onClose={() => { setExtendDialog({ open: false, item: null }); setExtendReason(''); }} maxWidth="xs" fullWidth>
-        <DialogTitle>ขยายวันยืม</DialogTitle>
-        <DialogContent dividers>
-          {extendDialog.item && (
-            <Box sx={{ pt: 1 }}>
-              <Typography variant="body2" fontWeight={600} gutterBottom>{extendDialog.item.assetCode}</Typography>
-              <Typography variant="body2" color="text.secondary" gutterBottom>กำหนดคืนปัจจุบัน: {new Date(extendDialog.item.dueDate).toLocaleDateString('th-TH')}</Typography>
-              <TextField type="number" label="จำนวนวันที่ต้องการขยาย" fullWidth value={extendDays} onChange={(e) => setExtendDays(parseInt(e.target.value) || 1)} inputProps={{ min: 1, max: 30 }} sx={{ mt: 2 }} />
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                วันสิ้นสุดใหม่: {new Date(new Date(extendDialog.item.dueDate).getTime() + extendDays * 86400000).toLocaleDateString('th-TH')}
-              </Typography>
-              <TextField
-                label="เหตุผลในการขยายวัน"
-                fullWidth
-                multiline
-                rows={2}
-                value={extendReason}
-                onChange={(e) => setExtendReason(e.target.value)}
-                placeholder="เช่น ยังใช้งานไม่เสร็จ, ต้องการทำงานต่อ"
-                sx={{ mt: 2 }}
-              />
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => { setExtendDialog({ open: false, item: null }); setExtendReason(''); }}>ยกเลิก</Button>
-          <Button variant="contained" onClick={handleExtendSubmit}>ส่งคำขอ</Button>
-        </DialogActions>
-      </Dialog>
+      <ExtendBorrowDialog
+        open={extendDialog.open}
+        item={extendDialog.item}
+        onClose={() => setExtendDialog({ open: false, item: null })}
+        onSuccess={() => setExtendDialog({ open: false, item: null })}
+      />
 
       {isAvailableOnlyView && (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
@@ -1281,186 +869,32 @@ export default function AssetListPage() {
         )
       )}
 
-      {/* Quick-view drawer — preview an asset without leaving the list (single click on a table row) */}
-      <Drawer anchor="right" open={quickView.open} onClose={() => setQuickView({ open: false, asset: null })} PaperProps={{ sx: { width: { xs: '100%', sm: 420 } } }}>
-        {quickView.asset && (
-          <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-              <Box sx={{ minWidth: 0 }}>
-                <Typography variant="h6" fontWeight={800} noWrap>{quickView.asset.assetCode}</Typography>
-                <Typography variant="body2" color="text.secondary" noWrap>{quickView.asset.assetName}</Typography>
-              </Box>
-              <IconButton onClick={() => setQuickView({ open: false, asset: null })}><CloseIcon /></IconButton>
-            </Box>
-            <StatusChip status={quickView.asset.status} sx={{ alignSelf: 'flex-start', mb: 2 }} />
-            <Divider sx={{ mb: 2 }} />
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, flex: 1, overflowY: 'auto' }}>
-              {([
-                ['ประเภท', quickView.asset.type],
-                ['ยี่ห้อ/รุ่น', [quickView.asset.brand, quickView.asset.model].filter(Boolean).join(' ')],
-                ['Serial No.', quickView.asset.serialNo],
-                ['ผู้ถือครอง', quickView.asset.ownerName],
-                ['แผนก', quickView.asset.departmentId],
-                ['สถานที่', [quickView.asset.location, quickView.asset.floor && `ชั้น ${quickView.asset.floor}`].filter(Boolean).join(' ')],
-                ['บริษัท', quickView.asset.company],
-                ['CPU', quickView.asset.cpu],
-                ['RAM', quickView.asset.ram],
-                ['Storage', quickView.asset.storage1],
-                ['OS', quickView.asset.osType],
-                ['Vendor', quickView.asset.vendor],
-                ['วันที่ซื้อ', formatDate(quickView.asset.purchaseDate)],
-              ] as [string, string | undefined][]).filter(([, v]) => v).map(([label, value]) => (
-                <Box key={label} sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
-                  <Typography variant="body2" color="text.secondary" sx={{ flexShrink: 0 }}>{label}</Typography>
-                  <Typography variant="body2" fontWeight={600} sx={{ textAlign: 'right' }}>{value}</Typography>
-                </Box>
-              ))}
-            </Box>
-            <Button variant="contained" fullWidth sx={{ mt: 2, borderRadius: '10px' }} onClick={() => navigate(`/assets/${quickView.asset.id}`)}>
-              ดูรายละเอียดเต็ม
-            </Button>
-          </Box>
-        )}
-      </Drawer>
+      <AssetQuickViewDrawer
+        open={quickView.open}
+        asset={quickView.asset}
+        onClose={() => setQuickView({ open: false, asset: null })}
+        onViewFull={(id) => navigate(`/assets/${id}`)}
+      />
 
-      <Dialog open={columnDialogOpen} onClose={() => { setColumnDialogOpen(false); setColumnSearch(''); }} fullWidth maxWidth="sm">
-        <DialogTitle>จัดคอลัมน์ที่แสดง</DialogTitle>
-        <DialogContent dividers>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-            เลือกหัวข้อจากข้อมูล Asset ทั้งหมดในฐานข้อมูล และใช้ปุ่มลูกศรเพื่อสลับตำแหน่งคอลัมน์
-          </Typography>
-          <TextField
-            size="small"
-            fullWidth
-            placeholder="ค้นหาคอลัมน์..."
-            value={columnSearch}
-            onChange={(e) => setColumnSearch(e.target.value)}
-            sx={{ mb: 1.5 }}
-            InputProps={{
-              startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 16 }} /></InputAdornment>,
-            }}
-          />
-          <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mb: 1.5 }}>
-            {columnCategoryNames.map((cat) => {
-              const fieldsInCat = columnConfig.filter((c) => COLUMN_CATEGORIES[c.field] === cat).map((c) => c.field);
-              const allVisible = fieldsInCat.length > 0 && fieldsInCat.every((f) => columnConfig.find((c) => c.field === f)?.visible);
-              return (
-                <Chip
-                  key={cat}
-                  label={cat}
-                  size="small"
-                  variant={allVisible ? 'filled' : 'outlined'}
-                  color={allVisible ? 'primary' : 'default'}
-                  onClick={() => setColumnConfig((current) => current.map((c) => fieldsInCat.includes(c.field) ? { ...c, visible: !allVisible } : c))}
-                  sx={{ cursor: 'pointer', fontWeight: 600 }}
-                />
-              );
-            })}
-          </Box>
-          <List dense disablePadding>
-            {filteredColumnConfig.map((config) => {
-              const index = columnConfig.findIndex((c) => c.field === config.field);
-              return (
-                <ListItem key={config.field} divider>
-                  <Checkbox
-                    edge="start"
-                    checked={config.visible}
-                    onChange={() => toggleColumn(config.field)}
-                    disabled={config.visible && visibleCount <= 1}
-                  />
-                  <ListItemText
-                    primary={config.label}
-                    secondary={
-                      <Box component="span" sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
-                        <Box component="span" sx={{
-                          fontSize: '0.62rem', fontWeight: 700, px: 0.75, py: 0.1, borderRadius: 0.75,
-                          bgcolor: alpha(theme.palette.text.secondary, 0.1), color: 'text.secondary',
-                        }}>
-                          {COLUMN_CATEGORIES[config.field] || 'อื่นๆ'}
-                        </Box>
-                        <span>{config.visible ? 'แสดงในตาราง' : 'ซ่อนจากตาราง'}</span>
-                      </Box>
-                    }
-                  />
-                  <Box sx={{ display: 'flex', gap: 0.5 }}>
-                    <IconButton size="small" onClick={() => moveColumn(config.field, 'up')} disabled={index === 0}>
-                      <ArrowUpwardIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton size="small" onClick={() => moveColumn(config.field, 'down')} disabled={index === columnConfig.length - 1}>
-                      <ArrowDownwardIcon fontSize="small" />
-                    </IconButton>
-                  </Box>
-                </ListItem>
-              );
-            })}
-          </List>
-        </DialogContent>
-        <DialogActions sx={{ justifyContent: 'space-between', px: 3, py: 2 }}>
-          <Button startIcon={<RestartAltIcon />} onClick={resetColumns}>คืนค่าเริ่มต้น</Button>
-          <Button variant="contained" onClick={() => { setColumnDialogOpen(false); setColumnSearch(''); }}>เสร็จสิ้น</Button>
-        </DialogActions>
-      </Dialog>
+      <ColumnPickerDialog
+        open={columnDialogOpen}
+        onClose={() => setColumnDialogOpen(false)}
+        columnConfig={columnConfig}
+        setColumnConfig={setColumnConfig}
+        columnSearch={columnSearch}
+        setColumnSearch={setColumnSearch}
+      />
 
-      <Menu
+      <AssetRowActionsMenu
         anchorEl={menuAnchor.element}
-        open={Boolean(menuAnchor.element)}
+        row={menuAnchor.row}
         onClose={handleMenuClose}
-        PaperProps={{
-          sx: { minWidth: 160, mt: 1, boxShadow: 3 }
-        }}
-      >
-        {menuAnchor.row && (
-          menuAnchor.row.isHeaderMenu ? (
-            <Box>
-              <MenuItem key="import" sx={{ p: 0 }}><Box sx={{ width: '100%', px: 2, py: 1 }}><ImportAssetsButton /></Box></MenuItem>
-              <MenuItem key="export" sx={{ p: 0 }}><Box sx={{ width: '100%', px: 2, py: 1 }}><ExportAssetsButton /></Box></MenuItem>
-              <MenuItem key="columns" onClick={() => { handleMenuClose(); setColumnDialogOpen(true); }}>
-                <TableViewIcon sx={{ mr: 1, fontSize: 20, color: 'text.secondary' }} /> จัดคอลัมน์ตาราง
-              </MenuItem>
-            </Box>
-          ) : (
-          <>
-            {/* USER view on Available page — friendly actions */}
-            {user?.role === 'USER' && isAvailableOnlyView && (
-              <>
-                <MenuItem onClick={() => { handleMenuClose(); navigate(`/assets/${menuAnchor.row.id}`); }}>
-                  <PageviewIcon fontSize="small" sx={{ mr: 1, color: 'primary.main' }} /> ดูรายละเอียด
-                </MenuItem>
-                {menuAnchor.row.status === 'Available' && (
-                  <MenuItem onClick={() => { handleMenuClose(); navigate(`/borrow/new?assetId=${menuAnchor.row.id}`); }}>
-                    <ShoppingCartIcon fontSize="small" sx={{ mr: 1, color: 'success.main' }} /> ยืมอุปกรณ์
-                  </MenuItem>
-                )}
-              </>
-            )}
-            {/* Admin Actions — only on non-user pages */}
-            {(user?.role === 'IT_ADMIN' || user?.role === 'SUPERADMIN') && !isAvailableOnlyView && (
-              <>
-                <MenuItem onClick={() => { handleMenuClose(); navigate(`/assets/${menuAnchor.row.id}`); }}>
-                  <PageviewIcon fontSize="small" sx={{ mr: 1, color: 'primary.main' }} /> ดูรายละเอียด
-                </MenuItem>
-                <MenuItem onClick={() => { handleMenuClose(); navigate(`/assets/${menuAnchor.row.id}/edit`); }}>
-                  <EditIcon fontSize="small" sx={{ mr: 1, color: 'info.main' }} /> แก้ไขข้อมูล
-                </MenuItem>
-                {user?.role === 'IT_ADMIN' && (
-                  <MenuItem onClick={() => { handleMenuClose(); navigate(`/borrow/checkout?assetId=${menuAnchor.row.id}`); }}>
-                    <ShoppingCartIcon fontSize="small" sx={{ mr: 1, color: 'warning.main' }} /> ส่งมอบ/Check-out
-                  </MenuItem>
-                )}
-                <MenuItem onClick={() => { handleMenuClose(); navigate(`/assets/print-qr?ids=${menuAnchor.row.id}`); }}>
-                  <PrintIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} /> พิมพ์ QR Code
-                </MenuItem>
-                {user?.role === 'SUPERADMIN' && (
-                  <MenuItem onClick={() => { handleMenuClose(); handleDelete(menuAnchor.row.id); }} sx={{ color: 'error.main' }}>
-                    <DeleteIcon fontSize="small" sx={{ mr: 1 }} /> ลบทรัพย์สิน
-                  </MenuItem>
-                )}
-              </>
-            )}
-          </>
-          )
-        )}
-      </Menu>
+        user={user}
+        isAvailableOnlyView={isAvailableOnlyView}
+        navigate={navigate}
+        onDelete={handleDelete}
+        onOpenColumnDialog={() => setColumnDialogOpen(true)}
+      />
 
       <BulkUpdateDialog
         open={bulkUpdateOpen}

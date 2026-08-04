@@ -87,7 +87,19 @@
 
 ### Phase 5 — โครงสร้างระยะยาว
 1. ❌ ยังไม่ทำ — รวม UX ของ PM 2 ระบบ
-2. ❌ ยังไม่ทำ — แตกไฟล์ใหญ่ (AssetDetailPage 1,637 บรรทัด, AssetListPage 1,206, DashboardPage 928)
+2. 🔶 กำลังทำ — แตกไฟล์ใหญ่ (ผู้ใช้เลือกข้อนี้ก่อนเพราะความเสี่ยงต่ำสุด: pure code-motion ไม่แตะ behavior/UX)
+   - ✅ `AssetDetailPage.tsx` (1,487 → 358 บรรทัด) แตกเป็น 7 ไฟล์ตาม convention เดิมของโปรเจกต์ (`pages/assets/components/`, `pages/assets/tabs/`) (2026-08-04):
+     - `components/assetTypeIcon.ts` — `getTypeIconComponent()`
+     - `components/WarrantyBar.tsx`, `components/LifecycleStepper.tsx`
+     - `tabs/SpecTab.tsx` (พร้อม private helper `SpecItem`/`BoolBadge`/`SectionHeader`), `tabs/HistoryTab.tsx`, `tabs/PMTab.tsx`, `tabs/DocumentsTab.tsx`
+   - ตรวจด้วย `tsc --noEmit` (23 error คงที่ ไม่มีใหม่), `vite build` ผ่าน, เปิดดูภาพจริงครบทั้ง 6 แท็บ (สเปก/ประวัติ/PM/เอกสาร/ประวัติการซ่อม/อุปกรณ์ที่เชื่อมโยง) + QR modal ทั้งโหมดสว่าง/มืด — ข้อมูลจริงจาก DB (GLPI comparison table, PM checklist พร้อม star rating, timeline ประวัติ) render ถูกต้องครบ
+   - ✅ `AssetListPage.tsx` (1,478 → 912 บรรทัด) แตกเป็น 7 ไฟล์ (2026-08-04) — ต่างจาก AssetDetailPage ตรงที่ไม่มี tab boundary ธรรมชาติ (state ตัวกรอง/คอลัมน์ใช้ร่วมกันทั้งหน้า) จึงแยกตามหน่วยที่ประกอบตัวเองได้จริงแทน:
+     - `assetListConfig.tsx` — constants ล้วน (columnConfig เริ่มต้น, label maps, `formatDate`/`formatDateTime`, `loadColumnConfig`) ไม่มี state
+     - `components/assetListColumns.tsx` — `assetColumnMap` (คำนิยามคอลัมน์ DataGrid ทั้งหมด) ย้ายเป็นค่าคงที่ระดับโมดูล แทน `useMemo(() => {...}, [])` เดิม (พฤติกรรมเดิมคือ "คำนวณครั้งเดียว" อยู่แล้ว การย้ายออกมาเป็นโมดูลระดับบนยิ่ง stable กว่าเดิม) — คอลัมน์ "actions" ที่ต้องปิดล้อม `user`/`navigate`/`theme`/`handleMenuOpen` ยังคงอยู่ใน `AssetListPage.tsx` เพราะย้ายออกไปเสี่ยงเปลี่ยนพฤติกรรม dependency array เดิม
+     - `components/AssetKpiStrip.tsx`, `components/AssetQuickViewDrawer.tsx`, `components/ColumnPickerDialog.tsx`, `components/AssetRowActionsMenu.tsx` — UI ที่ประกอบตัวเองได้ผ่าน props
+     - `components/ExtendBorrowDialog.tsx` — ย้าย state `extendDays`/`extendReason` เข้าไปอยู่ในคอมโพเนนต์เอง (ตามแพทเทิร์นเดียวกับ `DocumentsTab.tsx` ใน AssetDetailPage) แต่ต้องเพิ่ม `useEffect` reset `extendDays` เป็น 3 ทุกครั้งที่ `open` เปลี่ยนเป็น true — โค้ดเดิม reset ผ่าน `setExtendDays(3)` ที่จุดเปิด dialog ใน parent ซึ่งหายไปเมื่อย้าย state เข้าไปอยู่ใน component ถ้าไม่เพิ่ม effect นี้จะเกิดพฤติกรรมเพี้ยนจริง (ค่าค้างจากครั้งก่อนหน้า) — เป็นจุดเดียวที่ pure code-motion ต้องมี logic เพิ่มเพื่อรักษาพฤติกรรมเดิมไว้
+   - ตรวจด้วย `tsc --noEmit` (23 คงที่ ไม่มีใหม่), `vite build` ผ่าน, เปิดดูภาพจริง: table view, grid view, column picker dialog, quick-view drawer, KPI strip, mobile card view — ทั้งโหมดสว่าง/มืด ข้อมูลจริงจาก DB (765 รายการ) render ถูกต้องครบ; mobile header overflow-menu (ซึ่งใช้ `AssetRowActionsMenu` เดียวกันกับเมนูต่อแถว คนละ branch) ตรวจแล้วว่าทำงานถูกต้อง
+   - เหลือ: `DashboardPage.tsx` (990 บรรทัด) — ยังไม่ได้เริ่ม
 3. ❌ ยังไม่ทำ — ผูก FK master data (department/vendor/location) แบบ dual-write
 
 ## หมายเหตุจากรอบตรวจสอบ 2026-08-01
