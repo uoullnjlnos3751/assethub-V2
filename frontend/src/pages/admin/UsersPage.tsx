@@ -3,7 +3,7 @@ import {
   Box, Typography, Button, Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, Select, MenuItem, FormControl, InputLabel, Chip, CircularProgress,
   List, ListItem, ListItemText, Divider, IconButton, ListItemButton, Alert,
-  Avatar, Card, CardContent, Grid, Tooltip
+  Avatar, Card, CardContent, Grid, Tooltip, alpha, useTheme
 } from '@mui/material';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import {
@@ -18,6 +18,7 @@ const roleColors: Record<string, string> = { SUPERADMIN: 'error', IT_ADMIN: 'war
 const roleLabels: Record<string, string> = { SUPERADMIN: 'SuperAdmin', IT_ADMIN: 'IT Admin', USER: 'ผู้ใช้', VIEWER: 'ผู้บริหาร (อ่านอย่างเดียว)' };
 
 export default function UsersPage() {
+  const theme = useTheme();
   const [users, setUsers] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -192,7 +193,7 @@ export default function UsersPage() {
       renderCell: ({ row }) => (
         <Avatar
           src={row.avatarUrl || undefined}
-          sx={{ width: 32, height: 32, fontSize: '13px', bgcolor: row.isActive ? '#4f46e5' : '#9ca3af' }}
+          sx={{ width: 32, height: 32, fontSize: '13px', bgcolor: row.isActive ? 'primary.main' : 'text.disabled' }}
         >
           {!row.avatarUrl && (row.displayName?.charAt(0) || 'U')}
         </Avatar>
@@ -249,7 +250,7 @@ export default function UsersPage() {
           <Tooltip title="เปลี่ยนบทบาท">
             <Button
               size="small" variant="outlined"
-              sx={{ minWidth: 0, px: 1, fontSize: '11px', borderColor: '#e2e8f0', color: '#475569' }}
+              sx={{ minWidth: 0, px: 1, fontSize: '11px', borderColor: 'divider', color: 'text.secondary' }}
               onClick={() => { setRoleDialog({ open: true, user: row }); setNewRole(row.role); }}
             >
               บทบาท
@@ -258,7 +259,7 @@ export default function UsersPage() {
           <Tooltip title={row.authType === 'LOCAL' ? 'เปลี่ยนรหัสผ่าน' : 'ตั้งรหัสผ่าน Local'}>
             <Button
               size="small" variant="outlined"
-              sx={{ minWidth: 0, px: 1, fontSize: '11px', borderColor: '#e2e8f0', color: '#475569' }}
+              sx={{ minWidth: 0, px: 1, fontSize: '11px', borderColor: 'divider', color: 'text.secondary' }}
               onClick={() => { setPasswordDialog({ open: true, user: row }); setNewPassword(''); }}
             >
               {row.authType === 'LOCAL' ? 'รหัส' : 'ตั้งรหัส'}
@@ -269,8 +270,8 @@ export default function UsersPage() {
               size="small" variant="outlined"
               sx={{
                 minWidth: 0, px: 1, fontSize: '11px',
-                borderColor: row.isActive ? '#fecaca' : '#bbf7d0',
-                color: row.isActive ? '#dc2626' : '#16a34a',
+                borderColor: row.isActive ? alpha(theme.palette.error.main, 0.4) : alpha(theme.palette.success.main, 0.4),
+                color: row.isActive ? 'error.main' : 'success.main',
               }}
               onClick={() => handleToggleActive(row.id)}
             >
@@ -292,7 +293,7 @@ export default function UsersPage() {
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', mb: 3 }}>
         <Box>
-          <Typography variant="h4" fontWeight={800} sx={{ color: '#1e293b', mb: 0.5 }}>
+          <Typography variant="h4" fontWeight={800} sx={{ color: 'text.primary', mb: 0.5 }}>
             จัดการผู้ใช้งาน
           </Typography>
           <Typography variant="body2" color="text.secondary">
@@ -304,7 +305,7 @@ export default function UsersPage() {
           startIcon={<AddIcon />}
           onClick={() => { handleCloseAddDialog(); setAddDialog(true); }}
           sx={{
-            bgcolor: '#4f46e5', '&:hover': { bgcolor: '#4338ca' },
+            bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' },
             borderRadius: '8px', textTransform: 'none', fontWeight: 600, px: 3,
           }}
         >
@@ -315,11 +316,11 @@ export default function UsersPage() {
       {/* Summary Cards */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '2px solid #4f46e5', bgcolor: 'rgba(79,70,229,0.02)' }}>
+          <Card sx={{ borderLeft: '2px solid', borderLeftColor: 'primary.main', bgcolor: alpha(theme.palette.primary.main, 0.02) }}>
             <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                 <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(79,70,229,0.06)', display: 'flex' }}>
-                  <PeopleIcon sx={{ color: '#4f46e5', fontSize: 20 }} />
+                  <PeopleIcon sx={{ color: 'primary.main', fontSize: 20 }} />
                 </Box>
                 <Box>
                   <Typography variant="body2" color="text.secondary" sx={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -332,11 +333,11 @@ export default function UsersPage() {
           </Card>
         </Grid>
         <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '2px solid #16a34a', bgcolor: 'rgba(22,163,74,0.02)' }}>
+          <Card sx={{ borderLeft: '2px solid', borderLeftColor: 'success.main', bgcolor: alpha(theme.palette.success.main, 0.02) }}>
             <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                 <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(22,163,74,0.06)', display: 'flex' }}>
-                  <ShieldIcon sx={{ color: '#16a34a', fontSize: 20 }} />
+                  <ShieldIcon sx={{ color: 'success.main', fontSize: 20 }} />
                 </Box>
                 <Box>
                   <Typography variant="body2" color="text.secondary" sx={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -349,11 +350,11 @@ export default function UsersPage() {
           </Card>
         </Grid>
         <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '2px solid #f59e0b', bgcolor: 'rgba(245,158,11,0.02)' }}>
+          <Card sx={{ borderLeft: '2px solid', borderLeftColor: 'warning.main', bgcolor: alpha(theme.palette.warning.main, 0.02) }}>
             <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                 <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(245,158,11,0.06)', display: 'flex' }}>
-                  <AdminIcon sx={{ color: '#f59e0b', fontSize: 20 }} />
+                  <AdminIcon sx={{ color: 'warning.main', fontSize: 20 }} />
                 </Box>
                 <Box>
                   <Typography variant="body2" color="text.secondary" sx={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -366,11 +367,11 @@ export default function UsersPage() {
           </Card>
         </Grid>
         <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '2px solid #ef4444', bgcolor: 'rgba(239,68,68,0.02)' }}>
+          <Card sx={{ borderLeft: '2px solid', borderLeftColor: 'error.main', bgcolor: alpha(theme.palette.error.main, 0.02) }}>
             <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                 <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(239,68,68,0.06)', display: 'flex' }}>
-                  <BlockIcon sx={{ color: '#ef4444', fontSize: 20 }} />
+                  <BlockIcon sx={{ color: 'error.main', fontSize: 20 }} />
                 </Box>
                 <Box>
                   <Typography variant="body2" color="text.secondary" sx={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -395,7 +396,7 @@ export default function UsersPage() {
           sx={{
             minWidth: 400,
             '& .MuiOutlinedInput-root': {
-              borderRadius: '8px', bgcolor: '#fff',
+              borderRadius: '8px', bgcolor: 'background.paper',
             },
           }}
           InputProps={{
@@ -405,7 +406,7 @@ export default function UsersPage() {
         <Button
           variant="outlined"
           onClick={handleSearch}
-          sx={{ borderRadius: '8px', textTransform: 'none', borderColor: '#e2e8f0', color: '#475569' }}
+          sx={{ borderRadius: '8px', textTransform: 'none', borderColor: 'divider', color: 'text.secondary' }}
         >
           ค้นหา
         </Button>
@@ -413,13 +414,13 @@ export default function UsersPage() {
 
       {/* Data Grid */}
       <Box sx={{
-        bgcolor: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0',
+        bgcolor: 'background.paper', borderRadius: '12px', border: `1px solid ${theme.palette.divider}`,
         overflow: 'hidden',
         '& .MuiDataGrid-root': { border: 'none' },
-        '& .MuiDataGrid-columnHeaders': { bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0' },
-        '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 700, fontSize: '12px', color: '#475569' },
-        '& .MuiDataGrid-cell': { fontSize: '13px', color: '#334155' },
-        '& .MuiDataGrid-row:hover': { bgcolor: '#f8fafc' },
+        '& .MuiDataGrid-columnHeaders': { bgcolor: 'action.hover', borderBottom: `1px solid ${theme.palette.divider}` },
+        '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 700, fontSize: '12px', color: 'text.secondary' },
+        '& .MuiDataGrid-cell': { fontSize: '13px', color: 'text.primary' },
+        '& .MuiDataGrid-row:hover': { bgcolor: 'action.hover' },
       }}>
         <DataGrid
           rows={users}
@@ -457,7 +458,7 @@ export default function UsersPage() {
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setRoleDialog({ open: false, user: null })} sx={{ borderRadius: '8px' }}>ยกเลิก</Button>
           <Button variant="contained" onClick={handleUpdateRole} disabled={saving}
-            sx={{ borderRadius: '8px', bgcolor: '#4f46e5', '&:hover': { bgcolor: '#4338ca' } }}
+            sx={{ borderRadius: '8px', bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' } }}
           >บันทึก</Button>
         </DialogActions>
       </Dialog>
@@ -475,7 +476,7 @@ export default function UsersPage() {
               onClick={() => setTabValue(0)}
               sx={{
                 py: 1, borderRadius: '8px', textTransform: 'none',
-                ...(tabValue === 0 ? { bgcolor: '#4f46e5', '&:hover': { bgcolor: '#4338ca' } } : { borderColor: '#e2e8f0', color: '#475569' }),
+                ...(tabValue === 0 ? { bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' } } : { borderColor: 'divider', color: 'text.secondary' }),
               }}
             >
               ค้นหาจาก AD
@@ -486,7 +487,7 @@ export default function UsersPage() {
               onClick={() => setTabValue(1)}
               sx={{
                 py: 1, borderRadius: '8px', textTransform: 'none',
-                ...(tabValue === 1 ? { bgcolor: '#4f46e5', '&:hover': { bgcolor: '#4338ca' } } : { borderColor: '#e2e8f0', color: '#475569' }),
+                ...(tabValue === 1 ? { bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' } } : { borderColor: 'divider', color: 'text.secondary' }),
               }}
             >
               สร้างผู้ใช้ทดสอบ (Manual)
@@ -535,7 +536,7 @@ export default function UsersPage() {
                   )}
                 </List>
               ) : (
-                <Box sx={{ mt: 3, p: 2.5, border: '1px solid #e2e8f0', borderRadius: '10px', bgcolor: '#f8fafc' }}>
+                <Box sx={{ mt: 3, p: 2.5, border: `1px solid ${theme.palette.divider}`, borderRadius: '10px', bgcolor: 'action.hover' }}>
                   <Typography variant="subtitle2" color="primary" gutterBottom sx={{ fontWeight: 700 }}>ผู้ใช้ที่เลือก:</Typography>
                   <Typography variant="h6" fontWeight={700}>{selectedADUser.displayName}</Typography>
                   <Typography variant="body2" color="text.secondary">
@@ -639,7 +640,7 @@ export default function UsersPage() {
             onClick={handleCreateUser}
             disabled={saving || (tabValue === 0 ? !selectedADUser : (!manualUsername.trim() || !manualDisplayName.trim() || !manualPassword.trim()))}
             startIcon={saving && <CircularProgress size={16} color="inherit" />}
-            sx={{ borderRadius: '8px', bgcolor: '#4f46e5', '&:hover': { bgcolor: '#4338ca' }, textTransform: 'none', fontWeight: 600 }}
+            sx={{ borderRadius: '8px', bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' }, textTransform: 'none', fontWeight: 600 }}
           >
             เพิ่มเข้าระบบ
           </Button>
@@ -678,7 +679,7 @@ export default function UsersPage() {
             sx={{ borderRadius: '8px', textTransform: 'none' }}
           >ยกเลิก</Button>
           <Button variant="contained" onClick={handleSetPassword} disabled={saving}
-            sx={{ borderRadius: '8px', bgcolor: '#4f46e5', '&:hover': { bgcolor: '#4338ca' }, textTransform: 'none', fontWeight: 600 }}
+            sx={{ borderRadius: '8px', bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' }, textTransform: 'none', fontWeight: 600 }}
           >บันทึก</Button>
         </DialogActions>
       </Dialog>

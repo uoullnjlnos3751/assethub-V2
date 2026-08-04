@@ -179,7 +179,7 @@ export default function FlowchartsPage() {
           ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)'
           : 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 60%, #f0fdf4 100%)',
         border: '1px solid',
-        borderColor: theme.palette.mode === 'dark' ? '#334155' : '#bae6fd',
+        borderColor: theme.palette.divider,
         overflow: 'hidden', position: 'relative'
       }}>
         <Box sx={{ position: 'absolute', top: -30, right: -30, width: 160, height: 160, borderRadius: '50%', background: alpha('#0ea5e9', 0.07) }} />
@@ -188,14 +188,14 @@ export default function FlowchartsPage() {
           <Box display="flex" alignItems="center" gap={2}>
             <Box sx={{
               width: 56, height: 56, borderRadius: '14px',
-              background: 'linear-gradient(135deg, #0ea5e9, #6366f1)',
+              background: `linear-gradient(150deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               boxShadow: '0 8px 20px rgba(14,165,233,0.3)', fontSize: 26
             }}>📊</Box>
             <Box>
               <Typography variant="h5" fontWeight={800} sx={{
                 fontSize: { xs: '1.1rem', md: '1.5rem' },
-                background: 'linear-gradient(135deg, #0ea5e9, #6366f1)',
+                background: `linear-gradient(150deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
                 WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'
               }}>
                 แผนผังขั้นตอนการทำงานระบบ (System Flowcharts)
@@ -211,13 +211,13 @@ export default function FlowchartsPage() {
       {/* Tabs */}
       <Card elevation={0} sx={{
         borderRadius: '14px', mb: 0,
-        border: '1px solid', borderColor: theme.palette.mode === 'dark' ? '#334155' : '#e2e8f0',
+        border: '1px solid', borderColor: theme.palette.divider,
         overflow: 'hidden'
       }}>
         <Box sx={{
           borderBottom: '1px solid',
-          borderColor: theme.palette.mode === 'dark' ? '#334155' : '#e2e8f0',
-          bgcolor: theme.palette.mode === 'dark' ? '#0f172a' : '#f8fafc',
+          borderColor: theme.palette.divider,
+          bgcolor: 'action.hover',
           px: 1
         }}>
           <Tabs
@@ -244,8 +244,8 @@ export default function FlowchartsPage() {
         <Box sx={{
           px: { xs: 2, md: 3 }, py: 1.5,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1,
-          borderBottom: '1px solid', borderColor: theme.palette.mode === 'dark' ? '#334155' : '#e2e8f0',
-          bgcolor: theme.palette.mode === 'dark' ? '#1e293b' : '#fff'
+          borderBottom: '1px solid', borderColor: theme.palette.divider,
+          bgcolor: 'background.paper'
         }}>
           <Box display="flex" alignItems="center" gap={1.5}>
             <Box sx={{ color: active.color, display: 'flex' }}>{active.icon}</Box>
@@ -273,7 +273,7 @@ export default function FlowchartsPage() {
         <Box
           sx={{
             width: '100%',
-            bgcolor: theme.palette.mode === 'dark' ? '#070d1a' : '#f1f5f9',
+            bgcolor: 'action.hover',
             display: 'flex', justifyContent: 'center', alignItems: 'flex-start',
             overflow: 'auto',
             minHeight: fullscreen ? 'calc(100vh - 260px)' : { xs: 300, md: 520 },
@@ -308,14 +308,14 @@ export default function FlowchartsPage() {
           disableGutters
           sx={{
             borderTop: '1px solid',
-            borderColor: theme.palette.mode === 'dark' ? '#334155' : '#e2e8f0',
+            borderColor: theme.palette.divider,
             '&:before': { display: 'none' }
           }}
         >
           <AccordionSummary
             expandIcon={<ExpandMoreIcon />}
             sx={{
-              bgcolor: theme.palette.mode === 'dark' ? '#0f172a' : '#f8fafc',
+              bgcolor: 'action.hover',
               px: { xs: 2, md: 3 }, minHeight: 48,
               '& .MuiAccordionSummary-content': { my: 1 }
             }}
@@ -327,8 +327,8 @@ export default function FlowchartsPage() {
               </Typography>
             </Box>
           </AccordionSummary>
-          <AccordionDetails sx={{ p: { xs: 2, md: 3 }, bgcolor: theme.palette.mode === 'dark' ? '#111827' : '#fff' }}>
-            <Stepper orientation="vertical" sx={{ '& .MuiStepConnector-line': { minHeight: 28, borderColor: '#cbd5e1' } }}>
+          <AccordionDetails sx={{ p: { xs: 2, md: 3 }, bgcolor: 'background.paper' }}>
+            <Stepper orientation="vertical" sx={{ '& .MuiStepConnector-line': { minHeight: 28, borderColor: theme.palette.divider } }}>
               {active.steps.map((step, index) => (
                 <Step key={index} active={true}>
                   <StepLabel
@@ -359,9 +359,9 @@ export default function FlowchartsPage() {
                   <StepContent sx={{ borderLeft: `2px solid ${alpha(active.color, 0.25)}`, ml: '14px', pl: 3.5, pb: 2.5 }}>
                     <Paper elevation={0} sx={{
                       p: 2,
-                      bgcolor: theme.palette.mode === 'dark' ? '#1e293b' : alpha(active.color, 0.03),
+                      bgcolor: theme.palette.mode === 'dark' ? 'background.paper' : alpha(active.color, 0.03),
                       border: '1px solid',
-                      borderColor: theme.palette.mode === 'dark' ? '#334155' : alpha(active.color, 0.15),
+                      borderColor: theme.palette.mode === 'dark' ? theme.palette.divider : alpha(active.color, 0.15),
                       borderRadius: '10px', mt: 1
                     }}>
                       <Typography variant="body2" sx={{ fontSize: '0.8rem', lineHeight: 1.7 }}>
@@ -371,7 +371,7 @@ export default function FlowchartsPage() {
                         <Box sx={{
                           mt: 1.5, pt: 1.5,
                           borderTop: '1px dashed',
-                          borderColor: theme.palette.mode === 'dark' ? '#475569' : '#cbd5e1',
+                          borderColor: theme.palette.divider,
                           display: 'flex', alignItems: 'flex-start', gap: 1
                         }}>
                           <InfoIcon sx={{ fontSize: 15, color: active.color, mt: 0.25 }} />
@@ -421,7 +421,7 @@ export default function FlowchartsPage() {
             link.href = '#';
             alert('เปิด Accordion "คำอธิบายขั้นตอน" ด้านล่างรูปภาพเพื่อดูรายละเอียด');
           }}
-          sx={{ fontSize: '0.75rem', borderRadius: '8px', borderColor: '#94a3b8', color: 'text.secondary' }}
+          sx={{ fontSize: '0.75rem', borderRadius: '8px', borderColor: 'divider', color: 'text.secondary' }}
         >
           คำอธิบาย
         </Button>

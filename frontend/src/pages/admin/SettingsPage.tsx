@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Box, Typography, Card, CardContent, Grid, TextField, Switch, FormControlLabel,
   Button, Alert, CircularProgress, Divider, Stack, Chip, Paper, Tabs, Tab,
-  Select, MenuItem, InputLabel, FormControl, useTheme,
+  Select, MenuItem, InputLabel, FormControl, useTheme, alpha,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Checkbox,
   Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
 } from '@mui/material';
@@ -184,7 +184,7 @@ export default function SettingsPage() {
       </Box>
 
       {/* Tab Navigation */}
-      <Paper elevation={0} sx={{ borderRadius: 2.5, border: '0.5px solid #e5e7eb', mb: 3, p: 1 }}>
+      <Paper elevation={0} sx={{ borderRadius: 2.5, border: `0.5px solid ${theme.palette.divider}`, mb: 3, p: 1 }}>
         <Tabs
           value={tab}
           onChange={(_, v) => setTab(v)}
@@ -343,10 +343,10 @@ export default function SettingsPage() {
           </Paper>
 
           <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={6} sm={3}><StatBox label="ทั้งหมด" value={logs.length} color="#6366f1" icon="📊" /></Grid>
-            <Grid item xs={6} sm={3}><StatBox label="ส่งสำเร็จ" value={logs.filter((l: any) => l.status === 'SENT').length} color="#10b981" icon="✅" /></Grid>
-            <Grid item xs={6} sm={3}><StatBox label="ล้มเหลว" value={logs.filter((l: any) => l.status === 'FAILED').length} color="#ef4444" icon="❌" /></Grid>
-            <Grid item xs={6} sm={3}><StatBox label="วันนี้" value={logs.filter((l: any) => new Date(l.createdAt).toDateString() === new Date().toDateString()).length} color="#f59e0b" icon="📅" /></Grid>
+            <Grid item xs={6} sm={3}><StatBox label="ทั้งหมด" value={logs.length} color={theme.palette.primary.main} icon="📊" /></Grid>
+            <Grid item xs={6} sm={3}><StatBox label="ส่งสำเร็จ" value={logs.filter((l: any) => l.status === 'SENT').length} color={theme.palette.success.main} icon="✅" /></Grid>
+            <Grid item xs={6} sm={3}><StatBox label="ล้มเหลว" value={logs.filter((l: any) => l.status === 'FAILED').length} color={theme.palette.error.main} icon="❌" /></Grid>
+            <Grid item xs={6} sm={3}><StatBox label="วันนี้" value={logs.filter((l: any) => new Date(l.createdAt).toDateString() === new Date().toDateString()).length} color={theme.palette.warning.main} icon="📅" /></Grid>
           </Grid>
 
           <Grid container spacing={3}>
@@ -538,15 +538,15 @@ export default function SettingsPage() {
               <CardContent>
                 <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>ข้อมูลเซิร์ฟเวอร์</Typography>
                 <Stack spacing={1.5}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 1.5, bgcolor: '#f8fafc', borderRadius: 1.5 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 1.5, bgcolor: 'action.hover', borderRadius: 1.5 }}>
                     <Typography variant="body2" color="text.secondary">เวอร์ชัน</Typography>
                     <Typography variant="body2" fontWeight={600}>2.0.0</Typography>
                   </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 1.5, bgcolor: '#f8fafc', borderRadius: 1.5 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 1.5, bgcolor: 'action.hover', borderRadius: 1.5 }}>
                     <Typography variant="body2" color="text.secondary">API Status</Typography>
                     <Chip label={pingResult?.server?.status === 'ok' ? 'Running' : 'ตรวจสอบ...'} size="small" color={pingResult?.server?.status === 'ok' ? 'success' : 'default'} />
                   </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 1.5, bgcolor: '#f8fafc', borderRadius: 1.5 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 1.5, bgcolor: 'action.hover', borderRadius: 1.5 }}>
                     <Typography variant="body2" color="text.secondary">Timestamp</Typography>
                     <Typography variant="body2" fontWeight={600}>{pingResult?.server?.timestamp ? new Date(pingResult.server.timestamp).toLocaleString('th-TH') : '-'}</Typography>
                   </Box>
@@ -563,7 +563,7 @@ export default function SettingsPage() {
             <Card>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-                  <Download size={24} color="#0ea5e9" />
+                  <Download size={24} color={theme.palette.primary.main} />
                   <Typography variant="h6" fontWeight={700}>Backup</Typography>
                 </Box>
                 <Button variant="outlined" startIcon={backingUp ? <CircularProgress size={18} /> : <Download size={18} />} disabled={backingUp}
@@ -588,7 +588,7 @@ export default function SettingsPage() {
             <Card>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-                  <Upload size={24} color="#f59e0b" />
+                  <Upload size={24} color={theme.palette.warning.main} />
                   <Typography variant="h6" fontWeight={700}>Restore</Typography>
                 </Box>
                 <Button variant="outlined" component="label" sx={{ mb: 1 }}>
@@ -603,10 +603,10 @@ export default function SettingsPage() {
             </Card>
           </Grid>
           <Grid item xs={12}>
-            <Card sx={{ border: '2px solid #fecaca' }}>
+            <Card sx={{ border: '2px solid', borderColor: alpha(theme.palette.error.main, 0.3) }}>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-                  <Trash2 size={24} color="#dc2626" />
+                  <Trash2 size={24} color={theme.palette.error.main} />
                   <Typography variant="h6" fontWeight={700} color="error">ล้างข้อมูล</Typography>
                 </Box>
                 <Alert severity="error" sx={{ mb: 2 }}>
@@ -615,26 +615,26 @@ export default function SettingsPage() {
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 2 }}>
                   <TextField size="small" placeholder="ค้นหาทรัพย์สิน..." value={assetSearch} onChange={e => setAssetSearch(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && fetchAssetList(assetSearch)}
-                    InputProps={{ startAdornment: <Search size={16} style={{ marginRight: 8, color: '#94a3b8' }} /> }} sx={{ minWidth: 280 }} />
+                    InputProps={{ startAdornment: <Search size={16} style={{ marginRight: 8, color: theme.palette.text.secondary }} /> }} sx={{ minWidth: 280 }} />
                   <Button size="small" variant="outlined" onClick={() => fetchAssetList(assetSearch)} disabled={assetListLoading}>ค้นหา</Button>
                   <Button size="small" variant="outlined" onClick={() => { setAssetSearch(''); fetchAssetList(); }}>ล้าง</Button>
                   <Button size="small" variant="contained" color="error" disabled={selectedIds.length === 0} onClick={() => setBulkDialog(true)}>
                     ลบ {selectedIds.length} รายการ
                   </Button>
                 </Box>
-                <TableContainer sx={{ maxHeight: 350, border: '0.5px solid #e2e8f0', borderRadius: 2 }}>
+                <TableContainer sx={{ maxHeight: 350, border: `0.5px solid ${theme.palette.divider}`, borderRadius: 2 }}>
                   <Table size="small" stickyHeader>
                     <TableHead>
                       <TableRow>
-                        <TableCell padding="checkbox" sx={{ bgcolor: '#f8fafc' }}>
+                        <TableCell padding="checkbox" sx={{ bgcolor: 'action.hover' }}>
                           <Checkbox checked={assetList.length > 0 && selectedIds.length === assetList.length}
                             indeterminate={selectedIds.length > 0 && selectedIds.length < assetList.length}
                             onChange={() => setSelectedIds(selectedIds.length === assetList.length ? [] : assetList.map((a: any) => a.id))} />
                         </TableCell>
-                        <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', bgcolor: '#f8fafc' }}>เลขครุภัณฑ์</TableCell>
-                        <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', bgcolor: '#f8fafc' }}>ชื่อ</TableCell>
-                        <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', bgcolor: '#f8fafc' }}>Serial</TableCell>
-                        <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', bgcolor: '#f8fafc' }}>ประเภท</TableCell>
+                        <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', bgcolor: 'action.hover' }}>เลขครุภัณฑ์</TableCell>
+                        <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', bgcolor: 'action.hover' }}>ชื่อ</TableCell>
+                        <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', bgcolor: 'action.hover' }}>Serial</TableCell>
+                        <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', bgcolor: 'action.hover' }}>ประเภท</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>

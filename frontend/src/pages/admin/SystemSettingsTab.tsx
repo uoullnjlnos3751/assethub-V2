@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent, Grid, Typography, TextField, Button, CircularProgress, Box, Alert, IconButton, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material';
+import { Card, CardContent, Grid, Typography, TextField, Button, CircularProgress, Box, Alert, IconButton, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, useTheme } from '@mui/material';
 import { Settings, Save, Plus, Trash2 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
@@ -12,6 +12,7 @@ type PrefixConfig = {
 };
 
 export default function SystemSettingsTab() {
+  const theme = useTheme();
   const toast = useToast();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -123,7 +124,7 @@ export default function SystemSettingsTab() {
           <CardContent>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <Settings size={24} color="#3b82f6" />
+                <Settings size={24} color={theme.palette.primary.main} />
                 <Typography variant="h6" fontWeight={700}>ตั้งค่ารหัสทรัพย์สินอัตโนมัติ (Asset Generation)</Typography>
               </Box>
               <Button
@@ -163,7 +164,7 @@ export default function SystemSettingsTab() {
                 </Box>
                 <TableContainer component={Paper} variant="outlined">
                   <Table size="small">
-                    <TableHead sx={{ bgcolor: '#f8fafc' }}>
+                    <TableHead sx={{ bgcolor: 'action.hover' }}>
                       <TableRow>
                         <TableCell sx={{ fontWeight: 600 }}>สาขา/บริษัท (เช่น TRRHQ)</TableCell>
                         <TableCell sx={{ fontWeight: 600 }}>คำนำหน้า Monitor</TableCell>

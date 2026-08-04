@@ -1,4 +1,4 @@
-import { Box, Typography, Card, CardContent, Chip } from '@mui/material';
+import { Box, Typography, Card, CardContent, Chip, useTheme } from '@mui/material';
 import { CheckCircle, AlertTriangle, Activity, Wifi, WifiOff } from 'lucide-react';
 
 export function StatBox({ label, value, color, icon }: { label: string; value: number | string; color: string; icon: string }) {
@@ -18,11 +18,12 @@ export function StatBox({ label, value, color, icon }: { label: string; value: n
 }
 
 export function StatusRow({ icon, label, status, message, latency }: { icon: React.ReactNode; label: string; status?: string; message?: string; latency?: number }) {
+  const theme = useTheme();
   const isOk = status === 'ok';
   const isPending = !status;
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 1.5, border: '0.5px solid', borderColor: 'divider', borderRadius: 2 }}>
-      {isPending ? <Activity size={24} color="#94a3b8" /> : isOk ? <CheckCircle size={24} color="#10b981" /> : <AlertTriangle size={24} color="#ef4444" />}
+      {isPending ? <Activity size={24} color={theme.palette.text.disabled} /> : isOk ? <CheckCircle size={24} color={theme.palette.success.main} /> : <AlertTriangle size={24} color={theme.palette.error.main} />}
       <Box sx={{ flex: 1 }}>
         <Typography variant="subtitle2" fontWeight={700}>{label}</Typography>
         <Typography variant="caption" color="text.secondary">

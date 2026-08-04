@@ -31,15 +31,15 @@ export default function MasterDataManagementPage() {
         จัดการข้อมูลหลักทั้งหมดที่ใช้ในระบบทะเบียนทรัพย์สิน
       </Typography>
 
-      <Paper elevation={0} sx={{ borderRadius: '12px', border: '0.5px solid #e5e7eb', overflow: 'hidden' }}>
+      <Paper elevation={0} sx={{ borderRadius: '12px', border: `0.5px solid ${theme.palette.divider}`, overflow: 'hidden' }}>
         <Tabs
           value={tab}
           onChange={(_, v) => setTab(v)}
           variant="scrollable"
           scrollButtons="auto"
           sx={{
-            borderBottom: '0.5px solid #e5e7eb',
-            bgcolor: theme.palette.mode === 'dark' ? '#1c1c1e' : '#fafafa',
+            borderBottom: `0.5px solid ${theme.palette.divider}`,
+            bgcolor: 'action.hover',
             '& .MuiTab-root': { minHeight: 48, textTransform: 'none', fontWeight: 500 },
           }}
         >

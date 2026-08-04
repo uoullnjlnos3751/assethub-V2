@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  Box, Typography, Card, CardContent, Grid, TextField, Button, Chip,
+  Box, Typography, Card, CardContent, Grid, TextField, Button, Chip, useTheme,
 } from '@mui/material';
 import { Save } from 'lucide-react';
 import { adminAPI } from '../../../services/api';
@@ -41,6 +41,7 @@ interface Props {
 }
 
 export default function EmailTemplateEditor({ templates, setTemplates, onSaveTemplate }: Props) {
+  const theme = useTheme();
   const toast = useToast();
   const [editingId, setEditingId] = useState<number | null>(null);
   const [localSubject, setLocalSubject] = useState('');
@@ -115,8 +116,8 @@ export default function EmailTemplateEditor({ templates, setTemplates, onSaveTem
         <Grid container spacing={3}>
           <Grid item xs={12} lg={6}>
             <Card>
-              <Box sx={{ px: 2, py: 1.5, bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#10b981' }} />
+              <Box sx={{ px: 2, py: 1.5, bgcolor: 'action.hover', borderBottom: `1px solid ${theme.palette.divider}`, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'success.main' }} />
                 <Typography variant="subtitle2" fontWeight={700} color="text.secondary" sx={{ fontSize: '0.8rem' }}>HTML Template</Typography>
               </Box>
               <CardContent sx={{ p: 2 }}>
@@ -142,15 +143,15 @@ export default function EmailTemplateEditor({ templates, setTemplates, onSaveTem
           </Grid>
           <Grid item xs={12} lg={6}>
             <Card>
-              <Box sx={{ px: 2, py: 1.5, bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#6366f1' }} />
+              <Box sx={{ px: 2, py: 1.5, bgcolor: 'action.hover', borderBottom: `1px solid ${theme.palette.divider}`, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'secondary.main' }} />
                 <Typography variant="subtitle2" fontWeight={700} color="text.secondary" sx={{ fontSize: '0.8rem' }}>ตัวอย่างอีเมล (Preview)</Typography>
                 <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#10b981' }} />
+                  <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: 'success.main' }} />
                   <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>ข้อมูลตัวอย่าง</Typography>
                 </Box>
               </Box>
-              <Box sx={{ p: 2, bgcolor: '#f1f5f9' }}>
+              <Box sx={{ p: 2, bgcolor: 'action.hover' }}>
                 <Box sx={{ borderRadius: 2, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', bgcolor: '#fff' }}>
                   <iframe key={localBody.substring(0, 50) + localSubject} srcDoc={generatePreviewHtml(localBody)} title="Email Preview" style={{ width: '100%', height: '600px', border: 'none', display: 'block' }} sandbox="allow-same-origin" />
                 </Box>
@@ -190,7 +191,7 @@ export default function EmailTemplateEditor({ templates, setTemplates, onSaveTem
                           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontSize: '0.65rem' }}>{t.key}</Typography>
                         </Box>
                       </Box>
-                      <Box sx={{ bgcolor: '#f9fafb', borderRadius: 1.5, p: 1.5, mb: 1.5 }}>
+                      <Box sx={{ bgcolor: 'action.hover', borderRadius: 1.5, p: 1.5, mb: 1.5 }}>
                         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.25, fontSize: '0.65rem' }}>หัวข้อ:</Typography>
                         <Typography variant="body2" fontWeight={600} sx={{ fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.subjectTh}</Typography>
                       </Box>

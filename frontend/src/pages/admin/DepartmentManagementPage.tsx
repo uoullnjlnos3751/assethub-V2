@@ -22,6 +22,8 @@ import {
   Typography,
   AlertTitle,
   Alert,
+  alpha,
+  useTheme,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -38,6 +40,7 @@ interface Department {
 }
 
 export default function DepartmentManagementPage() {
+  const theme = useTheme();
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -177,11 +180,11 @@ export default function DepartmentManagementPage() {
                 onClick={handleSyncAD}
                 disabled={syncing}
                 sx={{
-                  borderColor: '#4f46e5',
-                  color: '#4f46e5',
+                  borderColor: 'primary.main',
+                  color: 'primary.main',
                   '&:hover': {
-                    borderColor: '#4338ca',
-                    bgcolor: 'rgba(79, 70, 229, 0.04)'
+                    borderColor: 'primary.dark',
+                    bgcolor: alpha(theme.palette.primary.main, 0.04)
                   }
                 }}
               >
@@ -192,7 +195,7 @@ export default function DepartmentManagementPage() {
                 startIcon={<AddIcon />}
                 onClick={() => handleOpenDialog()}
                 sx={{
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  background: `linear-gradient(150deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
                   color: 'white',
                 }}
               >
@@ -213,7 +216,7 @@ export default function DepartmentManagementPage() {
             <TableContainer component={Paper} sx={{ bgcolor: 'transparent', border: 'none' }}>
               <Table>
                 <TableHead>
-                  <TableRow sx={{ bgcolor: 'rgba(99, 102, 241, 0.05)' }}>
+                  <TableRow sx={{ bgcolor: alpha(theme.palette.primary.main, 0.05) }}>
                     <TableCell><strong>ชื่อแผนก (TH)</strong></TableCell>
                     <TableCell><strong>ชื่อแผนก (EN)</strong></TableCell>
                     <TableCell><strong>รหัส</strong></TableCell>
@@ -223,7 +226,7 @@ export default function DepartmentManagementPage() {
                 </TableHead>
                 <TableBody>
                   {departments.map((dept) => (
-                    <TableRow key={dept.id} sx={{ '&:hover': { bgcolor: 'rgba(99, 102, 241, 0.03)' } }}>
+                    <TableRow key={dept.id} sx={{ '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.03) } }}>
                       <TableCell sx={{ fontWeight: 500 }}>{dept.name}</TableCell>
                       <TableCell>{dept.nameEng || '—'}</TableCell>
                       <TableCell>
@@ -290,7 +293,7 @@ export default function DepartmentManagementPage() {
           <Button
             onClick={handleSave}
             variant="contained"
-            sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
+            sx={{ background: `linear-gradient(150deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})` }}
           >
             บันทึก
           </Button>

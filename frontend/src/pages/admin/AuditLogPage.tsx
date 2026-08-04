@@ -239,8 +239,8 @@ export default function AuditLogPage() {
     <Box sx={{ pb: 4 }}>
       {/* Page Header */}
       <Box sx={{ mb: 2 }}>
-        <Typography sx={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', mb: '2px', letterSpacing: '-0.02em' }}>Audit Log & Activity History</Typography>
-        <Typography sx={{ fontSize: '0.78rem', color: '#64748b' }}>ประวัติการปรับปรุง เปลี่ยนแปลงข้อมูล และการทำรายการธุรกรรมทั้งหมดในระบบ</Typography>
+        <Typography sx={{ fontSize: '1.35rem', fontWeight: 800, color: 'text.primary', mb: '2px', letterSpacing: '-0.02em' }}>Audit Log & Activity History</Typography>
+        <Typography sx={{ fontSize: '0.78rem', color: 'text.secondary' }}>ประวัติการปรับปรุง เปลี่ยนแปลงข้อมูล และการทำรายการธุรกรรมทั้งหมดในระบบ</Typography>
       </Box>
 
       {/* Modern Tabs */}
@@ -269,21 +269,21 @@ export default function AuditLogPage() {
 
       {/* Tab Panels */}
       {tabValue === 0 && (
-        <Card sx={{ borderRadius: 4, border: '1px solid #e2e8f0', boxShadow: '0 4px 15px rgba(0,0,0,0.015)' }}>
+        <Card sx={{ borderRadius: 4, border: `1px solid ${theme.palette.divider}`, boxShadow: '0 4px 15px rgba(0,0,0,0.015)' }}>
           <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
             {/* Filter Bar */}
-            <Box sx={{ p: 2, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center', bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+            <Box sx={{ p: 2, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center', bgcolor: 'action.hover', borderBottom: `1px solid ${theme.palette.divider}` }}>
               <TextField
                 size="small"
                 placeholder="ค้นหารหัสทรัพย์สิน, ชื่อเครื่อง, ผู้ทำรายการ..."
                 value={historySearch}
                 onChange={e => setHistorySearch(e.target.value)}
                 InputProps={{
-                  startAdornment: <Search size={15} style={{ marginRight: 8, color: '#64748b' }} />
+                  startAdornment: <Search size={15} style={{ marginRight: 8, color: theme.palette.text.secondary }} />
                 }}
-                sx={{ minWidth: 300, bgcolor: '#fff', '& .MuiInputBase-input': { fontSize: '0.78rem' } }}
+                sx={{ minWidth: 300, bgcolor: 'background.paper', '& .MuiInputBase-input': { fontSize: '0.78rem' } }}
               />
-              <FormControl size="small" sx={{ minWidth: 200, bgcolor: '#fff' }}>
+              <FormControl size="small" sx={{ minWidth: 200, bgcolor: 'background.paper' }}>
                 <InputLabel sx={{ fontSize: '0.78rem' }}>การกระทำ (Action)</InputLabel>
                 <Select
                   value={historyActionFilter}
@@ -313,16 +313,16 @@ export default function AuditLogPage() {
                 border: 'none', 
                 '& .MuiDataGrid-cell': { 
                   fontSize: '0.75rem', 
-                  color: '#334155' 
+                  color: 'text.primary' 
                 },
                 '& .MuiDataGrid-columnHeaderTitle': { 
                   fontSize: '0.75rem', 
                   fontWeight: 700, 
-                  color: '#475569' 
+                  color: 'text.secondary' 
                 },
                 '& .MuiDataGrid-columnHeaders': { 
-                  bgcolor: '#f8fafc',
-                  borderBottom: '1px solid #e2e8f0'
+                  bgcolor: 'action.hover',
+                  borderBottom: `1px solid ${theme.palette.divider}`
                 } 
               }}
             />
@@ -331,7 +331,7 @@ export default function AuditLogPage() {
       )}
 
       {tabValue === 1 && (
-        <Card sx={{ borderRadius: 4, border: '1px solid #e2e8f0', boxShadow: '0 4px 15px rgba(0,0,0,0.015)' }}>
+        <Card sx={{ borderRadius: 4, border: `1px solid ${theme.palette.divider}`, boxShadow: '0 4px 15px rgba(0,0,0,0.015)' }}>
           <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
             <DataGrid
               rows={recentRequests}
@@ -347,16 +347,16 @@ export default function AuditLogPage() {
                 border: 'none', 
                 '& .MuiDataGrid-cell': { 
                   fontSize: '0.75rem', 
-                  color: '#334155' 
+                  color: 'text.primary' 
                 },
                 '& .MuiDataGrid-columnHeaderTitle': { 
                   fontSize: '0.75rem', 
                   fontWeight: 700, 
-                  color: '#475569' 
+                  color: 'text.secondary' 
                 },
                 '& .MuiDataGrid-columnHeaders': { 
-                  bgcolor: '#f8fafc',
-                  borderBottom: '1px solid #e2e8f0'
+                  bgcolor: 'action.hover',
+                  borderBottom: `1px solid ${theme.palette.divider}`
                 } 
               }}
             />
@@ -365,7 +365,7 @@ export default function AuditLogPage() {
       )}
 
       {tabValue === 2 && (
-        <Card sx={{ borderRadius: 4, border: '1px solid #e2e8f0', boxShadow: '0 4px 15px rgba(0,0,0,0.015)' }}>
+        <Card sx={{ borderRadius: 4, border: `1px solid ${theme.palette.divider}`, boxShadow: '0 4px 15px rgba(0,0,0,0.015)' }}>
           <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
             <DataGrid
               rows={recentReturns}
@@ -381,16 +381,16 @@ export default function AuditLogPage() {
                 border: 'none', 
                 '& .MuiDataGrid-cell': { 
                   fontSize: '0.75rem', 
-                  color: '#334155' 
+                  color: 'text.primary' 
                 },
                 '& .MuiDataGrid-columnHeaderTitle': { 
                   fontSize: '0.75rem', 
                   fontWeight: 700, 
-                  color: '#475569' 
+                  color: 'text.secondary' 
                 },
                 '& .MuiDataGrid-columnHeaders': { 
-                  bgcolor: '#f8fafc',
-                  borderBottom: '1px solid #e2e8f0'
+                  bgcolor: 'action.hover',
+                  borderBottom: `1px solid ${theme.palette.divider}`
                 } 
               }}
             />
