@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Box, Typography, Card, CardContent, Grid, CircularProgress, Chip, Button, TextField, MenuItem, Select, InputLabel, FormControl, alpha } from '@mui/material';
+import { Box, Typography, Card, CardContent, Grid, CircularProgress, Chip, Button, TextField, MenuItem, Select, InputLabel, FormControl, alpha, useTheme } from '@mui/material';
 import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
 import { assetAPI, dashboardAPI } from '../../services/api';
 import CompanyAssetMatrix from '../../components/CompanyAssetMatrix';
@@ -11,11 +11,19 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
 const statusLabels: Record<string, string> = { Available: 'พร้อมใช้งาน', Borrowed: 'กำลังยืม', InUse: 'ใช้งานประจำ', Maintenance: 'ซ่อมบำรุง', Retired: 'ปลดระวาง', Lost: 'สูญหาย' };
-const STATUS_COLORS: Record<string, string> = { Available: '#10b981', Borrowed: '#f59e0b', InUse: '#3b82f6', Maintenance: '#ef4444', Retired: '#64748b', Lost: '#b91c1c' };
 const CAT_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16', '#ec4899', '#14b8a6', '#f43f5e'];
 
 export default function ReportAssetsPage() {
   const navigate = useNavigate();
+  const theme = useTheme();
+  const STATUS_COLORS: Record<string, string> = {
+    Available: theme.palette.success.main,
+    Borrowed: theme.palette.warning.main,
+    InUse: theme.palette.info.main,
+    Maintenance: theme.palette.error.main,
+    Retired: theme.palette.text.disabled,
+    Lost: theme.palette.error.dark,
+  };
   const [summary, setSummary] = useState<any>(null);
   const [assets, setAssets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -152,15 +160,15 @@ export default function ReportAssetsPage() {
       field: 'status', headerName: 'สถานะ', width: 130,
       renderCell: ({ value }) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: STATUS_COLORS[value] || '#94a3b8' }} />
-          <Typography variant="body2" fontWeight={600} sx={{ color: STATUS_COLORS[value] || '#94a3b8' }}>{statusLabels[value] || value}</Typography>
+          <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: STATUS_COLORS[value] || theme.palette.text.disabled }} />
+          <Typography variant="body2" fontWeight={600} sx={{ color: STATUS_COLORS[value] || theme.palette.text.disabled }}>{statusLabels[value] || value}</Typography>
         </Box>
       ),
     },
     {
       field: 'actions', type: 'actions', headerName: 'ดูข้อมูล', width: 100,
       getActions: (params) => [
-        <GridActionsCellItem icon={<Eye size={18} color="#4f46e5" />} label="ดูรายละเอียด" onClick={() => navigate(`/assets/${params.id}`)} />
+        <GridActionsCellItem icon={<Eye size={18} color={theme.palette.primary.main} />} label="ดูรายละเอียด" onClick={() => navigate(`/assets/${params.id}`)} />
       ],
     },
   ];
@@ -168,39 +176,39 @@ export default function ReportAssetsPage() {
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}><CircularProgress /></Box>;
 
   return (
-    <Box sx={{ pb: 6, bgcolor: '#f8fafc', minHeight: '100vh', mx: -3, px: 3 }}>
+    <Box sx={{ pb: 6, bgcolor: 'background.default', minHeight: '100vh', mx: -3, px: 3 }}>
       <Box sx={{ maxWidth: 1400, mx: 'auto' }}>
         <ReportHeaderTabs />
 
         <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 4 }}>
           <Box>
-            <Typography variant="h4" fontWeight={800} sx={{ color: '#0f172a', mb: 0.5, letterSpacing: '-0.02em' }}>Asset Executive Dashboard</Typography>
-            <Typography variant="body1" sx={{ color: '#64748b' }}>ภาพรวมสถานะและจำนวนทรัพย์สิน IT ทั้งหมดขององค์กร (Executive View)</Typography>
+            <Typography variant="h4" fontWeight={800} sx={{ color: 'text.primary', mb: 0.5, letterSpacing: '-0.02em' }}>Asset Executive Dashboard</Typography>
+            <Typography variant="body1" sx={{ color: 'text.secondary' }}>ภาพรวมสถานะและจำนวนทรัพย์สิน IT ทั้งหมดขององค์กร (Executive View)</Typography>
           </Box>
           <Box sx={{ display: 'flex', gap: 2 }}>
-            <Button variant="outlined" startIcon={<Download size={18} />} onClick={() => assetAPI.exportAssets().then(r => { const url = URL.createObjectURL(r.data); const a = document.createElement('a'); a.href = url; a.download = 'assets.xlsx'; a.click(); })} sx={{ borderRadius: 2, borderColor: '#cbd5e1', color: '#475569', fontWeight: 600, '&:hover': { bgcolor: '#f1f5f9', borderColor: '#94a3b8' } }}>Export Excel</Button>
-            <Button variant="contained" startIcon={exportingPDF ? <CircularProgress size={16} color="inherit" /> : <FileText size={18} />} onClick={handleExportPDF} disabled={exportingPDF} sx={{ borderRadius: 2, bgcolor: '#4f46e5', fontWeight: 600, boxShadow: '0 4px 12px rgba(79,70,229,0.25)', '&:hover': { bgcolor: '#4338ca' } }}>{exportingPDF ? 'Generating...' : 'Export PDF'}</Button>
+            <Button variant="outlined" startIcon={<Download size={18} />} onClick={() => assetAPI.exportAssets().then(r => { const url = URL.createObjectURL(r.data); const a = document.createElement('a'); a.href = url; a.download = 'assets.xlsx'; a.click(); })} sx={{ borderRadius: 2, borderColor: 'divider', color: 'text.secondary', fontWeight: 600, '&:hover': { bgcolor: 'action.hover', borderColor: 'text.disabled' } }}>Export Excel</Button>
+            <Button variant="contained" startIcon={exportingPDF ? <CircularProgress size={16} color="inherit" /> : <FileText size={18} />} onClick={handleExportPDF} disabled={exportingPDF} sx={{ borderRadius: 2, bgcolor: 'primary.main', fontWeight: 600, boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.25)}`, '&:hover': { bgcolor: 'primary.dark' } }}>{exportingPDF ? 'Generating...' : 'Export PDF'}</Button>
           </Box>
         </Box>
 
-        <Box id="report-content" sx={{ bgcolor: '#ffffff', borderRadius: 4, p: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+        <Box id="report-content" sx={{ bgcolor: 'background.paper', borderRadius: 4, p: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
           {/* Executive KPIs */}
           <Grid container spacing={3} sx={{ mb: 4 }}>
             <Grid item xs={12} sm={6} md={3}>
               <Card 
                 onClick={() => setFilterStatus('')}
-                sx={{ 
-                  borderRadius: 4, 
-                  bgcolor: '#0f172a', 
-                  color: '#fff', 
-                  boxShadow: filterStatus === '' ? '0 12px 28px -5px rgba(15,23,42,0.6)' : '0 6px 15px -5px rgba(15,23,42,0.2)', 
-                  position: 'relative', 
+                sx={{
+                  borderRadius: 4,
+                  background: `linear-gradient(150deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                  color: '#fff',
+                  boxShadow: filterStatus === '' ? '0 12px 28px -5px rgba(15,23,42,0.6)' : '0 6px 15px -5px rgba(15,23,42,0.2)',
+                  position: 'relative',
                   overflow: 'hidden',
                   cursor: 'pointer',
                   transition: 'all 0.25s ease',
                   opacity: (filterStatus === '' || filterStatus === 'Active' || filterStatus === 'Issue' || filterStatus === 'Other') ? 1 : 0.45,
                   transform: filterStatus === '' ? 'scale(1.02)' : 'scale(1)',
-                  border: filterStatus === '' ? '2px solid #3b82f6' : '2px solid transparent',
+                  border: filterStatus === '' ? '2px solid #fff' : '2px solid transparent',
                   '&:hover': {
                     transform: 'translateY(-4px)',
                     boxShadow: '0 12px 28px -5px rgba(15,23,42,0.5)'
@@ -218,12 +226,12 @@ export default function ReportAssetsPage() {
             <Grid item xs={12} sm={6} md={3}>
               <Card 
                 onClick={() => setFilterStatus(filterStatus === 'Active' ? '' : 'Active')}
-                sx={{ 
-                  borderRadius: 4, 
-                  bgcolor: '#10b981', 
-                  color: '#fff', 
-                  boxShadow: filterStatus === 'Active' ? '0 12px 28px -5px rgba(16,185,129,0.6)' : '0 6px 15px -5px rgba(16,185,129,0.2)', 
-                  position: 'relative', 
+                sx={{
+                  borderRadius: 4,
+                  bgcolor: 'success.main',
+                  color: '#fff',
+                  boxShadow: filterStatus === 'Active' ? '0 12px 28px -5px rgba(16,185,129,0.6)' : '0 6px 15px -5px rgba(16,185,129,0.2)',
+                  position: 'relative',
                   overflow: 'hidden',
                   cursor: 'pointer',
                   transition: 'all 0.25s ease',
@@ -247,12 +255,12 @@ export default function ReportAssetsPage() {
             <Grid item xs={12} sm={6} md={3}>
               <Card 
                 onClick={() => setFilterStatus(filterStatus === 'Issue' ? '' : 'Issue')}
-                sx={{ 
-                  borderRadius: 4, 
-                  bgcolor: '#ef4444', 
-                  color: '#fff', 
-                  boxShadow: filterStatus === 'Issue' ? '0 12px 28px -5px rgba(239,68,68,0.6)' : '0 6px 15px -5px rgba(239,68,68,0.2)', 
-                  position: 'relative', 
+                sx={{
+                  borderRadius: 4,
+                  bgcolor: 'error.main',
+                  color: '#fff',
+                  boxShadow: filterStatus === 'Issue' ? '0 12px 28px -5px rgba(239,68,68,0.6)' : '0 6px 15px -5px rgba(239,68,68,0.2)',
+                  position: 'relative',
                   overflow: 'hidden',
                   cursor: 'pointer',
                   transition: 'all 0.25s ease',
@@ -276,12 +284,12 @@ export default function ReportAssetsPage() {
             <Grid item xs={12} sm={6} md={3}>
               <Card 
                 onClick={() => setFilterStatus(filterStatus === 'Other' ? '' : 'Other')}
-                sx={{ 
-                  borderRadius: 4, 
-                  bgcolor: '#f59e0b', 
-                  color: '#fff', 
-                  boxShadow: filterStatus === 'Other' ? '0 12px 28px -5px rgba(245,158,11,0.6)' : '0 6px 15px -5px rgba(245,158,11,0.2)', 
-                  position: 'relative', 
+                sx={{
+                  borderRadius: 4,
+                  bgcolor: 'warning.main',
+                  color: '#fff',
+                  boxShadow: filterStatus === 'Other' ? '0 12px 28px -5px rgba(245,158,11,0.6)' : '0 6px 15px -5px rgba(245,158,11,0.2)',
+                  position: 'relative',
                   overflow: 'hidden',
                   cursor: 'pointer',
                   transition: 'all 0.25s ease',
@@ -305,8 +313,8 @@ export default function ReportAssetsPage() {
           </Grid>
 
           {/* Status Breakdown Bar & Legend */}
-          <Box sx={{ mb: 6, p: 4, bgcolor: '#f8fafc', borderRadius: 4, border: '1px solid #e2e8f0' }}>
-            <Typography variant="h6" fontWeight={800} sx={{ mb: 3, color: '#1e293b' }}>สัดส่วนสถานะทรัพย์สินโดยละเอียด (Status Distribution)</Typography>
+          <Box sx={{ mb: 6, p: 4, bgcolor: 'action.hover', borderRadius: 4, border: `1px solid ${theme.palette.divider}` }}>
+            <Typography variant="h6" fontWeight={800} sx={{ mb: 3, color: 'text.primary' }}>สัดส่วนสถานะทรัพย์สินโดยละเอียด (Status Distribution)</Typography>
             
             {/* Progress Bar */}
             <Box sx={{ width: '100%', height: 28, display: 'flex', borderRadius: 14, overflow: 'hidden', mb: 4, boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)' }}>
@@ -329,17 +337,17 @@ export default function ReportAssetsPage() {
                     <Box 
                       onClick={() => setFilterStatus(isActive ? '' : st)}
                       sx={{ 
-                        p: 2, borderRadius: 3, bgcolor: '#fff', border: `2px solid ${isActive ? STATUS_COLORS[st] : '#e2e8f0'}`,
+                        p: 2, borderRadius: 3, bgcolor: 'background.paper', border: `2px solid ${isActive ? STATUS_COLORS[st] : theme.palette.divider}`,
                         cursor: 'pointer', transition: 'all 0.2s', boxShadow: isActive ? `0 4px 12px ${alpha(STATUS_COLORS[st], 0.2)}` : '0 2px 4px rgba(0,0,0,0.02)',
                         '&:hover': { borderColor: STATUS_COLORS[st], transform: 'translateY(-2px)' }
                       }}
                     >
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                         <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: STATUS_COLORS[st] }} />
-                        <Typography variant="body2" fontWeight={700} sx={{ color: '#475569' }}>{statusLabels[st]}</Typography>
+                        <Typography variant="body2" fontWeight={700} sx={{ color: 'text.secondary' }}>{statusLabels[st]}</Typography>
                       </Box>
-                      <Typography variant="h5" fontWeight={800} sx={{ color: '#0f172a' }}>{count}</Typography>
-                      <Typography variant="caption" sx={{ color: '#94a3b8', fontWeight: 600 }}>{total > 0 ? ((count/total)*100).toFixed(1) : 0}%</Typography>
+                      <Typography variant="h5" fontWeight={800} sx={{ color: 'text.primary' }}>{count}</Typography>
+                      <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 600 }}>{total > 0 ? ((count/total)*100).toFixed(1) : 0}%</Typography>
                     </Box>
                   </Grid>
                 );
@@ -351,8 +359,8 @@ export default function ReportAssetsPage() {
           <Grid container spacing={4} sx={{ mb: 4 }}>
             {/* Donut Chart */}
             <Grid item xs={12} md={5}>
-              <Box sx={{ p: 4, borderRadius: 4, border: '1px solid #e2e8f0', height: '100%', bgcolor: '#fff' }}>
-                <Typography variant="h6" fontWeight={800} sx={{ mb: 4, color: '#1e293b' }}>ประเภทอุปกรณ์ (Device Types)</Typography>
+              <Box sx={{ p: 4, borderRadius: 4, border: `1px solid ${theme.palette.divider}`, height: '100%', bgcolor: 'background.paper' }}>
+                <Typography variant="h6" fontWeight={800} sx={{ mb: 4, color: 'text.primary' }}>ประเภทอุปกรณ์ (Device Types)</Typography>
                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                   <Box sx={{ position: 'relative', width: 220, height: 220, mb: 4 }}>
                     <ResponsiveContainer width="100%" height="100%">
@@ -373,14 +381,14 @@ export default function ReportAssetsPage() {
                         </Pie>
                         <RechartsTooltip 
                           formatter={(value: any, name: any) => [`${value} รายการ (${((value / total) * 100).toFixed(1)}%)`, name]}
-                          contentStyle={{ background: '#0f172a', borderRadius: 8, color: '#fff', border: 'none', fontSize: 12 }}
-                          itemStyle={{ color: '#fff' }}
+                          contentStyle={{ background: theme.palette.background.paper, borderRadius: 8, color: theme.palette.text.primary, border: `1px solid ${theme.palette.divider}`, fontSize: 12 }}
+                          itemStyle={{ color: theme.palette.text.primary }}
                         />
                       </ReChartsPieChart>
                     </ResponsiveContainer>
                     <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                      <Typography variant="h3" fontWeight={800} sx={{ color: '#0f172a', lineHeight: 1 }}>{total}</Typography>
-                      <Typography variant="caption" fontWeight={600} sx={{ color: '#64748b', mt: 0.5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>ทั้งหมด</Typography>
+                      <Typography variant="h3" fontWeight={800} sx={{ color: 'text.primary', lineHeight: 1 }}>{total}</Typography>
+                      <Typography variant="caption" fontWeight={600} sx={{ color: 'text.secondary', mt: 0.5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>ทั้งหมด</Typography>
                     </Box>
                   </Box>
                   
@@ -390,15 +398,15 @@ export default function ReportAssetsPage() {
                       <Box key={idx} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                           <Box sx={{ width: 12, height: 12, borderRadius: 3, bgcolor: slice.color }} />
-                          <Typography variant="body2" fontWeight={600} sx={{ color: '#334155' }}>{slice.name}</Typography>
+                          <Typography variant="body2" fontWeight={600} sx={{ color: 'text.primary' }}>{slice.name}</Typography>
                         </Box>
                         <Box sx={{ textAlign: 'right' }}>
-                          <Typography variant="body2" fontWeight={800} sx={{ color: '#0f172a' }}>{slice.count}</Typography>
+                          <Typography variant="body2" fontWeight={800} sx={{ color: 'text.primary' }}>{slice.count}</Typography>
                         </Box>
                       </Box>
                     ))}
                     {donutData.length > 5 && (
-                      <Typography variant="caption" sx={{ color: '#94a3b8', textAlign: 'center', mt: 1, fontWeight: 600 }}>+ อีก {donutData.length - 5} ประเภท</Typography>
+                      <Typography variant="caption" sx={{ color: 'text.disabled', textAlign: 'center', mt: 1, fontWeight: 600 }}>+ อีก {donutData.length - 5} ประเภท</Typography>
                     )}
                   </Box>
                 </Box>
@@ -410,16 +418,16 @@ export default function ReportAssetsPage() {
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, height: '100%' }}>
                 
                 {/* Category Cards */}
-                <Box sx={{ p: 4, borderRadius: 4, border: '1px solid #e2e8f0', bgcolor: '#fff' }}>
-                  <Typography variant="h6" fontWeight={800} sx={{ mb: 3, color: '#1e293b' }}>หมวดหมู่การใช้งานหลัก (Categories)</Typography>
+                <Box sx={{ p: 4, borderRadius: 4, border: `1px solid ${theme.palette.divider}`, bgcolor: 'background.paper' }}>
+                  <Typography variant="h6" fontWeight={800} sx={{ mb: 3, color: 'text.primary' }}>หมวดหมู่การใช้งานหลัก (Categories)</Typography>
                   <Grid container spacing={2}>
                     {byCategory.slice(0, 6).map((cat: any, i: number) => (
                       <Grid item xs={6} sm={4} key={cat.id || i}>
-                        <Box sx={{ p: 2, borderRadius: 3, bgcolor: '#f8fafc', border: '1px solid #f1f5f9', display: 'flex', flexDirection: 'column', height: '100%' }}>
+                        <Box sx={{ p: 2, borderRadius: 3, bgcolor: 'action.hover', border: `1px solid ${theme.palette.divider}`, display: 'flex', flexDirection: 'column', height: '100%' }}>
                            <Box sx={{ fontSize: 24, mb: 1 }}>{cat.icon || '📦'}</Box>
-                           <Typography variant="body2" fontWeight={700} sx={{ color: '#475569', mb: 1, flexGrow: 1 }}>{cat.name}</Typography>
+                           <Typography variant="body2" fontWeight={700} sx={{ color: 'text.secondary', mb: 1, flexGrow: 1 }}>{cat.name}</Typography>
                            <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                             <Typography variant="h5" fontWeight={800} sx={{ color: '#0f172a' }}>{cat.assetCount ?? 0}</Typography>
+                             <Typography variant="h5" fontWeight={800} sx={{ color: 'text.primary' }}>{cat.assetCount ?? 0}</Typography>
                              <Typography variant="caption" fontWeight={700} sx={{ color: CAT_COLORS[i % CAT_COLORS.length] }}>{total ? ((cat.assetCount/total)*100).toFixed(0) : 0}%</Typography>
                            </Box>
                         </Box>
@@ -431,26 +439,26 @@ export default function ReportAssetsPage() {
                 {/* Company & Dept Top 3 */}
                 <Grid container spacing={3} sx={{ flexGrow: 1 }}>
                   <Grid item xs={12} sm={6}>
-                    <Box sx={{ p: 3, borderRadius: 4, border: '1px solid #e2e8f0', bgcolor: '#fff', height: '100%' }}>
-                      <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 2, color: '#1e293b' }}>จัดสรรตามบริษัท (Top 4)</Typography>
+                    <Box sx={{ p: 3, borderRadius: 4, border: `1px solid ${theme.palette.divider}`, bgcolor: 'background.paper', height: '100%' }}>
+                      <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 2, color: 'text.primary' }}>จัดสรรตามบริษัท (Top 4)</Typography>
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                         {sortedCompany.slice(0, 4).map((c: any, i: number) => (
                           <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Typography variant="body2" fontWeight={600} color="#475569" noWrap sx={{ maxWidth: '70%' }}>{c.company || 'N/A'}</Typography>
-                            <Chip label={c._count} size="small" sx={{ fontWeight: 700, bgcolor: '#f1f5f9', color: '#0f172a' }} />
+                            <Typography variant="body2" fontWeight={600} color="text.secondary" noWrap sx={{ maxWidth: '70%' }}>{c.company || 'N/A'}</Typography>
+                            <Chip label={c._count} size="small" sx={{ fontWeight: 700, bgcolor: 'action.hover', color: 'text.primary' }} />
                           </Box>
                         ))}
                       </Box>
                     </Box>
                   </Grid>
                   <Grid item xs={12} sm={6}>
-                    <Box sx={{ p: 3, borderRadius: 4, border: '1px solid #e2e8f0', bgcolor: '#fff', height: '100%' }}>
-                      <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 2, color: '#1e293b' }}>จัดสรรตามแผนก (Top 4)</Typography>
+                    <Box sx={{ p: 3, borderRadius: 4, border: `1px solid ${theme.palette.divider}`, bgcolor: 'background.paper', height: '100%' }}>
+                      <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 2, color: 'text.primary' }}>จัดสรรตามแผนก (Top 4)</Typography>
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                         {sortedDepartment.slice(0, 4).map((d: any, i: number) => (
                           <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Typography variant="body2" fontWeight={600} color="#475569" noWrap sx={{ maxWidth: '70%' }}>{d.departmentId || 'N/A'}</Typography>
-                            <Chip label={d._count} size="small" sx={{ fontWeight: 700, bgcolor: '#f1f5f9', color: '#0f172a' }} />
+                            <Typography variant="body2" fontWeight={600} color="text.secondary" noWrap sx={{ maxWidth: '70%' }}>{d.departmentId || 'N/A'}</Typography>
+                            <Chip label={d._count} size="small" sx={{ fontWeight: 700, bgcolor: 'action.hover', color: 'text.primary' }} />
                           </Box>
                         ))}
                       </Box>
@@ -471,9 +479,9 @@ export default function ReportAssetsPage() {
         {/* Detailed Table Section */}
         <Box sx={{ mt: 4 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 2 }}>
-            <Typography variant="h5" fontWeight={800} sx={{ color: '#0f172a' }}>รายการข้อมูลทรัพย์สินทั้งหมด</Typography>
+            <Typography variant="h5" fontWeight={800} sx={{ color: 'text.primary' }}>รายการข้อมูลทรัพย์สินทั้งหมด</Typography>
             <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-              <FormControl size="small" sx={{ minWidth: 220, bgcolor: '#fff' }}>
+              <FormControl size="small" sx={{ minWidth: 220, bgcolor: 'background.paper' }}>
                 <InputLabel>สถานะ</InputLabel>
                 <Select value={filterStatus} label="สถานะ" onChange={e => setFilterStatus(e.target.value)}>
                   <MenuItem value="">ทั้งหมด</MenuItem>
@@ -482,7 +490,7 @@ export default function ReportAssetsPage() {
                   <MenuItem value="Other">🟠 กำลังยืม / ปลดระวาง</MenuItem>
                   <MenuItem value="WarrantyExpired">⚠️ ประกันหมดอายุ</MenuItem>
                   <MenuItem value="WarrantyExpiring">⏳ ประกันใกล้หมดอายุ (30 วัน)</MenuItem>
-                  <hr style={{ margin: '8px 0', border: 'none', borderTop: '1px solid #e2e8f0' }} />
+                  <hr style={{ margin: '8px 0', border: 'none', borderTop: `1px solid ${theme.palette.divider}` }} />
                   {Object.entries(statusLabels).map(([k, v]) => <MenuItem key={k} value={k}>{v}</MenuItem>)}
                 </Select>
               </FormControl>
@@ -491,7 +499,7 @@ export default function ReportAssetsPage() {
                 placeholder="ค้นหารหัส, ชื่อ, ยี่ห้อ..." 
                 value={search} 
                 onChange={e => setSearch(e.target.value)} 
-                sx={{ minWidth: 250, bgcolor: '#fff' }} 
+                sx={{ minWidth: 250, bgcolor: 'background.paper' }} 
               />
             </Box>
           </Box>
@@ -509,10 +517,10 @@ export default function ReportAssetsPage() {
               initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
               sx={{ 
                 border: 'none', 
-                '& .MuiDataGrid-columnHeader': { bgcolor: '#f1f5f9', color: '#1e293b', fontWeight: 800 },
-                '& .MuiDataGrid-cell': { borderColor: '#f8fafc', py: 1 },
+                '& .MuiDataGrid-columnHeader': { bgcolor: 'action.hover', color: 'text.primary', fontWeight: 800 },
+                '& .MuiDataGrid-cell': { borderColor: 'divider', py: 1 },
                 '& .MuiDataGrid-row': { cursor: 'pointer' },
-                '& .MuiDataGrid-row:hover': { bgcolor: '#f8fafc' }
+                '& .MuiDataGrid-row:hover': { bgcolor: 'action.hover' }
               }}
             />
           </Card>

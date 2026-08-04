@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Box, Typography, Card, CardContent, Grid, CircularProgress, Chip, TextField, MenuItem, Select, InputLabel, FormControl, Button, Tooltip, alpha } from '@mui/material';
+import { Box, Typography, Card, CardContent, Grid, CircularProgress, Chip, TextField, MenuItem, Select, InputLabel, FormControl, Button, Tooltip, alpha, useTheme } from '@mui/material';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { borrowAPI, dashboardAPI } from '../../services/api';
 import { ShoppingCart, AlertTriangle, CheckCircle2, History, Search, TrendingUp, User, Download, FileText } from 'lucide-react';
@@ -14,6 +14,7 @@ const statusColors: Record<string, string> = { Pending: 'warning', Approved: 'in
 const MONTHS_TH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 
 export default function ReportBorrowPage() {
+  const theme = useTheme();
   const [summary, setSummary] = useState<any>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [trend, setTrend] = useState<any[]>([]);
@@ -149,10 +150,10 @@ export default function ReportBorrowPage() {
             variant="outlined" 
             startIcon={<Download size={16} />} 
             onClick={handleExportExcel}
-            sx={{ 
-              borderColor: '#cbd5e1', 
-              color: '#475569', 
-              '&:hover': { bgcolor: '#f1f5f9', borderColor: '#94a3b8' },
+            sx={{
+              borderColor: 'divider',
+              color: 'text.secondary',
+              '&:hover': { bgcolor: 'action.hover', borderColor: 'text.disabled' },
               borderRadius: 2,
               textTransform: 'none',
               fontWeight: 600
@@ -160,15 +161,15 @@ export default function ReportBorrowPage() {
           >
             Export Excel
           </Button>
-          <Button 
-            variant="contained" 
-            startIcon={exportingPDF ? <CircularProgress size={16} color="inherit" /> : <FileText size={16} />} 
+          <Button
+            variant="contained"
+            startIcon={exportingPDF ? <CircularProgress size={16} color="inherit" /> : <FileText size={16} />}
             onClick={handleExportPDF}
             disabled={exportingPDF}
-            sx={{ 
-              bgcolor: '#b45309', 
-              '&:hover': { bgcolor: '#92400e' },
-              boxShadow: '0 4px 10px rgba(180, 83, 9, 0.15)',
+            sx={{
+              bgcolor: 'warning.dark',
+              '&:hover': { bgcolor: 'warning.dark', filter: 'brightness(0.9)' },
+              boxShadow: `0 4px 10px ${alpha(theme.palette.warning.dark, 0.15)}`,
               borderRadius: 2,
               textTransform: 'none',
               fontWeight: 600
@@ -179,81 +180,81 @@ export default function ReportBorrowPage() {
         </Box>
       </Box>
 
-      <Box id="report-content" sx={{ bgcolor: '#ffffff', borderRadius: 4, p: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: '1px solid #f1f5f9' }}>
+      <Box id="report-content" sx={{ bgcolor: 'background.paper', borderRadius: 4, p: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: `1px solid ${theme.palette.divider}` }}>
         {/* Summary cards */}
         <Grid container spacing={2.5} sx={{ mb: 4 }}>
           <Grid item xs={6} md={3}>
             <Card 
               onClick={() => setStatusFilter(statusFilter === 'Pending' ? '' : 'Pending')}
-              sx={{ 
-                borderLeft: '4px solid #f59e0b', 
-                bgcolor: statusFilter === 'Pending' ? 'rgba(245,158,11,0.06)' : 'rgba(245,158,11,0.01)',
+              sx={{
+                borderLeft: `4px solid ${theme.palette.warning.main}`,
+                bgcolor: statusFilter === 'Pending' ? alpha(theme.palette.warning.main, 0.06) : alpha(theme.palette.warning.main, 0.01),
                 cursor: 'pointer',
                 transition: 'all 0.2s',
                 opacity: (statusFilter === '' || statusFilter === 'Pending') ? 1 : 0.45,
                 transform: statusFilter === 'Pending' ? 'scale(1.02)' : 'scale(1)',
-                boxShadow: statusFilter === 'Pending' ? '0 8px 20px rgba(245,158,11,0.15)' : 'none',
-                '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 6px 15px rgba(245,158,11,0.1)' }
+                boxShadow: statusFilter === 'Pending' ? `0 8px 20px ${alpha(theme.palette.warning.main, 0.15)}` : 'none',
+                '&:hover': { transform: 'translateY(-2px)', boxShadow: `0 6px 15px ${alpha(theme.palette.warning.main, 0.1)}` }
               }}
             >
               <CardContent sx={{ p: 2.5 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
-                  <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(245,158,11,0.1)', color: '#d97706', display: 'flex' }}>
+                  <Box sx={{ p: 1, borderRadius: 2, bgcolor: alpha(theme.palette.warning.main, 0.1), color: 'warning.dark', display: 'flex' }}>
                     <ShoppingCart size={20} />
                   </Box>
                   <Typography variant="body2" color="text.secondary" fontWeight={700}>รออนุมัติ</Typography>
                 </Box>
-                <Typography variant="h4" fontWeight={800} color="#d97706">{summary?.pendingApproval || 0}</Typography>
+                <Typography variant="h4" fontWeight={800} color="warning.dark">{summary?.pendingApproval || 0}</Typography>
               </CardContent>
             </Card>
           </Grid>
           <Grid item xs={6} md={3}>
             <Card 
               onClick={() => setStatusFilter(statusFilter === 'CheckedOut' ? '' : 'CheckedOut')}
-              sx={{ 
-                borderLeft: '4px solid #3b82f6', 
-                bgcolor: statusFilter === 'CheckedOut' ? 'rgba(59,130,246,0.06)' : 'rgba(59,130,246,0.01)',
+              sx={{
+                borderLeft: `4px solid ${theme.palette.primary.main}`,
+                bgcolor: statusFilter === 'CheckedOut' ? alpha(theme.palette.primary.main, 0.06) : alpha(theme.palette.primary.main, 0.01),
                 cursor: 'pointer',
                 transition: 'all 0.2s',
                 opacity: (statusFilter === '' || statusFilter === 'CheckedOut') ? 1 : 0.45,
                 transform: statusFilter === 'CheckedOut' ? 'scale(1.02)' : 'scale(1)',
-                boxShadow: statusFilter === 'CheckedOut' ? '0 8px 20px rgba(59,130,246,0.15)' : 'none',
-                '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 6px 15px rgba(59,130,246,0.1)' }
+                boxShadow: statusFilter === 'CheckedOut' ? `0 8px 20px ${alpha(theme.palette.primary.main, 0.15)}` : 'none',
+                '&:hover': { transform: 'translateY(-2px)', boxShadow: `0 6px 15px ${alpha(theme.palette.primary.main, 0.1)}` }
               }}
             >
               <CardContent sx={{ p: 2.5 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
-                  <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(59,130,246,0.1)', color: '#2563eb', display: 'flex' }}>
+                  <Box sx={{ p: 1, borderRadius: 2, bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', display: 'flex' }}>
                     <CheckCircle2 size={20} />
                   </Box>
                   <Typography variant="body2" color="text.secondary" fontWeight={700}>กำลังยืม</Typography>
                 </Box>
-                <Typography variant="h4" fontWeight={800} color="#2563eb">{summary?.activeCheckedOut || 0}</Typography>
+                <Typography variant="h4" fontWeight={800} color="primary.main">{summary?.activeCheckedOut || 0}</Typography>
               </CardContent>
             </Card>
           </Grid>
           <Grid item xs={6} md={3}>
             <Card 
               onClick={() => setStatusFilter(statusFilter === 'Overdue' ? '' : 'Overdue')}
-              sx={{ 
-                borderLeft: '4px solid #ef4444', 
-                bgcolor: statusFilter === 'Overdue' ? 'rgba(239,68,68,0.06)' : 'rgba(239,68,68,0.01)',
+              sx={{
+                borderLeft: `4px solid ${theme.palette.error.main}`,
+                bgcolor: statusFilter === 'Overdue' ? alpha(theme.palette.error.main, 0.06) : alpha(theme.palette.error.main, 0.01),
                 cursor: 'pointer',
                 transition: 'all 0.2s',
                 opacity: (statusFilter === '' || statusFilter === 'Overdue') ? 1 : 0.45,
                 transform: statusFilter === 'Overdue' ? 'scale(1.02)' : 'scale(1)',
-                boxShadow: statusFilter === 'Overdue' ? '0 8px 20px rgba(239,68,68,0.15)' : 'none',
-                '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 6px 15px rgba(239,68,68,0.1)' }
+                boxShadow: statusFilter === 'Overdue' ? `0 8px 20px ${alpha(theme.palette.error.main, 0.15)}` : 'none',
+                '&:hover': { transform: 'translateY(-2px)', boxShadow: `0 6px 15px ${alpha(theme.palette.error.main, 0.1)}` }
               }}
             >
               <CardContent sx={{ p: 2.5 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
-                  <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(239,68,68,0.08)', color: '#dc2626', display: 'flex' }}>
+                  <Box sx={{ p: 1, borderRadius: 2, bgcolor: alpha(theme.palette.error.main, 0.08), color: 'error.main', display: 'flex' }}>
                     <AlertTriangle size={20} />
                   </Box>
                   <Typography variant="body2" color="text.secondary" fontWeight={700}>ยืมเกินกำหนด</Typography>
                 </Box>
-                <Typography variant="h4" fontWeight={800} color="#dc2626">{summary?.overdue || 0}</Typography>
+                <Typography variant="h4" fontWeight={800} color="error.main">{summary?.overdue || 0}</Typography>
               </CardContent>
             </Card>
           </Grid>
@@ -288,11 +289,11 @@ export default function ReportBorrowPage() {
         <Grid container spacing={2.5}>
           {/* Monthly trend */}
           <Grid item xs={12} md={8}>
-            <Card sx={{ height: '100%', borderRadius: '12px', border: '1px solid rgba(229,231,235,0.7)', boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
+            <Card sx={{ height: '100%', borderRadius: '12px', border: `1px solid ${theme.palette.divider}`, boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
               <CardContent sx={{ p: 2.5 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-                  <Typography variant="h6" fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#1e293b' }}>
-                    <TrendingUp size={20} color="#b45309" /> 
+                  <Typography variant="h6" fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'text.primary' }}>
+                    <TrendingUp size={20} color={theme.palette.warning.dark} />
                     แนวโน้มการขอยืมรายเดือน
                   </Typography>
                   <FormControl size="small" sx={{ minWidth: 110 }}>
@@ -301,30 +302,30 @@ export default function ReportBorrowPage() {
                     </Select>
                   </FormControl>
                 </Box>
-                
+
                 {/* Recharts Bar Chart */}
                 <Box sx={{ width: '100%', height: 220 }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={trend} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                      <XAxis dataKey="month" tickFormatter={(tick, idx) => MONTHS_TH[idx] || tick} stroke="#94a3b8" fontSize={10} tickLine={false} />
-                      <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
-                      <RechartsTooltip 
+                      <XAxis dataKey="month" tickFormatter={(tick, idx) => MONTHS_TH[idx] || tick} stroke={theme.palette.text.secondary} fontSize={10} tickLine={false} />
+                      <YAxis stroke={theme.palette.text.secondary} fontSize={10} tickLine={false} axisLine={false} />
+                      <RechartsTooltip
                         formatter={(value: any, name: any) => [`${value} ครั้ง`, 'จำนวนการยืม']}
-                        contentStyle={{ background: '#0f172a', borderRadius: 8, color: '#fff', border: 'none', fontSize: 12 }}
-                        itemStyle={{ color: '#fff' }}
+                        contentStyle={{ background: theme.palette.background.paper, borderRadius: 8, color: theme.palette.text.primary, border: `1px solid ${theme.palette.divider}`, fontSize: 12 }}
+                        itemStyle={{ color: theme.palette.text.primary }}
                       />
-                      <Bar dataKey="requests" fill="#b45309" radius={[4, 4, 0, 0]}>
+                      <Bar dataKey="requests" fill={theme.palette.warning.dark} radius={[4, 4, 0, 0]}>
                         {trend.map((entry: any, index: number) => (
-                          <Cell 
-                            key={`cell-${index}`} 
-                            fill={entry.requests > 0 ? 'url(#barGradient)' : '#e2e8f0'} 
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={entry.requests > 0 ? 'url(#barGradient)' : theme.palette.divider}
                           />
                         ))}
                       </Bar>
                       <defs>
                         <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#f59e0b" />
-                          <stop offset="100%" stopColor="#b45309" />
+                          <stop offset="0%" stopColor={theme.palette.warning.main} />
+                          <stop offset="100%" stopColor={theme.palette.warning.dark} />
                         </linearGradient>
                       </defs>
                     </BarChart>
@@ -333,49 +334,49 @@ export default function ReportBorrowPage() {
               </CardContent>
             </Card>
           </Grid>
-          
+
           {/* Top borrowers */}
           <Grid item xs={12} md={4}>
-          <Card sx={{ height: '100%', borderRadius: '12px', border: '1px solid rgba(229,231,235,0.7)', boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
+          <Card sx={{ height: '100%', borderRadius: '12px', border: `1px solid ${theme.palette.divider}`, boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
             <CardContent sx={{ p: 2.5 }}>
-              <Typography variant="h6" fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3, color: '#1e293b' }}>
-                <User size={20} color="#b45309" /> 
+              <Typography variant="h6" fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3, color: 'text.primary' }}>
+                <User size={20} color={theme.palette.warning.dark} />
                 10 อันดับผู้ขอยืมสูงสุด
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                 {topBorrowers.length > 0 ? (
                   topBorrowers.map((b, i) => (
-                    <Box 
-                      key={b.name} 
-                      sx={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
+                    <Box
+                      key={b.name}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
                         gap: 1.5,
                         p: 1,
                         borderRadius: '8px',
-                        border: '1px solid #f8fafc',
-                        '&:hover': { bgcolor: '#f8fafc' }
+                        border: '1px solid transparent',
+                        '&:hover': { bgcolor: 'action.hover' }
                       }}
                     >
-                      <Typography variant="body2" fontWeight={800} color={i < 3 ? '#b45309' : '#94a3b8'} sx={{ minWidth: 20 }}>
+                      <Typography variant="body2" fontWeight={800} color={i < 3 ? theme.palette.warning.dark : 'text.disabled'} sx={{ minWidth: 20 }}>
                         #{i + 1}
                       </Typography>
-                      <Typography variant="body2" sx={{ flex: 1, color: '#334155', fontWeight: i < 3 ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <Typography variant="body2" sx={{ flex: 1, color: 'text.primary', fontWeight: i < 3 ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {b.name}
                       </Typography>
-                      <Chip 
-                        label={`${b.count} ครั้ง`} 
-                        size="small" 
-                        sx={{ 
+                      <Chip
+                        label={`${b.count} ครั้ง`}
+                        size="small"
+                        sx={{
                           fontWeight: 700,
-                          bgcolor: i < 3 ? alpha('#b45309', 0.1) : '#f1f5f9',
-                          color: i < 3 ? '#b45309' : '#475569'
-                        }} 
+                          bgcolor: i < 3 ? alpha(theme.palette.warning.dark, 0.1) : 'action.hover',
+                          color: i < 3 ? theme.palette.warning.dark : 'text.secondary'
+                        }}
                       />
                     </Box>
                   ))
                 ) : (
-                  <Box sx={{ py: 4, textAlign: 'center', color: '#94a3b8' }}>ไม่มีข้อมูลผู้ขอยืม</Box>
+                  <Box sx={{ py: 4, textAlign: 'center', color: 'text.disabled' }}>ไม่มีข้อมูลผู้ขอยืม</Box>
                 )}
               </Box>
             </CardContent>
@@ -385,16 +386,16 @@ export default function ReportBorrowPage() {
     </Box>
 
       {/* Filter */}
-      <Card sx={{ mb: 3, borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)', border: '1px solid rgba(229,231,235,0.6)' }}>
+      <Card sx={{ mb: 3, borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)', border: `1px solid ${theme.palette.divider}` }}>
         <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-            <Search size={18} color="#6b7280" />
+            <Search size={18} color={theme.palette.text.secondary} />
             <FormControl size="small" sx={{ minWidth: 150 }}>
               <InputLabel>สถานะคำขอ</InputLabel>
               <Select value={statusFilter} label="สถานะคำขอ" onChange={e => setStatusFilter(e.target.value)}>
                 <MenuItem value="">ทั้งหมด</MenuItem>
                 <MenuItem value="Overdue">🔴 ยืมเกินกำหนด</MenuItem>
-                <hr style={{ margin: '8px 0', border: 'none', borderTop: '1px solid #e2e8f0' }} />
+                <hr style={{ margin: '8px 0', border: 'none', borderTop: `1px solid ${theme.palette.divider}` }} />
                 {Object.entries(statusLabels).map(([k, v]) => <MenuItem key={k} value={k}>{v}</MenuItem>)}
               </Select>
             </FormControl>
@@ -410,10 +411,10 @@ export default function ReportBorrowPage() {
       </Card>
 
       {/* Table */}
-      <Card sx={{ borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.02)', border: '1px solid rgba(229,231,235,0.7)', overflow: 'hidden' }}>
+      <Card sx={{ borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.02)', border: `1px solid ${theme.palette.divider}`, overflow: 'hidden' }}>
         <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
-          <Box sx={{ p: 2.5, borderBottom: '1px solid rgba(229,231,235,0.7)', bgcolor: '#fafafa' }}>
-            <Typography variant="h6" fontWeight={700} sx={{ color: '#1e293b' }}>ประวัติการยืม-คืนทั้งหมด ({filtered.length})</Typography>
+          <Box sx={{ p: 2.5, borderBottom: `1px solid ${theme.palette.divider}`, bgcolor: 'action.hover' }}>
+            <Typography variant="h6" fontWeight={700} sx={{ color: 'text.primary' }}>ประวัติการยืม-คืนทั้งหมด ({filtered.length})</Typography>
           </Box>
           <DataGrid
             rows={filtered}
@@ -424,11 +425,11 @@ export default function ReportBorrowPage() {
             disableRowSelectionOnClick
             pageSizeOptions={[25, 50, 100]}
             initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
-            sx={{ 
-              border: 'none', 
-              '& .MuiDataGrid-columnHeader': { bgcolor: '#f8fafc', color: '#475569', fontWeight: 700 },
-              '& .MuiDataGrid-cell': { borderColor: '#f1f5f9' },
-              '& .MuiDataGrid-row:hover': { bgcolor: '#f8fafc' }
+            sx={{
+              border: 'none',
+              '& .MuiDataGrid-columnHeader': { bgcolor: 'action.hover', color: 'text.secondary', fontWeight: 700 },
+              '& .MuiDataGrid-cell': { borderColor: 'divider' },
+              '& .MuiDataGrid-row:hover': { bgcolor: 'action.hover' }
             }}
           />
         </CardContent>
