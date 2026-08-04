@@ -1,11 +1,50 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { pmAPI } from '../../services/api';
-import * as XLSX from 'xlsx';
-import { formatDate } from '../../utils/dateUtils';
+import {
+  Box,
+  Typography,
+  Button,
+  IconButton,
+  TextField,
+  Select,
+  MenuItem,
+  Card,
+  Paper,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  TableContainer,
+  ToggleButtonGroup,
+  ToggleButton,
+  Snackbar,
+  Alert,
+  GlobalStyles,
+} from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
-
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import PrintIcon from '@mui/icons-material/Print';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import AutorenewIcon from '@mui/icons-material/Autorenew';
+import EventIcon from '@mui/icons-material/Event';
+import UnfoldLessIcon from '@mui/icons-material/UnfoldLess';
+import UnfoldMoreIcon from '@mui/icons-material/UnfoldMore';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import BusinessIcon from '@mui/icons-material/Business';
+import CorporateFareIcon from '@mui/icons-material/CorporateFare';
+import FolderIcon from '@mui/icons-material/Folder';
+import ComputerIcon from '@mui/icons-material/Computer';
+import ChevronRightRotateIcon from '@mui/icons-material/ChevronRight';
+import * as XLSX from 'xlsx';
+import { pmAPI } from '../../services/api';
+import { formatDate } from '../../utils/dateUtils';
 
 // Helper to format date
 function fmtDate(d: string | Date | null) {
@@ -38,12 +77,27 @@ function formatThaiMonthDay(date: Date) {
   return `${day} ${months[date.getMonth()]}`;
 }
 
+const PRINT_STYLES = {
+  '@media print': {
+    'body': { background: '#fff', color: '#000' },
+    '.pms-root': { padding: '0 !important', margin: '0 !important', width: '100% !important' },
+    '.no-print': { display: 'none !important' },
+    '.pms-card': { border: 'none !important', boxShadow: 'none !important', marginBottom: '0 !important' },
+    '.gantt-table': { width: '100% !important', border: '1px solid #000 !important' },
+    '.gantt-table th, .gantt-table td': { border: '1px solid #000 !important', color: '#000 !important' },
+    'header, nav, aside, footer, .sidebar, .topbar': { display: 'none !important' },
+    'body *': { visibility: 'hidden' },
+    '.pms-root, .pms-root *': { visibility: 'visible' },
+    '.pms-root ~ .pms-root': { display: 'none' },
+  },
+};
+
 export default function PMSchedulePage() {
   const navigate = useNavigate();
   const [plans, setPlans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear()); // Default to current year
-  
+
   // Interactive filters
   const [pmStartDate, setPmStartDate] = useState<string>('');
   const [selectedLead, setSelectedLead] = useState<string>('ALL');
@@ -72,10 +126,10 @@ export default function PMSchedulePage() {
       .then(res => {
         const plansList = res.data?.plans || [];
         setPlans(plansList);
-        
+
         // Default all collapsed
         setExpandedSites({});
-        
+
         // Find earliest start date to default PM Start Date
         const validPlans = plansList.filter((p: any) => p.startDate && new Date(p.startDate).getFullYear() === selectedYear);
         if (validPlans.length > 0) {
@@ -96,10 +150,10 @@ export default function PMSchedulePage() {
     if (!showAdhoc && p.isAdhoc) return false;
     const matchesLead = selectedLead === 'ALL' || p.lead === selectedLead;
     const label = p.deptTask || '';
-    const matchesSearch = label.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    const matchesSearch = label.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           (p.site || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                           (p.company || '').toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     // Status filter
     const pct = p.plannedDeviceCount > 0 ? (p.completedCount || 0) / p.plannedDeviceCount * 100 : 0;
     let matchesStatus = true;
@@ -141,7 +195,7 @@ export default function PMSchedulePage() {
           lead: plan.lead || 'ไม่ระบุ'
         };
       }
-      
+
       groups[siteKey].plans.push(plan);
       groups[siteKey].totalPlanned += plan.plannedDeviceCount || 0;
       groups[siteKey].totalCompleted += plan.completedCount || 0;
@@ -205,7 +259,7 @@ export default function PMSchedulePage() {
   const generateColumns = () => {
     const cols = [];
     const baseDate = pmStartDate ? new Date(pmStartDate) : new Date();
-    
+
     if (viewMode === 'weekly') {
       baseDate.setDate(baseDate.getDate() + (timeOffset * 7));
       let current = getMonday(baseDate);
@@ -244,11 +298,11 @@ export default function PMSchedulePage() {
 
   const columns = generateColumns();
 
-  const getProgressColor = (pct: number) => {
-    if (pct >= 100) return '#10b981';
-    if (pct >= 50) return '#0ea5e9';
-    if (pct >= 20) return '#f59e0b';
-    return '#ef4444';
+  const getProgressColor = (pct: number): 'success' | 'info' | 'warning' | 'error' => {
+    if (pct >= 100) return 'success';
+    if (pct >= 50) return 'info';
+    if (pct >= 20) return 'warning';
+    return 'error';
   };
 
   const isTodayInCol = (col: any) => {
@@ -266,41 +320,37 @@ export default function PMSchedulePage() {
     const isToday = isTodayInCol(col);
     const startVal = plan.startDate ? new Date(plan.startDate) : null;
     const endVal = plan.endDate ? new Date(plan.endDate) : null;
-    
+
     const hasBar = startVal && endVal && startVal <= col.end && endVal >= col.start;
 
-    let barClass = 'gantt-bar-block';
-    if (pct >= 100) {
-      barClass += isHeaderRow ? ' gantt-bar-done-light' : ' gantt-bar-done';
-    } else if (pct > 0) {
-      barClass += isHeaderRow ? ' gantt-bar-pending-light' : ' gantt-bar-pending';
-    } else {
-      barClass += isHeaderRow ? ' gantt-bar-scheduled-light' : ' gantt-bar-scheduled';
-    }
-
-    const radiusStyle: React.CSSProperties = {
-      borderRadius: '6px',
-      opacity: isHeaderRow ? 0.75 : 1,
-      height: '10px',
-      margin: '0 auto',
-      width: '95%',
-    };
+    const barColor: 'success' | 'info' | 'warning' = pct >= 100 ? 'success' : pct > 0 ? 'info' : 'warning';
 
     return (
-      <td 
-        key={col.start.getTime()} 
-        style={{ 
-          padding: hasBar ? '8px 0px' : '12px 14px', 
-          verticalAlign: 'middle', 
+      <TableCell
+        key={col.start.getTime()}
+        sx={{
+          p: hasBar ? '8px 0px' : '12px 14px',
+          verticalAlign: 'middle',
           position: 'relative',
-          background: isToday ? 'rgba(239, 68, 68, 0.05)' : (!isHeaderRow && col.isWeekend ? 'rgba(0,0,0,0.02)' : 'transparent'),
-          borderLeft: isToday ? '2.5px solid #ef4444' : undefined,
-          borderRight: isToday ? '2.5px solid #ef4444' : undefined,
+          bgcolor: (t) => isToday ? alpha(t.palette.error.main, 0.05) : (!isHeaderRow && col.isWeekend ? 'action.hover' : 'transparent'),
+          borderLeft: isToday ? '2.5px solid' : undefined,
+          borderRight: isToday ? '2.5px solid' : undefined,
+          borderLeftColor: isToday ? 'error.main' : undefined,
+          borderRightColor: isToday ? 'error.main' : undefined,
         }}
         title={hasBar ? `${plan.deptTask || plan.site || 'แผนงาน'}: ${pct}% (${fmtDate(plan.startDate)} - ${fmtDate(plan.endDate)})` : undefined}
       >
-        {hasBar && <div className={barClass} style={radiusStyle} />}
-      </td>
+        {hasBar && (
+          <Box
+            sx={{
+              height: 10, mx: 'auto', width: '95%', borderRadius: 1,
+              bgcolor: (t) => alpha(t.palette[barColor].main, isHeaderRow ? 0.3 : 1),
+              transition: 'all 0.2s ease',
+              '&:hover': { transform: 'scaleY(1.3)', cursor: 'pointer' },
+            }}
+          />
+        )}
+      </TableCell>
     );
   };
 
@@ -314,7 +364,7 @@ export default function PMSchedulePage() {
       dataRows.push(['รายงานกำหนดการ PM (PM Schedule Planner)']);
       dataRows.push([`ปีโครงการ: ${selectedYear + 543}`, `หัวหน้าโครงการ: ${selectedLead === 'ALL' ? 'ทั้งหมด' : selectedLead}`, `วันเริ่ม PM: ${pmStartDate || '—'}`]);
       dataRows.push([]); // blank line spacer
-      
+
       // Table Header Row
       const tableHeaders = ['WBS', 'TASK (บริษัท / แผนกงาน)', 'LEAD', 'Device (แผน)', 'Completed (เสร็จ)', 'Remaining (เหลือ)', 'START', 'END', 'DAYS', '% DONE', 'สถานะ'];
       columns.forEach(col => {
@@ -344,7 +394,7 @@ export default function PMSchedulePage() {
       // Grouped Rows (Hierarchy Level 1 = Site, Level 2 = Dept)
       groupedPlans.forEach((group, groupIdx) => {
         const sitePct = group.totalPlanned > 0 ? Math.round(group.totalCompleted / group.totalPlanned * 100) : 0;
-        
+
         // 1. Write Company summary row (WBS 1.1, 1.2, ...)
         const siteWbs = `1.${groupIdx + 1}`;
         const days = (group.startDate && group.endDate) ? Math.max(1, Math.ceil((group.endDate.getTime() - group.startDate.getTime()) / 86400000)) : '-';
@@ -377,11 +427,11 @@ export default function PMSchedulePage() {
         group.plans.forEach((plan, planIdx) => {
           const planPct = plan.plannedDeviceCount > 0 ? Math.round((plan.completedCount || 0) / plan.plannedDeviceCount * 100) : 0;
           const planWbs = `${siteWbs}.${planIdx + 1}`;
-          
+
           const pStartVal = plan.startDate ? new Date(plan.startDate) : null;
           const pEndVal = plan.endDate ? new Date(plan.endDate) : null;
           const pDays = (pStartVal && pEndVal) ? Math.max(1, Math.ceil((pEndVal.getTime() - pStartVal.getTime()) / 86400000)) : '-';
-          
+
           const planRow = [
             planWbs,
             `   ↳ 📁 ${plan.deptTask || 'ทั่วไป'}`,
@@ -411,7 +461,7 @@ export default function PMSchedulePage() {
 
       // Generate spreadsheet
       const ws = XLSX.utils.aoa_to_sheet(dataRows);
-      
+
       // Auto width formatting
       const colWidths = tableHeaders.map((_, colIdx) => {
         let maxLen = 12;
@@ -428,7 +478,7 @@ export default function PMSchedulePage() {
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'PM Schedule');
-      
+
       XLSX.writeFile(wb, `PM_Schedule_Planner_${selectedYear + 543}.xlsx`);
       showToast('🚀 ส่งออกไฟล์ Excel สำเร็จ!');
     } catch (err: any) {
@@ -440,399 +490,293 @@ export default function PMSchedulePage() {
   };
 
   return (
-    <>
-      <style>{`
-        .pms-root { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1d1d1f; }
-        .pms-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.02); margin-bottom: 20px; }
-        .pms-header { padding: 16px 20px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; gap: 10px; background: #ffffff; }
-        .pms-input { width: 100%; border: 1px solid #d2d2d7; border-radius: 8px; padding: 10px 12px; font-size: 13px; font-family: inherit; outline: none; background: #f5f5f7; box-sizing: border-box; transition: all 0.15s ease; color: #1d1d1f; }
-        .pms-input:focus { border-color: #0071e3; background: #ffffff; box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.15); }
-        .pms-select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2386868b' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; cursor: pointer; }
-        .pms-label { font-size: 11px; font-weight: 500; color: #86868b; margin-bottom: 6px; display: block; text-transform: uppercase; letter-spacing: 0.05em; }
-        
-        .pms-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px; }
-        .pms-stat-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 18px 22px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 20px rgba(0,0,0,0.02); }
-        .pms-stat-icon { width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
-        .pms-toast { position: fixed; bottom: 24px; right: 24px; background: #1d1d1f; color: #fff; padding: 12px 20px; border-radius: 8px; font-size: 13px; font-weight: 500; box-shadow: 0 8px 24px rgba(0,0,0,0.15); z-index: 9999; animation: slideIn 0.2s ease-out; }
+    <Box className="pms-root">
+      <GlobalStyles styles={PRINT_STYLES} />
 
-        /* Modern Gantt Table — Compact */
-        .gantt-table { border-collapse: collapse; font-size: 11px; width: 100%; border: 1px solid #e5e7eb; background: #ffffff; }
-        .gantt-table th, .gantt-table td { border: 1px solid #f3f4f6; padding: 6px 8px; white-space: nowrap; vertical-align: middle; }
-        .gantt-table thead th { background: #f5f5f7; font-weight: 600; color: #1d1d1f; text-align: center; font-size: 10px; border-bottom: 2px solid #e5e7eb; padding: 8px 6px; position: sticky; top: 0; z-index: 2; }
-        
-        .gantt-progress-wrap { background: #e5e7eb; border-radius: 99px; height: 5px; overflow: hidden; width: 50px; display: inline-block; }
-        .gantt-progress-bar { height: 100%; border-radius: 99px; }
-        
-        /* Gantt Bars - Modern Rounded Pill */
-        .gantt-bar-block { height: 8px; border-radius: 4px; box-shadow: none; transition: all 0.2s ease; }
-        .gantt-bar-block:hover { transform: scaleY(1.3); cursor: pointer; }
-        
-        .gantt-bar-done { background: #34c759; }
-        .gantt-bar-pending { background: #0071e3; }
-        .gantt-bar-scheduled { background: #ff9500; }
-        
-        .gantt-bar-done-light { background: rgba(52, 199, 89, 0.25); }
-        .gantt-bar-pending-light { background: rgba(0, 113, 227, 0.25); }
-        .gantt-bar-scheduled-light { background: rgba(255, 149, 0, 0.25); }
+      {/* ── Page Header ── */}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5, mb: 2.25 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box sx={{ width: 40, height: 40, borderRadius: 2.5, bgcolor: (t) => alpha(t.palette.primary.main, t.palette.mode === 'dark' ? 0.16 : 0.08), border: '1px solid', borderColor: 'primary.main', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <CalendarMonthIcon color="primary" />
+          </Box>
+          <Box>
+            <Typography sx={{ fontSize: 16, fontWeight: 700 }}>กำหนดการ PM (PM Schedule Planner)</Typography>
+            <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 0.25 }}>แผนจัดโครงการ PM จำแนกรายบริษัทและแผนกย่อย — ปี {selectedYear + 543}</Typography>
+          </Box>
+        </Box>
+        <Box className="no-print" sx={{ display: 'flex', gap: 1 }}>
+          <Button variant="contained" startIcon={<FileDownloadIcon />} onClick={handleExportExcel} disabled={exporting}>
+            {exporting ? 'กำลังส่งออก...' : 'ส่งออก Excel Planner'}
+          </Button>
+          <Button variant="outlined" startIcon={<PrintIcon />} onClick={() => window.print()}>พิมพ์แผนงาน</Button>
+          <Button variant="outlined" startIcon={<BarChartIcon />} onClick={() => navigate('/pm')}>Dashboard</Button>
+        </Box>
+      </Box>
 
-        .gantt-cell-empty { background: transparent; }
-        
-        /* WBS Rows styling — Compact */
-        .gantt-site-row { background: #f0f1f3 !important; font-weight: 600; color: #1d1d1f; border-bottom: 1px solid #e5e7eb; cursor: pointer; transition: background 0.15s; }
-        .gantt-site-row:hover { background: #e8e8ed !important; }
-        .gantt-site-row td { padding: 8px 8px !important; }
-        .gantt-dept-row { background: #ffffff; transition: background 0.15s; }
-        .gantt-dept-row:hover { background: #f5f5f7; }
-        .gantt-dept-row td { padding: 5px 8px !important; }
-        
-        .pms-btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; border-radius: 8px; font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit; transition: all .15s; border: 1px solid transparent; white-space: nowrap; }
-        .pms-btn-outline { background: #fff; border-color: #d2d2d7; color: #1d1d1f; }
-        .pms-btn-outline:hover { background-color: #f5f5f7; border-color: #86868b; }
-        .pms-btn-primary { background: #0071e3; color: #fff; border-color: #0071e3; }
-        .pms-btn-primary:hover { background: #0077ed; }
-        
-        .gantt-row-interactive { cursor: pointer; }
+      {/* ── Status Cards Grid ── */}
+      <Box className="no-print" sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 2, mb: 2.5 }}>
+        {[
+          { label: 'เสร็จสิ้นแผนงาน', val: completedPlansCount, color: 'success' as const, Icon: CheckCircleIcon },
+          { label: 'กำลังดำเนินการตรวจ', val: activePlansCount, color: 'info' as const, Icon: AutorenewIcon },
+          { label: 'รอดำเนินการตามแผน', val: pendingPlansCount, color: 'warning' as const, Icon: EventIcon },
+        ].map((s) => (
+          <Card key={s.label} variant="outlined" sx={{ p: '18px 22px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderLeft: 3, borderLeftColor: `${s.color}.main` }}>
+            <Box>
+              <Typography sx={{ fontSize: 11, color: 'text.secondary', fontWeight: 600 }}>{s.label}</Typography>
+              <Typography sx={{ fontSize: 24, fontWeight: 700, mt: 0.5, color: `${s.color}.main` }}>{s.val} แผนก</Typography>
+            </Box>
+            <Box sx={{ width: 40, height: 40, borderRadius: 2, bgcolor: (t) => alpha(t.palette[s.color].main, 0.12), color: `${s.color}.main`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <s.Icon />
+            </Box>
+          </Card>
+        ))}
+      </Box>
 
-        .collapsible-icon { display: inline-block; width: 14px; font-size: 10px; margin-right: 6px; color: #0071e3; transition: transform 0.2s; }
+      {/* ── Top Inputs Panel ── */}
+      <Card variant="outlined" className="pms-card no-print" sx={{ mb: 2.5 }}>
+        <Box sx={{ p: '12px 18px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 1.5 }}>
+          <Box>
+            <Typography sx={{ fontSize: 11, fontWeight: 500, color: 'text.secondary', mb: 0.75, textTransform: 'uppercase', letterSpacing: '0.05em' }}>ปีงบประมาณ (พ.ศ.)</Typography>
+            <Select fullWidth size="small" value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))}>
+              {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(y => (
+                <MenuItem key={y} value={y}>ปี {y + 543}</MenuItem>
+              ))}
+            </Select>
+          </Box>
+          <Box>
+            <Typography sx={{ fontSize: 11, fontWeight: 500, color: 'text.secondary', mb: 0.75, textTransform: 'uppercase', letterSpacing: '0.05em' }}>วันที่เริ่มแสดงผล</Typography>
+            <DatePicker
+              format="DD/MM/YYYY"
+              value={pmStartDate ? dayjs(pmStartDate) : null}
+              onChange={(newVal) => { setPmStartDate(newVal ? newVal.format('YYYY-MM-DD') : ''); setTimeOffset(0); }}
+              slotProps={{ textField: { size: 'small', fullWidth: true } }}
+            />
+          </Box>
+          <Box>
+            <Typography sx={{ fontSize: 11, fontWeight: 500, color: 'text.secondary', mb: 0.75, textTransform: 'uppercase', letterSpacing: '0.05em' }}>บริษัท (Company)</Typography>
+            <Select fullWidth size="small" value={selectedCompanyFilter} onChange={e => setSelectedCompanyFilter(e.target.value)}>
+              <MenuItem value="ALL">บริษัททั้งหมด</MenuItem>
+              {uniqueCompanies.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+            </Select>
+          </Box>
+          <Box>
+            <Typography sx={{ fontSize: 11, fontWeight: 500, color: 'text.secondary', mb: 0.75, textTransform: 'uppercase', letterSpacing: '0.05em' }}>ผู้ดูแล/หัวหน้างาน (Lead)</Typography>
+            <Select fullWidth size="small" value={selectedLead} onChange={e => setSelectedLead(e.target.value)}>
+              <MenuItem value="ALL">ผู้ดูแลทั้งหมด</MenuItem>
+              {uniqueLeads.map(l => <MenuItem key={l} value={l}>{l}</MenuItem>)}
+            </Select>
+          </Box>
+          <Box>
+            <Typography sx={{ fontSize: 11, fontWeight: 500, color: 'text.secondary', mb: 0.75, textTransform: 'uppercase', letterSpacing: '0.05em' }}>สถานะ (Status)</Typography>
+            <Select fullWidth size="small" value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)}>
+              <MenuItem value="ALL">ทุกสถานะ</MenuItem>
+              <MenuItem value="COMPLETED">เสร็จสิ้นแล้ว</MenuItem>
+              <MenuItem value="IN_PROGRESS">กำลังดำเนินการ</MenuItem>
+              <MenuItem value="PENDING">รอดำเนินการ</MenuItem>
+            </Select>
+          </Box>
+          <Box>
+            <Typography sx={{ fontSize: 11, fontWeight: 500, color: 'text.secondary', mb: 0.75, textTransform: 'uppercase', letterSpacing: '0.05em' }}>ค้นหาบริษัท หรือ แผนก</Typography>
+            <TextField fullWidth size="small" placeholder="พิมพ์ค้นหา..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+          </Box>
+        </Box>
+      </Card>
 
-        @keyframes slideIn {
-          from { transform: translateY(10px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
+      {/* ── Gantt Chart Card ── */}
+      <Paper variant="outlined" className="pms-card">
+        <Box sx={{ p: '10px 18px', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.25, alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+            <BarChartIcon fontSize="small" color="action" />
+            <Box>
+              <Typography sx={{ fontSize: 13, fontWeight: 700 }}>ตารางแผนงาน (Gantt Chart) - {viewMode === 'daily' ? 'รายวัน' : 'รายสัปดาห์'}</Typography>
+              <Typography sx={{ fontSize: 10, color: 'text.secondary', mt: 0.25 }}>
+                {columns[0]?.subLabel} ถึง {columns[columns.length - 1]?.subLabel} {selectedYear + 543}
+                {' · '}
+                <Box component="span" sx={{ fontWeight: 600 }}>{filteredPlans.length} แผนงาน</Box>
+                {' · '}
+                <Box component="span" sx={{ fontWeight: 600 }}>{totalPlanned} เครื่อง</Box>
+                {' · '}
+                <Box component="span" sx={{ color: `${getProgressColor(overallPct)}.main`, fontWeight: 700 }}>{overallPct}%</Box>
+              </Typography>
+            </Box>
+          </Box>
 
-        @media print {
-          body { background: #fff; color: #000; }
-          .pms-root { padding: 0; margin: 0; width: 100% !important; }
-          .no-print { display: none !important; }
-          .pms-card { border: none !important; box-shadow: none !important; margin-bottom: 0 !important; }
-          .gantt-table { width: 100% !important; border: 1px solid #000 !important; }
-          .gantt-table th, .gantt-table td { border: 1px solid #000 !important; color: #000 !important; }
-          header, nav, aside, footer, .sidebar, .topbar { display: none !important; }
-          body * { visibility: hidden; }
-          .pms-root, .pms-root * { visibility: visible; }
-          .pms-root { position: absolute; left: 0; top: 0; width: 100%; }
-        }
-      `}</style>
+          <Box className="no-print" sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Box sx={{ display: 'flex', gap: 0.5 }}>
+              <Button size="small" variant="outlined" startIcon={<UnfoldLessIcon fontSize="small" />} onClick={collapseAll}>ยุบทั้งหมด</Button>
+              <Button size="small" variant="outlined" startIcon={<UnfoldMoreIcon fontSize="small" />} onClick={expandAll}>ขยายทั้งหมด</Button>
+            </Box>
 
-      <div className="pms-root">
-        {/* ── Page Header ── */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 18 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(0, 113, 227, 0.08)', border: '1.5px solid rgba(0, 113, 227, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>📅</div>
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: '#1d1d1f' }}>กำหนดการ PM (PM Schedule Planner)</div>
-              <div style={{ fontSize: 11, color: '#86868b', marginTop: 2 }}>แผนจัดโครงการ PM จำแนกรายบริษัทและแผนกย่อย — ปี {selectedYear + 543}</div>
-            </div>
-          </div>
-          <div className="no-print" style={{ display: 'flex', gap: 8 }}>
-            <button 
-              className="pms-btn pms-btn-primary" 
-              onClick={handleExportExcel} 
-              disabled={exporting}
-            >
-              📥 {exporting ? 'กำลังส่งออก...' : 'ส่งออก Excel Planner'}
-            </button>
-            <button className="pms-btn pms-btn-outline" onClick={() => window.print()}>
-              🖨️ พิมพ์แผนงาน
-            </button>
-            <button className="pms-btn pms-btn-outline" onClick={() => navigate('/pm')} style={{ background: '#f5f5f7' }}>
-              📊 Dashboard
-            </button>
-          </div>
-        </div>
+            <Box sx={{ width: '1px', height: 20, bgcolor: 'divider' }} />
 
-        {/* ── Status Cards Grid ── */}
-        <div className="pms-stat-grid no-print">
-          <div className="pms-stat-card" style={{ borderLeft: '2px solid #34c759', background: 'rgba(52, 199, 89, 0.02)' }}>
-            <div>
-              <div style={{ fontSize: 11, color: '#86868b', fontWeight: 600 }}>🟢 เสร็จสิ้นแผนงาน</div>
-              <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4, color: '#34c759' }}>{completedPlansCount} แผนก</div>
-            </div>
-            <div className="pms-stat-icon" style={{ background: 'rgba(52, 199, 89, 0.08)', color: '#34c759' }}>✓</div>
-          </div>
-          <div className="pms-stat-card" style={{ borderLeft: '2px solid #0071e3', background: 'rgba(0, 113, 227, 0.02)' }}>
-            <div>
-              <div style={{ fontSize: 11, color: '#86868b', fontWeight: 600 }}>🔵 กำลังดำเนินการตรวจ</div>
-              <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4, color: '#0071e3' }}>{activePlansCount} แผนก</div>
-            </div>
-            <div className="pms-stat-icon" style={{ background: 'rgba(0, 113, 227, 0.08)', color: '#0071e3' }}>⏳</div>
-          </div>
-          <div className="pms-stat-card" style={{ borderLeft: '2px solid #ff9500', background: 'rgba(255, 149, 0, 0.02)' }}>
-            <div>
-              <div style={{ fontSize: 11, color: '#86868b', fontWeight: 600 }}>🟡 รอดำเนินการตามแผน</div>
-              <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4, color: '#ff9500' }}>{pendingPlansCount} แผนก</div>
-            </div>
-            <div className="pms-stat-icon" style={{ background: 'rgba(255, 149, 0, 0.08)', color: '#ff9500' }}>📅</div>
-          </div>
-        </div>
+            <ToggleButtonGroup size="small" exclusive value={viewMode} onChange={(_, v) => { if (v) { setViewMode(v); setTimeOffset(0); } }}>
+              <ToggleButton value="daily" sx={{ fontSize: 11 }}>รายวัน</ToggleButton>
+              <ToggleButton value="weekly" sx={{ fontSize: 11 }}>รายสัปดาห์</ToggleButton>
+            </ToggleButtonGroup>
 
-        {/* ── Top Inputs Panel ── */}
-        <div className="pms-card no-print">
-          <div style={{ padding: '12px 18px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
-            <div>
-              <label className="pms-label">ปีงบประมาณ (พ.ศ.)</label>
-              <select className="pms-input pms-select" value={selectedYear} onChange={e => setSelectedYear(parseInt(e.target.value))}>
-                {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(y => (
-                  <option key={y} value={y}>ปี {y + 543}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="pms-label">วันที่เริ่มแสดงผล</label>
-              <DatePicker
-                format="DD/MM/YYYY"
-                value={pmStartDate ? dayjs(pmStartDate) : null}
-                onChange={(newVal) => { setPmStartDate(newVal ? newVal.format('YYYY-MM-DD') : ''); setTimeOffset(0); }}
-                slotProps={{ textField: { size: 'small', className: 'pms-input', sx: { bgcolor: '#fff', borderRadius: '6px' } } }}
-              />
-            </div>
-            <div>
-              <label className="pms-label">บริษัท (Company)</label>
-              <select className="pms-input pms-select" value={selectedCompanyFilter} onChange={e => setSelectedCompanyFilter(e.target.value)}>
-                <option value="ALL">บริษัททั้งหมด</option>
-                {uniqueCompanies.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="pms-label">ผู้ดูแล/หัวหน้างาน (Lead)</label>
-              <select className="pms-input pms-select" value={selectedLead} onChange={e => setSelectedLead(e.target.value)}>
-                <option value="ALL">ผู้ดูแลทั้งหมด</option>
-                {uniqueLeads.map(l => <option key={l} value={l}>{l}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="pms-label">สถานะ (Status)</label>
-              <select className="pms-input pms-select" value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)}>
-                <option value="ALL">ทุกสถานะ</option>
-                <option value="COMPLETED">✅ เสร็จสิ้นแล้ว</option>
-                <option value="IN_PROGRESS">🔵 กำลังดำเนินการ</option>
-                <option value="PENDING">🟡 รอดำเนินการ</option>
-              </select>
-            </div>
-            <div>
-              <label className="pms-label">ค้นหาบริษัท หรือ แผนก</label>
-              <input
-                type="text"
-                className="pms-input"
-                placeholder="พิมพ์ค้นหา..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </div>
-        </div>
+            <Box sx={{ display: 'flex', gap: 0.5 }}>
+              <IconButton size="small" onClick={() => setTimeOffset(prev => prev - (viewMode === 'weekly' ? 1 : 7))}><ChevronLeftIcon fontSize="small" /></IconButton>
+              <IconButton size="small" onClick={() => setTimeOffset(0)} disabled={timeOffset === 0}><RestartAltIcon fontSize="small" /></IconButton>
+              <IconButton size="small" onClick={() => setTimeOffset(prev => prev + (viewMode === 'weekly' ? 1 : 7))}><ChevronRightIcon fontSize="small" /></IconButton>
+            </Box>
+          </Box>
+        </Box>
 
-        {/* ── Gantt Chart Card ── */}
-        <div className="pms-card">
-          <div className="pms-header" style={{ justifyContent: 'space-between', flexWrap: 'wrap', padding: '10px 18px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 16 }}>📊</span>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#1d1d1f' }}>ตารางแผนงาน (Gantt Chart) - {viewMode === 'daily' ? 'รายวัน' : 'รายสัปดาห์'}</div>
-                <div style={{ fontSize: 10, color: '#86868b', marginTop: 1 }}>
-                  {columns[0]?.subLabel} ถึง {columns[columns.length-1]?.subLabel} {selectedYear + 543}
-                  {' · '}
-                  <span style={{ fontWeight: 600 }}>{filteredPlans.length} แผนงาน</span>
-                  {' · '}
-                  <span style={{ fontWeight: 600 }}>{totalPlanned} เครื่อง</span>
-                  {' · '}
-                  <span style={{ color: getProgressColor(overallPct), fontWeight: 700 }}>{overallPct}%</span>
-                </div>
-              </div>
-            </div>
+        <TableContainer sx={{ maxHeight: '65vh' }}>
+          <Table className="gantt-table" size="small" sx={{ fontSize: 11 }}>
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ width: 40, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2 }}>WBS</TableCell>
+                <TableCell sx={{ minWidth: 160, bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2 }}>TASK (บริษัท / แผนกงาน)</TableCell>
+                <TableCell sx={{ width: 60, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2 }}>LEAD</TableCell>
+                <TableCell sx={{ width: 40, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2 }}>แผน</TableCell>
+                <TableCell sx={{ width: 40, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2 }}>เสร็จ</TableCell>
+                <TableCell sx={{ width: 40, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2 }}>เหลือ</TableCell>
+                <TableCell sx={{ width: 60, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2 }}>START</TableCell>
+                <TableCell sx={{ width: 60, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2 }}>END</TableCell>
+                <TableCell sx={{ width: 30, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2 }}>วัน</TableCell>
+                <TableCell sx={{ width: 40, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2 }}>%</TableCell>
+                {columns.map(col => {
+                  const isToday = isTodayInCol(col);
+                  return (
+                    <TableCell
+                      key={col.start.getTime()}
+                      sx={{
+                        width: viewMode === 'daily' ? 40 : 80,
+                        textAlign: 'center',
+                        minWidth: viewMode === 'daily' ? 35 : 75,
+                        bgcolor: isToday ? (t) => alpha(t.palette.error.main, 0.1) : 'action.hover',
+                        borderLeft: isToday ? '2.5px solid' : undefined,
+                        borderRight: isToday ? '2.5px solid' : undefined,
+                        borderLeftColor: isToday ? 'error.main' : undefined,
+                        borderRightColor: isToday ? 'error.main' : undefined,
+                        position: 'sticky', top: 0, zIndex: 2,
+                      }}
+                    >
+                      {col.label}<br />
+                      <Box component="span" sx={{ fontSize: 8, fontWeight: isToday ? 700 : 400, color: isToday ? 'error.main' : 'text.secondary' }}>
+                        {isToday ? '★ วันนี้' : col.subLabel.split(' ')[0]}
+                      </Box>
+                    </TableCell>
+                  );
+                })}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {/* ── Level 0: Total Summary Row ── */}
+              <TableRow sx={{ bgcolor: 'action.hover' }}>
+                <TableCell sx={{ textAlign: 'center', color: 'text.secondary', fontWeight: 600 }}>1</TableCell>
+                <TableCell sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5 }}><CorporateFareIcon sx={{ fontSize: 14 }} /> TRR GROUP (ทั้งหมดในระบบ)</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>-</TableCell>
+                <TableCell sx={{ textAlign: 'center', fontWeight: 600 }}>{totalPlanned}</TableCell>
+                <TableCell sx={{ textAlign: 'center', fontWeight: 600 }}>{totalCompleted}</TableCell>
+                <TableCell sx={{ textAlign: 'center', color: 'error.main', fontWeight: 600 }}>{totalPlanned - totalCompleted}</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>-</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>-</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>-</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>
+                  <Box component="span" sx={{ color: `${getProgressColor(overallPct)}.main`, fontWeight: 600 }}>{overallPct}%</Box>
+                </TableCell>
+                <TableCell colSpan={columns.length} sx={{ bgcolor: (t) => alpha(t.palette.success.main, 0.08), textAlign: 'center', fontSize: 11, color: 'success.main', fontWeight: 600 }}>
+                  {overallPct >= 100 ? 'เสร็จสิ้นโครงการ PM แล้ว' : 'กำลังดำเนินการตามแผน'}
+                </TableCell>
+              </TableRow>
 
-            <div className="no-print" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              {/* Collapse / Expand buttons */}
-              <div style={{ display: 'flex', gap: 4 }}>
-                <button className="pms-btn pms-btn-outline" style={{ padding: '4px 10px', fontSize: '10px' }} onClick={collapseAll} title="ยุบทั้งหมด">
-                  ▼ ยุบทั้งหมด
-                </button>
-                <button className="pms-btn pms-btn-outline" style={{ padding: '4px 10px', fontSize: '10px' }} onClick={expandAll} title="ขยายทั้งหมด">
-                  ▲ ขยายทั้งหมด
-                </button>
-              </div>
+              {/* ── Grouped Sites Rows ── */}
+              {groupedPlans.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={10 + columns.length} sx={{ textAlign: 'center', py: 3, color: 'text.secondary' }}>
+                    ไม่มีข้อมูลกำหนดการสำหรับปี {selectedYear + 543}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                groupedPlans.map((group, groupIdx) => {
+                  const sitePct = group.totalPlanned > 0 ? Math.round(group.totalCompleted / group.totalPlanned * 100) : 0;
+                  const isExpanded = expandedSites[group.site] === true;
+                  const siteWbs = `1.${groupIdx + 1}`;
+                  const siteDays = (group.startDate && group.endDate) ? Math.max(1, Math.ceil((group.endDate.getTime() - group.startDate.getTime()) / 86400000)) : '-';
 
-              <div style={{ width: 1, height: 20, background: '#e5e7eb' }} />
+                  const siteDummyPlan = {
+                    startDate: group.startDate,
+                    endDate: group.endDate,
+                    site: group.site,
+                    deptTask: 'ภาพรวม'
+                  };
 
-              <div style={{ background: '#f5f5f7', padding: '3px', borderRadius: '8px', display: 'flex', gap: '3px' }}>
-                <button 
-                  className={`pms-btn ${viewMode === 'daily' ? 'pms-btn-primary' : 'pms-btn-outline'}`} 
-                  style={{ padding: '4px 10px', fontSize: '10px', border: 'none' }} 
-                  onClick={() => { setViewMode('daily'); setTimeOffset(0); }}
-                >
-                  รายวัน
-                </button>
-                <button 
-                  className={`pms-btn ${viewMode === 'weekly' ? 'pms-btn-primary' : 'pms-btn-outline'}`} 
-                  style={{ padding: '4px 10px', fontSize: '10px', border: 'none' }} 
-                  onClick={() => { setViewMode('weekly'); setTimeOffset(0); }}
-                >
-                  รายสัปดาห์
-                </button>
-              </div>
+                  return (
+                    <React.Fragment key={group.site}>
+                      <TableRow hover onClick={() => toggleSite(group.site)} sx={{ bgcolor: 'action.hover', fontWeight: 600, cursor: 'pointer' }}>
+                        <TableCell sx={{ textAlign: 'center' }}>{siteWbs}</TableCell>
+                        <TableCell sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <ChevronRightRotateIcon sx={{ fontSize: 14, transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s', color: 'primary.main' }} />
+                          <BusinessIcon sx={{ fontSize: 14 }} /> {group.site}
+                        </TableCell>
+                        <TableCell sx={{ textAlign: 'center' }}>{group.lead || '-'}</TableCell>
+                        <TableCell sx={{ textAlign: 'center' }}>{group.totalPlanned}</TableCell>
+                        <TableCell sx={{ textAlign: 'center' }}>{group.totalCompleted}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', color: 'error.main' }}>{group.totalPlanned - group.totalCompleted}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', fontSize: 9 }}>{group.startDate ? fmtDate(group.startDate) : '-'}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', fontSize: 9 }}>{group.endDate ? fmtDate(group.endDate) : '-'}</TableCell>
+                        <TableCell sx={{ textAlign: 'center' }}>{siteDays}</TableCell>
+                        <TableCell sx={{ textAlign: 'center' }}>
+                          <Box component="span" sx={{ color: 'success.main', fontWeight: 600 }}>{sitePct}%</Box>
+                        </TableCell>
+                        {columns.map(col => renderGanttCell(siteDummyPlan, col, sitePct, true))}
+                      </TableRow>
 
-              <div style={{ display: 'flex', gap: 4 }}>
-                <button className="pms-btn pms-btn-outline" style={{ padding: '4px 8px', fontSize: '10px' }} onClick={() => setTimeOffset(prev => prev - (viewMode === 'weekly' ? 1 : 7))}>
-                  ◀
-                </button>
-                <button className="pms-btn pms-btn-outline" style={{ padding: '4px 8px', fontSize: '10px' }} onClick={() => setTimeOffset(0)} disabled={timeOffset === 0}>
-                  ↺
-                </button>
-                <button className="pms-btn pms-btn-outline" style={{ padding: '4px 8px', fontSize: '10px' }} onClick={() => setTimeOffset(prev => prev + (viewMode === 'weekly' ? 1 : 7))}>
-                  ▶
-                </button>
-              </div>
-            </div>
-          </div>
+                      {isExpanded && group.plans.map((plan, planIdx) => {
+                        const planPct = plan.plannedDeviceCount > 0 ? Math.round((plan.completedCount || 0) / plan.plannedDeviceCount * 100) : 0;
+                        const planWbs = `${siteWbs}.${planIdx + 1}`;
 
-          <div style={{ overflowX: 'auto', maxHeight: '65vh', padding: 0 }}>
-            <table className="gantt-table">
-              <thead>
-                <tr>
-                  <th style={{ width: 40, textAlign: 'center' }}>WBS</th>
-                  <th style={{ minWidth: 160, textAlign: 'left' }}>TASK (บริษัท / แผนกงาน)</th>
-                  <th style={{ width: 60, textAlign: 'center' }}>LEAD</th>
-                  <th style={{ width: 40, textAlign: 'center' }}>แผน</th>
-                  <th style={{ width: 40, textAlign: 'center' }}>เสร็จ</th>
-                  <th style={{ width: 40, textAlign: 'center' }}>เหลือ</th>
-                  <th style={{ width: 60, textAlign: 'center' }}>START</th>
-                  <th style={{ width: 60, textAlign: 'center' }}>END</th>
-                  <th style={{ width: 30, textAlign: 'center' }}>วัน</th>
-                  <th style={{ width: 40, textAlign: 'center' }}>%</th>
-                  {columns.map(col => {
-                    const isToday = isTodayInCol(col);
-                    return (
-                      <th 
-                        key={col.start.getTime()} 
-                        style={{ 
-                          width: viewMode === 'daily' ? 40 : 80, 
-                          textAlign: 'center', 
-                          minWidth: viewMode === 'daily' ? 35 : 75,
-                          backgroundColor: isToday ? '#fee2e2' : undefined,
-                          borderLeft: isToday ? '2.5px solid #ef4444' : undefined,
-                          borderRight: isToday ? '2.5px solid #ef4444' : undefined,
-                        }}
-                      >
-                        {col.label}<br />
-                        <span style={{ fontSize: 8, fontWeight: isToday ? 700 : 400, color: isToday ? '#ef4444' : '#86868b' }}>
-                          {isToday ? '★ วันนี้' : col.subLabel.split(' ')[0]}
-                        </span>
-                      </th>
-                    );
-                  })}
-                </tr>
-              </thead>
-              <tbody>
-                {/* ── Level 0: Total Summary Row ── */}
-                <tr style={{ background: '#f5f5f7', fontWeight: 600 }}>
-                  <td style={{ textAlign: 'center', color: '#86868b' }}>1</td>
-                  <td>💼 TRR GROUP (ทั้งหมดในระบบ)</td>
-                  <td style={{ textAlign: 'center' }}>-</td>
-                  <td style={{ textAlign: 'center' }}>{totalPlanned}</td>
-                  <td style={{ textAlign: 'center' }}>{totalCompleted}</td>
-                  <td style={{ textAlign: 'center', color: '#ff3b30' }}>{totalPlanned - totalCompleted}</td>
-                  <td style={{ textAlign: 'center' }}>-</td>
-                  <td style={{ textAlign: 'center' }}>-</td>
-                  <td style={{ textAlign: 'center' }}>-</td>
-                  <td style={{ textAlign: 'center' }}>
-                    <span style={{ color: getProgressColor(overallPct), fontWeight: 600 }}>{overallPct}%</span>
-                  </td>
-                  <td colSpan={columns.length} style={{ background: 'rgba(52, 199, 89, 0.05)', textAlign: 'center', fontSize: 11, color: '#248a3d', fontWeight: 600 }}>
-                    {overallPct >= 100 ? '✅ เสร็จสิ้นโครงการ PM แล้ว' : '🔄 กำลังดำเนินการตามแผน'}
-                  </td>
-                </tr>
+                        const pStartVal = plan.startDate ? new Date(plan.startDate) : null;
+                        const pEndVal = plan.endDate ? new Date(plan.endDate) : null;
+                        const pDays = (pStartVal && pEndVal) ? Math.max(1, Math.ceil((pEndVal.getTime() - pStartVal.getTime()) / 86400000)) : '-';
 
-                {/* ── Grouped Sites Rows ── */}
-                {groupedPlans.length === 0 ? (
-                  <tr>
-                    <td colSpan={10 + columns.length} style={{ textAlign: 'center', padding: 24, color: '#86868b' }}>
-                      ไม่มีข้อมูลกำหนดการสำหรับปี {selectedYear + 543}
-                    </td>
-                  </tr>
-                ) : (
-                  groupedPlans.map((group, groupIdx) => {
-                    const sitePct = group.totalPlanned > 0 ? Math.round(group.totalCompleted / group.totalPlanned * 100) : 0;
-                    const isExpanded = expandedSites[group.site] === true;
-                    const siteWbs = `1.${groupIdx + 1}`;
-                    const siteDays = (group.startDate && group.endDate) ? Math.max(1, Math.ceil((group.endDate.getTime() - group.startDate.getTime()) / 86400000)) : '-';
+                        return (
+                          <TableRow
+                            key={plan.id}
+                            hover
+                            sx={{ cursor: 'pointer' }}
+                            onClick={() => navigate(`/pm/runs?planId=${plan.id}`)}
+                          >
+                            <TableCell sx={{ textAlign: 'center', color: 'text.secondary' }}>{planWbs}</TableCell>
+                            <TableCell sx={{ pl: 3.5 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><FolderIcon sx={{ fontSize: 13 }} /> {plan.deptTask || 'ทั่วไป'}</Box>
+                              {plan.deviceType && (
+                                <Box sx={{ fontSize: 10, color: 'info.main', fontWeight: 600, mt: 0.25, pl: 2.25, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <ComputerIcon sx={{ fontSize: 11 }} /> {plan.deviceType}
+                                </Box>
+                              )}
+                            </TableCell>
+                            <TableCell sx={{ textAlign: 'center' }}>{plan.lead || group.lead || '-'}</TableCell>
+                            <TableCell sx={{ textAlign: 'center' }}>{plan.plannedDeviceCount}</TableCell>
+                            <TableCell sx={{ textAlign: 'center' }}>{plan.completedCount || 0}</TableCell>
+                            <TableCell sx={{ textAlign: 'center', color: 'error.main' }}>{plan.plannedDeviceCount - (plan.completedCount || 0)}</TableCell>
+                            <TableCell sx={{ textAlign: 'center', fontSize: 9 }}>{pStartVal ? fmtDate(pStartVal) : '-'}</TableCell>
+                            <TableCell sx={{ textAlign: 'center', fontSize: 9 }}>{pEndVal ? fmtDate(pEndVal) : '-'}</TableCell>
+                            <TableCell sx={{ textAlign: 'center' }}>{pDays}</TableCell>
+                            <TableCell sx={{ textAlign: 'center' }}>
+                              <Box component="span" sx={{ color: `${getProgressColor(planPct)}.main`, fontWeight: 600 }}>{planPct}%</Box>
+                            </TableCell>
+                            {columns.map(col => renderGanttCell(plan, col, planPct))}
+                          </TableRow>
+                        );
+                      })}
+                    </React.Fragment>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
 
-                    const siteDummyPlan = {
-                      startDate: group.startDate,
-                      endDate: group.endDate,
-                      site: group.site,
-                      deptTask: 'ภาพรวม'
-                    };
-
-                    return (
-                      <React.Fragment key={group.site}>
-                        <tr className="gantt-site-row" onClick={() => toggleSite(group.site)}>
-                          <td style={{ textAlign: 'center' }}>{siteWbs}</td>
-                          <td>
-                            <span className="collapsible-icon" style={{ transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
-                            🏢 {group.site}
-                          </td>
-                          <td style={{ textAlign: 'center' }}>{group.lead || '-'}</td>
-                          <td style={{ textAlign: 'center' }}>{group.totalPlanned}</td>
-                          <td style={{ textAlign: 'center' }}>{group.totalCompleted}</td>
-                          <td style={{ textAlign: 'center', color: '#ff3b30' }}>{group.totalPlanned - group.totalCompleted}</td>
-                          <td style={{ textAlign: 'center', fontSize: 9 }}>{group.startDate ? fmtDate(group.startDate) : '-'}</td>
-                          <td style={{ textAlign: 'center', fontSize: 9 }}>{group.endDate ? fmtDate(group.endDate) : '-'}</td>
-                          <td style={{ textAlign: 'center' }}>{siteDays}</td>
-                          <td style={{ textAlign: 'center' }}>
-                            <span style={{ color: '#248a3d', fontWeight: 600 }}>{sitePct}%</span>
-                          </td>
-                          {columns.map(col => renderGanttCell(siteDummyPlan, col, sitePct, true))}
-                        </tr>
-
-                        {isExpanded && group.plans.map((plan, planIdx) => {
-                          const planPct = plan.plannedDeviceCount > 0 ? Math.round((plan.completedCount || 0) / plan.plannedDeviceCount * 100) : 0;
-                          const planWbs = `${siteWbs}.${planIdx + 1}`;
-                          
-                          const pStartVal = plan.startDate ? new Date(plan.startDate) : null;
-                          const pEndVal = plan.endDate ? new Date(plan.endDate) : null;
-                          const pDays = (pStartVal && pEndVal) ? Math.max(1, Math.ceil((pEndVal.getTime() - pStartVal.getTime()) / 86400000)) : '-';
-
-                          return (
-                            <tr 
-                              key={plan.id} 
-                              className="gantt-dept-row gantt-row-interactive" 
-                              onClick={() => navigate(`/pm/runs?planId=${plan.id}`)}
-                            >
-                              <td style={{ textAlign: 'center', color: '#86868b' }}>{planWbs}</td>
-                              <td style={{ paddingLeft: '28px', color: '#1d1d1f' }}>
-                                ↳ 📁 {plan.deptTask || 'ทั่วไป'}
-                                {plan.deviceType && (
-                                  <div style={{ fontSize: 10, color: '#0ea5e9', fontWeight: 600, marginTop: 2, paddingLeft: 18 }}>
-                                    💻 {plan.deviceType}
-                                  </div>
-                                )}
-                              </td>
-                              <td style={{ textAlign: 'center' }}>{plan.lead || group.lead || '-'}</td>
-                              <td style={{ textAlign: 'center' }}>{plan.plannedDeviceCount}</td>
-                              <td style={{ textAlign: 'center' }}>{plan.completedCount || 0}</td>
-                              <td style={{ textAlign: 'center', color: '#ff3b30' }}>{plan.plannedDeviceCount - (plan.completedCount || 0)}</td>
-                              <td style={{ textAlign: 'center', fontSize: 9 }}>{pStartVal ? fmtDate(pStartVal) : '-'}</td>
-                              <td style={{ textAlign: 'center', fontSize: 9 }}>{pEndVal ? fmtDate(pEndVal) : '-'}</td>
-                              <td style={{ textAlign: 'center' }}>{pDays}</td>
-                              <td style={{ textAlign: 'center' }}>
-                                <span style={{ color: getProgressColor(planPct), fontWeight: 600 }}>{planPct}%</span>
-                              </td>
-                              {columns.map(col => renderGanttCell(plan, col, planPct))}
-                            </tr>
-                          );
-                        })}
-                      </React.Fragment>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* ── Toast Notification ── */}
-        {toast && <div className="pms-toast">{toast}</div>}
-      </div>
-    </>
+      {/* ── Toast Notification ── */}
+      <Snackbar open={!!toast} autoHideDuration={3000} onClose={() => setToast(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
+        <Alert severity={toast?.startsWith('❌') ? 'error' : 'success'} variant="filled" sx={{ whiteSpace: 'nowrap' }}>
+          {toast}
+        </Alert>
+      </Snackbar>
+    </Box>
   );
 }

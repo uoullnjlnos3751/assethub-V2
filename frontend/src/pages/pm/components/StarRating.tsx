@@ -1,38 +1,44 @@
 import React from 'react';
+import { Box } from '@mui/material';
+import StarIcon from '@mui/icons-material/Star';
+import StarBorderIcon from '@mui/icons-material/StarBorder';
 
 interface StarRatingProps {
   value: number;
   onChange?: (v: number) => void;
   size?: number;
-  color?: string;
   readOnly?: boolean;
+  disabled?: boolean;
 }
 
 export const StarRating: React.FC<StarRatingProps> = ({
   value,
   onChange,
   size = 24,
-  color = '#ff9500',
   readOnly = false,
+  disabled = false,
 }) => {
+  const inactive = readOnly || disabled || !onChange;
   return (
-    <div style={{ display: 'flex', gap: 4 }}>
-      {[1, 2, 3, 4, 5].map((n) => (
-        <span
-          key={n}
-          onClick={() => {
-            if (!readOnly && onChange) onChange(n);
-          }}
-          style={{
-            fontSize: size,
-            cursor: readOnly ? 'default' : 'pointer',
-            color: n <= value ? color : '#d2d2d7',
-            transition: 'color .1s',
-          }}
-        >
-          ★
-        </span>
-      ))}
-    </div>
+    <Box sx={{ display: 'flex', gap: 0.5 }}>
+      {[1, 2, 3, 4, 5].map((n) => {
+        const filled = n <= value;
+        const Icon = filled ? StarIcon : StarBorderIcon;
+        return (
+          <Icon
+            key={n}
+            onClick={() => {
+              if (!inactive) onChange?.(n);
+            }}
+            sx={{
+              fontSize: size,
+              cursor: inactive ? 'default' : 'pointer',
+              color: filled ? 'warning.main' : 'action.disabled',
+              transition: 'color .1s',
+            }}
+          />
+        );
+      })}
+    </Box>
   );
 };
