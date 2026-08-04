@@ -549,6 +549,16 @@
   text-decoration: underline;
 }
 
+.version-footer {
+  text-align: center;
+  margin-top: 1rem;
+  font-size: 0.68rem;
+  font-family: var(--font-mono);
+  color: var(--muted);
+  opacity: 0.7;
+  letter-spacing: 0.02em;
+}
+
 .animate-fade-in {
   animation: fade-in-anim 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }

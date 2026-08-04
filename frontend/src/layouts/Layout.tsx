@@ -27,6 +27,7 @@ import PageTransition from '../components/PageTransition';
 import QRScannerModal from '../components/QRScannerModal';
 import { notificationAPI, assetAPI, presenceAPI } from '../services/api';
 import { adminNav, NavGroup, NavItem, userNavItems } from '../navigation/nav';
+import { APP_VERSION, GIT_COMMIT, BUILD_TIME, formatBuildTime } from '../utils/buildInfo';
 
 // ── Sidebar width matching ITSM HTML (210px) ───────────────────────────────
 const drawerWidth = 220;
@@ -467,6 +468,21 @@ export default function Layout() {
           <LogoutIcon sx={{ fontSize: 16 }} />
         </IconButton>
       </Box>
+
+      {/* Build/version footer — so it's always visible which build is live */}
+      <Tooltip title={BUILD_TIME ? `Built ${formatBuildTime(BUILD_TIME)}` : ''} placement="top">
+        <Typography noWrap sx={{
+          fontSize: '9px',
+          fontFamily: 'monospace',
+          letterSpacing: '0.02em',
+          textAlign: 'center',
+          color: theme.palette.text.disabled,
+          py: '4px',
+          flexShrink: 0,
+        }}>
+          v{APP_VERSION} · {GIT_COMMIT}
+        </Typography>
+      </Tooltip>
     </Box>
   );
 

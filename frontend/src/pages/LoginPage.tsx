@@ -4,6 +4,7 @@ import { Lock, Eye, EyeOff, Package, AlertCircle, Loader, Calendar, Clock, Lapto
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/api';
 import { extractApiError } from '../utils/errorHandler';
+import { APP_VERSION, GIT_COMMIT, BUILD_TIME, formatBuildTime } from '../utils/buildInfo';
 import './LoginPage.css';
 
 export default function LoginPage() {
@@ -324,6 +325,10 @@ export default function LoginPage() {
               พบปัญหาการเข้าใช้งาน? ติดต่อ <a href="mailto:HQITSupport@trrgroup.com">IT Support</a>
             </div>
 
+          </div>
+
+          <div className="version-footer" title={BUILD_TIME ? `Built ${formatBuildTime(BUILD_TIME)}` : undefined}>
+            {systemSettings?.systemName || 'AssetHub'} v{APP_VERSION} · {GIT_COMMIT}
           </div>
         </div>
       </main>
