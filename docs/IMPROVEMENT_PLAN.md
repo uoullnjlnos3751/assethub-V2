@@ -87,7 +87,7 @@
 
 ### Phase 5 — โครงสร้างระยะยาว
 1. ❌ ยังไม่ทำ — รวม UX ของ PM 2 ระบบ
-2. 🔶 กำลังทำ — แตกไฟล์ใหญ่ (ผู้ใช้เลือกข้อนี้ก่อนเพราะความเสี่ยงต่ำสุด: pure code-motion ไม่แตะ behavior/UX)
+2. ✅ เสร็จสมบูรณ์ — แตกไฟล์ใหญ่ (ผู้ใช้เลือกข้อนี้ก่อนเพราะความเสี่ยงต่ำสุด: pure code-motion ไม่แตะ behavior/UX)
    - ✅ `AssetDetailPage.tsx` (1,487 → 358 บรรทัด) แตกเป็น 7 ไฟล์ตาม convention เดิมของโปรเจกต์ (`pages/assets/components/`, `pages/assets/tabs/`) (2026-08-04):
      - `components/assetTypeIcon.ts` — `getTypeIconComponent()`
      - `components/WarrantyBar.tsx`, `components/LifecycleStepper.tsx`
@@ -99,7 +99,14 @@
      - `components/AssetKpiStrip.tsx`, `components/AssetQuickViewDrawer.tsx`, `components/ColumnPickerDialog.tsx`, `components/AssetRowActionsMenu.tsx` — UI ที่ประกอบตัวเองได้ผ่าน props
      - `components/ExtendBorrowDialog.tsx` — ย้าย state `extendDays`/`extendReason` เข้าไปอยู่ในคอมโพเนนต์เอง (ตามแพทเทิร์นเดียวกับ `DocumentsTab.tsx` ใน AssetDetailPage) แต่ต้องเพิ่ม `useEffect` reset `extendDays` เป็น 3 ทุกครั้งที่ `open` เปลี่ยนเป็น true — โค้ดเดิม reset ผ่าน `setExtendDays(3)` ที่จุดเปิด dialog ใน parent ซึ่งหายไปเมื่อย้าย state เข้าไปอยู่ใน component ถ้าไม่เพิ่ม effect นี้จะเกิดพฤติกรรมเพี้ยนจริง (ค่าค้างจากครั้งก่อนหน้า) — เป็นจุดเดียวที่ pure code-motion ต้องมี logic เพิ่มเพื่อรักษาพฤติกรรมเดิมไว้
    - ตรวจด้วย `tsc --noEmit` (23 คงที่ ไม่มีใหม่), `vite build` ผ่าน, เปิดดูภาพจริง: table view, grid view, column picker dialog, quick-view drawer, KPI strip, mobile card view — ทั้งโหมดสว่าง/มืด ข้อมูลจริงจาก DB (765 รายการ) render ถูกต้องครบ; mobile header overflow-menu (ซึ่งใช้ `AssetRowActionsMenu` เดียวกันกับเมนูต่อแถว คนละ branch) ตรวจแล้วว่าทำงานถูกต้อง
-   - เหลือ: `DashboardPage.tsx` (990 บรรทัด) — ยังไม่ได้เริ่ม
+   - ✅ `DashboardPage.tsx` (990 → 260 บรรทัด) แตกเป็น 16 ไฟล์ (2026-08-04) — โฟลเดอร์ใหม่ `pages/dashboard/` (helpers + `components/`) เพราะเดิมไฟล์นี้อยู่เดี่ยวๆ ที่ `pages/` root ไม่มีโฟลเดอร์ของตัวเอง; คงพาธเดิม `pages/DashboardPage.tsx` ไว้ไม่ย้าย เพื่อไม่ต้องแตะ `App.tsx` (import เดียวที่ใช้ไฟล์นี้):
+     - `dashboard/dashboardHelpers.ts` — `now`/`pct`/`timeAgo`/`TH_MONTHS`/`STATUS_CFG`/`statusColor`/`CAT_COLORS`
+     - `dashboard/components/{DonutChart,KpiCard,SectionCard}.tsx` — 3 sub-component ที่ใช้ซ้ำหลายจุด
+     - การ์ดแต่ละใบใน dashboard (Row 1-6 เดิม) แยกเป็นคอมโพเนนต์ของตัวเอง 12 ไฟล์ (`ProactiveAlertsBar`, `OnlineTeamCard`, `CategoryDonutCard`, `BorrowTrendCard`, `RecentActivityCard`, `QuickActionsPanel`, `AssetStatusBreakdownCard`, `LocationBreakdownCard`, `BorrowSummaryCard`, `PMSummaryCard`, `DataHealthCard`, `WarrantyAlertsCard`, `ContractLicenseSummary`) — แต่ละใบรับ raw data ผ่าน props แล้วคำนวณ derived values (เช่น donut segments, chart data, activity list, contract/license stats) ไว้ภายในตัวเอง แทนที่จะคำนวณใน parent แล้วส่ง prop ที่แปลงแล้วเข้าไป — ลดพื้นที่ผิว props และให้แต่ละไฟล์ยืนได้ด้วยตัวเองมากขึ้น
+     - พบ dead code เดิม 3 จุดระหว่างอ่านไฟล์ (คงไว้ตามเดิม ไม่ใช่ scope ของงานนี้): ตัวแปร `byType` คำนวณแล้วไม่เคยใช้, import icon `PackageX`/`BellRing`/`Key`/`Users`/`Activity`/`Zap`/`FileText`/`AlertTriangle` ที่ไม่มีการใช้งานตรงในไฟล์หลัก (ย้ายไปอยู่ในคอมโพเนนต์ที่ใช้จริงแทน)
+   - ตรวจด้วย `tsc --noEmit` (23 คงที่ ไม่มีใหม่), `vite build` ผ่าน, เปิดดูภาพจริงทั้ง 2 role: ADMIN (KPI/alerts/donut/trend/activity/shortcuts/breakdown ทุกการ์ด) และ USER (quick-links 6 ปุ่ม) ทั้งโหมดสว่าง/มืด — พบว่า `KpiCard`/`SectionCard` ใช้สี hex คงที่ (ไม่ theme-aware) มาตั้งแต่โค้ดเดิม จึงยังคงพื้นหลังสีขาวแม้สลับ dark mode — เป็นพฤติกรรมเดิมที่ยกมาทั้งดุ้น ไม่ใช่บั๊กใหม่จากการแตกไฟล์
+   - **บันทึกกับดักเครื่องมือทดสอบ:** ตอนแรกทดสอบ USER role โดยใช้ userId ที่สุ่มขึ้น (ไม่มีจริงใน DB) แล้ว reuse browser context เดียวกับที่เพิ่ง test ADMIN มา — dashboard ยังคงแสดงเป็น Admin/all-zero เพราะ Chromium cache request `/api/auth/me` แบบไม่สนใจ Cookie header (ไม่มี `Vary: Cookie`) ข้าม network ไปเสิร์ฟ response แคชของ token ก่อนหน้า แก้โดย (1) หา userId จริงที่ role=USER จาก `/api/admin/users` แล้ว (2) เปิด browser instance ใหม่แยกจากที่ test ADMIN — ไม่ใช่บั๊กของแอปหรือของการแตกไฟล์
+   - **Phase 5 ข้อ 2 (แตกไฟล์ใหญ่) เสร็จสมบูรณ์ทั้ง 3 ไฟล์** (AssetDetailPage, AssetListPage, DashboardPage)
 3. ❌ ยังไม่ทำ — ผูก FK master data (department/vendor/location) แบบ dual-write
 
 ## หมายเหตุจากรอบตรวจสอบ 2026-08-01
