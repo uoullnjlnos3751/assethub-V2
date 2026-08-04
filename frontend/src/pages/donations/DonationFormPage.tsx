@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Button, Card, CardContent, TextField, Grid, Checkbox,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Chip, InputAdornment, alpha, Skeleton, Divider, Tooltip, IconButton,
+  Chip, InputAdornment, alpha, Skeleton, Divider, Tooltip, IconButton, useTheme,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SearchIcon from '@mui/icons-material/Search';
@@ -20,6 +20,7 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
 
 export default function DonationFormPage() {
+  const theme = useTheme();
   const [assets, setAssets]                   = useState<any[]>([]);
   const [loadingAssets, setLoadingAssets]     = useState(true);
   const [selectedIds, setSelectedIds]         = useState<Set<number>>(new Set());
@@ -204,8 +205,8 @@ export default function DonationFormPage() {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                 <Box sx={{
                   width: 32, height: 32, borderRadius: 1.5,
-                  bgcolor: alpha('#6366F1', 0.1), display: 'flex',
-                  alignItems: 'center', justifyContent: 'center', color: '#6366F1',
+                  bgcolor: alpha(theme.palette.primary.main, 0.1), display: 'flex',
+                  alignItems: 'center', justifyContent: 'center', color: theme.palette.primary.main,
                 }}>
                   <BusinessIcon sx={{ fontSize: 18 }} />
                 </Box>
@@ -271,17 +272,17 @@ export default function DonationFormPage() {
                   onClick={() => batchInputRef.current?.click()}
                   sx={{
                     border: '2px dashed',
-                    borderColor: '#6366F1',
+                    borderColor: theme.palette.primary.main,
                     borderRadius: '8px',
                     p: 3,
                     textAlign: 'center',
                     cursor: 'pointer',
-                    bgcolor: alpha('#6366F1', 0.04),
+                    bgcolor: alpha(theme.palette.primary.main, 0.04),
                     transition: 'background-color 0.2s',
-                    '&:hover': { bgcolor: alpha('#6366F1', 0.08) },
+                    '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.08) },
                   }}
                 >
-                  <CloudUploadIcon sx={{ fontSize: 32, color: '#6366F1', mb: 0.5 }} />
+                  <CloudUploadIcon sx={{ fontSize: 32, color: theme.palette.primary.main, mb: 0.5 }} />
                   <Typography variant="body2" color="text.secondary">
                     คลิกหรือลากไฟล์รูปภาพมาวาง
                   </Typography>
@@ -341,8 +342,8 @@ export default function DonationFormPage() {
                         sx={{
                           display: 'flex', alignItems: 'center', gap: 1,
                           p: 1, borderRadius: 1,
-                          bgcolor: alpha('#10B981', 0.05),
-                          border: '0.5px solid', borderColor: alpha('#10B981', 0.2),
+                          bgcolor: alpha(theme.palette.success.main, 0.05),
+                          border: '0.5px solid', borderColor: alpha(theme.palette.success.main, 0.2),
                         }}
                       >
                         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -396,7 +397,7 @@ export default function DonationFormPage() {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                 <Box sx={{
                   width: 32, height: 32, borderRadius: 1.5,
-                  bgcolor: alpha('#f59e0b', 0.12), display: 'flex',
+                  bgcolor: alpha(theme.palette.warning.main, 0.12), display: 'flex',
                   alignItems: 'center', justifyContent: 'center', color: 'primary.dark',
                 }}>
                   <InventoryIcon sx={{ fontSize: 18 }} />
@@ -483,8 +484,8 @@ export default function DonationFormPage() {
                             sx={{
                               cursor: 'pointer',
                               ...(isSelected && {
-                                bgcolor: `${alpha('#10B981', 0.06)} !important`,
-                                '& .MuiTableCell-body': { borderColor: alpha('#10B981', 0.1) },
+                                bgcolor: `${alpha(theme.palette.success.main, 0.06)} !important`,
+                                '& .MuiTableCell-body': { borderColor: alpha(theme.palette.success.main, 0.1) },
                               }),
                             }}
                             onClick={() => toggleSelect(a.id)}
@@ -544,7 +545,7 @@ export default function DonationFormPage() {
                                     <IconButton
                                       size="small"
                                       onClick={() => itemInputRefs.current[a.id]?.click()}
-                                      sx={{ color: '#6366F1' }}
+                                      sx={{ color: theme.palette.primary.main }}
                                     >
                                       <PhotoCameraIcon sx={{ fontSize: 18 }} />
                                     </IconButton>
@@ -568,7 +569,7 @@ export default function DonationFormPage() {
                   <Typography variant="caption" color="text.secondary">
                     แสดง {filteredAssets.length} จาก {assets.length} รายการ
                     {selectedIds.size > 0 && (
-                      <> &nbsp;·&nbsp; <strong style={{ color: '#059669' }}>เลือกแล้ว {selectedIds.size} รายการ</strong></>
+                      <> &nbsp;·&nbsp; <strong style={{ color: theme.palette.success.dark }}>เลือกแล้ว {selectedIds.size} รายการ</strong></>
                     )}
                   </Typography>
                 </Box>

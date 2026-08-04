@@ -4,7 +4,7 @@ import {
   Box, Typography, Button, Card, CardContent, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Chip, IconButton, Tooltip, alpha,
   Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
-  TextField, InputAdornment, Skeleton, Stack,
+  TextField, InputAdornment, Skeleton, Stack, useTheme,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -66,6 +66,7 @@ function StatCard({ icon, label, value, color, bgColor, loading }: StatCardProps
 
 // ── Main page ──────────────────────────────────────────────────────────────
 export default function DonationListPage() {
+  const theme = useTheme();
   const [donations, setDonations] = useState<any[]>([]);
   const [loading, setLoading]     = useState(true);
   const [deleteId, setDeleteId]   = useState<number | null>(null);
@@ -143,24 +144,24 @@ export default function DonationListPage() {
           icon={<CardGiftcardIcon fontSize="small" />}
           label="รายการทั้งหมด"
           value={stats.total}
-          color="#6366F1"
-          bgColor={alpha('#6366F1', 0.1)}
+          color={theme.palette.primary.main}
+          bgColor={alpha(theme.palette.primary.main, 0.1)}
           loading={loading}
         />
         <StatCard
           icon={<HourglassEmptyIcon fontSize="small" />}
           label="รอส่งมอบ"
           value={stats.pending}
-          color="#d97706"
-          bgColor={alpha('#f59e0b', 0.12)}
+          color={theme.palette.warning.dark}
+          bgColor={alpha(theme.palette.warning.main, 0.12)}
           loading={loading}
         />
         <StatCard
           icon={<CheckCircleOutlineIcon fontSize="small" />}
           label="ส่งมอบแล้ว"
           value={stats.completed}
-          color="#059669"
-          bgColor={alpha('#10B981', 0.1)}
+          color={theme.palette.success.dark}
+          bgColor={alpha(theme.palette.success.main, 0.1)}
           loading={loading}
         />
       </Stack>
