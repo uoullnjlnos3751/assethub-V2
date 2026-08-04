@@ -61,14 +61,23 @@ foreach ($container in $containers) {
 }
 
 # 4. Swap Nginx configuration
+#
+# `map` instead of `upstream {}` deliberately: an `upstream {}` block
+# resolves its `server` hostname via DNS once, at nginx config load —
+# if nginx reloads this file before the new-color container is up and
+# resolvable (or ever, for any other reason), that's a fatal config
+# error and nginx exits instead of just reloading. `map` never touches
+# DNS itself; it only assigns a string, so the reload always succeeds,
+# and actual resolution happens per-request via nginx.conf's `resolver`
+# directive (self-healing if the container isn't ready yet).
 Write-Host "Swapping Nginx upstream to $newColor..." -ForegroundColor Yellow
 $newUpstreamConfig = @"
-upstream frontend_upstream {
-    server assethub-$newColor-frontend-1:80;
+map `$host `$backend_upstream {
+    default "assethub-$newColor-backend-1:4000";
 }
 
-upstream backend_upstream {
-    server assethub-$newColor-backend-1:4000;
+map `$host `$frontend_upstream {
+    default "assethub-$newColor-frontend-1:80";
 }
 "@
 Set-Content -Path $upstreamFile -Value $newUpstreamConfig
