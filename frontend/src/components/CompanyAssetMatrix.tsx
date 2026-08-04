@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { 
-  Box, Button, Checkbox, FormControlLabel, FormGroup, Typography, 
-  Popover, IconButton, Paper, Divider, Chip
+import {
+  Box, Button, Checkbox, FormControlLabel, FormGroup, Typography,
+  Popover, IconButton, Paper, Divider, Chip, alpha, useTheme
 } from '@mui/material';
 import { Filter, Download, Settings2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -39,6 +39,7 @@ function getBucket(asset: any): string {
 }
 
 export default function CompanyAssetMatrix({ assets }: { assets: any[] }) {
+  const theme = useTheme();
   const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);
 
   // Extract unique companies and types
@@ -257,33 +258,33 @@ export default function CompanyAssetMatrix({ assets }: { assets: any[] }) {
       </Popover>
 
       {/* Matrix Table */}
-      <Box sx={{ overflowX: 'auto', maxHeight: '75vh', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 2, bgcolor: '#fff' }}>
+      <Box sx={{ overflowX: 'auto', maxHeight: '75vh', overflowY: 'auto', border: `1px solid ${theme.palette.divider}`, borderRadius: 2, bgcolor: 'background.paper' }}>
         <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '0.75rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
           <thead>
             {/* Type Headers */}
-            <tr style={{ background: '#10b981', color: '#fff' }}>
-              <th rowSpan={2} style={{ padding: '8px', border: '1px solid #059669', borderBottom: 'none', minWidth: 100, position: 'sticky', left: 0, top: 0, zIndex: 10, background: '#10b981' }}>
+            <tr style={{ background: theme.palette.success.main, color: '#fff' }}>
+              <th rowSpan={2} style={{ padding: '8px', border: `1px solid ${theme.palette.success.dark}`, borderBottom: 'none', minWidth: 100, position: 'sticky', left: 0, top: 0, zIndex: 10, background: theme.palette.success.main }}>
                 บริษัท
               </th>
               {selectedTypes.map(type => (
-                <th key={type} colSpan={selectedBuckets.length + 1} style={{ padding: '6px', border: '1px solid #059669', position: 'sticky', top: 0, zIndex: 2, background: '#10b981' }}>
+                <th key={type} colSpan={selectedBuckets.length + 1} style={{ padding: '6px', border: `1px solid ${theme.palette.success.dark}`, position: 'sticky', top: 0, zIndex: 2, background: theme.palette.success.main }}>
                   {type}
                 </th>
               ))}
-              <th rowSpan={2} style={{ padding: '8px', border: '1px solid #059669', minWidth: 80, position: 'sticky', top: 0, zIndex: 2, background: '#10b981' }}>
+              <th rowSpan={2} style={{ padding: '8px', border: `1px solid ${theme.palette.success.dark}`, minWidth: 80, position: 'sticky', top: 0, zIndex: 2, background: theme.palette.success.main }}>
                 รวมทั้งหมด
               </th>
             </tr>
             {/* Status Headers */}
-            <tr style={{ background: '#f8fafc', color: '#334155' }}>
+            <tr style={{ background: theme.palette.action.hover, color: theme.palette.text.primary }}>
               {selectedTypes.map(type => (
                 <React.Fragment key={type}>
                   {selectedBuckets.map(bucket => (
-                    <th key={bucket} style={{ padding: '6px 4px', border: '1px solid #cbd5e1', fontWeight: 600, fontSize: '0.7rem', maxWidth: 80, whiteSpace: 'normal', position: 'sticky', top: 31, zIndex: 2, background: '#f8fafc' }}>
+                    <th key={bucket} style={{ padding: '6px 4px', border: `1px solid ${theme.palette.divider}`, fontWeight: 600, fontSize: '0.7rem', maxWidth: 80, whiteSpace: 'normal', position: 'sticky', top: 31, zIndex: 2, background: theme.palette.action.hover }}>
                       {STATUS_BUCKETS.find(x => x.id === bucket)?.label}
                     </th>
                   ))}
-                  <th style={{ padding: '6px 4px', border: '1px solid #cbd5e1', background: '#f1f5f9', fontWeight: 700, fontSize: '0.7rem', position: 'sticky', top: 31, zIndex: 2 }}>
+                  <th style={{ padding: '6px 4px', border: `1px solid ${theme.palette.divider}`, background: theme.palette.action.hover, fontWeight: 700, fontSize: '0.7rem', position: 'sticky', top: 31, zIndex: 2 }}>
                     รวม {type.substring(0,3)}
                   </th>
                 </React.Fragment>
@@ -294,8 +295,8 @@ export default function CompanyAssetMatrix({ assets }: { assets: any[] }) {
             {allCompanies.map(company => {
               let rowTotal = 0;
               return (
-                <tr key={company} style={{ '&:hover': { background: '#f8fafc' } } as any}>
-                  <td style={{ padding: '6px 8px', border: '1px solid #cbd5e1', fontWeight: 700, background: '#fff', textAlign: 'left', position: 'sticky', left: 0, zIndex: 5 }}>
+                <tr key={company} style={{ '&:hover': { background: theme.palette.action.hover } } as any}>
+                  <td style={{ padding: '6px 8px', border: `1px solid ${theme.palette.divider}`, fontWeight: 700, background: theme.palette.background.paper, textAlign: 'left', position: 'sticky', left: 0, zIndex: 5 }}>
                     {company}
                   </td>
                   {selectedTypes.map(type => {
@@ -306,18 +307,18 @@ export default function CompanyAssetMatrix({ assets }: { assets: any[] }) {
                           const val = matrixData[company]?.[type]?.[bucket] || 0;
                           typeTotal += val;
                           return (
-                            <td key={bucket} style={{ padding: '6px 4px', border: '1px solid #cbd5e1', color: val > 0 ? '#0f172a' : '#94a3b8' }}>
+                            <td key={bucket} style={{ padding: '6px 4px', border: `1px solid ${theme.palette.divider}`, color: val > 0 ? theme.palette.text.primary : theme.palette.text.disabled }}>
                               {val}
                             </td>
                           );
                         })}
-                        <td style={{ padding: '6px 4px', border: '1px solid #cbd5e1', fontWeight: 700, background: '#f8fafc' }}>
+                        <td style={{ padding: '6px 4px', border: `1px solid ${theme.palette.divider}`, fontWeight: 700, background: theme.palette.action.hover }}>
                           {typeTotal}
                         </td>
                       </React.Fragment>
                     );
                   })}
-                  <td style={{ padding: '6px 8px', border: '1px solid #cbd5e1', fontWeight: 700, background: '#ecfdf5', color: '#047857' }}>
+                  <td style={{ padding: '6px 8px', border: `1px solid ${theme.palette.divider}`, fontWeight: 700, background: alpha(theme.palette.success.main, 0.1), color: theme.palette.success.dark }}>
                     {(() => {
                       selectedTypes.forEach(t => {
                         selectedBuckets.forEach(b => rowTotal += (matrixData[company]?.[t]?.[b] || 0));
@@ -330,8 +331,8 @@ export default function CompanyAssetMatrix({ assets }: { assets: any[] }) {
             })}
           </tbody>
           <tfoot>
-            <tr style={{ background: '#f1f5f9', fontWeight: 700, position: 'sticky', bottom: 0, zIndex: 6 }}>
-              <td style={{ padding: '8px', border: '1px solid #cbd5e1', textAlign: 'left', position: 'sticky', left: 0, zIndex: 7, background: '#f1f5f9' }}>รวมทั้งหมด</td>
+            <tr style={{ background: theme.palette.action.hover, fontWeight: 700, position: 'sticky', bottom: 0, zIndex: 6 }}>
+              <td style={{ padding: '8px', border: `1px solid ${theme.palette.divider}`, textAlign: 'left', position: 'sticky', left: 0, zIndex: 7, background: theme.palette.action.hover }}>รวมทั้งหมด</td>
               {selectedTypes.map(type => {
                 let grandTypeTotal = 0;
                 return (
@@ -341,18 +342,18 @@ export default function CompanyAssetMatrix({ assets }: { assets: any[] }) {
                       allCompanies.forEach(c => colTotal += (matrixData[c]?.[type]?.[bucket] || 0));
                       grandTypeTotal += colTotal;
                       return (
-                        <td key={bucket} style={{ padding: '6px 4px', border: '1px solid #cbd5e1' }}>
+                        <td key={bucket} style={{ padding: '6px 4px', border: `1px solid ${theme.palette.divider}` }}>
                           {colTotal}
                         </td>
                       );
                     })}
-                    <td style={{ padding: '6px 4px', border: '1px solid #cbd5e1', background: '#e2e8f0' }}>
+                    <td style={{ padding: '6px 4px', border: `1px solid ${theme.palette.divider}`, background: theme.palette.action.selected }}>
                       {grandTypeTotal}
                     </td>
                   </React.Fragment>
                 );
               })}
-              <td style={{ padding: '8px', border: '1px solid #cbd5e1', background: '#d1fae5', color: '#047857' }}>
+              <td style={{ padding: '8px', border: `1px solid ${theme.palette.divider}`, background: alpha(theme.palette.success.main, 0.15), color: theme.palette.success.dark }}>
                 {(() => {
                   let grandGrandTotal = 0;
                   selectedTypes.forEach(t => {
@@ -370,18 +371,18 @@ export default function CompanyAssetMatrix({ assets }: { assets: any[] }) {
 
       {/* Summary Table 2 */}
       <Box sx={{ mt: 4, mb: 2, display: 'flex', gap: 4, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        <Box sx={{ flex: '1 1 500px', overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 2, bgcolor: '#fff' }}>
-          <Typography variant="subtitle1" fontWeight="bold" sx={{ p: 2, pb: 1, background: '#10b981', color: '#fff', m: 0 }}>
+        <Box sx={{ flex: '1 1 500px', overflowX: 'auto', border: `1px solid ${theme.palette.divider}`, borderRadius: 2, bgcolor: 'background.paper' }}>
+          <Typography variant="subtitle1" fontWeight="bold" sx={{ p: 2, pb: 1, background: theme.palette.success.main, color: '#fff', m: 0 }}>
             แยกอุปกรณ์ตามบริษัท (Summary)
           </Typography>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', textAlign: 'center' }}>
             <thead>
-              <tr style={{ background: '#f8fafc' }}>
-                <th style={{ padding: '10px', border: '1px solid #cbd5e1', textAlign: 'left' }}>บริษัท</th>
+              <tr style={{ background: theme.palette.action.hover }}>
+                <th style={{ padding: '10px', border: `1px solid ${theme.palette.divider}`, textAlign: 'left' }}>บริษัท</th>
                 {selectedTypes.map(type => (
-                  <th key={type} style={{ padding: '10px', border: '1px solid #cbd5e1' }}>{type}</th>
+                  <th key={type} style={{ padding: '10px', border: `1px solid ${theme.palette.divider}` }}>{type}</th>
                 ))}
-                <th style={{ padding: '10px', border: '1px solid #cbd5e1', background: '#f1f5f9' }}>รวมทั้งหมด</th>
+                <th style={{ padding: '10px', border: `1px solid ${theme.palette.divider}`, background: theme.palette.action.hover }}>รวมทั้งหมด</th>
               </tr>
             </thead>
             <tbody>
@@ -389,33 +390,33 @@ export default function CompanyAssetMatrix({ assets }: { assets: any[] }) {
                 let rowTotal = 0;
                 return (
                   <tr key={company}>
-                    <td style={{ padding: '10px', border: '1px solid #cbd5e1', fontWeight: 700, textAlign: 'left' }}>{company}</td>
+                    <td style={{ padding: '10px', border: `1px solid ${theme.palette.divider}`, fontWeight: 700, textAlign: 'left' }}>{company}</td>
                     {selectedTypes.map(type => {
                       let tTotal = 0;
                       selectedBuckets.forEach(b => tTotal += (matrixData[company]?.[type]?.[b] || 0));
                       rowTotal += tTotal;
                       return (
-                        <td key={type} style={{ padding: '10px', border: '1px solid #cbd5e1' }}>{tTotal}</td>
+                        <td key={type} style={{ padding: '10px', border: `1px solid ${theme.palette.divider}` }}>{tTotal}</td>
                       );
                     })}
-                    <td style={{ padding: '10px', border: '1px solid #cbd5e1', fontWeight: 700, background: '#f8fafc' }}>{rowTotal}</td>
+                    <td style={{ padding: '10px', border: `1px solid ${theme.palette.divider}`, fontWeight: 700, background: theme.palette.action.hover }}>{rowTotal}</td>
                   </tr>
                 );
               })}
             </tbody>
             <tfoot>
-              <tr style={{ background: '#f1f5f9', fontWeight: 700 }}>
-                <td style={{ padding: '10px', border: '1px solid #cbd5e1', textAlign: 'left' }}>รวมทั้งหมด</td>
+              <tr style={{ background: theme.palette.action.hover, fontWeight: 700 }}>
+                <td style={{ padding: '10px', border: `1px solid ${theme.palette.divider}`, textAlign: 'left' }}>รวมทั้งหมด</td>
                 {selectedTypes.map(type => {
                   let cTotal = 0;
                   allCompanies.forEach(c => {
                     selectedBuckets.forEach(b => cTotal += (matrixData[c]?.[type]?.[b] || 0));
                   });
                   return (
-                    <td key={type} style={{ padding: '10px', border: '1px solid #cbd5e1' }}>{cTotal}</td>
+                    <td key={type} style={{ padding: '10px', border: `1px solid ${theme.palette.divider}` }}>{cTotal}</td>
                   );
                 })}
-                <td style={{ padding: '10px', border: '1px solid #cbd5e1', background: '#e2e8f0' }}>
+                <td style={{ padding: '10px', border: `1px solid ${theme.palette.divider}`, background: theme.palette.action.selected }}>
                   {(() => {
                     let gTotal = 0;
                     selectedTypes.forEach(t => {
