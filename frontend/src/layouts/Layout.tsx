@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { keyframes } from '@emotion/react';
 import {
   AppBar, Box, Drawer, IconButton, List, ListItem, ListItemButton,
   ListItemIcon, ListItemText, Toolbar, Typography, Button, Avatar, Menu, MenuItem,
@@ -8,6 +9,7 @@ import {
   CircularProgress
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
+import MenuOpenIcon from '@mui/icons-material/MenuOpen';
 import SearchIcon from '@mui/icons-material/Search';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import DevicesIcon from '@mui/icons-material/Devices';
@@ -25,14 +27,21 @@ import { useAppTheme } from '../contexts/ThemeContext';
 import Breadcrumbs from '../components/Breadcrumbs';
 import PageTransition from '../components/PageTransition';
 import QRScannerModal from '../components/QRScannerModal';
-import { notificationAPI, assetAPI, presenceAPI } from '../services/api';
+import { notificationAPI, assetAPI, presenceAPI, dashboardAPI } from '../services/api';
 import { adminNav, NavGroup, NavItem, userNavItems } from '../navigation/nav';
 import { APP_VERSION, GIT_COMMIT, BUILD_TIME, formatBuildTime } from '../utils/buildInfo';
 
 // ── Sidebar width matching ITSM HTML (210px) ───────────────────────────────
 const drawerWidth = 220;
+const drawerWidthCollapsed = 72;
 const mobileDrawerWidth = 240;
 const appBarHeight = 50;
+
+const pulseKeyframes = keyframes`
+  0% { box-shadow: 0 0 0 0 rgba(22,163,74,.5); }
+  70% { box-shadow: 0 0 0 6px rgba(22,163,74,0); }
+  100% { box-shadow: 0 0 0 0 rgba(22,163,74,0); }
+`;
 
 // ── Section label component ──────────────────────────────────────────────
 function SidebarSection({ children }: { children: React.ReactNode }) {
@@ -63,6 +72,7 @@ export default function Layout() {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const { mode, toggleColorMode } = useAppTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === '1');
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState('');
@@ -73,9 +83,26 @@ export default function Layout() {
   const [qrOpen, setQrOpen] = useState(false);
   const [anchorElNotif, setAnchorElNotif] = useState<null | HTMLElement>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [pmOverdueCount, setPmOverdueCount] = useState(0);
+  const [clock, setClock] = useState(new Date());
   const { user, logout, systemSettings } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const currentDrawerWidth = collapsed ? drawerWidthCollapsed : drawerWidth;
+
+  const toggleCollapsed = () => {
+    setCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem('sidebarCollapsed', next ? '1' : '0');
+      return next;
+    });
+  };
+
+  // Live clock — matches the mockup's "ระบบออนไลน์ HH:MM:SS" topbar indicator
+  useEffect(() => {
+    const t = setInterval(() => setClock(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,6 +151,12 @@ export default function Layout() {
 
   const isAdmin = user?.role === 'IT_ADMIN' || user?.role === 'SUPERADMIN';
   const isViewer = user?.role === 'VIEWER';
+
+  // PM overdue count — powers the red nav badge on "PM ทรัพย์สิน" (mirrors the mockup's nav-badge)
+  useEffect(() => {
+    if (!isAdmin) return;
+    dashboardAPI.pmSummary().then(res => setPmOverdueCount(res.data?.overdue || 0)).catch(() => {});
+  }, [isAdmin]);
 
   // VIEWER = read-only executive access: dashboard, license/contract, reports only
   const viewerVisiblePaths = new Set(['/dashboard', '/contracts', '/licenses']);
@@ -215,7 +248,7 @@ export default function Layout() {
     filteredNav.forEach((entry) => {
       // Section headings are data-driven from nav.tsx (entry.section field)
       const sectionLabel = entry.section ?? null;
-      if (sectionLabel && sectionLabel !== prevSection) {
+      if (sectionLabel && sectionLabel !== prevSection && !collapsed) {
         items.push(<SidebarSection key={`sec-${sectionLabel}`}>{sectionLabel}</SidebarSection>);
         prevSection = sectionLabel;
       }
@@ -223,38 +256,60 @@ export default function Layout() {
       if ('children' in entry) {
         const group = entry as NavGroup;
         const isOpen = openGroups[group.label] ?? false;
+        const badgeCount = group.label === 'PM ทรัพย์สิน' ? pmOverdueCount : 0;
+        const groupButton = (
+          <ListItemButton
+            onClick={() => {
+              if (collapsed) {
+                setCollapsed(false);
+                localStorage.setItem('sidebarCollapsed', '0');
+                setOpenGroups(prev => ({ ...prev, [group.label]: true }));
+              } else {
+                toggleGroup(group.label);
+              }
+            }}
+            sx={{
+              borderRadius: '9px',
+              mx: '8px',
+              py: '7px',
+              px: '12px',
+              my: '1px',
+              justifyContent: collapsed ? 'center' : 'flex-start',
+              '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.04) },
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: collapsed ? 0 : 30, color: isOpen ? theme.palette.primary.main : theme.palette.text.secondary }}>
+              <Badge
+                badgeContent={badgeCount}
+                color="error"
+                overlap="circular"
+                sx={{ '& .MuiBadge-badge': { fontSize: '9px', height: 14, minWidth: 14 } }}
+              >
+                {group.icon}
+              </Badge>
+            </ListItemIcon>
+            {!collapsed && (
+              <ListItemText
+                primary={group.label}
+                primaryTypographyProps={{
+                  fontSize: '0.8125rem',
+                  fontWeight: 500,
+                  color: theme.palette.text.primary,
+                }}
+              />
+            )}
+            {!collapsed && (isOpen
+              ? <ExpandLess sx={{ fontSize: 16, color: theme.palette.text.secondary }} />
+              : <ExpandMore sx={{ fontSize: 16, color: theme.palette.text.secondary }} />)}
+          </ListItemButton>
+        );
         items.push(
           <React.Fragment key={group.label}>
             <ListItem disablePadding>
-              <ListItemButton
-                onClick={() => toggleGroup(group.label)}
-                sx={{
-                  borderRadius: '9px',
-                  mx: '8px',
-                  py: '7px',
-                  px: '12px',
-                  my: '1px',
-                  '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.04) },
-                }}
-              >
-                <ListItemIcon sx={{ minWidth: 30, color: isOpen ? theme.palette.primary.main : theme.palette.text.secondary }}>
-                  {group.icon}
-                </ListItemIcon>
-                <ListItemText
-                  primary={group.label}
-                  primaryTypographyProps={{
-                    fontSize: '0.8125rem',
-                    fontWeight: 500,
-                    color: theme.palette.text.primary,
-                  }}
-                />
-                {isOpen
-                  ? <ExpandLess sx={{ fontSize: 16, color: theme.palette.text.secondary }} />
-                  : <ExpandMore sx={{ fontSize: 16, color: theme.palette.text.secondary }} />}
-              </ListItemButton>
+              {collapsed ? <Tooltip title={group.label} placement="right">{groupButton}</Tooltip> : groupButton}
             </ListItem>
 
-            <Collapse in={isOpen} timeout="auto" unmountOnExit>
+            <Collapse in={isOpen && !collapsed} timeout="auto" unmountOnExit>
               <List component="div" disablePadding sx={{ mb: 0.5 }}>
                 {(() => {
                   let headerCount = 0;
@@ -340,28 +395,29 @@ export default function Layout() {
       } else {
         const item = entry as NavItem;
         const active = isActive(item.path || '');
-        items.push(
-          <ListItem key={item.path || item.label} disablePadding>
-            <ListItemButton
-              selected={active}
-              onClick={() => { navigate(item.path || ''); setMobileOpen(false); }}
-              sx={{
-                borderRadius: '9px',
-                mx: '8px',
-                py: '7px',
-                px: '12px',
-                my: '1px',
-                '&.Mui-selected': {
-                  bgcolor: alpha(theme.palette.primary.main, 0.1),
-                  color: theme.palette.primary.main,
-                  '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.15) },
-                },
-                '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.04) },
-              }}
-            >
-              <ListItemIcon sx={{ minWidth: 30, color: active ? theme.palette.primary.main : theme.palette.text.secondary }}>
-                {item.icon}
-              </ListItemIcon>
+        const itemButton = (
+          <ListItemButton
+            selected={active}
+            onClick={() => { navigate(item.path || ''); setMobileOpen(false); }}
+            sx={{
+              borderRadius: '9px',
+              mx: '8px',
+              py: '7px',
+              px: '12px',
+              my: '1px',
+              justifyContent: collapsed ? 'center' : 'flex-start',
+              '&.Mui-selected': {
+                bgcolor: alpha(theme.palette.primary.main, 0.1),
+                color: theme.palette.primary.main,
+                '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.15) },
+              },
+              '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.04) },
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: collapsed ? 0 : 30, color: active ? theme.palette.primary.main : theme.palette.text.secondary }}>
+              {item.icon}
+            </ListItemIcon>
+            {!collapsed && (
               <ListItemText
                 primary={item.label}
                 primaryTypographyProps={{
@@ -370,7 +426,12 @@ export default function Layout() {
                   color: active ? theme.palette.primary.main : theme.palette.text.primary,
                 }}
               />
-            </ListItemButton>
+            )}
+          </ListItemButton>
+        );
+        items.push(
+          <ListItem key={item.path || item.label} disablePadding>
+            {collapsed ? <Tooltip title={item.label} placement="right">{itemButton}</Tooltip> : itemButton}
           </ListItem>
         );
       }
@@ -391,6 +452,7 @@ export default function Layout() {
         height: `${appBarHeight}px`,
         borderBottom: `0.5px solid ${theme.palette.divider}`,
         flexShrink: 0,
+        justifyContent: collapsed ? 'center' : 'flex-start',
       }}>
         {systemSettings?.logoUrl ? (
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, overflow: 'hidden', borderRadius: '8px', flexShrink: 0 }}>
@@ -415,14 +477,16 @@ export default function Layout() {
             {(systemSettings?.systemName || 'IT').substring(0, 2).toUpperCase()}
           </Box>
         )}
-        <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Typography noWrap sx={{ fontSize: '13px', fontWeight: 600, color: theme.palette.text.primary, lineHeight: 1.2 }}>
-            ITAM
-          </Typography>
-          <Typography noWrap sx={{ fontSize: '10px', color: theme.palette.text.secondary, lineHeight: 1 }}>
-            {systemSettings?.organizationName || 'ระบบจัดการ IT ครบวงจร'}
-          </Typography>
-        </Box>
+        {!collapsed && (
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Typography noWrap sx={{ fontSize: '13px', fontWeight: 600, color: theme.palette.text.primary, lineHeight: 1.2 }}>
+              ITAM
+            </Typography>
+            <Typography noWrap sx={{ fontSize: '10px', color: theme.palette.text.secondary, lineHeight: 1 }}>
+              {systemSettings?.organizationName || 'ระบบจัดการ IT ครบวงจร'}
+            </Typography>
+          </Box>
+        )}
       </Box>
 
       {/* Nav */}
@@ -439,6 +503,7 @@ export default function Layout() {
         py: '10px',
         borderTop: `0.5px solid ${theme.palette.divider}`,
         mt: 'auto',
+        justifyContent: collapsed ? 'center' : 'flex-start',
       }}>
         <Avatar sx={{
           width: 32,
@@ -452,38 +517,44 @@ export default function Layout() {
         }}>
           {user?.displayName?.charAt(0) || 'U'}
         </Avatar>
-        <Box sx={{ overflow: 'hidden', flex: 1 }}>
-          <Typography noWrap sx={{ fontSize: '12px', fontWeight: 500, color: theme.palette.text.primary, lineHeight: 1.3 }}>
-            {user?.displayName || user?.adUsername}
-          </Typography>
-          <Typography sx={{ fontSize: '10px', color: theme.palette.warning.main, lineHeight: 1 }}>
-            {user?.role === 'SUPERADMIN' ? 'Super Admin' : user?.role === 'IT_ADMIN' ? 'IT Admin' : 'User'}
-          </Typography>
-        </Box>
-        <IconButton
-          size="small"
-          onClick={() => { logout(); navigate('/login'); }}
-          sx={{ color: theme.palette.text.secondary, p: '4px', '&:hover': { color: theme.palette.error.main, bgcolor: alpha(theme.palette.error.main, 0.08) } }}
-          title="ออกจากระบบ"
-        >
-          <LogoutIcon sx={{ fontSize: 16 }} />
-        </IconButton>
+        {!collapsed && (
+          <>
+            <Box sx={{ overflow: 'hidden', flex: 1 }}>
+              <Typography noWrap sx={{ fontSize: '12px', fontWeight: 500, color: theme.palette.text.primary, lineHeight: 1.3 }}>
+                {user?.displayName || user?.adUsername}
+              </Typography>
+              <Typography sx={{ fontSize: '10px', color: theme.palette.warning.main, lineHeight: 1 }}>
+                {user?.role === 'SUPERADMIN' ? 'Super Admin' : user?.role === 'IT_ADMIN' ? 'IT Admin' : 'User'}
+              </Typography>
+            </Box>
+            <IconButton
+              size="small"
+              onClick={() => { logout(); navigate('/login'); }}
+              sx={{ color: theme.palette.text.secondary, p: '4px', '&:hover': { color: theme.palette.error.main, bgcolor: alpha(theme.palette.error.main, 0.08) } }}
+              title="ออกจากระบบ"
+            >
+              <LogoutIcon sx={{ fontSize: 16 }} />
+            </IconButton>
+          </>
+        )}
       </Box>
 
       {/* Build/version footer — so it's always visible which build is live */}
-      <Tooltip title={BUILD_TIME ? `Built ${formatBuildTime(BUILD_TIME)}` : ''} placement="top">
-        <Typography noWrap sx={{
-          fontSize: '9px',
-          fontFamily: 'monospace',
-          letterSpacing: '0.02em',
-          textAlign: 'center',
-          color: theme.palette.text.disabled,
-          py: '4px',
-          flexShrink: 0,
-        }}>
-          v{APP_VERSION} · {GIT_COMMIT}
-        </Typography>
-      </Tooltip>
+      {!collapsed && (
+        <Tooltip title={BUILD_TIME ? `Built ${formatBuildTime(BUILD_TIME)}` : ''} placement="top">
+          <Typography noWrap sx={{
+            fontSize: '9px',
+            fontFamily: 'monospace',
+            letterSpacing: '0.02em',
+            textAlign: 'center',
+            color: theme.palette.text.disabled,
+            py: '4px',
+            flexShrink: 0,
+          }}>
+            v{APP_VERSION} · {GIT_COMMIT}
+          </Typography>
+        </Tooltip>
+      )}
     </Box>
   );
 
@@ -495,8 +566,9 @@ export default function Layout() {
         position="fixed"
         elevation={0}
         sx={{
-          width: { md: `calc(100% - ${drawerWidth}px)` },
-          ml: { md: `${drawerWidth}px` },
+          width: { md: `calc(100% - ${currentDrawerWidth}px)` },
+          ml: { md: `${currentDrawerWidth}px` },
+          transition: theme.transitions.create(['width', 'margin'], { duration: theme.transitions.duration.shorter }),
           zIndex: (t) => t.zIndex.drawer + 1,
           height: `${appBarHeight}px`,
           backgroundColor: alpha(theme.palette.background.paper, 0.85),
@@ -521,6 +593,24 @@ export default function Layout() {
           >
             <MenuIcon sx={{ fontSize: 20 }} />
           </IconButton>
+
+          {/* Desktop sidebar collapse toggle */}
+          <Tooltip title={collapsed ? 'ขยายเมนู' : 'ย่อเมนู'}>
+            <IconButton
+              onClick={toggleCollapsed}
+              sx={{
+                display: { xs: 'none', md: 'flex' },
+                width: 34,
+                height: 34,
+                borderRadius: '8px',
+                border: `0.5px solid ${theme.palette.divider}`,
+                color: theme.palette.text.secondary,
+                '&:hover': { borderColor: theme.palette.primary.main, color: theme.palette.primary.main },
+              }}
+            >
+              {collapsed ? <MenuIcon sx={{ fontSize: 18 }} /> : <MenuOpenIcon sx={{ fontSize: 18 }} />}
+            </IconButton>
+          </Tooltip>
 
            {/* Page title area */}
            <Box>
@@ -606,6 +696,27 @@ export default function Layout() {
            </Box>
 
            <Box sx={{ flex: 1, display: { xs: 'flex', sm: 'none' } }} />
+
+           {/* Live clock — mirrors the mockup's "ระบบออนไลน์ HH:MM:SS" indicator */}
+           <Box sx={{
+             display: { xs: 'none', lg: 'flex' },
+             alignItems: 'center',
+             gap: '7px',
+             fontFamily: 'monospace',
+             fontSize: '12.5px',
+             color: theme.palette.text.secondary,
+             whiteSpace: 'nowrap',
+           }}>
+             <Box sx={{
+               width: 7,
+               height: 7,
+               borderRadius: '50%',
+               bgcolor: 'success.main',
+               animation: `${pulseKeyframes} 2s infinite`,
+             }} />
+             <span>ระบบออนไลน์</span>
+             <span>{clock.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span>
+           </Box>
 
            {/* Right side: notification + user */}
            <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -815,7 +926,7 @@ export default function Layout() {
       </AppBar>
 
       {/* ── Sidebar nav box ──────────────────────────────────────────── */}
-      <Box component="nav" sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}>
+      <Box component="nav" sx={{ width: { md: currentDrawerWidth }, flexShrink: { md: 0 }, transition: theme.transitions.create('width', { duration: theme.transitions.duration.shorter }) }}>
         {/* Mobile drawer */}
         <Drawer
           variant="temporary"
@@ -823,8 +934,8 @@ export default function Layout() {
           onClose={() => setMobileOpen(false)}
           sx={{
             display: { xs: 'block', md: 'none' },
-            '& .MuiDrawer-paper': { 
-              boxSizing: 'border-box', 
+            '& .MuiDrawer-paper': {
+              boxSizing: 'border-box',
               width: mobileDrawerWidth,
               borderRight: 'none',
               boxShadow: '10px 0 25px rgba(0,0,0,0.05)',
@@ -839,10 +950,12 @@ export default function Layout() {
           variant="permanent"
           sx={{
             display: { xs: 'none', md: 'block' },
-            '& .MuiDrawer-paper': { 
-              boxSizing: 'border-box', 
-              width: drawerWidth,
+            '& .MuiDrawer-paper': {
+              boxSizing: 'border-box',
+              width: currentDrawerWidth,
               borderRight: `1px solid ${theme.palette.divider}`,
+              overflowX: 'hidden',
+              transition: theme.transitions.create('width', { duration: theme.transitions.duration.shorter }),
             },
           }}
           open
@@ -858,7 +971,8 @@ export default function Layout() {
           flexGrow: 1,
           minWidth: 0,
           p: { xs: 2, md: '24px' },
-          width: { md: `calc(100% - ${drawerWidth}px)` },
+          width: { md: `calc(100% - ${currentDrawerWidth}px)` },
+          transition: theme.transitions.create('width', { duration: theme.transitions.duration.shorter }),
           mt: `${appBarHeight}px`,
           mb: { xs: '56px', md: 0 },
           position: 'relative',
