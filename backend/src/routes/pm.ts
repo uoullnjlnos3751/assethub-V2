@@ -510,6 +510,12 @@ async function generateAssetCode(tx: any, companyStr: string, isPrinter: boolean
     }
   }
 
+  // Serialize concurrent code generation for the same prefix within this transaction's
+  // lifetime, otherwise two simultaneous PM submissions can both read the same "last"
+  // asset code and race to insert the same next code, tripping the assetCode unique
+  // constraint. Auto-releases on transaction commit/rollback.
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${prefix}))`;
+
   const lastAsset = await tx.asset.findFirst({
     where: { assetCode: { startsWith: prefix } },
     orderBy: { assetCode: 'desc' },
