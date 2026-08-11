@@ -113,7 +113,7 @@ const ALLOWED_ASSET_FIELDS = new Set([
   'location', 'status', 'remark', 'company', 'cpuGeneration', 'domainName',
   'floor', 'poDate', 'ramDetail', 'gpu', 'osType', 'ramSlot1', 'ramSlot2',
   'snComputer', 'storage1', 'storage2', 'createdAt', 'updatedAt',
-  'oldAssetCode', 'budget', 'image', 'categoryId',
+  'oldAssetCode', 'accountingCode', 'budget', 'image', 'categoryId',
   'memoryType', 'ramOnboard', 'ramType', 'ramSpeed', 'ramMaxSupported', 'ramAvailableSlots', 'ramUpgradeable',
   'assignedToUserId', 'departmentRefId', 'vendorRefId', 'locationRefId',
 ]);
@@ -275,6 +275,17 @@ const checkDuplicateAssets = async (data: any, excludeId?: number) => {
     const existingCode = await prisma.asset.findFirst({ where: query });
     if (existingCode) {
       errors.push(`Asset Code นี้มีอยู่แล้ว (S/N: ${existingCode.serialNo})`);
+    }
+  }
+
+  // Check duplicate Accounting Code (เลขครุภัณฑ์ฝ่ายบัญชี) — optional field,
+  // only enforced when actually provided.
+  if (data.accountingCode && data.accountingCode.trim()) {
+    const query: any = { accountingCode: { equals: data.accountingCode.trim() } };
+    if (excludeId) query.id = { not: excludeId };
+    const existingAccountingCode = await prisma.asset.findFirst({ where: query });
+    if (existingAccountingCode) {
+      errors.push(`เลขครุภัณฑ์นี้มีอยู่แล้ว (Asset Code: ${existingAccountingCode.assetCode})`);
     }
   }
 
@@ -750,17 +761,19 @@ router.get('/filter-options', authenticate, async (_req: Request, res: Response,
 
 router.get('/check-duplicate', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { assetCode, serialNo, assetName, excludeId } = req.query;
+    const { assetCode, accountingCode, serialNo, assetName, excludeId } = req.query;
     const where: any[] = [];
     if (assetCode) where.push({ assetCode: assetCode as string });
+    if (accountingCode) where.push({ accountingCode: accountingCode as string });
     if (serialNo) where.push({ serialNo: serialNo as string });
     if (assetName) where.push({ assetName: assetName as string });
     if (where.length === 0) return res.json({ duplicates: {} });
     const whereClause: any = { OR: where };
     if (excludeId) whereClause.NOT = { id: parseInt(excludeId as string) };
-    const existing = await prisma.asset.findMany({ where: whereClause, select: { id: true, assetCode: true, serialNo: true, assetName: true } });
+    const existing = await prisma.asset.findMany({ where: whereClause, select: { id: true, assetCode: true, accountingCode: true, serialNo: true, assetName: true } });
     const duplicates: Record<string, boolean> = {};
     if (assetCode) duplicates.assetCode = existing.some(a => a.assetCode === assetCode);
+    if (accountingCode) duplicates.accountingCode = existing.some(a => a.accountingCode === accountingCode);
     if (serialNo) duplicates.serialNo = existing.some(a => a.serialNo === serialNo);
     if (assetName) duplicates.assetName = existing.some(a => a.assetName === assetName);
     res.json({ duplicates });

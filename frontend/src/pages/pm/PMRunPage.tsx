@@ -482,6 +482,7 @@ export default function PMRunPage() {
   const [filterPlan, setFilterPlan] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterStaff, setFilterStaff] = useState('');
+  const [filterCompany, setFilterCompany] = useState('');
   const [plans, setPlans] = useState<any[]>([]);
 
   const [pmModal, setPMModal] = useState<{ open: boolean; run: any; readOnly?: boolean }>({ open: false, run: null, readOnly: false });
@@ -500,6 +501,7 @@ export default function PMRunPage() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [fetchingGLPI, setFetchingGLPI] = useState(false);
   const [glpiSpec, setGlpiSpec] = useState<any>(null);
+  const [glpiSpecApplied, setGlpiSpecApplied] = useState(false);
   const [noteModal, setNoteModal] = useState<{ open: boolean; run: any; value: string }>({ open: false, run: null, value: '' });
   const [savingNote, setSavingNote] = useState(false);
 
@@ -573,6 +575,7 @@ export default function PMRunPage() {
   // Compute unique values for filtering options
   const uniqueTypes = Array.from(new Set(runs.map(r => r.asset?.type).filter(Boolean))) as string[];
   const uniqueStaff = Array.from(new Set(runs.map(r => r.performer?.displayName || r.staffName).filter(Boolean))) as string[];
+  const uniqueCompanies = Array.from(new Set(runs.map(r => r.asset?.company).filter(Boolean))) as string[];
 
   /* ── Filter ── */
   const filtered = runs.filter(r => {
@@ -584,7 +587,8 @@ export default function PMRunPage() {
     const matchPlan = !filterPlan || planName === filterPlan;
     const matchType = !filterType || r.asset?.type === filterType;
     const matchStaff = !filterStaff || (r.performer?.displayName || r.staffName) === filterStaff;
-    return matchQ && matchStatus && matchPlan && matchType && matchStaff;
+    const matchCompany = !filterCompany || r.asset?.company === filterCompany;
+    return matchQ && matchStatus && matchPlan && matchType && matchStaff && matchCompany;
   });
 
   const sortedRuns = [...filtered].sort((a, b) => {
@@ -626,31 +630,85 @@ export default function PMRunPage() {
   const fetchGLPI = async (runId: number) => {
     setFetchingGLPI(true);
     setGlpiSpec(null);
+    setGlpiSpecApplied(false);
     try {
       const res = await pmAPI.getGLPISpec(runId);
       setGlpiSpec(res.data);
-      showToast('🔌 ดึงข้อมูลจาก GLPI สำเร็จ');
-
-      // Auto-prefill OS and hardware check values
-      const newAnswers = { ...answers };
-      if (res.data.os) {
-        newAnswers['windows_version'] = 'yes';
-        newAnswers['windows_version_note'] = res.data.os;
-      }
-      if (res.data.msOffice) {
-        newAnswers['office_check'] = 'yes';
-        newAnswers['office_check_note'] = res.data.msOffice;
-      }
-      if (res.data.antivirus) {
-        newAnswers['antivirus'] = 'yes';
-        newAnswers['antivirus_note'] = res.data.antivirus;
-      }
-      setAnswers(newAnswers);
+      showToast('🔌 ดึงข้อมูลจาก GLPI สำเร็จ — ตรวจสอบแล้วกด "ยืนยันอัพเดทข้อมูลสเปคคอม" เพื่อนำไปใส่ในแบบฟอร์ม');
     } catch (err: any) {
       showToast(`❌ ดึงข้อมูลล้มเหลว: ${err.response?.data?.error || err.message}`);
     } finally {
       setFetchingGLPI(false);
     }
+  };
+
+  // Applies the previously-fetched GLPI spec into the checklist answers.
+  // Kept as a separate, explicit step (rather than doing this inside
+  // fetchGLPI) so a technician can review the scanned data before it
+  // overwrites whatever they've already checked/entered by hand.
+  const applyGLPISpecToAnswers = () => {
+    if (!glpiSpec) return;
+    const newAnswers = { ...answers };
+    if (glpiSpec.os) {
+      newAnswers['windows_version'] = 'yes';
+      newAnswers['windows_version_note'] = glpiSpec.os;
+    }
+    if (glpiSpec.msOffice) {
+      newAnswers['office_check'] = 'yes';
+      newAnswers['office_check_note'] = glpiSpec.msOffice;
+    }
+    if (glpiSpec.antivirus) {
+      newAnswers['antivirus'] = 'yes';
+      newAnswers['antivirus_note'] = glpiSpec.antivirus;
+    }
+
+    // Pre-fill the "ตรวจสอบจอ Monitor" device list from what GLPI saw
+    // connected, so the technician only has to verify/correct it instead of
+    // typing brand/model/S/N by hand. Existing entries are kept — GLPI
+    // monitors are merged in by serial number so re-applying (or applying
+    // after the technician already typed something) never wipes their work.
+    if (glpiSpec.monitors && glpiSpec.monitors.length > 0 && pmModal.run) {
+      const monitorItem = getChecklistItems(pmModal.run).find(
+        (item: any) => (item.type || '').toLowerCase() === 'monitor_array'
+      );
+      if (monitorItem) {
+        let existingDevices: any[] = [];
+        const rawExisting = newAnswers[monitorItem.key];
+        if (rawExisting && rawExisting !== 'no') {
+          try {
+            const parsed = JSON.parse(rawExisting);
+            if (Array.isArray(parsed)) existingDevices = parsed;
+          } catch { /* start fresh if it wasn't valid device JSON */ }
+        }
+
+        const existingSerials = new Set(
+          existingDevices.map((d) => (d.serialNo || '').trim().toLowerCase()).filter(Boolean)
+        );
+
+        const glpiDevices = glpiSpec.monitors
+          .filter((m: any) => !m.serial || !existingSerials.has(String(m.serial).trim().toLowerCase()))
+          .map((m: any) => ({
+            _assetId: m._assetId || undefined,
+            hasMonitor: true,
+            company: m.company || pmModal.run.asset?.company || 'TRR HQ',
+            brand: m.brand || '',
+            model: m.model || '',
+            serialNo: m.serial || '',
+            source: 'glpi',
+            screenSize: m.screenSize || null,
+            ports: m.ports || null,
+            hasSpeaker: !!m.hasSpeaker,
+          }));
+
+        if (glpiDevices.length > 0) {
+          newAnswers[monitorItem.key] = JSON.stringify([...existingDevices, ...glpiDevices]);
+        }
+      }
+    }
+
+    setAnswers(newAnswers);
+    setGlpiSpecApplied(true);
+    showToast('✅ อัปเดตข้อมูลสเปคคอม (และจอที่ตรวจพบ) ลงในแบบฟอร์มแล้ว');
   };
 
   /* ── Open PM Checklist ── */
@@ -994,7 +1052,7 @@ export default function PMRunPage() {
             </IconButton>
           </Tooltip>
           <Tooltip title="ล้างตัวกรอง">
-            <IconButton onClick={() => { setSearch(''); setFilterStatus(''); setFilterPlan(''); setFilterType(''); setFilterStaff(''); setCurrentPage(1); }}>
+            <IconButton onClick={() => { setSearch(''); setFilterStatus(''); setFilterPlan(''); setFilterType(''); setFilterStaff(''); setFilterCompany(''); setCurrentPage(1); }}>
               <RestartAltIcon />
             </IconButton>
           </Tooltip>
@@ -1019,6 +1077,10 @@ export default function PMRunPage() {
         <Select size="small" sx={{ minWidth: 140 }} displayEmpty value={filterStaff} onChange={e => { setFilterStaff(e.target.value); setCurrentPage(1); }}>
           <MenuItem value="">ทุกผู้ทำ PM</MenuItem>
           {uniqueStaff.map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+        </Select>
+        <Select size="small" sx={{ minWidth: 140 }} displayEmpty value={filterCompany} onChange={e => { setFilterCompany(e.target.value); setCurrentPage(1); }}>
+          <MenuItem value="">ทุกบริษัท</MenuItem>
+          {uniqueCompanies.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}
         </Select>
         <Typography sx={{ fontSize: 12, color: 'text.secondary', whiteSpace: 'nowrap', ml: 'auto' }}>
           แสดง {filtered.length}/{runs.length} รายการ
@@ -1346,6 +1408,22 @@ export default function PMRunPage() {
                         </Box>
                       )}
                     </Box>
+                    {!isReadOnly && (
+                      <Box sx={{ mt: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Button
+                          size="small"
+                          variant={glpiSpecApplied ? 'outlined' : 'contained'}
+                          color="success"
+                          startIcon={glpiSpecApplied ? <CheckCircleIcon fontSize="small" /> : undefined}
+                          onClick={applyGLPISpecToAnswers}
+                        >
+                          {glpiSpecApplied ? 'อัปเดตแบบฟอร์มแล้ว (กดซ้ำได้)' : 'ยืนยันอัพเดทข้อมูลสเปคคอม'}
+                        </Button>
+                        <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>
+                          ตรวจสอบข้อมูลด้านบนก่อน แล้วจึงกดยืนยันเพื่อนำไปใส่ในช่อง Windows/Office/Antivirus ของแบบฟอร์ม
+                        </Typography>
+                      </Box>
+                    )}
                   </Alert>
                 )}
 

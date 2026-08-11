@@ -40,7 +40,7 @@ import { getTypeIcon, SectionCard, ToggleWrap, getBrandSuggestionsForType } from
 
 /* ─── Types / Defaults ─────────────────────────────────────────── */
 const initialData = {
-  assetCode: '', assetName: '', serialNo: '', type: '', brand: '', model: '',
+  assetCode: '', accountingCode: '', assetName: '', serialNo: '', type: '', brand: '', model: '',
   cpu: '', cpuGeneration: '', ram: '', ramSlot1: '', ramSlot2: '', gpu: '',
   memoryType: 'Slot', ramOnboard: '', ramType: '', ramSpeed: '',
   ramMaxSupported: '', ramAvailableSlots: '', ramUpgradeable: '',
@@ -212,13 +212,13 @@ export default function AssetFormPage() {
     showToast('กรอกข้อมูลสเปคลงฟอร์มเรียบร้อยแล้ว', '#10b981');
   };
 
-  const checkDuplicate = useCallback(async (assetCode?: string, serialNo?: string, assetName?: string) => {
-    if (!assetCode && !serialNo && !assetName) {
+  const checkDuplicate = useCallback(async (assetCode?: string, serialNo?: string, assetName?: string, accountingCode?: string) => {
+    if (!assetCode && !serialNo && !assetName && !accountingCode) {
       setDuplicates({});
       return {};
     }
     try {
-      const res = await assetAPI.checkDuplicate({ assetCode, serialNo, assetName, excludeId: id ? parseInt(id) : undefined });
+      const res = await assetAPI.checkDuplicate({ assetCode, accountingCode, serialNo, assetName, excludeId: id ? parseInt(id) : undefined });
       const next = res.data.duplicates || {};
       setDuplicates(next);
       return next;
@@ -232,9 +232,10 @@ export default function AssetFormPage() {
     const code = form.assetCode?.trim();
     const serial = form.serialNo?.trim();
     const name = form.assetName?.trim();
-    checkTimer.current = setTimeout(() => checkDuplicate(code || undefined, serial || undefined, name || undefined), 600);
+    const accountingCode = form.accountingCode?.trim();
+    checkTimer.current = setTimeout(() => checkDuplicate(code || undefined, serial || undefined, name || undefined, accountingCode || undefined), 600);
     return () => { if (checkTimer.current) clearTimeout(checkTimer.current); };
-  }, [form.assetCode, form.serialNo, form.assetName, checkDuplicate]);
+  }, [form.assetCode, form.serialNo, form.assetName, form.accountingCode, checkDuplicate]);
 
   const assetAge = useMemo(() => calculateAge(form.purchaseDate), [form.purchaseDate]);
 
@@ -267,7 +268,7 @@ export default function AssetFormPage() {
       .then((res) => {
         const a = res.data;
         const loaded: Record<string, any> = {
-          assetCode: a.assetCode || '', assetName: a.assetName || '',
+          assetCode: a.assetCode || '', accountingCode: a.accountingCode || '', assetName: a.assetName || '',
           serialNo: a.serialNo || '', type: a.type || '',
           brand: a.brand || '', model: a.model || '',
           cpu: a.cpu || '', cpuGeneration: a.cpuGeneration || '',
@@ -457,14 +458,17 @@ export default function AssetFormPage() {
     const latestDuplicates = await checkDuplicate(
       form.assetCode?.trim() || undefined,
       form.serialNo?.trim() || undefined,
-      form.assetName?.trim() || undefined
+      form.assetName?.trim() || undefined,
+      form.accountingCode?.trim() || undefined
     );
-    if ((!id && latestDuplicates.assetCode) || latestDuplicates.serialNo || latestDuplicates.assetName) {
+    if ((!id && latestDuplicates.assetCode) || latestDuplicates.serialNo || latestDuplicates.assetName || latestDuplicates.accountingCode) {
       const msg = latestDuplicates.assetCode
         ? 'เลขครุภัณฑ์นี้มีอยู่ในระบบแล้ว'
-        : latestDuplicates.serialNo
-          ? 'Serial number นี้มีอยู่ในระบบแล้ว'
-          : 'ชื่อทรัพย์สินนี้มีอยู่ในระบบแล้ว';
+        : latestDuplicates.accountingCode
+          ? 'เลขครุภัณฑ์ (ฝ่ายบัญชี) นี้มีอยู่ในระบบแล้ว'
+          : latestDuplicates.serialNo
+            ? 'Serial number นี้มีอยู่ในระบบแล้ว'
+            : 'ชื่อทรัพย์สินนี้มีอยู่ในระบบแล้ว';
       setError(msg);
       showToast('⚠️ ' + msg, '#b45309');
       return;
@@ -679,6 +683,18 @@ export default function AssetFormPage() {
                   required={!id}
                   error={!!duplicates.assetCode || (submitAttempted && !id && !form.assetCode?.trim())}
                   helperText={duplicates.assetCode ? '⚠️ เลขครุภัณฑ์นี้มีอยู่ในระบบแล้ว' : (submitAttempted && !id && !form.assetCode?.trim() ? 'กรุณาระบุเลขครุภัณฑ์' : '')}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="เลขครุภัณฑ์ (ฝ่ายบัญชี) — ถ้ามี"
+                  value={form.accountingCode}
+                  onChange={e => setFormField('accountingCode', 'เลขครุภัณฑ์ (ฝ่ายบัญชี)', e.target.value)}
+                  placeholder="กรอกเมื่อทราบเลขครุภัณฑ์จริงจากฝ่ายบัญชี ไม่ทราบเว้นว่างไว้ได้"
+                  fullWidth
+                  size="small"
+                  error={!!duplicates.accountingCode}
+                  helperText={duplicates.accountingCode ? '⚠️ เลขครุภัณฑ์นี้มีอยู่ในระบบแล้ว' : ''}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>

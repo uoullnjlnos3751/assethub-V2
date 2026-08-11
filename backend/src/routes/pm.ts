@@ -516,15 +516,23 @@ async function generateAssetCode(tx: any, companyStr: string, isPrinter: boolean
   // constraint. Auto-releases on transaction commit/rollback.
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${prefix}))`;
 
-  const lastAsset = await tx.asset.findFirst({
+  // Codes for a prefix aren't always padded to the same width (legacy data,
+  // manual entry), so `ORDER BY assetCode DESC` is a plain string sort and
+  // can pick the wrong "last" code — e.g. "...M09" sorts above "...M035"
+  // even though 9 < 35 — which then regenerates an already-taken number on
+  // every retry. Pull every matching code and take the actual numeric max.
+  const existingAssets = await tx.asset.findMany({
     where: { assetCode: { startsWith: prefix } },
-    orderBy: { assetCode: 'desc' },
+    select: { assetCode: true },
   });
 
   let nextNum = 1;
-  if (lastAsset && lastAsset.assetCode) {
-    const digitMatch = lastAsset.assetCode.match(/(\d+)$/);
-    if (digitMatch) nextNum = parseInt(digitMatch[1], 10) + 1;
+  for (const a of existingAssets) {
+    const digitMatch = a.assetCode?.match(/(\d+)$/);
+    if (digitMatch) {
+      const n = parseInt(digitMatch[1], 10) + 1;
+      if (n > nextNum) nextNum = n;
+    }
   }
 
   return `${prefix}${nextNum.toString().padStart(padding, '0')}`;
@@ -573,16 +581,40 @@ async function processDeviceAnswers(tx: any, run: any, answers: any[], oldAnswer
                       finalCode = parts[parts.length - 1].trim();
                     }
 
-                    const isPlaceholder = !finalCode || finalCode.includes('X') || finalCode.includes('x') || finalCode.includes('ร่าง');
-                    if (isPlaceholder) {
+                    let needsFreshCode = !finalCode || finalCode.includes('X') || finalCode.includes('x') || finalCode.includes('ร่าง');
+                    if (!needsFreshCode) {
+                      // finalCode came from the client (typed, or accepted from an
+                      // earlier "use suggested code" preview). That preview can go
+                      // stale between when it was shown and when this PM is actually
+                      // saved — another save may have taken it in the meantime — so
+                      // re-check it's still free instead of trusting it blindly.
+                      const taken = await tx.asset.findFirst({ where: { assetCode: finalCode }, select: { id: true } });
+                      if (taken) needsFreshCode = true;
+                    }
+                    if (needsFreshCode) {
                       finalCode = await generateAssetCode(tx, dev.company || run.asset?.company || 'HQ-TRRT', isPrinter);
                     }
+
+                    // Prefer the detected brand/model as the display name (e.g.
+                    // "Samsung S24D300H") over a bare "Monitor"/"Printer" label,
+                    // which told the technician nothing beyond the device type.
+                    const deviceLabel = [dev.brand, dev.model].filter(Boolean).join(' ').trim()
+                      || (isPrinter ? 'Printer' : 'Monitor');
+
+                    // เลขครุภัณฑ์ฝ่ายบัญชี — คนละอย่างกับ finalCode (รหัสที่ IT
+                    // สร้างอัตโนมัติ). ฝ่ายบัญชีมักออกเลขทีหลังหรือไม่เคยออกเลย
+                    // จึงเว้นว่างได้จนกว่าช่างจะทราบและกรอกเข้ามา (ตอนทำ PM
+                    // ครั้งนี้หรือครั้งถัดไปก็ได้).
+                    const accountingCode = dev.accountingCode && dev.accountingCode.trim() !== ''
+                      ? dev.accountingCode.trim()
+                      : null;
 
                     const newAsset = await tx.asset.create({
                       data: {
                         assetCode: finalCode,
+                        accountingCode,
                         serialNo: sNo,
-                        assetName: isPrinter ? 'Printer' : 'Monitor',
+                        assetName: deviceLabel,
                         type: isPrinter ? 'Printer' : 'Monitor',
                         company: dev.company || run.asset?.company,
                         brand: dev.brand || '',
@@ -606,7 +638,7 @@ async function processDeviceAnswers(tx: any, run: any, answers: any[], oldAnswer
                       });
                     }
 
-                    devices[i].assetCode = `${isPrinter ? 'Printer' : 'Monitor'} / ${finalCode}`;
+                    devices[i].assetCode = `${deviceLabel} / ${finalCode}`;
                     devices[i]._assetId = newAsset.id;
                     newAssetIds.add(newAsset.id);
                   }
@@ -621,6 +653,9 @@ async function processDeviceAnswers(tx: any, run: any, answers: any[], oldAnswer
                     where: { id: existingAsset.id },
                     data: {
                       assetCode: finalCode,
+                      accountingCode: dev.accountingCode && dev.accountingCode.trim() !== ''
+                        ? dev.accountingCode.trim()
+                        : existingAsset.accountingCode,
                       brand: dev.brand || existingAsset.brand,
                       model: dev.model || existingAsset.model,
                       company: dev.company || existingAsset.company,
@@ -992,15 +1027,21 @@ router.get('/preview-monitor-code', authenticate, authorize('IT_ADMIN', 'SUPERAD
       if (companyStr) prefix = `${String(req.query.company).toUpperCase()}-M`;
     }
 
-    const lastAsset = await prisma.asset.findFirst({
+    // See generateAssetCode()'s comment: inconsistent padding across existing
+    // codes makes a string ORDER BY DESC pick the wrong "last" code, so scan
+    // all matches and take the actual numeric max instead.
+    const existingAssets = await prisma.asset.findMany({
       where: { assetCode: { startsWith: prefix } },
-      orderBy: { assetCode: 'desc' },
+      select: { assetCode: true },
     });
 
     let nextNum = 1;
-    if (lastAsset && lastAsset.assetCode) {
-      const digitMatch = lastAsset.assetCode.match(/(\d+)$/);
-      if (digitMatch) nextNum = parseInt(digitMatch[1], 10) + 1;
+    for (const a of existingAssets) {
+      const digitMatch = a.assetCode?.match(/(\d+)$/);
+      if (digitMatch) {
+        const n = parseInt(digitMatch[1], 10) + 1;
+        if (n > nextNum) nextNum = n;
+      }
     }
     nextNum += index;
     const code = `${prefix}${nextNum.toString().padStart(padding, '0')}`;
@@ -1029,15 +1070,18 @@ router.get('/preview-printer-code', authenticate, authorize('IT_ADMIN', 'SUPERAD
       if (companyStr) prefix = `${String(req.query.company).toUpperCase()}-P`;
     }
 
-    const lastAsset = await prisma.asset.findFirst({
+    const existingAssets = await prisma.asset.findMany({
       where: { assetCode: { startsWith: prefix } },
-      orderBy: { assetCode: 'desc' },
+      select: { assetCode: true },
     });
 
     let nextNum = 1;
-    if (lastAsset && lastAsset.assetCode) {
-      const digitMatch = lastAsset.assetCode.match(/(\d+)$/);
-      if (digitMatch) nextNum = parseInt(digitMatch[1], 10) + 1;
+    for (const a of existingAssets) {
+      const digitMatch = a.assetCode?.match(/(\d+)$/);
+      if (digitMatch) {
+        const n = parseInt(digitMatch[1], 10) + 1;
+        if (n > nextNum) nextNum = n;
+      }
     }
     nextNum += index;
     const code = `${prefix}${nextNum.toString().padStart(padding, '0')}`;

@@ -163,7 +163,7 @@ export const assetAPI = {
   updateAssetStatus: (id: number, data: any) => api.put(`/assets/asset-statuses/${id}`, data),
   deleteAssetStatus: (id: number) => api.delete(`/assets/asset-statuses/${id}`),
   stats: (typeGroup: string) => api.get('/assets/stats', { params: { typeGroup } }),
-  checkDuplicate: (params: { assetCode?: string; serialNo?: string; assetName?: string; excludeId?: number }) => api.get('/assets/check-duplicate', { params }),
+  checkDuplicate: (params: { assetCode?: string; accountingCode?: string; serialNo?: string; assetName?: string; excludeId?: number }) => api.get('/assets/check-duplicate', { params }),
 };
 
 // Borrow

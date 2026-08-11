@@ -47,6 +47,10 @@ model Asset {
   id                  Int                  @id @default(autoincrement())
   assetCode           String?              @unique
   assetName           String?
+  // เลขครุภัณฑ์ที่ฝ่ายบัญชีออกให้ — แยกจาก assetCode (รหัสที่ฝ่าย IT
+  // สร้างอัตโนมัติ) เพราะฝ่ายบัญชีมักจะออกเลขทีหลัง หรือบางเครื่องไม่เคย
+  // มีเลขนี้เลย จึงต้องเว้นว่างได้จนกว่าจะทราบ
+  accountingCode      String?              @unique
   serialNo            String               @unique
   type                String?
   categoryId          Int?

@@ -465,10 +465,15 @@ export const getAppTheme = (mode: PaletteMode) => {
       MuiAlert: {
         styleOverrides: {
           root: { borderRadius: 10, borderWidth: '1px', fontSize: '0.8125rem' },
-          standardSuccess: { backgroundColor: t.availableSoft, borderColor: t.available, color: isDark ? t.text : undefined },
-          standardError: { backgroundColor: t.dangerSoft, borderColor: t.danger, color: isDark ? t.text : undefined },
-          standardWarning: { backgroundColor: t.maintenanceSoft, borderColor: t.maintenance, color: isDark ? t.text : undefined },
-          standardInfo: { backgroundColor: t.accentSoft, borderColor: t.accent, color: isDark ? t.text : undefined },
+          // Light mode: MUI's built-in standard-variant text color for these
+          // severities was resolving to a near-transparent tint (alpha ~0.1),
+          // making the text unreadable against the soft background. Pin an
+          // explicit solid, dark shade per severity instead of relying on
+          // MUI's default computation.
+          standardSuccess: { backgroundColor: t.availableSoft, borderColor: t.available, color: isDark ? t.text : '#065f46' },
+          standardError: { backgroundColor: t.dangerSoft, borderColor: t.danger, color: isDark ? t.text : '#7f1d1d' },
+          standardWarning: { backgroundColor: t.maintenanceSoft, borderColor: t.maintenance, color: isDark ? t.text : '#78350f' },
+          standardInfo: { backgroundColor: t.accentSoft, borderColor: t.accent, color: isDark ? t.text : '#1e3a8a' },
         },
       },
       MuiDivider: {

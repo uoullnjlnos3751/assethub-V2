@@ -17,6 +17,7 @@ import imageCompression from 'browser-image-compression';
 interface PMDeviceData {
   _assetId?: number;
   assetCode?: string;
+  accountingCode?: string;
   hasMonitor?: boolean;
   hasPrinter?: boolean;
   company: string;
@@ -429,6 +430,18 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
                         </Button>
                       )}
                     </Box>
+                  </Box>
+
+                  <Box>
+                    <Typography variant="caption" sx={{ display: 'block', color: theme.palette.text.secondary, mb: 0.5 }}>เลขครุภัณฑ์ (ฝ่ายบัญชี) — ถ้ามี</Typography>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      disabled={readOnly}
+                      value={d.accountingCode || ''}
+                      placeholder="กรอกถ้าเห็นป้ายเลขครุภัณฑ์ติดที่เครื่อง ไม่ทราบเว้นว่างไว้ได้"
+                      onChange={(e) => updateField(idx, 'accountingCode', e.target.value)}
+                    />
                   </Box>
 
                   <FormControl size="small" fullWidth disabled={readOnly}>
