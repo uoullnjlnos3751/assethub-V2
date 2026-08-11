@@ -3,6 +3,7 @@ import {
   Box, Typography, Card, CardContent, Chip, CircularProgress, Alert, Grid,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Button,
   InputAdornment, TextField, Dialog, DialogTitle, DialogContent, DialogActions,
+  useTheme, alpha,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
@@ -10,6 +11,8 @@ import WarningIcon from '@mui/icons-material/Warning';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import SendIcon from '@mui/icons-material/Send';
 import { borrowAPI } from '../../services/api';
+import { formatDate } from '../../utils/dateUtils';
+
 
 interface OverdueItem {
   id: number;
@@ -25,6 +28,7 @@ interface OverdueItem {
 }
 
 export default function BorrowOverduePage() {
+  const theme = useTheme();
   const [items, setItems] = useState<OverdueItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<OverdueItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -181,7 +185,7 @@ export default function BorrowOverduePage() {
         <TableContainer>
           <Table>
             <TableHead>
-              <TableRow sx={{ backgroundColor: 'rgba(211, 47, 47, 0.1)' }}>
+              <TableRow sx={{ backgroundColor: alpha(theme.palette.error.main, 0.1) }}>
                 <TableCell>เลขที่</TableCell>
                 <TableCell>ผู้ยืม</TableCell>
                 <TableCell>รหัส</TableCell>
@@ -205,13 +209,13 @@ export default function BorrowOverduePage() {
                   <TableRow
                     key={item.id}
                     hover
-                    sx={{ backgroundColor: 'rgba(211, 47, 47, 0.05)' }}
+                    sx={{ backgroundColor: alpha(theme.palette.error.main, 0.05) }}
                   >
                     <TableCell sx={{ fontWeight: 600 }}>{item.requestNo}</TableCell>
                     <TableCell>{item.borrowerName}</TableCell>
                     <TableCell>{item.asset?.assetCode || item.inventoryItem?.name || '-'}</TableCell>
                     <TableCell>{item.asset?.serialNo || (item.inventoryItem ? `${item.quantity} ${item.inventoryItem.unit}` : '-')}</TableCell>
-                    <TableCell>{new Date(item.dueDate).toLocaleDateString('th-TH')}</TableCell>
+                    <TableCell>{formatDate(item.dueDate)}</TableCell>
                     <TableCell align="center">
                       <Chip
                         label={`${item.daysOverdue} วัน`}
@@ -294,10 +298,10 @@ export default function BorrowOverduePage() {
                   สถานะการยืม
                 </Typography>
                 <Typography variant="body2">
-                  ยืมเมื่อ: {new Date(selectedItem.borrowDate).toLocaleDateString('th-TH')}
+                  ยืมเมื่อ: {formatDate(selectedItem.borrowDate)}
                 </Typography>
                 <Typography variant="body2" color="error" fontWeight={600}>
-                  กำหนดคืน: {new Date(selectedItem.dueDate).toLocaleDateString('th-TH')}
+                  กำหนดคืน: {formatDate(selectedItem.dueDate)}
                 </Typography>
                 <Typography variant="body2" color="error" fontWeight={600}>
                   เกินกำหนด: {selectedItem.daysOverdue} วัน

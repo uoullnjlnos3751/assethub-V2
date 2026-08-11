@@ -1,0 +1,62 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./backend/.env
+    environment:
+      - DATABASE_URL=postgresql://assethub:${POSTGRES_PASSWORD:-assethub123}@assethub-postgres:5432/assethub?schema=public
+      # Pass-through form (name only, no value): docker compose forwards these
+      # from the deploying shell when they are set and omits them otherwise, so
+      # backend/.env stays authoritative. With `KEY: ${KEY:-default}` the
+      # default always won — this stack silently ran NODE_ENV=development and
+      # CORS_ORIGIN=http://localhost:5173 in production, overriding env_file.
+      - NODE_ENV
+      - FRONTEND_URL
+      - CORS_ORIGIN
+      - CORS_ALLOWED_HOSTNAMES
+    volumes:
+      - uploads_data:/app/uploads
+      - backups_data:/app/backups
+    networks:
+      - assethub-net
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:4000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      VITE_BORROW_DUE_DAYS: ${VITE_BORROW_DUE_DAYS:-3}
+      VITE_API_PROXY_TARGET: "http://backend:4000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - frontend_node:/app/node_modules
+    networks:
+      - assethub-net
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  uploads_data:
+  backups_data:
+  backend_node:
+    external: true
+  frontend_node:
+    external: true
+
+networks:
+  assethub-net:
+    external: true

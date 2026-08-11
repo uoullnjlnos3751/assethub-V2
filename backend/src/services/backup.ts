@@ -1,4 +1,4 @@
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -38,7 +38,8 @@ export function performBackup(backupDir?: string) {
       if (f.endsWith('.sql')) {
         const fullPath = path.join(dir, f);
         const stats = fs.statSync(fullPath);
-        if (now - stats.mtimeMs > 7 * 24 * 60 * 60 * 1000) {
+        // Keep backups for 180 days (approx 6 months)
+        if (now - stats.mtimeMs > 180 * 24 * 60 * 60 * 1000) {
           fs.unlinkSync(fullPath);
           console.log(`Deleted old backup: ${f}`);
         }
@@ -48,15 +49,21 @@ export function performBackup(backupDir?: string) {
     console.error('Error cleaning old backups:', err);
   }
 
-  const dbUrl = process.env.DATABASE_URL;
+  let dbUrl = process.env.DATABASE_URL;
   if (!dbUrl) {
     console.error('Auto Backup failed: DATABASE_URL not set');
     return;
   }
 
-  // Execute pg_dump
-  const cmd = `pg_dump --dbname="${dbUrl}" -F p -f "${filepath}"`;
-  exec(cmd, (error, stdout, stderr) => {
+  // pg_dump doesn't support URI query params like ?schema=public
+  if (dbUrl.includes('?')) {
+    dbUrl = dbUrl.split('?')[0];
+  }
+
+  // Execute pg_dump using execFile to prevent injection
+  const pgDumpPath = process.env.PG_DUMP_PATH || 'pg_dump';
+  
+  execFile(pgDumpPath, ['--dbname', dbUrl, '--clean', '--if-exists', '--file', filepath], (error, stdout, stderr) => {
     if (error) {
       console.error(`Backup error: ${error.message}`);
       return;

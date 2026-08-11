@@ -16,6 +16,13 @@ interface ImportedAsset {
   cpuGeneration?: string;
   ram?: string;
   ramDetail?: string;
+  memoryType?: string;
+  ramOnboard?: string;
+  ramType?: string;
+  ramSpeed?: string;
+  ramMaxSupported?: string;
+  ramAvailableSlots?: string;
+  ramUpgradeable?: string;
   storage1?: string;
   storage2?: string;
   ramSlot1?: string;
@@ -80,7 +87,7 @@ export default function ImportAssetsButton() {
               jsonData.push(...sheetData);
             }
             
-            console.log('Raw Excel Data (first row):', jsonData[0]);
+            // Removed console.log
 
             const mapped = jsonData.map((row: any) => {
               const item = {
@@ -94,6 +101,13 @@ export default function ImportAssetsButton() {
                 cpuGeneration: row['Generation'] || row['Gen'] || row['cpuGeneration'],
                 ram: row['RAM'] || row['ram'] || row['Ram'],
                 ramDetail: row['RAM Detail'] || row['ramDetail'],
+                memoryType: row['Memory Type'] || row['memoryType'] || row['ประเภทหน่วยความจำ'] || row['Memory Type (Onboard/Slot)'],
+                ramOnboard: row['RAM Onboard'] || row['ramOnboard'] || row['RAM Onboard (GB)'] || row['Onboard RAM'],
+                ramType: row['RAM Type'] || row['ramType'] || row['ประเภท RAM'] || row['Ram Type'],
+                ramSpeed: row['RAM Speed'] || row['ramSpeed'] || row['ความเร็ว RAM'] || row['Ram Speed'],
+                ramMaxSupported: row['Maximum Supported'] || row['ramMaxSupported'] || row['RAM สูงสุดที่รองรับ'] || row['Max Supported'],
+                ramAvailableSlots: row['Available Slots'] || row['ramAvailableSlots'] || row['ช่องเสียบที่เหลือ'] || row['Available Slot'],
+                ramUpgradeable: row['Upgradeable'] || row['ramUpgradeable'] || row['อัปเกรดได้'],
                 storage1: row['Storage 1'] || row['storage1'] || row['SSD'] || row['HD'],
                 storage2: row['Storage 2'] || row['storage2'],
                 ramSlot1: row['RAM Slot1'] || row['RAM Slot 1'] || row['ramSlot1'],
@@ -123,7 +137,7 @@ export default function ImportAssetsButton() {
               return item;
             });
             
-            console.log('Mapped Excel Data (count):', mapped.length);
+            // Removed console.log
             setPreviewData(mapped);
             setOpen(true);
           } catch (err) {
@@ -138,7 +152,7 @@ export default function ImportAssetsButton() {
         reader.onload = (e) => {
           try {
             let csv = e.target?.result as string;
-            console.log('CSV Raw Snippet:', csv.substring(0, 100));
+            // Removed console.log
             
             // Handle UTF-8 BOM
             if (csv.charCodeAt(0) === 0xFEFF) {
@@ -148,7 +162,7 @@ export default function ImportAssetsButton() {
               header: true,
               skipEmptyLines: true,
               complete: (results: Papa.ParseResult<any>) => {
-                console.log('PapaParse Headers:', results.meta.fields);
+                // Removed console.log
                 
                 const mapped = (results.data as any[])
                   .map((row: any) => ({
@@ -162,6 +176,13 @@ export default function ImportAssetsButton() {
                     cpuGeneration: row['Generation'] || row['Gen'] || row['cpuGeneration'],
                     ram: row['RAM'] || row['ram'] || row['Ram'],
                     ramDetail: row['RAM Detail'] || row['ramDetail'],
+                    memoryType: row['Memory Type'] || row['memoryType'] || row['ประเภทหน่วยความจำ'] || row['Memory Type (Onboard/Slot)'],
+                    ramOnboard: row['RAM Onboard'] || row['ramOnboard'] || row['RAM Onboard (GB)'] || row['Onboard RAM'],
+                    ramType: row['RAM Type'] || row['ramType'] || row['ประเภท RAM'] || row['Ram Type'],
+                    ramSpeed: row['RAM Speed'] || row['ramSpeed'] || row['ความเร็ว RAM'] || row['Ram Speed'],
+                    ramMaxSupported: row['Maximum Supported'] || row['ramMaxSupported'] || row['RAM สูงสุดที่รองรับ'] || row['Max Supported'],
+                    ramAvailableSlots: row['Available Slots'] || row['ramAvailableSlots'] || row['ช่องเสียบที่เหลือ'] || row['Available Slot'],
+                    ramUpgradeable: row['Upgradeable'] || row['ramUpgradeable'] || row['อัปเกรดได้'],
                     storage1: row['Storage 1'] || row['storage1'] || row['SSD'] || row['HD'],
                     storage2: row['Storage 2'] || row['storage2'],
                     ramSlot1: row['RAM Slot1'] || row['RAM Slot 1'] || row['ramSlot1'],
@@ -189,7 +210,7 @@ export default function ImportAssetsButton() {
                     isValid: !!String(row['Serial No.'] || row['serialNo'] || row['Serial Number'] || row['S/N Computer'] || '').trim(),
                   }));
                 
-                console.log('Mapped CSV Data (count):', mapped.length);
+                // Removed console.log
                 setPreviewData(mapped);
                 setOpen(true);
               },
@@ -228,11 +249,9 @@ export default function ImportAssetsButton() {
     setSuccess('');
     setErrorDetails([]);
     try {
-      console.log('--- STARTING IMPORT (JSON) ---');
       const res = await assetAPI.importJson(previewData);
       const { success: successCount, errors, total, errorDetails: details } = res.data;
       
-      console.log('--- IMPORT FINISHED ---', { successCount, errors, total });
       setErrorDetails(details || []);
 
       if (successCount > 0) {

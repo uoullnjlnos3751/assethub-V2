@@ -29,11 +29,10 @@ interface SystemSettings {
 
 interface AuthContextType {
   user: User | null;
-  token: string | null;
   loading: boolean;
   systemSettings: SystemSettings | null;
   login: (username: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   refreshSettings: () => Promise<void>;
 }
 
@@ -41,7 +40,6 @@ const AuthContext = createContext<AuthContextType>(null!);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
   const [loading, setLoading] = useState(true);
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
 
@@ -58,29 +56,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshSettings();
   }, []);
 
+  // Auth now rides on an httpOnly session cookie instead of a token kept in
+  // localStorage (closes the XSS path where a script could read the token
+  // directly). There is nothing left in JS to check for a session, so this
+  // asks the backend directly on every load; the browser sends the cookie
+  // automatically if one exists. A 401 here just means "not logged in" — see
+  // SILENT_401_PATHS in services/api.ts, which keeps this call from
+  // triggering the global redirect-to-login or error toast.
   useEffect(() => {
-    if (token) {
-      authAPI.me()
-        .then((res) => setUser(res.data))
-        .catch(() => { localStorage.removeItem('token'); setToken(null); })
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
-  }, [token]);
+    authAPI.me()
+      .then((res) => setUser(res.data))
+      .catch(() => setUser(null))
+      .finally(() => setLoading(false));
+  }, []);
 
   const login = async (username: string, password: string) => {
     const res = await authAPI.login(username, password);
-    localStorage.setItem('token', res.data.token);
-    localStorage.setItem('user', JSON.stringify(res.data.user));
-    setToken(res.data.token);
+    // The backend also sets the session cookie on this response (Set-Cookie);
+    // the browser stores it, nothing to do here beyond updating UI state.
     setUser(res.data.user);
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setToken(null);
+  const logout = async () => {
+    try {
+      await authAPI.logout();
+    } catch (err) {
+      // Clear local UI state regardless — worst case the cookie outlives the
+      // React state until it expires on its own, but the user is logged out
+      // of this tab either way.
+      console.error('Logout request failed:', err);
+    }
     setUser(null);
   };
 
@@ -90,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const resetTimer = () => {
       clearTimeout(timeoutId);
-      if (token) {
+      if (user) {
         timeoutId = setTimeout(() => {
           logout();
           alert('หมดเวลาการใช้งานในระบบ (Session Expired) กรุณาเข้าสู่ระบบใหม่');
@@ -98,7 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    if (token) {
+    if (user) {
       window.addEventListener('mousemove', resetTimer);
       window.addEventListener('keydown', resetTimer);
       window.addEventListener('scroll', resetTimer);
@@ -113,10 +118,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('scroll', resetTimer);
       window.removeEventListener('click', resetTimer);
     };
-  }, [token]);
+  }, [user]);
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, systemSettings, login, logout, refreshSettings }}>
+    <AuthContext.Provider value={{ user, loading, systemSettings, login, logout, refreshSettings }}>
       {children}
     </AuthContext.Provider>
   );

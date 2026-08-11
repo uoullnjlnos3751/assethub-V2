@@ -2,13 +2,15 @@ import React, { useEffect, useState } from 'react';
 import {
   Box, Typography, Chip, CircularProgress, Card, CardContent, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, Button, Grid, InputAdornment, TextField,
-  Dialog, DialogTitle, DialogContent, DialogActions, Divider,
+  Dialog, DialogTitle, DialogContent, DialogActions, Divider, useTheme, alpha,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DownloadIcon from '@mui/icons-material/Download';
 import { borrowAPI } from '../../services/api';
+import { formatDate } from '../../utils/dateUtils';
+
 
 interface HistoryRecord {
   id: number;
@@ -52,6 +54,7 @@ const getStatusColor = (status: string) => {
 };
 
 export default function BorrowHistoryPage() {
+  const theme = useTheme();
   const [records, setRecords] = useState<HistoryRecord[]>([]);
   const [filteredRecords, setFilteredRecords] = useState<HistoryRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -137,7 +140,7 @@ export default function BorrowHistoryPage() {
             <Card
               sx={{
                 cursor: 'pointer',
-                backgroundColor: filterStatus === 'all' ? 'rgba(37, 99, 235, 0.1)' : 'inherit',
+                backgroundColor: filterStatus === 'all' ? alpha(theme.palette.primary.main, 0.1) : 'inherit',
               }}
               onClick={() => setFilterStatus('all')}
             >
@@ -170,7 +173,7 @@ export default function BorrowHistoryPage() {
                 sx={{
                   cursor: 'pointer',
                   backgroundColor:
-                    filterStatus === stat.key ? 'rgba(37, 99, 235, 0.1)' : 'inherit',
+                    filterStatus === stat.key ? alpha(theme.palette.primary.main, 0.1) : 'inherit',
                 }}
               >
                 <CardContent>
@@ -219,7 +222,7 @@ export default function BorrowHistoryPage() {
         <TableContainer>
           <Table>
             <TableHead>
-              <TableRow sx={{ backgroundColor: 'rgba(37, 99, 235, 0.05)' }}>
+              <TableRow sx={{ backgroundColor: alpha(theme.palette.primary.main, 0.05) }}>
                 <TableCell>เลขที่คำขอ</TableCell>
                 <TableCell>ผู้ขอ</TableCell>
                 <TableCell>แผนก</TableCell>
@@ -261,7 +264,7 @@ export default function BorrowHistoryPage() {
                         <Chip label={statusInfo.label} color={statusInfo.color} size="small" />
                       </TableCell>
                       <TableCell sx={{ fontSize: '0.85rem' }}>{receiverDisplay}</TableCell>
-                      <TableCell>{new Date(record.createdAt).toLocaleDateString('th-TH')}</TableCell>
+                      <TableCell>{formatDate(record.createdAt)}</TableCell>
                       <TableCell align="right">
                         <Button
                           size="small"
@@ -335,7 +338,7 @@ export default function BorrowHistoryPage() {
                   sx={{
                     p: 1.5,
                     mb: 1,
-                    backgroundColor: 'rgba(37, 99, 235, 0.05)',
+                    backgroundColor: alpha(theme.palette.primary.main, 0.05),
                     borderRadius: 1,
                     border: '1px solid',
                     borderColor: 'divider',
@@ -370,7 +373,7 @@ export default function BorrowHistoryPage() {
                           </Typography>
                           {ret.returnedAt && (
                             <Typography variant="caption" color="text.secondary">
-                              {new Date(ret.returnedAt).toLocaleDateString('th-TH')}
+                              {formatDate(ret.returnedAt)}
                             </Typography>
                           )}
                         </Box>

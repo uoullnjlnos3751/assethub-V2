@@ -2,7 +2,73 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { assetAPI, borrowAPI, inventoryAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
-import { useTheme, useMediaQuery } from '@mui/material';
+import {
+  Box, Typography, Card, CardContent, TextField, Select, MenuItem, FormControl,
+  Button, Chip, IconButton, Tabs, Tab, InputAdornment, Snackbar, Alert,
+  CircularProgress, alpha, useTheme, useMediaQuery,
+} from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search';
+import CloseIcon from '@mui/icons-material/Close';
+import CheckIcon from '@mui/icons-material/Check';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
+import LockIcon from '@mui/icons-material/Lock';
+import ShieldIcon from '@mui/icons-material/Shield';
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import InventoryIcon from '@mui/icons-material/Inventory2';
+import SendIcon from '@mui/icons-material/Send';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import RemoveIcon from '@mui/icons-material/Remove';
+import AddIcon from '@mui/icons-material/Add';
+import { formatDate } from '../../utils/dateUtils';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs from 'dayjs';
+import { Laptop, Monitor, Printer, Smartphone, Mouse, Wifi, Package } from 'lucide-react';
+
+const getMuiCategoryIcon = (categoryName: string) => {
+  const name = categoryName.toLowerCase();
+  if (name.includes('notebook') || name.includes('laptop') || name.includes('macbook')) {
+    return <Laptop size={18} />;
+  }
+  if (name.includes('monitor') || name.includes('จอ')) {
+    return <Monitor size={18} />;
+  }
+  if (name.includes('printer') || name.includes('พิมพ์')) {
+    return <Printer size={18} />;
+  }
+  if (name.includes('phone') || name.includes('mobile') || name.includes('โทรศัพท์')) {
+    return <Smartphone size={18} />;
+  }
+  if (name.includes('mouse') || name.includes('เมาส์')) {
+    return <Mouse size={18} />;
+  }
+  if (name.includes('wifi') || name.includes('router') || name.includes('network')) {
+    return <Wifi size={18} />;
+  }
+  return <Package size={18} />;
+};
+
+// Shared borrow policy notice — used on both mobile (below the catalog) and desktop (below the summary card)
+function PolicyCard({ maxItemsPerRequest, maxBorrowDays }: { maxItemsPerRequest: number; maxBorrowDays: number }) {
+  const theme = useTheme();
+  return (
+    <Card sx={{ background: `linear-gradient(135deg, ${theme.palette.background.paper}, ${alpha(theme.palette.primary.main, 0.03)})`, mt: 1 }}>
+      <CardContent sx={{ p: '16px 20px !important' }}>
+        <Typography sx={{ fontSize: '0.85rem', fontWeight: 800, color: theme.palette.text.secondary, display: 'flex', alignItems: 'center', gap: 0.75, mb: 1.25 }}>
+          <ShieldIcon sx={{ fontSize: 18 }} /> นโยบายการยืมคืน
+        </Typography>
+        <Box sx={{ fontSize: '0.78rem', color: theme.palette.text.secondary, display: 'flex', flexDirection: 'column', gap: 1, lineHeight: 1.4 }}>
+          <div>1. สามารถยืมทรัพย์สินและวัสดุสิ้นเปลืองได้ตามโควตาที่กำหนด</div>
+          <div>2. จำนวนรายการที่ยืมได้สูงสุด: <Box component="strong" sx={{ color: 'primary.main' }}>{maxItemsPerRequest} รายการต่อคำขอ</Box></div>
+          <div>3. ระยะเวลาการยืมสูงสุด: <Box component="strong" sx={{ color: 'primary.main' }}>{maxBorrowDays} วัน</Box></div>
+          <Box sx={{ borderTop: `1px dashed ${theme.palette.divider}`, pt: 1, color: 'error.main' }}>
+            4. กรุณาส่งคืนทรัพย์สินตรงเวลา หากมีรายการเกินกำหนดส่งคืน จะต้องคืนทรัพย์สินนั้นก่อนจึงจะยืมใหม่ได้
+          </Box>
+        </Box>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function BorrowRequestPage() {
   const { user, systemSettings } = useAuth();
@@ -109,7 +175,7 @@ export default function BorrowRequestPage() {
 
   const getBorrowDurationText = () => {
     if (!dueDate) {
-      return `(${effectiveBorrowDays} \u0e27\u0e31\u0e19)`;
+      return `(${effectiveBorrowDays} วัน)`;
     }
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -118,7 +184,7 @@ export default function BorrowRequestPage() {
     const diffTime = selectedDue.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     if (isNaN(diffDays) || diffDays < 0) return '';
-    return `(${diffDays} \u0e27\u0e31\u0e19)`;
+    return `(${diffDays} วัน)`;
   };
 
   const handleSubmit = async () => {
@@ -160,338 +226,479 @@ export default function BorrowRequestPage() {
     } finally { setSubmitting(false); }
   };
 
+  const maxItemsPerRequest = systemSettings?.maxItemsPerRequest ?? 5;
+  const maxBorrowDays = systemSettings?.maxBorrowDays ?? 30;
+  const submitDisabled = submitting || totalSelected === 0 || !purpose.trim() || overdueItems.length > 0;
+
   if (loading) return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-      <div style={{ textAlign: 'center', color: '#64748b' }}><div style={{ fontSize: '2rem', marginBottom: 8 }}>⏳</div><div>กำลังโหลดรายการ...</div></div>
-    </div>
+    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+      <Box sx={{ textAlign: 'center', color: 'text.secondary' }}>
+        <CircularProgress size={32} sx={{ mb: 1 }} />
+        <div>กำลังโหลดรายการ...</div>
+      </Box>
+    </Box>
   );
 
   return (
-    <div style={{ paddingBottom: 48, maxWidth: 1200, margin: '0 auto', padding: isMobile ? '0 8px' : undefined }}>
-      {toast && (
-        <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 9999, background: toastType === 'ok' ? '#1e293b' : '#dc2626', color: '#fff', padding: '12px 20px', borderRadius: 10, fontWeight: 600, boxShadow: '0 4px 20px rgba(0,0,0,0.3)', fontSize: '0.9rem', maxWidth: 360 }}>
+    <Box sx={{ pb: isMobile ? 15 : 6, px: isMobile ? 1 : 0, maxWidth: 1200, mx: 'auto' }}>
+      <Snackbar open={!!toast} autoHideDuration={3500} onClose={() => setToast('')} anchorOrigin={{ vertical: 'top', horizontal: 'right' }}>
+        <Alert severity={toastType === 'ok' ? 'success' : 'error'} onClose={() => setToast('')} sx={{ fontWeight: 600 }}>
           {toast}
-        </div>
-      )}
+        </Alert>
+      </Snackbar>
 
       {/* Header */}
-      <div style={{ marginBottom: 28 }}>
-        <h2 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 800, color: '#0f172a' }}>{"\u0e22\u0e37\u0e21\u0e17\u0e23\u0e31\u0e1e\u0e22\u0e4c\u0e2a\u0e34\u0e19"}</h2>
-        <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '0.9rem' }}>{"\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e17\u0e35\u0e48\u0e15\u0e49\u0e2d\u0e07\u0e01\u0e32\u0e23\u0e22\u0e37\u0e21 \u0e41\u0e25\u0e49\u0e27\u0e01\u0e23\u0e2d\u0e01\u0e23\u0e32\u0e22\u0e25\u0e30\u0e40\u0e2d\u0e35\u0e22\u0e14"}</p>
-      </div>
+      <Box sx={{ mb: 3.5 }}>
+        <Typography variant="h5" fontWeight={800} color="text.primary">ยืมทรัพย์สิน</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>เลือกรายการที่ต้องการยืม แล้วกรอกรายละเอียด</Typography>
+      </Box>
 
       {overdueItems.length > 0 && (
-        <div style={{ background: 'linear-gradient(135deg, #fef2f2, #ffe4e6)', border: '1px solid #fecdd3', borderRadius: 14, padding: '16px 20px', marginBottom: 24, boxShadow: '0 4px 12px rgba(220, 38, 38, 0.05)' }}>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-            <span style={{ fontSize: '1.3rem', marginTop: -2 }}>⚠️</span>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 800, color: '#991b1b', fontSize: '0.92rem', marginBottom: 4 }}>
-                {"\u0e04\u0e38\u0e13\u0e21\u0e35\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e22\u0e37\u0e21\u0e17\u0e35\u0e48\u0e40\u0e01\u0e34\u0e19\u0e01\u0e33\u0e2b\u0e19\u0e14\u0e2a\u0e48\u0e07\u0e04\u0e37\u0e19 \u0e01\u0e23\u0e38\u0e13\u0e32\u0e2a\u0e48\u0e07\u0e04\u0e37\u0e19\u0e2b\u0e23\u0e37\u0e2d\u0e02\u0e2d\u0e15\u0e48\u0e2d\u0e40\u0e27\u0e25\u0e32\u0e01\u0e48\u0e2d\u0e19\u0e17\u0e33\u0e01\u0e32\u0e23\u0e22\u0e37\u0e21\u0e43\u0e2b\u0e21\u0e48"}
-              </div>
-              <div style={{ fontSize: '0.8rem', color: '#b91c1c', marginTop: 8 }}>
-                <strong style={{ display: 'block', marginBottom: 6 }}>{"\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e17\u0e35\u0e48\u0e40\u0e01\u0e34\u0e19\u0e01\u0e33\u0e2b\u0e19\u0e14:"}</strong>
-                <ul style={{ margin: '4px 0 0', paddingLeft: 20 }}>
-                  {overdueItems.map((item: any) => (
-                    <li key={item.id}>
-                      {item.asset ? `${item.asset.assetCode} - ${item.asset.brand} ${item.asset.model}` : item.inventoryItem?.name}{' '}
-                      ({new Date(item.dueDate).toLocaleDateString('th-TH')})
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
+        <Alert severity="error" icon={<WarningAmberIcon />} sx={{ mb: 3, borderRadius: '14px' }}>
+          <Typography sx={{ fontWeight: 800, fontSize: '0.92rem', mb: 0.5 }}>
+            คุณมีรายการยืมที่เกินกำหนดส่งคืน กรุณาส่งคืนหรือขอต่อเวลาก่อนทำการยืมใหม่
+          </Typography>
+          <Box sx={{ fontSize: '0.8rem', mt: 1 }}>
+            <Box component="strong" sx={{ display: 'block', mb: 0.75 }}>รายการที่เกินกำหนด:</Box>
+            <Box component="ul" sx={{ m: '4px 0 0', pl: 2.5 }}>
+              {overdueItems.map((item: any) => (
+                <li key={item.id}>
+                  {item.asset ? `${item.asset.assetCode} - ${item.asset.brand} ${item.asset.model}` : item.inventoryItem?.name}{' '}
+                  ({formatDate(item.dueDate)})
+                </li>
+              ))}
+            </Box>
+          </Box>
+        </Alert>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 340px', gap: isMobile ? 16 : 24, alignItems: 'start' }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 340px', gap: isMobile ? 2 : 3, alignItems: 'start' }}>
         {/* Left: Form + Selection */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
 
           {/* Borrow Info Card */}
-          <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '20px 24px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-            <h3 style={{ margin: '0 0 16px', fontSize: '1rem', fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span>📋</span> ข้อมูลการยืม
-            </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 14 }}>
-              <div style={{ gridColumn: '1 / -1' }}>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#374151', marginBottom: 6 }}>วัตถุประสงค์การยืม <span style={{ color: '#dc2626' }}>*</span></label>
-                <textarea value={purpose} onChange={e => setPurpose(e.target.value)} rows={2}
+          <Card>
+            <CardContent sx={{ p: '20px 24px !important' }}>
+              <Typography sx={{ fontSize: '1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                <AssignmentIcon sx={{ fontSize: 20, color: 'primary.main' }} /> ข้อมูลการยืม
+              </Typography>
+              <Box sx={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 1.75 }}>
+                <TextField
+                  sx={{ gridColumn: '1 / -1' }}
+                  label="วัตถุประสงค์การยืม"
+                  required
+                  multiline
+                  rows={2}
+                  value={purpose}
+                  onChange={e => setPurpose(e.target.value)}
                   placeholder="เช่น ใช้ในการประชุม, ใช้สำหรับโปรเจกต์ XYZ"
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: `1px solid ${purpose.trim() === '' && submitting ? '#dc2626' : '#e2e8f0'}`, fontSize: '0.9rem', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }} />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#374151', marginBottom: 6 }}>สถานที่/หน่วยงานที่ใช้งาน</label>
-                <input value={location} onChange={e => setLocation(e.target.value)}
+                  error={submitting && purpose.trim() === ''}
+                />
+                <TextField
+                  label="สถานที่/หน่วยงานที่ใช้งาน"
+                  value={location}
+                  onChange={e => setLocation(e.target.value)}
                   placeholder="เช่น สำนักงานใหญ่ ชั้น 5"
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: '0.9rem', boxSizing: 'border-box' }} />
-              </div>
-              <div>
-                <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', fontWeight: 700, color: '#374151', marginBottom: 6 }}>
-                  <span>{"\u0e01\u0e33\u0e2b\u0e19\u0e14\u0e04\u0e37\u0e19"}</span>
-                  <span style={{ color: '#0ea5e9', fontWeight: 800 }}>{getBorrowDurationText()}</span>
-                </label>
-                <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
-                  min={new Date().toISOString().split('T')[0]}
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: '0.9rem', boxSizing: 'border-box' }} />
-                <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: 4 }}>{"\u0e04\u0e48\u0e32\u0e40\u0e23\u0e34\u0e48\u0e21\u0e15\u0e49\u0e19"} {effectiveBorrowDays} {"\u0e27\u0e31\u0e19\u0e19\u0e31\u0e1a\u0e08\u0e32\u0e01\u0e27\u0e31\u0e19\u0e19\u0e35\u0e49"} ({"\u0e2a\u0e39\u0e07\u0e2a\u0e39\u0e14"} {systemSettings?.maxBorrowDays ?? 30} {"\u0e27\u0e31\u0e19"})</div>
-              </div>
-              <div style={{ gridColumn: '1 / -1' }}>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#374151', marginBottom: 6 }}>หมายเหตุ</label>
-                <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
+                />
+                <Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Typography variant="caption" fontWeight={700} color="text.secondary">กำหนดคืน</Typography>
+                    <Typography variant="caption" fontWeight={800} color="primary.main">{getBorrowDurationText()}</Typography>
+                  </Box>
+                  <DatePicker
+                    format="DD/MM/YYYY"
+                    value={dueDate ? dayjs(dueDate) : null}
+                    onChange={(newVal) => setDueDate(newVal ? newVal.format('YYYY-MM-DD') : '')}
+                    minDate={dayjs()}
+                    maxDate={dayjs().add(maxBorrowDays, 'day')}
+                    slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                  />
+                  <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mt: 0.5 }}>
+                    ค่าเริ่มต้น {effectiveBorrowDays} วันนับจากวันนี้ (สูงสุด {maxBorrowDays} วัน)
+                  </Typography>
+                </Box>
+                <TextField
+                  sx={{ gridColumn: '1 / -1' }}
+                  label="หมายเหตุ"
+                  multiline
+                  rows={2}
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
                   placeholder="ข้อมูลเพิ่มเติม (ถ้ามี)"
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: '0.9rem', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }} />
-              </div>
-            </div>
-          </div>
+                />
+              </Box>
+            </CardContent>
+          </Card>
 
           {/* Asset / Inventory Selection Card */}
-          <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '20px 24px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-            {/* Tabs */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-              {[{ label: `🖥 ทรัพย์สิน IT (${assets.length})`, value: 0 }, { label: `📦 วัสดุสิ้นเปลือง (${inventoryItems.filter(i => i.availableQuantity > 0).length})`, value: 1 }].map(t => (
-                <button key={t.value} onClick={() => setActiveTab(t.value)}
-                  style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid ${activeTab === t.value ? '#0ea5e9' : '#e2e8f0'}`, background: activeTab === t.value ? '#e0f2fe' : '#f8fafc', color: activeTab === t.value ? '#0284c7' : '#64748b', fontWeight: activeTab === t.value ? 700 : 500, cursor: 'pointer', fontSize: '0.85rem' }}>
-                  {t.label}
-                </button>
-              ))}
-            </div>
+          <Card>
+            <CardContent sx={{ p: '20px 24px !important' }}>
+              <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} sx={{ mb: 2, minHeight: 40 }}>
+                <Tab label={`อุปกรณ์และทรัพย์สิน (${assets.length})`} sx={{ minHeight: 40 }} />
+                <Tab label={`วัสดุสิ้นเปลือง (${inventoryItems.filter(i => i.availableQuantity > 0).length})`} sx={{ minHeight: 40 }} />
+              </Tabs>
 
-            {activeTab === 0 ? (
-              <>
-                {/* Quick Filters */}
-                <div style={{ display: 'flex', gap: 6, marginBottom: 14, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
-                  <button onClick={() => setFilterType('')} style={{ padding: '6px 14px', borderRadius: 20, border: '1px solid', borderColor: filterType === '' ? '#0ea5e9' : '#e2e8f0', background: filterType === '' ? '#f0f9ff' : '#fff', color: filterType === '' ? '#0284c7' : '#64748b', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s' }}>ทั้งหมด</button>
-                  {allTypes.map(t => (
-                    <button key={t} onClick={() => setFilterType(t)} style={{ padding: '6px 14px', borderRadius: 20, border: '1px solid', borderColor: filterType === t ? '#0ea5e9' : '#e2e8f0', background: filterType === t ? '#f0f9ff' : '#fff', color: filterType === t ? '#0284c7' : '#64748b', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s' }}>{t}</button>
-                  ))}
-                </div>
+              {activeTab === 0 ? (
+                <>
+                  {/* Quick Filters */}
+                  <Box sx={{ display: 'flex', gap: 0.75, mb: 1.75, overflowX: 'auto', pb: 0.5, scrollbarWidth: 'none' }}>
+                    <Chip
+                      label="ทั้งหมด"
+                      onClick={() => setFilterType('')}
+                      color={filterType === '' ? 'primary' : 'default'}
+                      variant={filterType === '' ? 'filled' : 'outlined'}
+                      sx={{ fontWeight: 700, flexShrink: 0 }}
+                    />
+                    {allTypes.map(t => (
+                      <Chip
+                        key={t}
+                        label={t}
+                        onClick={() => setFilterType(t)}
+                        color={filterType === t ? 'primary' : 'default'}
+                        variant={filterType === t ? 'filled' : 'outlined'}
+                        sx={{ fontWeight: 700, flexShrink: 0 }}
+                      />
+                    ))}
+                  </Box>
 
-                {/* Search & Location Filter */}
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr auto', gap: 10, marginBottom: 14 }}>
-                  <div style={{ position: 'relative' }}>
-                    <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}>🔍</span>
-                    <input value={assetSearch} onChange={e => setAssetSearch(e.target.value)}
+                  {/* Search & Location Filter */}
+                  <Box sx={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr auto', gap: 1.25, mb: 1.75 }}>
+                    <TextField
+                      size="small"
+                      value={assetSearch}
+                      onChange={e => setAssetSearch(e.target.value)}
                       placeholder="ค้นหา รหัส / ชื่อ / Serial / ยี่ห้อ / รุ่น"
-                      style={{ width: '100%', padding: '9px 12px 9px 32px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: '0.85rem', boxSizing: 'border-box' }} />
-                  </div>
-                  <select value={filterLocation} onChange={e => setFilterLocation(e.target.value)}
-                    style={{ padding: '9px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: '0.85rem', color: filterLocation ? '#0284c7' : '#6b7280', background: filterLocation ? '#f0f9ff' : '#fff', minWidth: 130 }}>
-                    <option value="">ทุกสถานที่</option>
-                    {allLocations.map(l => <option key={l} value={l}>{l}</option>)}
-                  </select>
-                </div>
+                      InputProps={{
+                        startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 18, color: 'text.disabled' }} /></InputAdornment>,
+                      }}
+                    />
+                    <FormControl size="small" sx={{ minWidth: 150 }}>
+                      <Select value={filterLocation} onChange={e => setFilterLocation(e.target.value)} displayEmpty>
+                        <MenuItem value="">ทุกสถานที่</MenuItem>
+                        {allLocations.map(l => <MenuItem key={l} value={l}>{l}</MenuItem>)}
+                      </Select>
+                    </FormControl>
+                  </Box>
 
-                {/* Active filters */}
-                {(filterType || filterLocation) && (
-                  <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
-                    {filterType && <span style={{ background: '#e0f2fe', color: '#0284c7', borderRadius: 20, padding: '2px 10px', fontSize: '0.75rem', fontWeight: 600 }}>🏷 {filterType} <button onClick={() => setFilterType('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0284c7', fontWeight: 700, padding: 0, marginLeft: 4 }}>✕</button></span>}
-                    {filterLocation && <span style={{ background: '#e0f2fe', color: '#0284c7', borderRadius: 20, padding: '2px 10px', fontSize: '0.75rem', fontWeight: 600 }}>📍 {filterLocation} <button onClick={() => setFilterLocation('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0284c7', fontWeight: 700, padding: 0, marginLeft: 4 }}>✕</button></span>}
-                  </div>
-                )}
+                  {/* Active filters */}
+                  {(filterType || filterLocation) && (
+                    <Box sx={{ display: 'flex', gap: 0.75, mb: 1.5, flexWrap: 'wrap' }}>
+                      {filterType && <Chip size="small" color="primary" label={filterType} onDelete={() => setFilterType('')} sx={{ fontWeight: 600 }} />}
+                      {filterLocation && <Chip size="small" color="primary" icon={<LocationOnIcon sx={{ fontSize: 14 }} />} label={filterLocation} onDelete={() => setFilterLocation('')} sx={{ fontWeight: 600 }} />}
+                    </Box>
+                  )}
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <span style={{ fontSize: '0.78rem', color: '#64748b' }}>พบ <strong>{filteredAssets.length}</strong> รายการ</span>
-                  <span style={{ background: selected.length > 0 ? '#dcfce7' : '#f1f5f9', color: selected.length > 0 ? '#16a34a' : '#94a3b8', borderRadius: 20, padding: '2px 10px', fontSize: '0.75rem', fontWeight: 700 }}>เลือกแล้ว {selected.length}</span>
-                </div>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.25 }}>
+                    <Typography variant="caption" color="text.secondary">พบ <Box component="strong">{filteredAssets.length}</Box> รายการ</Typography>
+                    <Chip
+                      size="small"
+                      label={`เลือกแล้ว ${selected.length}`}
+                      color={selected.length > 0 ? 'success' : 'default'}
+                      sx={{ fontWeight: 700 }}
+                    />
+                  </Box>
 
-                {/* Asset Table */}
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden', maxHeight: isMobile ? 300 : 350, overflowY: 'auto', overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
-                    <thead>
-                      <tr style={{ background: '#f8fafc', position: 'sticky', top: 0 }}>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8', width: 36 }}></th>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>ชื่อทรัพย์สิน</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>Serial No.</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>ยี่ห้อ/รุ่น</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>ประเภท</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>สถานที่</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>บริษัท</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredAssets.length === 0 ? (
-                        <tr><td colSpan={7} style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>ไม่พบรายการ</td></tr>
-                      ) : filteredAssets.map((a, idx) => {
-                        const isSelected = selected.includes(a.id);
-                        const isTypeBlocked = a.type && blockedTypes.includes(a.type);
-                        return (
-                          <tr key={a.id}
-                            onClick={() => !isTypeBlocked && toggleAsset(a.id)}
-                            onMouseEnter={() => setAssetHover(isTypeBlocked ? null : a)}
-                            onMouseLeave={() => setAssetHover(null)}
-                            style={{
-                              borderTop: idx > 0 ? '1px solid #f1f5f9' : 'none',
-                              background: isTypeBlocked ? '#f1f5f9' : isSelected ? '#f0f9ff' : 'transparent',
-                              cursor: isTypeBlocked ? 'not-allowed' : 'pointer',
-                              opacity: isTypeBlocked ? 0.5 : 1,
-                              transition: 'background 0.1s',
-                            }}
-                            title={isTypeBlocked ? `คุณยืม "${a.type}" อยู่แล้ว กรุณาคืนก่อนจึงจะยืมเพิ่มได้` : ''}>
-                            <td style={{ padding: '10px 12px' }}>
-                              {isTypeBlocked ? (
-                                <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>🔒</span>
-                              ) : (
-                                <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${isSelected ? '#0ea5e9' : '#d1d5db'}`, background: isSelected ? '#0ea5e9' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}>
-                                  {isSelected && <span style={{ color: '#fff', fontSize: '0.7rem', fontWeight: 900 }}>✓</span>}
-                                </div>
-                              )}
-                            </td>
-                            <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0f172a' }}>
-                              <div>{a.assetName || a.assetCode}</div>
-                              {a.assetName ? <div style={{ fontSize: '0.73rem', color: '#94a3b8', fontWeight: 400 }}>{a.assetCode}</div> : null}
-                            </td>
-                            <td style={{ padding: '10px 12px', color: '#374151' }}>{a.serialNo || '-'}</td>
-                            <td style={{ padding: '10px 12px', color: '#374151' }}>{`${a.brand || ''} ${a.model || ''}`.trim() || '-'}</td>
-                            <td style={{ padding: '10px 12px' }}>
-                              {(a.deviceType || a.category?.name) ? <span style={{ background: '#f1f5f9', color: '#475569', borderRadius: 20, padding: '2px 8px', fontSize: '0.72rem', fontWeight: 600 }}>{a.deviceType || a.category?.name}</span> : <span style={{ color: '#cbd5e1' }}>-</span>}
-                            </td>
-                            <td style={{ padding: '10px 12px', color: '#64748b', fontSize: '0.8rem' }}>{a.location || '-'}</td>
-                            <td style={{ padding: '10px 12px', color: '#64748b', fontSize: '0.8rem' }}>{a.company || '-'}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                  {/* Catalog Card Grid */}
+                  <Box sx={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                    gap: 2,
+                    maxHeight: 400,
+                    overflowY: 'auto',
+                    p: '6px 4px',
+                    scrollbarWidth: 'thin',
+                  }}>
+                    {filteredAssets.length === 0 ? (
+                      <Box sx={{ gridColumn: '1 / -1', p: 6, textAlign: 'center', color: 'text.disabled' }}>
+                        ไม่พบรายการทรัพย์สินที่พร้อมยืม
+                      </Box>
+                    ) : filteredAssets.map((a) => {
+                      const isSelected = selected.includes(a.id);
+                      const isTypeBlocked = a.type && blockedTypes.includes(a.type);
 
-                {/* Hover detail tooltip */}
-                {assetHover && !selected.includes(assetHover.id) && (
-                  <div style={{ marginTop: 10, padding: '10px 14px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 10, fontSize: '0.82rem', color: '#0369a1' }}>
-                    <strong>{assetHover.assetCode}</strong> · {assetHover.brand} {assetHover.model}
-                    {assetHover.cpu && <> · CPU: {assetHover.cpu}</>}
-                    {assetHover.ram && <> · RAM: {assetHover.ram}</>}
-                    {assetHover.os && <> · OS: {assetHover.os}</>}
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                <div style={{ position: 'relative', marginBottom: 14 }}>
-                  <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}>🔍</span>
-                  <input value={invSearch} onChange={e => setInvSearch(e.target.value)}
+                      return (
+                        <Box
+                          key={a.id}
+                          onClick={() => !isTypeBlocked && toggleAsset(a.id)}
+                          sx={{
+                            bgcolor: isTypeBlocked ? 'action.hover' : isSelected ? alpha(theme.palette.primary.main, 0.06) : 'background.paper',
+                            border: `1.5px solid ${isSelected ? theme.palette.primary.main : theme.palette.divider}`,
+                            borderRadius: '14px',
+                            p: 2,
+                            cursor: isTypeBlocked ? 'not-allowed' : 'pointer',
+                            opacity: isTypeBlocked ? 0.65 : 1,
+                            boxShadow: isSelected ? `0 10px 15px -3px ${alpha(theme.palette.primary.main, 0.1)}` : '0 1px 3px rgba(0,0,0,0.04)',
+                            transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            gap: 1.5,
+                          }}
+                        >
+                          {/* Card Header: Category Icon & Selection indicator */}
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Box sx={{
+                              width: 36, height: 36, borderRadius: '10px',
+                              bgcolor: isSelected ? alpha(theme.palette.primary.main, 0.15) : 'action.hover',
+                              color: isSelected ? 'primary.main' : 'text.secondary',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}>
+                              {getMuiCategoryIcon(a.deviceType || a.category?.name || '')}
+                            </Box>
+                            <Box sx={{
+                              width: 20, height: 20, borderRadius: '50%',
+                              border: `2px solid ${isSelected ? theme.palette.primary.main : theme.palette.divider}`,
+                              bgcolor: isSelected ? 'primary.main' : 'transparent',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              transition: 'all 0.15s',
+                            }}>
+                              {isSelected && <CheckIcon sx={{ fontSize: 13, color: '#fff' }} />}
+                            </Box>
+                          </Box>
+
+                          {/* Card Content */}
+                          <Box sx={{ flex: 1 }}>
+                            <Typography sx={{ fontWeight: 800, fontSize: '0.925rem', mb: 0.25, wordBreak: 'break-word' }}>
+                              {a.assetName || a.assetCode}
+                            </Typography>
+                            {a.assetName && (
+                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
+                                {a.assetCode}
+                              </Typography>
+                            )}
+                            <Box sx={{ fontSize: '0.78rem', color: 'text.secondary', display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
+                              {a.brand && <Box component="span" sx={{ bgcolor: 'action.hover', px: 1, py: 0.25, borderRadius: '20px' }}>{a.brand} {a.model}</Box>}
+                              {a.serialNo && <Box component="span" sx={{ color: 'text.disabled', fontSize: '0.7rem' }}>S/N: {a.serialNo}</Box>}
+                            </Box>
+
+                            {(a.cpu || a.ram || a.os) && (
+                              <Box sx={{
+                                fontSize: '0.72rem', color: 'secondary.main',
+                                bgcolor: alpha(theme.palette.secondary.main, 0.06),
+                                p: '4px 8px', borderRadius: '8px', mt: 0.5,
+                              }}>
+                                {a.cpu && <span>CPU: {a.cpu} </span>}
+                                {a.ram && <span>RAM: {a.ram} </span>}
+                              </Box>
+                            )}
+                          </Box>
+
+                          {/* Card Footer: Location & Lock */}
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: `1px solid ${theme.palette.divider}`, pt: 1 }}>
+                            <Typography variant="caption" color="text.disabled" sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+                              <LocationOnIcon sx={{ fontSize: 13 }} /> {a.location || 'ไม่ระบุสถานที่'}
+                            </Typography>
+                            {isTypeBlocked && (
+                              <Typography
+                                variant="caption"
+                                sx={{ color: 'error.main', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.25 }}
+                                title={`คุณยืม "${a.type}" อยู่แล้ว กรุณาคืนก่อนจึงจะยืมเพิ่มได้`}
+                              >
+                                <LockIcon sx={{ fontSize: 12 }} /> จำกัดสิทธิ์
+                              </Typography>
+                            )}
+                          </Box>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                </>
+              ) : (
+                <>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    value={invSearch}
+                    onChange={e => setInvSearch(e.target.value)}
                     placeholder="ค้นหาวัสดุ..."
-                    style={{ width: '100%', padding: '9px 12px 9px 32px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: '0.85rem', boxSizing: 'border-box' }} />
-                </div>
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden', maxHeight: 350, overflowY: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
-                    <thead>
-                      <tr style={{ background: '#f8fafc', position: 'sticky', top: 0 }}>
-                        <th style={{ padding: '10px 12px', width: 36 }}></th>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>ชื่อรายการ</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#94a3b8' }}>หมวด</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#94a3b8' }}>คงเหลือ</th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                    sx={{ mb: 1.75 }}
+                    InputProps={{
+                      startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 18, color: 'text.disabled' }} /></InputAdornment>,
+                    }}
+                  />
+                  {isMobile ? (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, maxHeight: 400, overflowY: 'auto', py: 0.5, scrollbarWidth: 'none' }}>
                       {filteredInventory.length === 0 ? (
-                        <tr><td colSpan={4} style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>ไม่มีวัสดุให้ยืม</td></tr>
-                      ) : filteredInventory.map((item, idx) => {
+                        <Box sx={{ p: 4, textAlign: 'center', color: 'text.disabled' }}>ไม่มีวัสดุให้ยืม</Box>
+                      ) : filteredInventory.map((item) => {
                         const isSel = selectedInventory.some(s => s.item.id === item.id);
                         return (
-                          <tr key={item.id} onClick={() => toggleInventory(item)}
-                            style={{ borderTop: idx > 0 ? '1px solid #f1f5f9' : 'none', background: isSel ? '#f0fdf4' : 'transparent', cursor: 'pointer' }}>
-                            <td style={{ padding: '10px 12px' }}>
-                              <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${isSel ? '#16a34a' : '#d1d5db'}`, background: isSel ? '#16a34a' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                {isSel && <span style={{ color: '#fff', fontSize: '0.7rem', fontWeight: 900 }}>✓</span>}
-                              </div>
-                            </td>
-                            <td style={{ padding: '10px 12px', fontWeight: 600, color: '#0f172a' }}>{item.name}</td>
-                            <td style={{ padding: '10px 12px' }}><span style={{ background: '#f1f5f9', color: '#475569', borderRadius: 20, padding: '2px 8px', fontSize: '0.72rem' }}>{item.category}</span></td>
-                            <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>{item.availableQuantity} {item.unit}</td>
-                          </tr>
+                          <Box key={item.id} onClick={() => toggleInventory(item)}
+                            sx={{
+                              display: 'flex', gap: 1.5, alignItems: 'center',
+                              p: '14px 16px', borderRadius: '12px',
+                              border: `2px solid ${isSel ? theme.palette.success.main : theme.palette.divider}`,
+                              bgcolor: isSel ? alpha(theme.palette.success.main, 0.06) : 'background.paper',
+                              cursor: 'pointer',
+                              boxShadow: isSel ? `0 2px 8px ${alpha(theme.palette.success.main, 0.15)}` : '0 1px 2px rgba(0,0,0,0.04)',
+                              transition: 'all 0.2s',
+                            }}
+                          >
+                            <Box sx={{
+                              width: 24, height: 24, flexShrink: 0, borderRadius: '6px',
+                              border: `2px solid ${isSel ? theme.palette.success.main : theme.palette.divider}`,
+                              bgcolor: isSel ? 'success.main' : 'background.paper',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}>
+                              {isSel && <CheckIcon sx={{ fontSize: 16, color: '#fff' }} />}
+                            </Box>
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <Typography sx={{ fontWeight: 800, fontSize: '0.95rem', mb: 0.25 }}>{item.name}</Typography>
+                              <Box sx={{ fontSize: '0.75rem', color: 'text.secondary', display: 'flex', gap: 0.75 }}>
+                                <Box component="span" sx={{ bgcolor: 'action.hover', px: 1, py: 0.25, borderRadius: '12px' }}>{item.category}</Box>
+                              </Box>
+                            </Box>
+                            <Box sx={{ textAlign: 'right' }}>
+                              <Typography variant="caption" fontWeight={700} color="text.disabled">คงเหลือ</Typography>
+                              <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color: 'success.main' }}>{item.availableQuantity} <Box component="span" sx={{ fontSize: '0.75rem' }}>{item.unit}</Box></Typography>
+                            </Box>
+                          </Box>
                         );
                       })}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+                    </Box>
+                  ) : (
+                    <Box sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: '10px', overflow: 'hidden', maxHeight: 350, overflowY: 'auto' }}>
+                      <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
+                        <Box component="thead">
+                          <Box component="tr" sx={{ bgcolor: 'action.hover', position: 'sticky', top: 0 }}>
+                            <Box component="th" sx={{ p: '10px 12px', width: 36 }} />
+                            <Box component="th" sx={{ p: '10px 12px', textAlign: 'left', fontWeight: 700, color: 'text.disabled' }}>ชื่อรายการ</Box>
+                            <Box component="th" sx={{ p: '10px 12px', textAlign: 'left', fontWeight: 700, color: 'text.disabled' }}>หมวด</Box>
+                            <Box component="th" sx={{ p: '10px 12px', textAlign: 'right', fontWeight: 700, color: 'text.disabled' }}>คงเหลือ</Box>
+                          </Box>
+                        </Box>
+                        <Box component="tbody">
+                          {filteredInventory.length === 0 ? (
+                            <Box component="tr"><Box component="td" colSpan={4} sx={{ p: 4, textAlign: 'center', color: 'text.disabled' }}>ไม่มีวัสดุให้ยืม</Box></Box>
+                          ) : filteredInventory.map((item, idx) => {
+                            const isSel = selectedInventory.some(s => s.item.id === item.id);
+                            return (
+                              <Box component="tr" key={item.id} onClick={() => toggleInventory(item)}
+                                sx={{ borderTop: idx > 0 ? `1px solid ${theme.palette.divider}` : 'none', bgcolor: isSel ? alpha(theme.palette.success.main, 0.06) : 'transparent', cursor: 'pointer' }}>
+                                <Box component="td" sx={{ p: '10px 12px' }}>
+                                  <Box sx={{ width: 18, height: 18, borderRadius: '4px', border: `2px solid ${isSel ? theme.palette.success.main : theme.palette.divider}`, bgcolor: isSel ? 'success.main' : 'background.paper', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    {isSel && <CheckIcon sx={{ fontSize: 12, color: '#fff' }} />}
+                                  </Box>
+                                </Box>
+                                <Box component="td" sx={{ p: '10px 12px', fontWeight: 600 }}>{item.name}</Box>
+                                <Box component="td" sx={{ p: '10px 12px' }}><Chip size="small" label={item.category} sx={{ fontSize: '0.72rem' }} /></Box>
+                                <Box component="td" sx={{ p: '10px 12px', textAlign: 'right', fontWeight: 700, color: 'success.main' }}>{item.availableQuantity} {item.unit}</Box>
+                              </Box>
+                            );
+                          })}
+                        </Box>
+                      </Box>
+                    </Box>
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Policy Card on Mobile */}
+          {isMobile && <PolicyCard maxItemsPerRequest={maxItemsPerRequest} maxBorrowDays={maxBorrowDays} />}
+        </Box>
 
         {/* Right: Summary Card (sticky) */}
-        <div style={{ position: isMobile ? 'relative' : 'sticky', top: isMobile ? undefined : 20 }}>
-          <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '20px 22px', boxShadow: '0 4px 20px rgba(0,0,0,0.07)' }}>
-            <h3 style={{ margin: '0 0 4px', fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>สรุปการยืม</h3>
-            <div style={{ borderTop: '1px solid #f1f5f9', marginTop: 12, paddingTop: 14 }}>
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', marginBottom: 3 }}>ผู้ขอ</div>
-                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>{user?.displayName || user?.adUsername || '-'}</div>
-              </div>
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', marginBottom: 3 }}>รายการที่เลือก</div>
-                <div style={{ fontSize: '2rem', fontWeight: 900, color: totalSelected > 0 ? '#0ea5e9' : '#94a3b8' }}>{totalSelected}</div>
-              </div>
+        <Box sx={{
+          position: isMobile ? 'fixed' : 'sticky',
+          bottom: isMobile ? 0 : undefined,
+          top: isMobile ? undefined : 20,
+          left: 0, right: 0,
+          zIndex: isMobile ? 1000 : 1,
+          p: isMobile ? '12px 16px' : 0,
+          bgcolor: isMobile ? alpha(theme.palette.background.paper, 0.95) : 'transparent',
+          backdropFilter: isMobile ? 'blur(10px)' : 'none',
+          borderTop: isMobile ? `1px solid ${theme.palette.divider}` : 'none',
+          boxShadow: isMobile ? '0 -4px 20px rgba(0,0,0,0.12)' : 'none',
+        }}>
+          {isMobile ? (
+            /* Mobile Quick Summary Bar */
+            <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', maxWidth: 600, mx: 'auto' }}>
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="caption" fontWeight={700} color="text.secondary">รายการที่เลือก</Typography>
+                <Typography sx={{ fontSize: '1.2rem', fontWeight: 900, color: totalSelected > 0 ? 'primary.main' : 'text.disabled' }}>{totalSelected} รายการ</Typography>
+              </Box>
+              <Button variant="outlined" color="inherit" onClick={() => navigate('/borrow/my-requests')}>ยกเลิก</Button>
+              <Button variant="contained" onClick={handleSubmit} disabled={submitDisabled}>
+                {submitting ? <CircularProgress size={18} color="inherit" /> : overdueItems.length > 0 ? 'ยืมไม่ได้' : 'ส่งคำขอ'}
+              </Button>
+            </Box>
+          ) : (
+            <Card sx={{ boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
+              <CardContent sx={{ p: '20px 22px !important' }}>
+                <Typography sx={{ fontSize: '1rem', fontWeight: 700 }}>สรุปการยืม</Typography>
+                <Box sx={{ borderTop: `1px solid ${theme.palette.divider}`, mt: 1.5, pt: 1.75 }}>
+                  <Box sx={{ mb: 1.5 }}>
+                    <Typography variant="caption" fontWeight={700} color="text.disabled" sx={{ textTransform: 'uppercase', display: 'block', mb: 0.25 }}>ผู้ขอ</Typography>
+                    <Typography sx={{ fontWeight: 700, fontSize: '0.9rem' }}>{user?.displayName || user?.adUsername || '-'}</Typography>
+                  </Box>
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="caption" fontWeight={700} color="text.disabled" sx={{ textTransform: 'uppercase', display: 'block', mb: 0.25 }}>รายการที่เลือก</Typography>
+                    <Typography sx={{ fontSize: '2rem', fontWeight: 900, color: totalSelected > 0 ? 'primary.main' : 'text.disabled' }}>{totalSelected}</Typography>
+                  </Box>
 
-              {/* Selected items list */}
-              <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 16 }}>
-                {selectedAssets.map(a => (
-                  <div key={a.id} style={{ padding: '10px 12px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 9, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.assetCode}</div>
-                      <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{a.brand} {a.model}</div>
-                    </div>
-                    <button onClick={() => removeAsset(a.id)}
-                      style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1rem', lineHeight: 1, padding: 2 }}>✕</button>
-                  </div>
-                ))}
-                {selectedInventory.map(({ item, qty }) => (
-                  <div key={item.id} style={{ padding: '10px 12px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 9 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                      <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#0f172a' }}>{item.name}</div>
-                      <button onClick={() => setSelectedInventory(prev => prev.filter(s => s.item.id !== item.id))}
-                        style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1rem', lineHeight: 1, padding: 2 }}>✕</button>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <button onClick={() => updateQty(item.id, qty - 1)} style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer', fontWeight: 700 }}>-</button>
-                      <span style={{ fontWeight: 700, minWidth: 24, textAlign: 'center' }}>{qty}</span>
-                      <button onClick={() => updateQty(item.id, qty + 1)} style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer', fontWeight: 700 }}>+</button>
-                      <span style={{ fontSize: '0.78rem', color: '#64748b' }}>{item.unit} (คงเหลือ {item.availableQuantity})</span>
-                    </div>
-                  </div>
-                ))}
-                {totalSelected === 0 && (
-                  <div style={{ padding: '20px', textAlign: 'center', color: '#cbd5e1', fontSize: '0.85rem' }}>
-                    <div style={{ fontSize: '1.8rem', marginBottom: 6 }}>📋</div>
-                    ยังไม่มีรายการที่เลือก
-                  </div>
-                )}
-              </div>
+                  {/* Selected items list */}
+                  <Box sx={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 0.875, mb: 2 }}>
+                    {selectedAssets.map(a => (
+                      <Box key={a.id} sx={{ p: '10px 12px', bgcolor: alpha(theme.palette.primary.main, 0.05), border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`, borderRadius: '9px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography sx={{ fontWeight: 700, fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.assetCode}</Typography>
+                          <Typography variant="caption" color="text.secondary">{a.brand} {a.model}</Typography>
+                        </Box>
+                        <IconButton size="small" onClick={() => removeAsset(a.id)}><CloseIcon sx={{ fontSize: 16 }} /></IconButton>
+                      </Box>
+                    ))}
+                    {selectedInventory.map(({ item, qty }) => (
+                      <Box key={item.id} sx={{ p: '10px 12px', bgcolor: alpha(theme.palette.success.main, 0.05), border: `1px solid ${alpha(theme.palette.success.main, 0.25)}`, borderRadius: '9px' }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.75 }}>
+                          <Typography sx={{ fontWeight: 700, fontSize: '0.85rem' }}>{item.name}</Typography>
+                          <IconButton size="small" onClick={() => setSelectedInventory(prev => prev.filter(s => s.item.id !== item.id))}><CloseIcon sx={{ fontSize: 16 }} /></IconButton>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <IconButton size="small" onClick={() => updateQty(item.id, qty - 1)} sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: '6px', width: 24, height: 24 }}><RemoveIcon sx={{ fontSize: 14 }} /></IconButton>
+                          <Typography sx={{ fontWeight: 700, minWidth: 24, textAlign: 'center' }}>{qty}</Typography>
+                          <IconButton size="small" onClick={() => updateQty(item.id, qty + 1)} sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: '6px', width: 24, height: 24 }}><AddIcon sx={{ fontSize: 14 }} /></IconButton>
+                          <Typography variant="caption" color="text.secondary">{item.unit} (คงเหลือ {item.availableQuantity})</Typography>
+                        </Box>
+                      </Box>
+                    ))}
+                    {totalSelected === 0 && (
+                      <Box sx={{ p: 2.5, textAlign: 'center', color: 'text.disabled', fontSize: '0.85rem' }}>
+                        <AssignmentIcon sx={{ fontSize: 30, mb: 0.75, opacity: 0.5 }} />
+                        <div>ยังไม่มีรายการที่เลือก</div>
+                      </Box>
+                    )}
+                  </Box>
 
-              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 14 }}>
-                <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  ℹ️ {"\u0e01\u0e33\u0e2b\u0e19\u0e14\u0e04\u0e37\u0e19\u0e2d\u0e31\u0e15\u0e42\u0e19\u0e21\u0e31\u0e15\u0e34"} <strong style={{ color: '#374151' }}>{effectiveBorrowDays} {"\u0e27\u0e31\u0e19"}</strong> {"\u0e19\u0e31\u0e1a\u0e08\u0e32\u0e01\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48\u0e22\u0e37\u0e21"} ({"\u0e2a\u0e39\u0e07\u0e2a\u0e39\u0e14"} {systemSettings?.maxBorrowDays ?? 30} {"\u0e27\u0e31\u0e19"})
-                </div>
-                <button onClick={handleSubmit} disabled={submitting || totalSelected === 0 || !purpose.trim() || overdueItems.length > 0}
-                  style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', background: totalSelected === 0 || !purpose.trim() || overdueItems.length > 0 ? '#e2e8f0' : '#0ea5e9', color: totalSelected === 0 || !purpose.trim() || overdueItems.length > 0 ? '#94a3b8' : '#fff', fontWeight: 800, fontSize: '0.95rem', cursor: totalSelected === 0 || !purpose.trim() || overdueItems.length > 0 ? 'not-allowed' : 'pointer', transition: 'all 0.2s', marginBottom: 8 }}
-                  title={overdueItems.length > 0 ? "\u0e04\u0e38\u0e13\u0e44\u0e21\u0e48\u0e2a\u0e32\u0e21\u0e32\u0e23\u0e16\u0e22\u0e37\u0e21\u0e17\u0e23\u0e31\u0e1e\u0e22\u0e4c\u0e2a\u0e34\u0e19\u0e43\u0e2b\u0e21\u0e48\u0e44\u0e14\u0e49 \u0e40\u0e19\u0e37\u0e48\u0e2d\u0e07\u0e08\u0e32\u0e01\u0e21\u0e35\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e04\u0e49\u0e32\u0e07\u0e2a\u0e48\u0e07\u0e04\u0e37\u0e19\u0e40\u0e01\u0e34\u0e19\u0e01\u0e33\u0e2b\u0e19\u0e14" : ""}>
-                  {submitting ? '⏳ ...' : overdueItems.length > 0 ? "\u0e04\u0e38\u0e13\u0e44\u0e21\u0e48\u0e2a\u0e32\u0e21\u0e32\u0e23\u0e16\u0e22\u0e37\u0e21\u0e43\u0e2b\u0e21\u0e48\u0e44\u0e14\u0e49" : `📤 \u0e2a\u0e48\u0e07\u0e04\u0e33\u0e02\u0e2d\u0e22\u0e37\u0e21${totalSelected > 0 ? ` (${totalSelected} \u0e23\u0e32\u0e22\u0e01\u0e32\u0e23)` : ''}`}
-                </button>
-                <button onClick={() => navigate('/borrow/my-requests')}
-                  style={{ width: '100%', padding: '10px', borderRadius: 10, border: '1px solid #e2e8f0', background: '#f8fafc', color: '#64748b', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>
-                  {"\u0e22\u0e01\u0e40\u0e25\u0e34\u0e01"}
-                </button>
-              </div>
+                  <Box sx={{ borderTop: `1px solid ${theme.palette.divider}`, pt: 1.75 }}>
+                    <Typography variant="caption" color="text.disabled" sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <InfoOutlinedIcon sx={{ fontSize: 14 }} /> กำหนดคืนอัตโนมัติ <Box component="strong" sx={{ color: 'text.secondary' }}>{effectiveBorrowDays} วัน</Box> นับจากวันที่ยืม (สูงสุด {maxBorrowDays} วัน)
+                    </Typography>
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      onClick={handleSubmit}
+                      disabled={submitDisabled}
+                      startIcon={submitting ? undefined : <SendIcon sx={{ fontSize: 16 }} />}
+                      sx={{ mb: 1 }}
+                      title={overdueItems.length > 0 ? 'คุณไม่สามารถยืมใหม่ได้ เนื่องจากมีรายการค้างส่งคืนเกินกำหนด' : ''}
+                    >
+                      {submitting ? <CircularProgress size={18} color="inherit" /> : overdueItems.length > 0 ? 'คุณไม่สามารถยืมใหม่ได้' : `ส่งคำขอยืม${totalSelected > 0 ? ` (${totalSelected} รายการ)` : ''}`}
+                    </Button>
+                    <Button fullWidth variant="outlined" color="inherit" onClick={() => navigate('/borrow/my-requests')}>
+                      ยกเลิก
+                    </Button>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+          )}
 
-              {/* Policy Card */}
-              <div style={{ background: 'linear-gradient(135deg, #f8fafc, #f1f5f9)', borderRadius: 14, border: '1px solid #e2e8f0', padding: '16px 20px', marginTop: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
-                <h4 style={{ margin: '0 0 10px', fontSize: '0.85rem', fontWeight: 800, color: '#475569', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span>🛡️</span> {"\u0e19\u0e42\u0e22\u0e1a\u0e32\u0e22\u0e01\u0e32\u0e23\u0e22\u0e37\u0e21\u0e04\u0e37\u0e19"}
-                </h4>
-                <div style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', flexDirection: 'column', gap: 8, lineHeight: 1.4 }}>
-                  <div>{"1. \u0e2a\u0e32\u0e21\u0e32\u0e23\u0e16\u0e22\u0e37\u0e21\u0e17\u0e23\u0e31\u0e1e\u0e22\u0e4c\u0e2a\u0e34\u0e19\u0e41\u0e25\u0e30\u0e27\u0e31\u0e2a\u0e14\u0e38\u0e2a\u0e34\u0e49\u0e19\u0e40\u0e1b\u0e25\u0e37\u0e2d\u0e07\u0e44\u0e14\u0e49\u0e15\u0e32\u0e21\u0e42\u0e04\u0e27\u0e15\u0e32\u0e17\u0e35\u0e48\u0e01\u0e33\u0e2b\u0e19\u0e14"}</div>
-                  <div>{"2. \u0e08\u0e33\u0e19\u0e27\u0e19\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e17\u0e35\u0e48\u0e22\u0e37\u0e21\u0e44\u0e14\u0e49\u0e2a\u0e39\u0e07\u0e2a\u0e38\u0e14:"} <strong style={{ color: '#0ea5e9' }}>{systemSettings?.maxItemsPerRequest ?? 5} {"\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e15\u0e48\u0e2d\u0e04\u0e33\u0e02\u0e2d"}</strong></div>
-                  <div>{"3. \u0e23\u0e30\u0e22\u0e30\u0e40\u0e27\u0e25\u0e32\u0e01\u0e32\u0e23\u0e22\u0e37\u0e21\u0e2a\u0e39\u0e07\u0e2a\u0e38\u0e14:"} <strong style={{ color: '#0ea5e9' }}>{systemSettings?.maxBorrowDays ?? 30} {"\u0e27\u0e31\u0e19"}</strong></div>
-                  <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: 8, color: '#b91c1c' }}>
-                    {"4. \u0e01\u0e23\u0e38\u0e13\u0e32\u0e2a\u0e48\u0e07\u0e04\u0e37\u0e19\u0e17\u0e23\u0e31\u0e1e\u0e22\u0e4c\u0e2a\u0e34\u0e19\u0e15\u0e23\u0e07\u0e40\u0e27\u0e25\u0e32 \u0e2b\u0e32\u0e01\u0e21\u0e35\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e40\u0e01\u0e34\u0e19\u0e01\u0e33\u0e2b\u0e19\u0e14\u0e2a\u0e48\u0e07\u0e04\u0e37\u0e19 \u0e08\u0e30\u0e15\u0e49\u0e2d\u0e07\u0e04\u0e37\u0e19\u0e17\u0e23\u0e31\u0e1e\u0e22\u0e4c\u0e2a\u0e34\u0e19\u0e19\u0e31\u0e49\u0e19\u0e01\u0e48\u0e2d\u0e19\u0e08\u0e36\u0e07\u0e08\u0e30\u0e22\u0e37\u0e21\u0e43\u0e2b\u0e21\u0e48\u0e44\u0e14\u0e49"}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+          {/* Policy Card on Desktop */}
+          {!isMobile && <PolicyCard maxItemsPerRequest={maxItemsPerRequest} maxBorrowDays={maxBorrowDays} />}
+        </Box>
+      </Box>
+    </Box>
   );
 }

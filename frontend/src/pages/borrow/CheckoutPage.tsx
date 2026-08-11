@@ -3,6 +3,7 @@ import {
   Box, Typography, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   Chip, CircularProgress, Alert, Card, CardContent, CardActions, Grid, Divider,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, InputAdornment,
+  alpha, useTheme,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
@@ -10,6 +11,8 @@ import HandymanIcon from '@mui/icons-material/Handyman';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import { borrowAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { formatDate } from '../../utils/dateUtils';
+
 
 interface Request {
   id: number;
@@ -40,6 +43,7 @@ interface Request {
 
 export default function CheckoutPage() {
   const { user } = useAuth();
+  const theme = useTheme();
   const [requests, setRequests] = useState<Request[]>([]);
   const [filteredRequests, setFilteredRequests] = useState<Request[]>([]);
   const [loading, setLoading] = useState(true);
@@ -186,7 +190,7 @@ export default function CheckoutPage() {
         <TableContainer>
           <Table>
             <TableHead>
-              <TableRow sx={{ backgroundColor: 'rgba(37, 99, 235, 0.05)' }}>
+              <TableRow sx={{ backgroundColor: alpha(theme.palette.primary.main, 0.05) }}>
                 <TableCell>เลขที่คำขอ</TableCell>
                 <TableCell>ผู้ขอ</TableCell>
                 <TableCell>วัตถุประสงค์</TableCell>
@@ -216,7 +220,7 @@ export default function CheckoutPage() {
                         {request.items.map(item => item.isQuantityBased ? item.inventoryItem?.name : `${item.asset?.brand || ''} ${item.asset?.model || ''}`.trim()).filter(Boolean).join(', ')}
                       </Typography>
                     </TableCell>
-                    <TableCell>{new Date(request.createdAt).toLocaleDateString('th-TH')}</TableCell>
+                    <TableCell>{formatDate(request.createdAt)}</TableCell>
                     <TableCell align="right">
                       <Button
                         size="small"
@@ -286,14 +290,14 @@ export default function CheckoutPage() {
                   sx={{
                     p: 2,
                     mb: 1.5,
-                    background: 'rgba(255, 255, 255, 0.9)',
-                    border: '1px solid rgba(226, 232, 240, 0.8)',
+                    bgcolor: alpha(theme.palette.background.paper, 0.9),
+                    border: `1px solid ${alpha(theme.palette.divider, 0.8)}`,
                     borderRadius: '12px',
                     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)',
                     transition: 'transform 0.2s, box-shadow 0.2s',
                     '&:hover': {
                       transform: 'translateY(-1px)',
-                      boxShadow: '0 4px 12px rgba(0, 113, 227, 0.05)'
+                      boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.05)}`
                     }
                   }}
                 >
@@ -310,9 +314,9 @@ export default function CheckoutPage() {
                             height: 18, 
                             fontSize: '0.65rem', 
                             fontWeight: 600, 
-                            bgcolor: 'rgba(234, 88, 12, 0.08)', 
-                            color: 'rgb(234, 88, 12)', 
-                            border: '1px solid rgba(234, 88, 12, 0.15)' 
+                            bgcolor: alpha(theme.palette.warning.main, 0.08),
+                            color: theme.palette.warning.dark,
+                            border: `1px solid ${alpha(theme.palette.warning.main, 0.15)}`
                           }} 
                         />
                       </Box>
@@ -334,9 +338,9 @@ export default function CheckoutPage() {
                               height: 18, 
                               fontSize: '0.65rem', 
                               fontWeight: 600, 
-                              bgcolor: 'rgba(0, 113, 227, 0.06)', 
-                              color: '#0071e3', 
-                              border: '1px solid rgba(0, 113, 227, 0.12)' 
+                              bgcolor: alpha(theme.palette.primary.main, 0.06),
+                              color: 'primary.main',
+                              border: `1px solid ${alpha(theme.palette.primary.main, 0.12)}`
                             }} 
                           />
                         )}
@@ -374,7 +378,7 @@ export default function CheckoutPage() {
         <DialogContent dividers>
           {dialog.request && (
             <Box sx={{ pt: 1 }}>
-              <Box sx={{ p: 2, mb: 3, backgroundColor: 'rgba(0, 113, 227, 0.03)', border: '1px solid rgba(0, 113, 227, 0.1)', borderRadius: '10px' }}>
+              <Box sx={{ p: 2, mb: 3, bgcolor: alpha(theme.palette.primary.main, 0.03), border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`, borderRadius: '10px' }}>
                 <Typography variant="subtitle2" color="primary.main" fontWeight={700} sx={{ mb: 1.5, fontSize: '0.85rem' }}>
                   📄 รายละเอียดคำขอยืม {dialog.request.requestNo}
                 </Typography>
@@ -386,7 +390,7 @@ export default function CheckoutPage() {
                   </Grid>
                   <Grid item xs={6}>
                     <Typography variant="caption" color="text.secondary" display="block">วันที่ขอ</Typography>
-                    <Typography variant="body2" fontWeight={600}>{new Date(dialog.request.createdAt).toLocaleDateString('th-TH')}</Typography>
+                    <Typography variant="body2" fontWeight={600}>{formatDate(dialog.request.createdAt)}</Typography>
                   </Grid>
                   <Grid item xs={12}>
                     <Typography variant="caption" color="text.secondary" display="block">วัตถุประสงค์</Typography>
@@ -394,7 +398,7 @@ export default function CheckoutPage() {
                   </Grid>
                 </Grid>
 
-                <Divider sx={{ my: 1.5, borderColor: 'rgba(0, 113, 227, 0.08)' }} />
+                <Divider sx={{ my: 1.5, borderColor: alpha(theme.palette.primary.main, 0.08) }} />
 
                 <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>รายการที่ต้องส่งมอบ</Typography>
                 {dialog.request.items.map((item) => (
@@ -403,8 +407,8 @@ export default function CheckoutPage() {
                     sx={{
                       p: 2,
                       mb: 1.5,
-                      background: 'rgba(255, 255, 255, 0.9)',
-                      border: '1px solid rgba(226, 232, 240, 0.8)',
+                      bgcolor: alpha(theme.palette.background.paper, 0.9),
+                      border: `1px solid ${alpha(theme.palette.divider, 0.8)}`,
                       borderRadius: '12px',
                       boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)'
                     }}
@@ -422,9 +426,9 @@ export default function CheckoutPage() {
                               height: 18, 
                               fontSize: '0.65rem', 
                               fontWeight: 600, 
-                              bgcolor: 'rgba(234, 88, 12, 0.08)', 
-                              color: 'rgb(234, 88, 12)', 
-                              border: '1px solid rgba(234, 88, 12, 0.15)' 
+                              bgcolor: alpha(theme.palette.warning.main, 0.08),
+                              color: theme.palette.warning.dark,
+                              border: `1px solid ${alpha(theme.palette.warning.main, 0.15)}`
                             }} 
                           />
                         </Box>
@@ -446,9 +450,9 @@ export default function CheckoutPage() {
                                 height: 18, 
                                 fontSize: '0.65rem', 
                                 fontWeight: 600, 
-                                bgcolor: 'rgba(0, 113, 227, 0.06)', 
-                                color: '#0071e3', 
-                                border: '1px solid rgba(0, 113, 227, 0.12)' 
+                                bgcolor: alpha(theme.palette.primary.main, 0.06),
+                                color: 'primary.main',
+                                border: `1px solid ${alpha(theme.palette.primary.main, 0.12)}`
                               }} 
                             />
                           )}

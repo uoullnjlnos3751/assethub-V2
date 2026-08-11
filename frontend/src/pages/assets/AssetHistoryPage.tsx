@@ -220,7 +220,7 @@ export default function AssetHistoryPage() {
                               />
                               {record.actor && (
                                 <Typography variant="caption" color="text.secondary">
-                                  โดย {record.actor.name} ({record.actor.email})
+                                  โดย {record.actor.displayName || record.actor.email}
                                 </Typography>
                               )}
                             </Box>

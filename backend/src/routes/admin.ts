@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { authenticate, authorize } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { searchADUsers, getAllADCompanies } from '../services/ldap';
@@ -20,6 +20,7 @@ const DEFAULT_TEMPLATES: Record<string, { subjectTh: string, bodyTh: string }> =
   extension_pending: { subjectTh: 'คำขอต่อเวลายุ่งเกี่ยวกับการยืมทรัพย์สิน', bodyTh: 'มีคำขอขยายเวลาการยืมอุปกรณ์สำหรับคำขอเลขที่ {{requestNo}} จาก {{requester}} จำนวน {{extraDays}} วัน เนื่องจาก {{reason}}' },
   extension_approved: { subjectTh: 'คำขอต่อเวลาการยืมได้รับการอนุมัติ', bodyTh: 'คำขอต่อเวลาการยืมอุปกรณ์สำหรับคำขอเลขที่ {{requestNo}} ได้รับการอนุมัติแล้ว กำหนดคืนใหม่คือ {{newDueDate}}' },
   extension_rejected: { subjectTh: 'คำขอต่อเวลาการยืมถูกปฏิเสธ', bodyTh: 'คำขอต่อเวลาการยืมอุปกรณ์สำหรับคำขอเลขที่ {{requestNo}} ได้ถูกปฏิเสธเนื่องจาก {{note}}' },
+  pm_overdue: { subjectTh: '⚠️ แจ้งเตือนแผนงาน PM เกินกำหนดเสร็จสิ้น', bodyTh: 'แผนงาน PM {{planName}} (ปี {{year}}) เลยกำหนดสิ้นสุดมาแล้ว แต่ยังมีเครื่องที่ค้างดำเนินการจำนวน {{remainingCount}} เครื่อง (กำหนดเสร็จ: {{endDate}})' }
 };
 
 // ── Users list / management ──
@@ -32,25 +33,12 @@ router.get('/ad-companies', authenticate, authorize('SUPERADMIN', 'IT_ADMIN'), a
   } catch (err) { next(err); }
 });
 
+import { syncMasterDataFromIntraTools } from '../services/intraSync';
+
 router.post('/sync-companies', authenticate, authorize('SUPERADMIN', 'IT_ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { companies } = req.body;
-    if (!Array.isArray(companies)) throw new AppError('ข้อมูลไม่ถูกต้อง');
-
-    const results = [];
-    for (const name of companies) {
-      if (typeof name !== 'string' || !name.trim()) continue;
-      const cName = name.trim();
-      const existing = await prisma.company.findUnique({ where: { name: cName } });
-      if (!existing) {
-        const created = await prisma.company.create({ data: { name: cName, isActive: true } });
-        results.push(created);
-      } else if (!existing.isActive) {
-        const updated = await prisma.company.update({ where: { id: existing.id }, data: { isActive: true } });
-        results.push(updated);
-      }
-    }
-    res.json({ message: 'นำเข้าข้อมูลบริษัทเรียบร้อยแล้ว', syncedCount: results.length });
+    const result: any = await syncMasterDataFromIntraTools();
+    res.json({ message: `นำเข้าสำเร็จ: บริษัท ${result.company.added} รายการ, แผนก ${result.department.added} รายการ`, ...result });
   } catch (err) { next(err); }
 });
 router.get('/users/search-ad', authenticate, authorize('SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
@@ -152,8 +140,8 @@ router.delete('/users/:id', authenticate, authorize('SUPERADMIN'), async (req: R
     await prisma.appUser.delete({ where: { id } });
     res.json({ message: 'ลบผู้ใช้งานเรียบร้อย' });
   } catch (err: any) {
-    if (err.code === 'P2003') {
-      next(new AppError('ไม่สามารถลบผู้ใช้นี้ได้ เนื่องจากมีข้อมูลที่เกี่ยวข้องในระบบ', 400));
+    if (err.code === 'P2003' || (err.message && err.message.includes('foreign key constraint'))) {
+      next(new AppError('ไม่สามารถลบผู้ใช้นี้ได้ เนื่องจากมีประวัติการยืมหรือทำรายการในระบบ แนะนำให้ใช้วิธี "ปิดการใช้งาน" แทนครับ', 400));
     } else {
       next(err);
     }
@@ -167,8 +155,8 @@ router.post('/users/local', authenticate, authorize('SUPERADMIN'), async (req: R
     if (!username || !password || !displayName) {
       throw new AppError('กรุณากรอกชื่อผู้ใช้ รหัสผ่าน และชื่อแสดงผลให้ครบถ้วน');
     }
-    if (password.length < 4) {
-      throw new AppError('รหัสผ่านต้องมีความยาวอย่างน้อย 4 ตัวอักษร');
+    if (password.length < 8) {
+      throw new AppError('รหัสผ่านต้องมีความยาวอย่างน้อย 8 ตัวอักษร');
     }
     const result = await AuthService.createLocalUser(username, password, displayName, role);
     res.status(201).json(result);
@@ -179,8 +167,8 @@ router.put('/users/:id/local-password', authenticate, authorize('SUPERADMIN'), a
   try {
     const id = parseInt(req.params.id);
     const { password } = req.body;
-    if (!password || password.length < 4) {
-      throw new AppError('รหัสผ่านต้องมีความยาวอย่างน้อย 4 ตัวอักษร');
+    if (!password || password.length < 8) {
+      throw new AppError('รหัสผ่านต้องมีความยาวอย่างน้อย 8 ตัวอักษร');
     }
     const user = await prisma.appUser.findUnique({ where: { id } });
     if (!user) throw new AppError('ไม่พบผู้ใช้', 404);
@@ -218,7 +206,7 @@ router.put('/settings', authenticate, authorize('SUPERADMIN'), async (req: Reque
       systemName, organizationName, logoUrl, timezone, darkMode, showWelcomeBanner,
       borrowDays, maxBorrowDays, maxItemsPerRequest, allowExtension, maxExtensionsPerRequest, overdueWarningDays,
       enableEmail, enableTeams, teamsWebhookUrl, enabledEventKeys,
-      smtpHost, smtpPort, smtpUser, smtpPass, smtpFromEmail, smtpFromName,
+      smtpHost, smtpPort, smtpUser, smtpPass, smtpFromEmail, smtpFromName, emailCc,
       requireStrongPassword, passwordExpiryDays, sessionTimeoutHours,
       enableLine, lineChannelAccessToken, lineWebhookUrl, lineWebhookVerifyToken, lineSendMode, lineUserIds, lineEnabledStatuses,
     } = req.body;
@@ -248,6 +236,7 @@ router.put('/settings', authenticate, authorize('SUPERADMIN'), async (req: Reque
     if (smtpPass !== undefined) data.smtpPass = smtpPass;
     if (smtpFromEmail !== undefined) data.smtpFromEmail = smtpFromEmail;
     if (smtpFromName !== undefined) data.smtpFromName = smtpFromName;
+    if (emailCc !== undefined) data.emailCc = emailCc;
     if (enableLine !== undefined) data.enableLine = enableLine;
     if (lineChannelAccessToken !== undefined) data.lineChannelAccessToken = lineChannelAccessToken;
     if (lineWebhookUrl !== undefined) data.lineWebhookUrl = lineWebhookUrl;
@@ -317,6 +306,7 @@ router.post('/test-email', authenticate, authorize('SUPERADMIN'), async (req: Re
 // ── Ping System Health ──
 router.get('/ping', authenticate, authorize('SUPERADMIN'), async (_req: Request, res: Response) => {
   const results: Record<string, { status: 'ok' | 'error'; message: string; latency?: number }> = {};
+  results.server = { status: 'ok', message: 'Running', latency: 0 };
 
   // Database
   const dbStart = Date.now();
@@ -353,17 +343,20 @@ router.get('/ping', authenticate, authorize('SUPERADMIN'), async (_req: Request,
   }
 
   // LDAP
-  try {
-    const { searchADUsers } = await import('../services/ldap');
+  const { isLdapConfigured, searchADUsers } = await import('../services/ldap');
+  if (isLdapConfigured()) {
     const ldapStart = Date.now();
-    await searchADUsers('test_ping_probe');
-    results.ldap = { status: 'ok', message: 'Connected', latency: Date.now() - ldapStart };
-  } catch (e: any) {
-    const msg = e.message || 'Unknown LDAP Error';
-    results.ldap = { status: 'error', message: msg };
+    try {
+      await searchADUsers('test_ping_probe');
+      results.ldap = { status: 'ok', message: 'Connected', latency: Date.now() - ldapStart };
+    } catch (e: any) {
+      results.ldap = { status: 'error', message: e.message || 'LDAP Error' };
+    }
+  } else {
+    results.ldap = { status: 'error', message: 'LDAP_SEARCH_USER ไม่ได้ตั้งค่าใน .env' };
   }
 
-  res.json(results);
+  res.json({ ...results, server: { ...results.server, timestamp: new Date().toISOString() } });
 });
 
 // ── Force Logout All Sessions ──

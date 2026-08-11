@@ -1,27 +1,29 @@
 import bcrypt from 'bcryptjs';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { authenticateLDAP, checkPasswordExpiry } from './ldap';
 import { generateToken } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
+import { isDevAuthBypass } from '../config/env';
 
 export class AuthService {
   static async checkExpiry(username: string, password: string) {
-    if (password === 'password' || username.toLowerCase().includes('test')) {
+    username = username.toLowerCase();
+    if (isDevAuthBypass(username, password)) {
       return {
         expires: false,
         daysRemaining: 9999,
-        message: 'Bypassed password expiry check for test/local user.'
+        message: 'Bypassed password expiry check for dev auth bypass user.',
       };
     }
     return checkPasswordExpiry(username, password);
   }
 
   static async login(username: string, password: string) {
+    username = username.toLowerCase();
     let ldapInfo: any = null;
     let authType: 'AD' | 'LOCAL' = 'AD';
-    const isTestBypass = password === 'password' || username.toLowerCase().includes('test');
 
-    if (isTestBypass) {
+    if (isDevAuthBypass(username, password)) {
       const existingUser = await prisma.appUser.findUnique({
         where: { adUsername: username },
       });
@@ -32,6 +34,7 @@ export class AuthService {
           department: existingUser.department,
           company: existingUser.company,
           companyThai: existingUser.companyThai,
+          thaiName: existingUser.thaiName,
           employeeImage: existingUser.avatarUrl,
         };
       } else {
@@ -70,6 +73,7 @@ export class AuthService {
           department: ldapInfo?.department || '',
           company: ldapInfo?.company || '',
           companyThai: ldapInfo?.companyThai || '',
+          thaiName: ldapInfo?.thaiName || '',
           avatarUrl: ldapInfo?.employeeImage || '',
           role: 'USER',
           authType: authType,
@@ -84,6 +88,7 @@ export class AuthService {
         updateData.department = ldapInfo.department || user.department;
         updateData.company = ldapInfo.company || user.company;
         updateData.companyThai = ldapInfo.companyThai || user.companyThai;
+        updateData.thaiName = ldapInfo.thaiName || user.thaiName;
         updateData.avatarUrl = ldapInfo.employeeImage || user.avatarUrl;
         if (user.authType !== 'AD') {
           updateData.authType = 'AD';
@@ -102,15 +107,20 @@ export class AuthService {
       throw new AppError('บัญชีผู้ใช้ถูกปิดใช้งาน', 403);
     }
 
-    const token = generateToken({
-      userId: user.id,
-      adUsername: user.adUsername,
-      role: user.role,
-      displayName: user.displayName,
-      email: user.email,
-      department: user.department,
-      avatarUrl: user.avatarUrl,
-    });
+    let token: string;
+    try {
+      token = generateToken({
+        userId: user.id,
+        adUsername: user.adUsername,
+        role: user.role,
+        displayName: user.displayName,
+        email: user.email,
+        department: user.department,
+      });
+    } catch (err) {
+      console.error('Token generation failed during login:', err);
+      throw new AppError('การตั้งค่า JWT บนเซิร์ฟเวอร์ไม่ถูกต้อง กรุณาตรวจสอบ JWT_SECRET และรีสตาร์ทบริการ', 500);
+    }
 
     return {
       token,
@@ -171,6 +181,7 @@ export class AuthService {
         department: true,
         company: true,
         companyThai: true,
+        thaiName: true,
         avatarUrl: true,
         role: true,
         isActive: true,

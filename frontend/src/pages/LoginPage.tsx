@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, Eye, EyeOff, Package, AlertCircle, Loader, Calendar, Clock } from 'lucide-react';
+import { Lock, Eye, EyeOff, Package, AlertCircle, Loader, Calendar, Clock, Laptop, ArrowRight, ShieldCheck, Mail } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/api';
+import { extractApiError } from '../utils/errorHandler';
+import { APP_VERSION, GIT_COMMIT, BUILD_TIME, formatBuildTime } from '../utils/buildInfo';
 import './LoginPage.css';
 
 export default function LoginPage() {
@@ -46,7 +48,7 @@ export default function LoginPage() {
       navigate('/dashboard');
     } catch (err: any) {
       console.error('Sign in error:', err);
-      setError(err.response?.data?.error || 'ล้มเหลว กรุณาตรวจสอบชื่อผู้ใช้และรหัสผ่าน');
+      setError(extractApiError(err, 'ล้มเหลว กรุณาตรวจสอบชื่อผู้ใช้และรหัสผ่าน'));
     } finally {
       setLoading(false);
     }
@@ -66,163 +68,270 @@ export default function LoginPage() {
       setExpiryInfo(res.data);
     } catch (err: any) {
       console.error('Check expiry error:', err);
-      setError(err.response?.data?.error || 'การตรวจสอบล้มเหลว');
+      setError(extractApiError(err, 'การตรวจสอบล้มเหลว'));
     } finally {
       setCheckingExpiry(false);
     }
   };
 
-  const toggleForm = () => {
-    setIsActive(!isActive);
+  const toggleForm = (expiry: boolean) => {
+    setIsActive(expiry);
     setError('');
     setExpiryInfo(null);
   };
 
   return (
     <div className="login-wrapper">
-      {/* Background Elements */}
-      <div className="bg-blobs">
-        <div className="blob blob-blue" />
-        <div className="blob blob-purple" />
-      </div>
+      {/* ── HERO (desktop only) ─────────────────────────────────────── */}
+      <aside className="hero-banner">
+        <div className="hero-grid"></div>
 
-      <div className={`container-login ${isActive ? 'active' : ''}`} id="container">
-        {/* Expiry Check Section (Sign Up Position) */}
-        <div className="form-container sign-up">
-          <form onSubmit={handleCheckExpiry}>
-            <h1 className="form-title">Check Expiry</h1>
-            <div className="icon-container">
-              <Clock size={40} className="text-primary-dark" />
-            </div>
-            <span className="form-subtitle">
-              Enter your AD credentials to check<br/>when your password expires.
-            </span>
-
-            {expiryInfo && (
-              <div className={`status-box ${expiryInfo.daysRemaining < 7 ? 'danger' : 'success'}`}>
-                <div className="status-title">
-                  <Calendar size={18} />
-                  {expiryInfo.daysRemaining > 0 ? `${expiryInfo.daysRemaining} Days Left` : 'Expired'}
-                </div>
-                <p className="status-msg">{expiryInfo.message}</p>
-              </div>
-            )}
-
-            {error && !expiryInfo && isActive && (
-              <div className="error-alert">
-                <AlertCircle size={14} />
-                {error}
-              </div>
-            )}
-
-            <input
-              type="text"
-              name="username"
-              placeholder="AD Username"
-              className="premium-input"
-              value={expiryData.username}
-              onChange={handleExpiryChange}
-              required
-            />
-            <div className="input-group">
-              <input
-                type={showExpiryPassword ? 'text' : 'password'}
-                name="password"
-                placeholder="Password"
-                className="premium-input"
-                value={expiryData.password}
-                onChange={handleExpiryChange}
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowExpiryPassword(!showExpiryPassword)}
-                className="input-icon-btn"
-              >
-                {showExpiryPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </div>
-
-            <button type="submit" disabled={checkingExpiry} className="premium-btn">
-              {checkingExpiry ? <Loader size={16} className="spin" /> : 'Check Expiry'}
-            </button>
-          </form>
+        <div className="brand">
+          <div className="brand-mark">
+            <Laptop size={18} />
+          </div>
+          <div>
+            <span className="brand-word">{systemSettings?.systemName || 'ITAM'}</span>
+            <span className="brand-eyebrow">TRR Group · IT Asset Management</span>
+          </div>
         </div>
 
-        {/* Sign In Section */}
-        <div className="form-container sign-in">
-          <form onSubmit={handleSignIn}>
-            <div className="icon-container" style={{ margin: '0.75rem 0' }}>
-               {systemSettings?.logoUrl ? (
-                 <img src={systemSettings.logoUrl} alt="Logo" style={{ height: '50px', maxWidth: '100%', objectFit: 'contain' }} />
-               ) : (
-                 <Package size={40} className="text-brand-blue" />
-               )}
-            </div>
-            <h1 className="form-title-large" style={{ marginBottom: '0.25rem' }}>{systemSettings?.systemName || 'AssetHub'}</h1>
-            <span className="form-subtitle">{systemSettings?.organizationName || 'Use your AD account to sign in'}</span>
+        <div className="hero-body">
+          <p className="hero-kicker">ระบบยืม–คืนอุปกรณ์ไอที</p>
+          <h1 className="hero-title">ดูแลทุกชิ้นส่วนไอที<br />ให้เป็นระเบียบ <em>อย่างมืออาชีพ</em></h1>
+          <p className="hero-desc">
+            ขอยืม ติดตาม และคืนอุปกรณ์ไอทีของพนักงาน TRR Group ได้ในที่เดียว
+            เชื่อมต่อบัญชี Office 365 ของบริษัท พร้อมระบบอนุมัติและแจ้งเตือนแบบเรียลไทม์
+          </p>
 
-            {error && !isActive && (
-              <div className="error-alert">
-                <AlertCircle size={14} />
-                {error}
+          <div className="hero-features">
+            <div className="hero-feature">
+              <div className="hero-feature-icon">
+                <Laptop size={16} />
               </div>
-            )}
-
-            <input
-              type="text"
-              name="username"
-              placeholder="Username"
-              className="premium-input"
-              value={signInData.username}
-              onChange={handleSignInChange}
-              required
-            />
-            <div className="input-group">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                name="password"
-                placeholder="Password"
-                className="premium-input"
-                value={signInData.password}
-                onChange={handleSignInChange}
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="input-icon-btn"
-              >
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
+              <div>
+                <div className="hero-feature-title">ขอยืมอุปกรณ์ใน 3 ขั้นตอน</div>
+                <div className="hero-feature-desc">เลือกอุปกรณ์ ระบุเหตุผล รออนุมัติ — จบในหน้าเดียว</div>
+              </div>
             </div>
-
-            <button type="submit" disabled={loading} className="premium-btn mt-large">
-              {loading ? <Loader size={16} className="spin" /> : 'Sign In'}
-            </button>
-          </form>
-        </div>
-
-        {/* Toggle Panels */}
-        <div className="toggle-wrapper">
-          <div className="toggle-main">
-            <div className="toggle-panel-content panel-left">
-              <h1 className="toggle-title">Need to Login?</h1>
-              <p className="toggle-desc">
-                Go back to the sign in page to access your assets.
-              </p>
-              <button className="btn-ghost" onClick={toggleForm}>Sign In</button>
+            <div className="hero-feature">
+              <div className="hero-feature-icon">
+                <ShieldCheck size={16} />
+              </div>
+              <div>
+                <div className="hero-feature-title">ใช้งานได้ทุกอุปกรณ์</div>
+                <div className="hero-feature-desc">ออกแบบให้ใช้งานลื่นไหลทั้งบนมือถือและคอมพิวเตอร์</div>
+              </div>
             </div>
-            <div className="toggle-panel-content panel-right">
-              <h1 className="toggle-title">Check Expiry</h1>
-              <p className="toggle-desc">
-                Worried about your AD password? Check how many days are left.
-              </p>
-              <button className="btn-ghost" onClick={toggleForm}>Check Expiry</button>
+            <div className="hero-feature">
+              <div className="hero-feature-icon">
+                <Clock size={16} />
+              </div>
+              <div>
+                <div className="hero-feature-title">เช็ควันหมดอายุรหัสผ่าน AD</div>
+                <div className="hero-feature-desc">รู้ล่วงหน้าก่อนบัญชีจะถูกล็อก ไม่ต้องรอ IT แจ้ง</div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+
+        <div className="hero-footer">&copy; {new Date().getFullYear() + 543} TRR Group IT Support · สงวนลิขสิทธิ์ทุกประการ</div>
+      </aside>
+
+      {/* ── FORM PANEL ─────────────────────────────────────────── */}
+      <main className="form-wrapper-panel">
+        <div className="card-wrap">
+
+          <div className="mobile-brand">
+            <div className="brand-mark">
+              <Laptop size={16} />
+            </div>
+            <span className="brand-word">{systemSettings?.systemName || 'ITAM'}</span>
+          </div>
+
+          <div className="form-main-card">
+            <div className="segmented" role="tablist">
+              <button 
+                type="button" 
+                className={!isActive ? 'active' : ''} 
+                role="tab" 
+                aria-selected={!isActive}
+                onClick={() => toggleForm(false)}
+              >
+                เข้าสู่ระบบ
+              </button>
+              <button 
+                type="button" 
+                className={isActive ? 'active' : ''} 
+                role="tab" 
+                aria-selected={isActive}
+                onClick={() => toggleForm(true)}
+              >
+                เช็ควันหมดอายุรหัสผ่าน
+              </button>
+            </div>
+
+            {/* SIGN IN VIEW */}
+            {!isActive && (
+              <div id="view-signin" className="animate-fade-in">
+                <div className="card-head">
+                  {systemSettings?.logoUrl ? (
+                    <div className="card-logo-wrap" style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.2rem' }}>
+                      <img src={systemSettings.logoUrl} alt="Logo" style={{ height: '48px', maxWidth: '200px', objectFit: 'contain' }} />
+                    </div>
+                  ) : (
+                    <div className="card-icon">
+                      <Lock size={18} />
+                    </div>
+                  )}
+                  <h2 className="card-title">ยินดีต้อนรับกลับมา</h2>
+                  <p className="card-sub">{systemSettings?.organizationName || 'เข้าสู่ระบบด้วยบัญชี AD (Office 365) ของบริษัท'}</p>
+                </div>
+
+                {error && (
+                  <div className="error-alert">
+                    <AlertCircle size={14} style={{ flexShrink: 0 }} />
+                    {error}
+                  </div>
+                )}
+
+                <form onSubmit={handleSignIn} className="login-form">
+                  <div className="field">
+                    <label htmlFor="si-user">ชื่อผู้ใช้ (AD Username)</label>
+                    <input 
+                      type="text" 
+                      id="si-user" 
+                      name="username"
+                      placeholder="somchai.jai" 
+                      value={signInData.username}
+                      onChange={handleSignInChange}
+                      required 
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="si-pass">รหัสผ่าน</label>
+                    <div className="field-input-wrap">
+                      <input 
+                        type={showPassword ? 'text' : 'password'} 
+                        id="si-pass" 
+                        name="password"
+                        placeholder="••••••••" 
+                        value={signInData.password}
+                        onChange={handleSignInChange}
+                        required 
+                      />
+                      <button 
+                        type="button" 
+                        className="eye-btn" 
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <button type="submit" disabled={loading} className="premium-btn">
+                    {loading && <Loader size={15} className="spin" />}
+                    <span className="btn-label">{loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}</span>
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* EXPIRY CHECK VIEW */}
+            {isActive && (
+              <div id="view-expiry" className="animate-fade-in">
+                <div className="card-head">
+                  <div className="card-icon">
+                    <Clock size={18} />
+                  </div>
+                  <h2 className="card-title">เช็ควันหมดอายุรหัสผ่าน</h2>
+                  <p className="card-sub">กรอกบัญชี AD เพื่อตรวจสอบว่ารหัสผ่านจะหมดอายุเมื่อใด</p>
+                </div>
+
+                {expiryInfo && (
+                  <div className={`status-box ${expiryInfo.daysRemaining < 7 ? 'danger' : 'success'}`}>
+                    {expiryInfo.daysRemaining < 7 ? <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} /> : <Clock size={16} style={{ flexShrink: 0, marginTop: '2px' }} />}
+                    <div>
+                      <strong>
+                        {expiryInfo.daysRemaining > 0 
+                          ? `เหลืออีก ${expiryInfo.daysRemaining} วัน` 
+                          : 'หมดอายุแล้ว'}
+                      </strong>
+                      {expiryInfo.message}
+                    </div>
+                  </div>
+                )}
+
+                {error && !expiryInfo && (
+                  <div className="error-alert">
+                    <AlertCircle size={14} style={{ flexShrink: 0 }} />
+                    {error}
+                  </div>
+                )}
+
+                <form onSubmit={handleCheckExpiry} className="login-form">
+                  <div className="field">
+                    <label htmlFor="ex-user">ชื่อผู้ใช้ (AD Username)</label>
+                    <input 
+                      type="text" 
+                      id="ex-user" 
+                      name="username"
+                      placeholder="somchai.jai" 
+                      value={expiryData.username}
+                      onChange={handleExpiryChange}
+                      required 
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="ex-pass">รหัสผ่าน</label>
+                    <div className="field-input-wrap">
+                      <input 
+                        type={showExpiryPassword ? 'text' : 'password'} 
+                        id="ex-pass" 
+                        name="password"
+                        placeholder="••••••••" 
+                        value={expiryData.password}
+                        onChange={handleExpiryChange}
+                        required 
+                      />
+                      <button 
+                        type="button" 
+                        className="eye-btn" 
+                        onClick={() => setShowExpiryPassword(!showExpiryPassword)}
+                      >
+                        {showExpiryPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <button type="submit" disabled={checkingExpiry} className="premium-btn">
+                    {checkingExpiry && <Loader size={15} className="spin" />}
+                    <span className="btn-label">{checkingExpiry ? 'กำลังตรวจสอบ...' : 'ตรวจสอบวันหมดอายุ'}</span>
+                  </button>
+                </form>
+              </div>
+            )}
+
+            <div className="info-box">
+              <div className="info-head">
+                <Lock size={14} />
+                คำแนะนำในการเข้าใช้งาน
+              </div>
+              กรุณาใช้บัญชี Office 365 ของบริษัทเท่านั้น เช่น <code>somchai.jai</code> (ชื่อ.นามสกุล 3 ตัวอักษร)
+            </div>
+
+            <div className="form-card-footer">
+              พบปัญหาการเข้าใช้งาน? ติดต่อ <a href="mailto:HQITSupport@trrgroup.com">IT Support</a>
+            </div>
+
+          </div>
+
+          <div className="version-footer" title={BUILD_TIME ? `Built ${formatBuildTime(BUILD_TIME)}` : undefined}>
+            {systemSettings?.systemName || 'AssetHub'} v{APP_VERSION} · {GIT_COMMIT}
+          </div>
+        </div>
+      </main>
     </div>
   );
 }

@@ -2,6 +2,8 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import QRCode from 'react-qr-code';
 import { assetAPI } from '../../services/api';
+import { formatDate } from '../../utils/dateUtils';
+
 
 /* ─────────────────────────────────────────────────────────────────
    Types & constants
@@ -67,8 +69,8 @@ const AVAILABLE_FIELDS: FieldDef[] = [
   // ── การจัดซื้อ ────────────────────────────
   { key: 'vendor',         label: 'ผู้จัดจำหน่าย',    group: 'จัดซื้อ',   getter: a => a.vendor },
   { key: 'poNumber',       label: 'เลขที่ PO',         group: 'จัดซื้อ',   getter: a => a.poNumber },
-  { key: 'purchaseDate',   label: 'วันที่ซื้อ',         group: 'จัดซื้อ',   getter: a => a.purchaseDate ? new Date(a.purchaseDate).toLocaleDateString('th-TH', { year: '2-digit', month: 'short', day: 'numeric' }) : null },
-  { key: 'warrantyEndDate',label: 'วันหมดประกัน',      group: 'จัดซื้อ',   getter: a => a.warrantyEndDate ? new Date(a.warrantyEndDate).toLocaleDateString('th-TH', { year: '2-digit', month: 'short', day: 'numeric' }) : null },
+  { key: 'purchaseDate',   label: 'วันที่ซื้อ',         group: 'จัดซื้อ',   getter: a => a.purchaseDate ? formatDate(a.purchaseDate) : null },
+  { key: 'warrantyEndDate',label: 'วันหมดประกัน',      group: 'จัดซื้อ',   getter: a => a.warrantyEndDate ? formatDate(a.warrantyEndDate) : null },
   { key: 'budget',         label: 'งบประมาณ',         group: 'จัดซื้อ',   getter: a => a.budget },
   // ── สเปกคอมพิวเตอร์ ──────────────────────
   { key: 'cpu',            label: 'CPU',              group: 'สเปก IT',   getter: a => a.cpu },

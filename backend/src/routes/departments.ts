@@ -1,7 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { authenticate, authorize } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
+import { getAllADDepartments } from '../services/ldap';
 
 const router = Router();
 
@@ -115,6 +116,16 @@ router.delete('/:id', authenticate, authorize('SUPERADMIN'), async (req: Request
 
     await prisma.department.delete({ where: { id } });
     res.json({ message: 'ลบแผนกเรียบร้อย' });
+  } catch (err) { next(err); }
+});
+
+import { syncMasterDataFromIntraTools } from '../services/intraSync';
+
+// Sync from AD
+router.post('/sync-ad', authenticate, authorize('SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result: any = await syncMasterDataFromIntraTools();
+    res.json({ message: `นำเข้าสำเร็จ: บริษัท ${result.company.added} รายการ, แผนก ${result.department.added} รายการ`, addedCount: result.department.added });
   } catch (err) { next(err); }
 });
 

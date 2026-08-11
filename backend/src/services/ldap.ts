@@ -13,8 +13,13 @@ export interface LDAPUserInfo {
   department: string;
   company?: string;
   companyThai?: string;
+  thaiName?: string;
   sAMAccountName?: string;
   employeeImage?: string;
+}
+
+export function isLdapConfigured(): boolean {
+  return !!(LDAP_HOST && LDAP_SEARCH_USER && LDAP_SEARCH_PASSWORD);
 }
 
 function createClient() {
@@ -28,7 +33,6 @@ function createClient() {
   });
   return client;
 }
-
 
 function buildBindUser(user: string) {
   if (user.includes('\\') || user.includes('@')) return user;
@@ -80,46 +84,60 @@ async function bind(client: any, dn: string, password: string): Promise<void> {
 }
 
 export async function authenticateLDAP(username: string, password: string): Promise<LDAPUserInfo | null> {
+  // 1. Verify password via LDAP bind
   try {
-    const response = await fetch('https://intra-tools.trrgroup.com/api_sys_auth/SysAuth/login_auth_emp_get', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        employee_username: username,
-        password: password,
-        application_code: 'INTRANET'
-      }).toString()
+    const client = createClient();
+    await new Promise<void>((resolve, reject) => {
+      client.on('connect', () => resolve());
+      client.on('error', (err: any) => reject(err));
+      setTimeout(() => reject(new Error('LDAP connect timeout')), 10000);
     });
+    const bindDn = buildBindUser(username);
+    console.log(`[LDAP] Attempting bind: ${bindDn}`);
+    await bind(client, bindDn, password);
+    console.log(`[LDAP] Bind OK for ${username}`);
+    client.destroy();
+  } catch (err: any) {
+    console.error(`[LDAP] Bind FAILED for ${username}:`, err.message || err);
+    return null;
+  }
+
+  // 2. Fetch profile from Employee API
+  try {
+    const response = await fetch(
+      `https://intra-serv.trrgroup.com/api_intranet/Employee/Employee_Get?show_profile=Y&employee_username=${encodeURIComponent(username)}`,
+      { method: 'GET' }
+    );
 
     if (!response.ok) {
-      console.error('API Error:', response.status);
+      console.error('Employee API Error:', response.status);
+      return null;
+    }
+    const json = await response.json() as any;
+    if (json.status !== 'Success' || !Array.isArray(json.data) || json.data.length === 0) {
       return null;
     }
 
-    const text = await response.text();
-    // API returns BOM, so remove it
-    const cleanText = text.replace(/^\uFEFF/, '');
-    const json = JSON.parse(cleanText);
+    const profile = json.data[0];
 
-    if (json.status !== 'Success' || !json.data || !json.data.auth_role_profile || json.data.auth_role_profile.length === 0) {
+    if (!profile.employee_username || profile.employee_username.toLowerCase() !== username.toLowerCase()) {
       return null;
     }
-
-    const profile = json.data.auth_role_profile[0];
 
     return {
-      displayName: profile.employee_fname_en ? `${profile.employee_fname_en} ${profile.employee_lname_en || ''}`.trim() : username,
+      displayName: profile.employee_fname_en
+        ? `${profile.employee_fname_en} ${profile.employee_lname_en || ''}`.trim()
+        : username,
       email: profile.employee_email || '',
       department: profile.itasset_department_name || '',
-      company: profile.itasset_company_name_eng || '',
+      company: profile.itasset_company_name_eng || profile.itasset_company_name || '',
       companyThai: profile.itasset_company_name || '',
+      thaiName: profile.fullname_th || (profile.employee_fname_th ? `${profile.employee_fname_th} ${profile.employee_lname_th || ''}`.trim() : ''),
       sAMAccountName: profile.employee_username || username,
-      employeeImage: profile.employee_image || ''
+      employeeImage: profile.employee_url || ''
     };
   } catch (err) {
-    console.error('API Auth Error:', err);
+    console.error('Employee API Error:', err);
     return null;
   }
 }
@@ -141,17 +159,21 @@ async function getDomainMaxPwdAge(client: any) {
 }
 
 export async function checkPasswordExpiry(username: string, password: string) {
-  console.log(`--- [DEBUG] Check Expiry Start: User=${username} ---`);
+  if (!isLdapConfigured()) {
+    return {
+      expires: false,
+      daysRemaining: 9999,
+      message: 'ไม่สามารถตรวจสอบผ่าน AD Direct (ไม่ได้กำหนด LDAP Search User)'
+    };
+  }
+
   const client = createClient();
   try {
     const bindUser = buildBindUser(username);
-    console.log(`[DEBUG] Attempting bind with user: ${bindUser}`);
     await bind(client, bindUser, password);
-    console.log(`[DEBUG] Bind successful for: ${bindUser}`);
 
     const accountName = username.includes('\\') ? username.split('\\').pop() : username.split('@')[0];
     const safeUsername = escapeFilter(accountName || '');
-    console.log(`[DEBUG] Searching for AD entry with accountName: ${accountName}`);
 
     const entries = await search(client, LDAP_BASE_DN, {
       scope: 'sub',
@@ -159,21 +181,18 @@ export async function checkPasswordExpiry(username: string, password: string) {
       attributes: ['*', '+', 'msDS-UserPasswordExpiryTimeComputed']
     });
 
-    console.log(`[DEBUG] Found ${entries.length} entries for search.`);
-
     const entry = entries[0];
     if (!entry) {
-      console.error(`[DEBUG] No AD entry found for safeUsername: ${safeUsername}`);
-      throw new Error('User not found in AD');
+      return {
+        expires: false,
+        daysRemaining: 9999,
+        message: 'ไม่พบผู้ใช้ใน Active Directory'
+      };
     }
 
-    const userObj = entry.object;
     const pwdLastSet = getAttr(entry, 'pwdLastSet');
     const uac = getAttr(entry, 'userAccountControl');
     let expiryTimeTicks = getAttr(entry, 'msDS-UserPasswordExpiryTimeComputed');
-
-    console.log(`[DEBUG] Raw AD attributes: pwdLastSet=${pwdLastSet}, UAC=${uac}, ExpiryTicks=${expiryTimeTicks}`);
-    console.log(`[DEBUG] User Object Keys: ${Object.keys(userObj || {}).join(', ')}`);
 
     const isUacNeverExpires = (parseInt(uac) & 0x10000) !== 0;
 
@@ -207,7 +226,7 @@ export async function checkPasswordExpiry(username: string, password: string) {
     const expiryMs = (Number(expiryTimeTicks) / 10000) - 11644473600000;
     const expiryDate = new Date(expiryMs);
     const now = new Date();
-    
+
     const expiryDateReset = new Date(expiryDate);
     expiryDateReset.setHours(0, 0, 0, 0);
     const nowReset = new Date(now);
@@ -226,12 +245,27 @@ export async function checkPasswordExpiry(username: string, password: string) {
           ? `Your password expires today!`
           : `Your password has expired ${Math.abs(diffDays)} days ago.`
     };
+  } catch (err: any) {
+    const isBindError = err.message?.includes('bind') || err.message?.includes('000004DC') || err.message?.includes('credentials') || err.message?.includes('LDAP_INVALID_CREDENTIALS');
+    console.error('LDAP checkPasswordExpiry error:', isBindError ? 'Bind failed (possibly wrong password or LDAP unreachable)' : err.message);
+    return {
+      expires: false,
+      daysRemaining: 9999,
+      message: isBindError
+        ? 'ไม่สามารถตรวจสอบวันหมดอายุรหัสผ่านได้ (กรุณาลองใหม่อีกครั้ง)'
+        : 'เกิดข้อผิดพลาดในการเชื่อมต่อ AD กรุณาลองใหม่อีกครั้ง'
+    };
   } finally {
     try { client.unbind(); } catch (_) {}
   }
 }
 
 export async function searchADUsers(query: string): Promise<any[]> {
+  if (!isLdapConfigured()) {
+    console.warn('LDAP not configured — searchADUsers skipped');
+    return [];
+  }
+
   const client = createClient();
   const searchBindUser = buildBindUser(LDAP_SEARCH_USER);
 
@@ -256,12 +290,20 @@ export async function searchADUsers(query: string): Promise<any[]> {
         company: obj.company || '',
       };
     });
+  } catch (err: any) {
+    console.error('LDAP searchADUsers error:', err.message || err);
+    return [];
   } finally {
     try { client.unbind(); } catch (_) {}
   }
 }
 
 export async function getAllADCompanies(): Promise<string[]> {
+  if (!isLdapConfigured()) {
+    console.warn('LDAP not configured — getAllADCompanies skipped');
+    return [];
+  }
+
   const client = createClient();
   const searchBindUser = buildBindUser(LDAP_SEARCH_USER);
   try {
@@ -290,8 +332,50 @@ export async function getAllADCompanies(): Promise<string[]> {
     }
 
     return Array.from(companySet).sort();
-  } catch (err) {
-    console.error('LDAP Get Companies Error:', err);
+  } catch (err: any) {
+    console.error('LDAP getAllADCompanies error:', err.message || err);
+    return [];
+  } finally {
+    try { client.unbind(); } catch (_) {}
+  }
+}
+
+export async function getAllADDepartments(): Promise<string[]> {
+  if (!isLdapConfigured()) {
+    console.warn('LDAP not configured — getAllADDepartments skipped');
+    return [];
+  }
+
+  const client = createClient();
+  const searchBindUser = buildBindUser(LDAP_SEARCH_USER);
+  try {
+    await bind(client, searchBindUser, LDAP_SEARCH_PASSWORD);
+
+    const entries = await search(client, LDAP_BASE_DN, {
+      scope: 'sub',
+      filter: `(&(objectClass=user)(department=*))`,
+      attributes: ['department'],
+      sizeLimit: 5000,
+    });
+
+    const departmentSet = new Set<string>();
+    for (const entry of entries) {
+      if (entry.object && entry.object.department) {
+        let departments = entry.object.department;
+        if (!Array.isArray(departments)) {
+          departments = [departments];
+        }
+        for (const d of departments) {
+          if (d && typeof d === 'string' && d.trim()) {
+            departmentSet.add(d.trim());
+          }
+        }
+      }
+    }
+
+    return Array.from(departmentSet).sort();
+  } catch (err: any) {
+    console.error('LDAP getAllADDepartments error:', err.message || err);
     return [];
   } finally {
     try { client.unbind(); } catch (_) {}

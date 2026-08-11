@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Box, Typography, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   Chip, CircularProgress, Alert, Card, CardContent, Grid, Divider, Table, TableBody,
-  TableCell, TableContainer, TableHead, TableRow, InputAdornment, useMediaQuery, useTheme
+  TableCell, TableContainer, TableHead, TableRow, InputAdornment, useMediaQuery, useTheme, alpha
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
@@ -10,6 +10,8 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import { borrowAPI } from '../../services/api';
+import { formatDate } from '../../utils/dateUtils';
+
 
 interface Request {
   id: number;
@@ -182,14 +184,14 @@ export default function ApprovalQueuePage() {
             </Typography>
           ) : (
             filteredRequests.map((request) => (
-              <Card key={request.id} sx={{ borderRadius: 3, border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+              <Card key={request.id} sx={{ borderRadius: 3 }}>
                 <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
                     <Typography variant="body2" fontWeight={700} color="primary.main">
                       {request.requestNo}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {new Date(request.createdAt).toLocaleDateString('th-TH')}
+                      {formatDate(request.createdAt)}
                     </Typography>
                   </Box>
                   
@@ -255,7 +257,7 @@ export default function ApprovalQueuePage() {
           <TableContainer>
             <Table>
               <TableHead>
-                <TableRow sx={{ backgroundColor: 'rgba(37, 99, 235, 0.05)' }}>
+                <TableRow sx={{ backgroundColor: alpha(theme.palette.primary.main, 0.05) }}>
                   <TableCell>เลขที่คำขอ</TableCell>
                   <TableCell>ผู้ขอ</TableCell>
                   <TableCell>แผนก</TableCell>
@@ -284,7 +286,7 @@ export default function ApprovalQueuePage() {
                       <TableCell>{(request.requester as any)?.company || '-'}</TableCell>
                       <TableCell>{request.purpose}</TableCell>
                       <TableCell>{request.items.length} รายการ</TableCell>
-                      <TableCell>{new Date(request.createdAt).toLocaleDateString('th-TH')}</TableCell>
+                      <TableCell>{formatDate(request.createdAt)}</TableCell>
                       <TableCell align="right">
                         <Button
                           size="small"
@@ -387,9 +389,9 @@ export default function ApprovalQueuePage() {
                   sx={{
                     p: 1.5,
                     mb: 1.5,
-                    backgroundColor: 'rgba(37, 99, 235, 0.05)',
+                    backgroundColor: alpha(theme.palette.primary.main, 0.05),
                     borderRadius: 2,
-                    border: '1px solid rgba(37, 99, 235, 0.1)'
+                    border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
                   }}
                 >
                   <Typography fontWeight={600} color="primary.main" gutterBottom sx={{ fontSize: '0.95rem' }}>

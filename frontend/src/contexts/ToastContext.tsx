@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { Snackbar, Alert, AlertColor } from '@mui/material';
+import { API_ERROR_EVENT } from '../services/api';
 
 interface ToastMessage {
   id: number;
@@ -21,7 +22,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   const showToast = useCallback((message: string, severity: AlertColor = 'info') => {
-    const id = Date.now();
+    const id = Date.now() + Math.random();
     setToasts(prev => [...prev, { id, message, severity }]);
   }, []);
 
@@ -29,6 +30,15 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const error = useCallback((message: string) => showToast(message, 'error'), [showToast]);
   const warning = useCallback((message: string) => showToast(message, 'warning'), [showToast]);
   const info = useCallback((message: string) => showToast(message, 'info'), [showToast]);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.message) showToast(detail.message, 'error');
+    };
+    window.addEventListener(API_ERROR_EVENT, handler);
+    return () => window.removeEventListener(API_ERROR_EVENT, handler);
+  }, [showToast]);
 
   const handleClose = (id: number) => {
     setToasts(prev => prev.filter(t => t.id !== id));

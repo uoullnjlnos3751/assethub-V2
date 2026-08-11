@@ -1,252 +1,136 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Box, Typography, alpha, useTheme } from '@mui/material';
 import {
-  Grid, Box, Typography, LinearProgress, CircularProgress,
-  Divider, alpha, useTheme
-} from '@mui/material';
-import {
-  BarChart, Bar, Cell, ResponsiveContainer, PieChart, Pie, Tooltip as RechartsTooltip
-} from 'recharts';
+  LayoutDashboard, Boxes, ShoppingCart, Wrench,
+  CheckCircle2, Clock, Shield, ClipboardList,
+  RotateCcw, ArrowUpRight,
+  type LucideIcon,
+} from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { dashboardAPI } from '../services/api';
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-function now() {
-  return new Date().toLocaleDateString('th-TH', {
-    year: 'numeric', month: 'long', day: 'numeric',
-  });
-}
-function pct(a: number, b: number) {
-  return b > 0 ? Math.round((a / b) * 100) : 0;
-}
-
-// ── Sub-components ─────────────────────────────────────────────────────────
-
-// Mini donut SVG using Recharts
-function DonutChart({ segments, total }: { segments: { value: number; color: string; name?: string }[]; total: number }) {
-  const theme = useTheme();
-  return (
-    <Box sx={{ width: 100, height: 100, position: 'relative' }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={segments}
-            cx="50%"
-            cy="50%"
-            innerRadius={32}
-            outerRadius={45}
-            paddingAngle={2}
-            dataKey="value"
-            stroke="none"
-          >
-            {segments.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={entry.color} />
-            ))}
-          </Pie>
-          <RechartsTooltip 
-            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px' }}
-            itemStyle={{ color: '#111827', fontWeight: 500 }}
-            formatter={(value: any) => [value, 'รายการ']}
-          />
-        </PieChart>
-      </ResponsiveContainer>
-      <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-        <Typography sx={{ fontSize: '16px', fontWeight: 700, color: theme.palette.text.primary }}>{total}</Typography>
-      </Box>
-    </Box>
-  );
-}
-
-// Mini bar chart (sparkline style) using Recharts
-function MiniBarChart({ values, color }: { values: number[]; color: string }) {
-  const data = values.map((v, i) => ({ name: `Day ${i+1}`, value: v }));
-  return (
-    <Box sx={{ height: '56px', width: '100%' }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data}>
-          <Bar dataKey="value" radius={[3, 3, 0, 0]}>
-            {data.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={index === data.length - 1 ? color : alpha(color, 0.4)} />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </Box>
-  );
-}
-
-// Stat card compact
-function StatCard({ label, value, sub, color, icon, topBorder, onClick }: {
-  label: string; value: string | number; sub?: string;
-  color: string; icon: string; topBorder?: boolean; onClick?: () => void;
-}) {
-  return (
-    <Box onClick={onClick} sx={{
-      bgcolor: '#fff',
-      border: '0.5px solid #e5e7eb',
-      borderTop: topBorder ? `3px solid ${color}` : '0.5px solid #e5e7eb',
-      borderRadius: '10px',
-      p: '14px 12px',
-      cursor: onClick ? 'pointer' : 'default',
-      transition: 'border-color .15s',
-      '&:hover': onClick ? { borderColor: '#d1d5db' } : {},
-    }}>
-      <Box sx={{ fontSize: '20px', mb: '6px' }}>{icon}</Box>
-      <Box sx={{ fontSize: '22px', fontWeight: 500, color: '#111827', lineHeight: 1 }}>{value}</Box>
-      <Box sx={{ fontSize: '11px', color: '#6b7280', mt: '4px', lineHeight: 1.3 }}>{label}</Box>
-      {sub && <Box sx={{ fontSize: '10px', color: '#9ca3af', mt: '3px' }}>{sub}</Box>}
-    </Box>
-  );
-}
-
-// Section card
-function SectionCard({ title, action, actionLabel, children }: {
-  title: string; action?: () => void; actionLabel?: string; children: React.ReactNode;
-}) {
-  return (
-    <Box sx={{
-      bgcolor: '#fff',
-      border: '0.5px solid #e5e7eb',
-      borderRadius: '10px',
-      p: '16px',
-      height: '100%',
-    }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: '12px' }}>
-        <Typography sx={{ fontSize: '13px', fontWeight: 500, color: '#111827' }}>{title}</Typography>
-        {action && actionLabel && (
-          <Box onClick={action} sx={{ fontSize: '11px', color: '#f59e0b', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
-            {actionLabel} →
-          </Box>
-        )}
-      </Box>
-      {children}
-    </Box>
-  );
-}
-
-// Pill badge
-function Pill({ label, variant }: { label: string; variant: 'green' | 'orange' | 'red' | 'blue' | 'grey' | 'yellow' }) {
-  const map = {
-    green:  { bg: '#d1fae5', color: '#065f46' },
-    orange: { bg: '#fff7ed', color: '#c2410c' },
-    red:    { bg: '#fee2e2', color: '#991b1b' },
-    blue:   { bg: '#dbeafe', color: '#1e40af' },
-    grey:   { bg: '#f3f4f6', color: '#374151' },
-    yellow: { bg: '#fef9c3', color: '#a16207' },
-  };
-  const { bg, color } = map[variant];
-  return (
-    <Box component="span" sx={{
-      display: 'inline-block',
-      fontSize: '10px',
-      px: '7px',
-      py: '2px',
-      borderRadius: '999px',
-      bgcolor: bg,
-      color,
-      fontWeight: 500,
-    }}>
-      {label}
-    </Box>
-  );
-}
-
-// ── Status config ──────────────────────────────────────────────────────────
-const STATUS_CFG: Record<string, { label: string; color: string; pill: any }> = {
-  Available:   { label: 'พร้อมใช้งาน', color: '#10b981', pill: 'green' },
-  Borrowed:    { label: 'กำลังยืม',    color: '#f59e0b', pill: 'yellow' },
-  InUse:       { label: 'ใช้งานประจำ', color: '#3b82f6', pill: 'blue' },
-  Maintenance: { label: 'ซ่อมบำรุง',  color: '#ef4444', pill: 'red' },
-  Retired:     { label: 'ปลดระวาง',   color: '#6b7280', pill: 'grey' },
-  Lost:        { label: 'สูญหาย',     color: '#dc2626', pill: 'red' },
-};
-
-// Asset category config
-const CAT_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16'];
-
-// Map category names to navigation paths
-const categoryNavMap: Record<string, string> = {
-  'คอมพิวเตอร์': '/assets?typeGroup=computers',
-  'จอภาพ': '/assets?typeGroup=monitors',
-  'เครื่องพิมพ์': '/assets?typeGroup=printers',
-  'อุปกรณ์เครือข่าย': '/assets?typeGroup=network',
-  'อุปกรณ์สื่อสาร': '/assets?typeGroup=phonesTablets',
-  'อุปกรณ์ต่อพ่วง': '/assets?typeGroup=devices',
-  'Rack & Infrastructure': '/assets?typeGroup=rack',
-  'สายสัญญาณ': '/inventory?category=Cable',
-  'วัสดุสิ้นเปลือง': '/inventory?category=Consumable',
-};
+import { dashboardAPI, contractAPI, licenseAPI, presenceAPI } from '../services/api';
+import LoadingSkeleton from '../components/LoadingSkeleton';
+import { KpiCard } from './dashboard/components/KpiCard';
+import { OnlineTeamCard } from './dashboard/components/OnlineTeamCard';
+import { ProactiveAlertsBar } from './dashboard/components/ProactiveAlertsBar';
+import { CategoryDonutCard } from './dashboard/components/CategoryDonutCard';
+import { BorrowTrendCard } from './dashboard/components/BorrowTrendCard';
+import { RecentActivityCard } from './dashboard/components/RecentActivityCard';
+import { QuickActionsPanel } from './dashboard/components/QuickActionsPanel';
+import { AssetStatusBreakdownCard } from './dashboard/components/AssetStatusBreakdownCard';
+import { LocationBreakdownCard } from './dashboard/components/LocationBreakdownCard';
+import { BorrowSummaryCard } from './dashboard/components/BorrowSummaryCard';
+import { PMSummaryCard } from './dashboard/components/PMSummaryCard';
+import { DataHealthCard } from './dashboard/components/DataHealthCard';
+import { WarrantyAlertsCard } from './dashboard/components/WarrantyAlertsCard';
+import { ContractLicenseSummary } from './dashboard/components/ContractLicenseSummary';
+import { now, pct } from './dashboard/dashboardHelpers';
 
 // ── Main Dashboard ──────────────────────────────────────────────────────────
 export default function DashboardPage() {
+  const theme = useTheme();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [assetSummary, setAssetSummary] = useState<any>(null);
   const [borrowSummary, setBorrowSummary] = useState<any>(null);
   const [pmSummary, setPmSummary] = useState<any>(null);
   const [proactiveAlerts, setProactiveAlerts] = useState<any>(null);
+  const [dataHealth, setDataHealth] = useState<any>(null);
+  const [warrantyData, setWarrantyData] = useState<any>(null);
+  const [trendData, setTrendData] = useState<any>(null);
+  const [activityData, setActivityData] = useState<any>(null);
+  const [contractList, setContractList] = useState<any[]>([]);
+  const [licenseList, setLicenseList] = useState<any[]>([]);
+  const [onlineNow, setOnlineNow] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user?.role === 'IT_ADMIN' || user?.role === 'SUPERADMIN') {
+    if (user?.role === 'IT_ADMIN' || user?.role === 'SUPERADMIN' || user?.role === 'VIEWER') {
+      const year = new Date().getFullYear();
       Promise.all([
         dashboardAPI.assetSummary(),
         dashboardAPI.borrowSummary(),
         dashboardAPI.pmSummary(),
         dashboardAPI.proactiveAlerts(),
+        dashboardAPI.dataHealth(),
+        dashboardAPI.borrowTrend(year),
+        dashboardAPI.recentActivity(),
       ])
-        .then(([a, b, p, pa]) => {
+        .then(([a, b, p, pa, dh, tr, ra]) => {
           setAssetSummary(a.data);
           setBorrowSummary(b.data);
           setPmSummary(p.data);
           setProactiveAlerts(pa.data);
+          setDataHealth(dh.data);
+          setTrendData(tr.data);
+          setActivityData(ra.data);
         })
         .finally(() => setLoading(false));
+
+      // Warranty แยกออกมา — ถ้า API ยังไม่พร้อมหรือ 404 ไม่ทำให้ Dashboard พัง
+      dashboardAPI.warrantyExpiring(60)
+        .then(w => setWarrantyData(w.data))
+        .catch(() => setWarrantyData(null));
+
+      // Contract & License summary (Phase 3) — non-blocking, fail silently
+      contractAPI.list({}).then(r => setContractList(r.data || [])).catch(() => {});
+      licenseAPI.list({}).then(r => setLicenseList(r.data || [])).catch(() => {});
     } else {
       setLoading(false);
     }
   }, [user]);
 
-  if (loading) return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
-      <CircularProgress size={28} sx={{ color: '#f59e0b' }} />
-    </Box>
-  );
+  // Team presence — refreshed on its own faster cadence than the rest of the
+  // dashboard data, since "who's online" is only useful if it's actually current.
+  useEffect(() => {
+    if (!(user?.role === 'IT_ADMIN' || user?.role === 'SUPERADMIN' || user?.role === 'VIEWER')) return;
+    const load = () => { presenceAPI.online().then(r => setOnlineNow(r.data || [])).catch(() => {}); };
+    load();
+    const interval = setInterval(load, 15000);
+    return () => clearInterval(interval);
+  }, [user]);
+
+  if (loading) return <LoadingSkeleton type="page" />;
 
   // ── USER role — simple quick access ────────────────────────────────────
   if (user?.role === 'USER') {
     const quickLinks = [
-      { icon: '✅', label: 'อุปกรณ์พร้อมยืม', path: '/assets?status=Available', color: '#10b981' },
-      { icon: '🛒', label: 'ยืมทรัพย์สินใหม่', path: '/borrow/new', color: '#3b82f6' },
-      { icon: '📋', label: 'คำขอของฉัน', path: '/borrow/my-requests', color: '#f59e0b' },
-      { icon: '📦', label: 'รายการที่ยืม', path: '/borrow/my-items', color: '#8b5cf6' },
-      { icon: '📅', label: 'คำขอขยายวัน', path: '/borrow/my-extensions', color: '#06b6d4' },
-      { icon: '🕐', label: 'ประวัติการยืม', path: '/borrow/my-history', color: '#6b7280' },
+      { icon: CheckCircle2, label: 'อุปกรณ์พร้อมยืม', path: '/assets?status=Available', color: theme.palette.success.main },
+      { icon: ShoppingCart, label: 'ยืมทรัพย์สินใหม่', path: '/borrow/new', color: theme.palette.primary.main },
+      { icon: ClipboardList, label: 'คำขอของฉัน', path: '/borrow/my-requests', color: theme.palette.warning.main },
+      { icon: Boxes, label: 'รายการที่ยืม', path: '/borrow/my-items', color: theme.palette.info.main },
+      { icon: Clock, label: 'คำขอขยายวัน', path: '/borrow/my-extensions', color: '#bd5700' },
+      { icon: RotateCcw, label: 'ประวัติการยืม', path: '/borrow/my-history', color: theme.palette.text.secondary },
     ];
     return (
       <Box>
-        {/* Header */}
         <Box sx={{ mb: '20px' }}>
-          <Typography sx={{ fontSize: '18px', fontWeight: 600, color: '#111827', mb: '4px' }}>
-            สวัสดี, {user?.displayName || user?.adUsername} 👋
+          <Typography sx={{ fontSize: 18, fontWeight: 600, color: theme.palette.text.primary, mb: '4px' }}>
+            สวัสดี, {user?.displayName || user?.adUsername}
           </Typography>
-          <Typography sx={{ fontSize: '12px', color: '#6b7280' }}>
+          <Typography sx={{ fontSize: '0.8rem', color: theme.palette.text.secondary }}>
             ระบบบริหารจัดการทรัพย์สิน IT — {now()}
           </Typography>
         </Box>
-        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-          {quickLinks.map(lnk => (
-            <Box key={lnk.path} onClick={() => navigate(lnk.path)} sx={{
-              bgcolor: '#fff', border: '0.5px solid #e5e7eb', borderRadius: '10px',
-              p: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px',
-              transition: 'border-color .15s, box-shadow .15s',
-              '&:hover': { borderColor: lnk.color, boxShadow: `0 0 0 3px ${alpha(lnk.color, 0.08)}` },
-            }}>
-              <Box sx={{ fontSize: '22px' }}>{lnk.icon}</Box>
-              <Typography sx={{ fontSize: '12.5px', fontWeight: 500, color: '#374151' }}>{lnk.label}</Typography>
-              <Box sx={{ ml: 'auto', fontSize: '14px', color: '#d1d5db' }}>›</Box>
-            </Box>
-          ))}
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' }, gap: '10px' }}>
+          {quickLinks.map(lnk => {
+            const Icon = lnk.icon;
+            return (
+              <Box key={lnk.path} onClick={() => navigate(lnk.path)} sx={{
+                bgcolor: theme.palette.background.paper,
+                border: `1px solid ${theme.palette.divider}`,
+                borderRadius: 2,
+                p: 2, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 1.5,
+                transition: 'all .2s ease',
+                '&:hover': { borderColor: lnk.color, boxShadow: `0 0 0 3px ${alpha(lnk.color, 0.08)}` },
+              }}>
+                <Icon size={22} strokeWidth={2} color={lnk.color} />
+                <Typography sx={{ fontSize: '0.82rem', fontWeight: 500, color: theme.palette.text.primary, flex: 1 }}>{lnk.label}</Typography>
+                <ArrowUpRight size={16} color={theme.palette.text.disabled} />
+              </Box>
+            );
+          })}
         </Box>
       </Box>
     );
@@ -256,368 +140,121 @@ export default function DashboardPage() {
   const total = assetSummary?.total || 0;
   const byStatus: any[] = assetSummary?.byStatus || [];
   const byCategory: any[] = assetSummary?.byCategory || [];
+  const byType: any[] = assetSummary?.byType || [];
+  const byLocation: any[] = assetSummary?.byLocation || [];
 
-  const available   = byStatus.find(s => s.status === 'Available')?._count || 0;
+  const available = byStatus.find(s => s.status === 'Available')?._count || 0;
   const maintenance = byStatus.find(s => s.status === 'Maintenance')?._count || 0;
 
-  const pmTotal     = pmSummary?.total || 0;
-  const pmDone      = pmSummary?.completed || 0;
-  const pmPct       = pct(pmDone, pmTotal);
+  const pmTotal = pmSummary?.total || 0;
+  const pmDone = pmSummary?.completed || 0;
+  const pmPct = pct(pmDone, pmTotal);
 
-  const borrowActive  = borrowSummary?.activeItems || 0;
+  const borrowActive = borrowSummary?.activeItems || 0;
   const borrowPending = borrowSummary?.pendingApproval || 0;
   const borrowOverdue = borrowSummary?.overdue || 0;
 
-  // Simulated sparkline data (last 6 months ratio from summary)
-  const sparkValues = [3, 5, 4, 7, 6, pmDone || 5, maintenance || 2];
-
-  // Donut segments from byCategory
-  const donutTotal = byCategory.reduce((s: number, c: any) => s + (c.assetCount ?? 0), 0) || total;
-  const donutSegs = byCategory.slice(0, 6).map((c: any, i: number) => ({
-    value: c.assetCount ?? 0,
-    color: CAT_COLORS[i % CAT_COLORS.length],
-  }));
-  if (donutSegs.length === 0) {
-    donutSegs.push({ value: total, color: '#f59e0b' });
-  }
-
-  // Alerts list
-  const alerts: { icon: string; text: string; sub: string; pill: any }[] = [];
+  // Alerts list (from real proactive-alerts data)
+  const alerts: { icon: LucideIcon; text: string; sub: string; colorKey: string }[] = [];
   if (proactiveAlerts) {
-    if (proactiveAlerts.overdueItems > 0) alerts.push({ icon: '⏰', text: `ยืมเกินกำหนด ${proactiveAlerts.overdueItems} รายการ`, sub: 'กรุณาติดตามผู้ยืม', pill: 'red' });
-    if (proactiveAlerts.pendingApprovals > 0) alerts.push({ icon: '⏳', text: `รออนุมัติ ${proactiveAlerts.pendingApprovals} รายการ`, sub: 'คำขอยืมรอการตรวจสอบ', pill: 'orange' });
-    if (proactiveAlerts.upcomingPMs > 0) alerts.push({ icon: '📅', text: `มีแผน PM ในสัปดาห์นี้ ${proactiveAlerts.upcomingPMs} รายการ`, sub: 'เตรียมความพร้อมการตรวจนับ', pill: 'yellow' });
+    if (proactiveAlerts.overdueItems > 0) alerts.push({ icon: Clock, text: `ยืมเกินกำหนด ${proactiveAlerts.overdueItems} รายการ`, sub: 'กรุณาติดตามผู้ยืม', colorKey: 'error' });
+    if (proactiveAlerts.pendingApprovals > 0) alerts.push({ icon: ClipboardList, text: `รออนุมัติ ${proactiveAlerts.pendingApprovals} รายการ`, sub: 'คำขอยืมรอการตรวจสอบ', colorKey: 'warning' });
+    if (proactiveAlerts.upcomingPMs > 0) alerts.push({ icon: Shield, text: `มีแผน PM ในสัปดาห์นี้ ${proactiveAlerts.upcomingPMs} รายการ`, sub: 'เตรียมความพร้อมการตรวจนับ', colorKey: 'warning' });
   }
-
-  // If no proactive alerts, fallback to summaries-based alerts (or maintenance)
   if (alerts.length === 0) {
-    if (maintenance > 0) alerts.push({ icon: '🔧', text: `ส่งซ่อม ${maintenance} รายการ`, sub: 'อุปกรณ์อยู่ระหว่างซ่อม', pill: 'yellow' });
-    if (alerts.length === 0) alerts.push({ icon: '✅', text: 'ไม่มีการแจ้งเตือนด่วน', sub: 'ระบบทำงานปกติทุกส่วน', pill: 'green' });
+    if (maintenance > 0) alerts.push({ icon: Wrench, text: `ส่งซ่อม ${maintenance} รายการ`, sub: 'อุปกรณ์อยู่ระหว่างซ่อม', colorKey: 'warning' });
+    else alerts.push({ icon: CheckCircle2, text: 'ไม่มีการแจ้งเตือนด่วน', sub: 'ระบบทำงานปกติทุกส่วน', colorKey: 'success' });
   }
-
-  // Quick links
-  const quickLinks = [
-    { icon: '➕', label: 'เพิ่มทรัพย์สิน', path: '/assets/new', color: '#f59e0b' },
-    { icon: '✅', label: 'รออนุมัติยืม', path: '/borrow/approval-queue', color: '#3b82f6' },
-    { icon: '📤', label: 'ส่งมอบอุปกรณ์', path: '/borrow/checkout', color: '#10b981' },
-    { icon: '📥', label: 'รับคืนอุปกรณ์', path: '/borrow/return', color: '#8b5cf6' },
-    { icon: '📊', label: 'รายงานทรัพย์สิน', path: '/reports/assets', color: '#06b6d4' },
-    { icon: '📅', label: 'แผน PM', path: '/pm/plans', color: '#f97316' },
-  ];
 
   return (
-    <Box sx={{ pb: '24px' }}>
+    <Box sx={{ pb: 3 }}>
 
       {/* ── Page header ─────────────────────────────────────────── */}
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: '16px' }}>
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
         <Box>
-          <Typography sx={{ fontSize: '15px', fontWeight: 500, color: '#111827', mb: '2px' }}>
-            📊 Dashboard ภาพรวมระบบ
+          <Typography sx={{ fontSize: '1.05rem', fontWeight: 600, color: theme.palette.text.primary, mb: '2px', display: 'flex', alignItems: 'center', gap: 1 }}>
+            <LayoutDashboard size={18} color={theme.palette.primary.main} />
+            Dashboard ภาพรวมระบบ
           </Typography>
-          <Typography sx={{ fontSize: '11px', color: '#6b7280' }}>
-            ข้อมูล ณ {now()} — อัปเดตเรียลไทม์
+          <Typography sx={{ fontSize: '0.75rem', color: theme.palette.text.secondary }}>
+            ข้อมูล ณ {now()}
           </Typography>
         </Box>
         <Box sx={{
-          display: 'flex', alignItems: 'center', gap: '6px',
-          bgcolor: '#f0fdf4', color: '#065f46',
-          fontSize: '11px', fontWeight: 500, px: '10px', py: '4px',
-          borderRadius: '999px', border: '0.5px solid #bbf7d0',
+          display: 'flex', alignItems: 'center', gap: 0.75,
+          bgcolor: alpha(theme.palette.success.main, 0.10), color: theme.palette.success.main,
+          fontSize: '0.72rem', fontWeight: 600, px: 1.25, py: 0.5,
+          borderRadius: '999px', border: `1px solid ${alpha(theme.palette.success.main, 0.25)}`,
         }}>
-          <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#10b981', animation: 'pulse 2s infinite' }} />
+          <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: theme.palette.success.main }} />
           Live
         </Box>
       </Box>
 
-      {/* ── Proactive Alerts Bar ────────────────────────────────── */}
-      {proactiveAlerts && (
-        alerts.some(a => a.pill !== 'green') && (
-          <Box sx={{ mb: '16px', display: 'flex', gap: '10px', overflowX: 'auto', pb: '4px' }}>
-            {alerts.filter(a => a.pill !== 'green').map((alert, i) => (
-              <Box key={i} sx={{
-                minWidth: '280px',
-                bgcolor: alpha(alert.pill === 'red' ? '#ef4444' : alert.pill === 'orange' ? '#f59e0b' : '#fcd34d', 0.1),
-                border: '1px solid',
-                borderColor: alert.pill === 'red' ? '#fca5a5' : alert.pill === 'orange' ? '#fdba74' : '#fde68a',
-                borderRadius: '10px',
-                p: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-              }}>
-                <Box sx={{ fontSize: '24px' }}>{alert.icon}</Box>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{alert.text}</Typography>
-                  <Typography sx={{ fontSize: '11px', color: '#4b5563', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{alert.sub}</Typography>
-                </Box>
-              </Box>
-            ))}
-          </Box>
-        )
-      )}
+      <ProactiveAlertsBar alerts={alerts} />
 
-      {/* ── Asset summary grid (12 tiles) ───────────────────────── */}
-      <Box sx={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(6, 1fr)',
-        gap: '10px',
-        mb: '16px',
-      }}>
-        {byCategory.slice(0, 5).map((cat: any, i: number) => (
-          <StatCard key={cat.id || i} icon={cat.icon || '📦'} label={cat.name}
-            value={cat.assetCount ?? 0}
-            color={CAT_COLORS[i % CAT_COLORS.length]}
-            onClick={() => navigate(categoryNavMap[cat.name] || '/assets')} />
-        ))}
-        <StatCard icon="📦" label="อุปกรณ์ทั้งหมด"  value={total} color="#374151" topBorder onClick={() => navigate('/assets')} />
-        <StatCard icon="✏️"  label="งานซ่อมเปิดอยู่" value={maintenance}      color="#ef4444" sub="Maintenance" onClick={() => navigate('/assets?status=Maintenance')} />
-        <StatCard icon="🔄" label="กำลังยืม"         value={borrowActive}     color="#f59e0b" onClick={() => navigate('/borrow/history')} />
-        <StatCard icon="⏳"  label="รออนุมัติ"        value={borrowPending}    color="#3b82f6" onClick={() => navigate('/borrow/approval-queue')} />
-        <StatCard icon="⚠️" label="ยืมเกินกำหนด"     value={borrowOverdue}    color="#ef4444" sub="Overdue" onClick={() => navigate('/borrow/overdue')} />
-        <StatCard icon="📅" label="แผน PM เดือนนี้"  value={pmTotal}          color="#f59e0b" onClick={() => navigate('/pm')} />
-        <StatCard icon="✅" label="PM เสร็จแล้ว"      value={pmDone}           color="#10b981" sub={`${pmPct}%`} onClick={() => navigate('/pm/runs')} />
+      {/* ── Row 1: 4 KPI cards (mockup-style) ────────────────────── */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 1.5, mb: 2 }}>
+        <KpiCard
+          icon={Boxes} label="ทรัพย์สิน IT ทั้งหมด" value={total}
+          sub={`พร้อมใช้ ${available} · ซ่อม ${maintenance}`}
+          accent={theme.palette.primary.main}
+          onClick={() => navigate('/assets')}
+        />
+        <KpiCard
+          icon={ShoppingCart} label="กำลังยืม / รออนุมัติ" value={borrowActive}
+          sub={`รออนุมัติ ${borrowPending} · เกินกำหนด ${borrowOverdue}`}
+          accent={theme.palette.warning.main}
+          onClick={() => navigate('/borrow/approval-queue')}
+        />
+        <KpiCard
+          icon={Wrench} label="งานซ่อมเปิดอยู่" value={maintenance}
+          sub="อุปกรณ์ระหว่างซ่อมบำรุง"
+          accent={theme.palette.error.main}
+          onClick={() => navigate('/assets?status=Maintenance')}
+        />
+        <KpiCard
+          icon={Shield} label="PM เสร็จแล้ว" value={`${pmPct}%`}
+          sub={`${pmDone}/${pmTotal} แผนงาน`}
+          accent={theme.palette.success.main}
+          onClick={() => navigate('/pm/runs')}
+        />
       </Box>
 
-      {/* ── Row 2: 4 stat bands ─────────────────────────────────── */}
-      <Box sx={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
-        gap: '12px',
-        mb: '16px',
-      }}>
-        {[
-          { icon: '✏️', label: 'งานซ่อมที่เปิดอยู่', value: maintenance, sub: `เดือนนี้ ${maintenance} งาน`, badge: 'On Track', badgePill: 'green' as const, barColor: '#f59e0b', barPct: pct(maintenance, total || 1) },
-          { icon: '🖥️', label: 'ทรัพย์สิน IT ทั้งหมด', value: total, sub: `ใช้งาน ${available} · ซ่อม ${maintenance}`, badge: 'Active', badgePill: 'blue' as const, barColor: '#3b82f6', barPct: pct(available, total || 1) },
-          { icon: '✅', label: 'PM Completion', value: `${pmPct}%`, sub: `เป้า 100% · เสร็จ ${pmDone}/${pmTotal}`, badge: `${pmPct}%`, badgePill: pmPct >= 80 ? 'green' as const : 'yellow' as const, barColor: '#10b981', barPct: pmPct },
-          { icon: '⚠️', label: 'การแจ้งเตือน', value: alerts.filter(a => a.pill !== 'green').length, sub: `Overdue ${borrowOverdue} · รออนุมัติ ${borrowPending}`, badge: alerts.filter(a => a.pill !== 'green').length > 0 ? 'ด่วน' : 'ปกติ', badgePill: alerts.filter(a => a.pill !== 'green').length > 0 ? 'red' as const : 'green' as const, barColor: '#ef4444', barPct: pct(borrowOverdue, borrowActive || 1) },
-        ].map((band, i) => (
-          <Box key={i} sx={{ bgcolor: '#fff', border: '0.5px solid #e5e7eb', borderRadius: '10px', p: '14px' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: '8px' }}>
-              <Box sx={{ fontSize: '20px' }}>{band.icon}</Box>
-              <Pill label={band.badge} variant={band.badgePill} />
-            </Box>
-            <Box sx={{ fontSize: '28px', fontWeight: 500, color: band.barColor, lineHeight: 1 }}>{band.value}</Box>
-            <Box sx={{ fontSize: '12px', color: '#374151', mt: '2px' }}>{band.label}</Box>
-            <Box sx={{ fontSize: '10px', color: '#9ca3af', mt: '2px', mb: '10px' }}>{band.sub}</Box>
-            {/* mini bar segments */}
-            <Box sx={{ display: 'flex', gap: '2px' }}>
-              {Array(10).fill(0).map((_, j) => (
-                <Box key={j} sx={{
-                  flex: 1, height: '5px', borderRadius: '2px',
-                  bgcolor: j < Math.round(band.barPct / 10) ? band.barColor : alpha(band.barColor, 0.15),
-                }} />
-              ))}
-            </Box>
-          </Box>
-        ))}
+      {/* ── ทีมงานออนไลน์ตอนนี้ ────────────────────────────────────── */}
+      <Box sx={{ mb: 2 }}>
+        <OnlineTeamCard onlineNow={onlineNow} />
       </Box>
 
-      {/* ── Row 3: Charts + Table ────────────────────────────────── */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', mb: '14px' }}>
-
-        {/* Asset status breakdown */}
-        <SectionCard title="📊 สรุปสถานะทรัพย์สิน" action={() => navigate('/assets')} actionLabel="ดูทั้งหมด">
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {byStatus.length > 0 ? byStatus.map((s: any) => {
-              const cfg = STATUS_CFG[s.status] || { label: s.status, color: '#6b7280', pill: 'grey' };
-              const p = pct(s._count, total);
-              return (
-                <Box key={s.status}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: '4px' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: cfg.color, flexShrink: 0 }} />
-                      <Typography sx={{ fontSize: '12px', color: '#374151' }}>{cfg.label}</Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#111827' }}>{s._count}</Typography>
-                      <Typography sx={{ fontSize: '10px', color: '#9ca3af', minWidth: '32px', textAlign: 'right' }}>{p}%</Typography>
-                    </Box>
-                  </Box>
-                  <Box sx={{ height: '5px', borderRadius: '3px', bgcolor: '#f3f4f6', overflow: 'hidden' }}>
-                    <Box sx={{ height: '100%', width: `${p}%`, borderRadius: '3px', bgcolor: cfg.color, transition: 'width .5s ease' }} />
-                  </Box>
-                </Box>
-              );
-            }) : (
-              <Typography sx={{ fontSize: '12px', color: '#9ca3af', py: '8px' }}>ยังไม่มีข้อมูล</Typography>
-            )}
-          </Box>
-        </SectionCard>
-
-        {/* Category donut */}
-        <SectionCard title="🗂️ สัดส่วนทรัพย์สินตามหมวดหมู่" action={() => navigate('/assets')} actionLabel={`${total} รายการ`}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <DonutChart segments={donutSegs} total={donutTotal} />
-            <Box sx={{ flex: 1 }}>
-              {byCategory.slice(0, 6).map((c: any, i: number) => (
-                <Box key={c.name || i} sx={{ display: 'flex', alignItems: 'center', gap: '6px', mb: '5px' }}>
-                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: CAT_COLORS[i % CAT_COLORS.length], flexShrink: 0 }} />
-                  <Typography sx={{ fontSize: '11px', color: '#4b5563', flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
-                    {c.name || 'อื่นๆ'}
-                  </Typography>
-                  <Typography sx={{ fontSize: '11px', fontWeight: 600, color: '#111827', flexShrink: 0 }}>{c.assetCount ?? 0}</Typography>
-                </Box>
-              ))}
-              {byCategory.length === 0 && (
-                <Typography sx={{ fontSize: '11px', color: '#9ca3af' }}>ยังไม่มีข้อมูลหมวดหมู่</Typography>
-              )}
-            </Box>
-          </Box>
-        </SectionCard>
+      {/* ── Row 2: Donut + Trend bar chart ───────────────────────── */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '5fr 7fr' }, gap: 1.5, mb: 2 }}>
+        <CategoryDonutCard byCategory={byCategory} total={total} onNavigate={() => navigate('/assets')} />
+        <BorrowTrendCard trendData={trendData} onNavigate={() => navigate('/reports/borrow')} />
       </Box>
 
-      {/* ── Row 4: Borrow + PM + Alerts ─────────────────────────── */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', mb: '14px' }}>
-
-        {/* Borrow summary */}
-        <SectionCard title="🔄 ระบบยืม-คืน" action={() => navigate('/borrow/approval-queue')} actionLabel="จัดการ">
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px', mb: '12px' }}>
-            {[
-              { label: 'กำลังยืม', value: borrowActive, color: '#f59e0b', icon: '📦' },
-              { label: 'รออนุมัติ', value: borrowPending, color: '#3b82f6', icon: '⏳' },
-              { label: 'เกินกำหนด', value: borrowOverdue, color: '#ef4444', icon: '⚠️' },
-            ].map(row => (
-              <Box key={row.label} sx={{
-                display: 'flex', alignItems: 'center', gap: '8px',
-                p: '9px 12px', borderRadius: '8px',
-                border: '0.5px solid #f3f4f6',
-                bgcolor: alpha(row.color, 0.03),
-              }}>
-                <Box sx={{ fontSize: '14px' }}>{row.icon}</Box>
-                <Typography sx={{ fontSize: '12px', color: '#374151', flex: 1 }}>{row.label}</Typography>
-                <Typography sx={{ fontSize: '16px', fontWeight: 600, color: row.color }}>{row.value}</Typography>
-              </Box>
-            ))}
-          </Box>
-          {/* Mini sparkline */}
-          <Box>
-            <Typography sx={{ fontSize: '10px', color: '#9ca3af', mb: '4px' }}>แนวโน้ม 7 วัน</Typography>
-            <MiniBarChart values={[2,4,3,5,4,borrowActive||3,borrowOverdue||1]} color="#f59e0b" />
-          </Box>
-        </SectionCard>
-
-        {/* PM summary */}
-        <SectionCard title="📅 PM ตรวจนับ" action={() => navigate('/pm')} actionLabel="รายละเอียด">
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px', mb: '12px' }}>
-            {[
-              { label: 'แผนงานทั้งหมด', value: pmTotal,         color: '#374151', icon: '📋' },
-              { label: 'เสร็จสมบูรณ์',   value: pmDone,          color: '#10b981', icon: '✅' },
-              { label: 'คงเหลือ',         value: pmTotal - pmDone, color: '#f59e0b', icon: '🕐' },
-            ].map(row => (
-              <Box key={row.label} sx={{
-                display: 'flex', alignItems: 'center', gap: '8px',
-                p: '9px 12px', borderRadius: '8px',
-                border: '0.5px solid #f3f4f6',
-              }}>
-                <Box sx={{ fontSize: '14px' }}>{row.icon}</Box>
-                <Typography sx={{ fontSize: '12px', color: '#374151', flex: 1 }}>{row.label}</Typography>
-                <Typography sx={{ fontSize: '16px', fontWeight: 600, color: row.color }}>{row.value}</Typography>
-              </Box>
-            ))}
-          </Box>
-          {/* Progress ring */}
-          <Box sx={{ bgcolor: alpha('#10b981', 0.05), border: '0.5px solid #d1fae5', borderRadius: '8px', p: '12px' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: '6px' }}>
-              <Typography sx={{ fontSize: '11px', color: '#374151' }}>ความคืบหน้า</Typography>
-              <Typography sx={{ fontSize: '14px', fontWeight: 600, color: '#10b981' }}>{pmPct}%</Typography>
-            </Box>
-            <LinearProgress variant="determinate" value={pmPct} sx={{
-              height: '6px', borderRadius: '3px',
-              bgcolor: alpha('#10b981', 0.12),
-              '& .MuiLinearProgress-bar': { borderRadius: '3px', bgcolor: '#10b981' },
-            }} />
-          </Box>
-        </SectionCard>
-
-        {/* Alerts */}
-        <SectionCard title="🔔 การแจ้งเตือน" action={() => navigate('/admin/notification-logs')} actionLabel="ดูประวัติ">
-          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-            {alerts.map((alert, i) => (
-              <React.Fragment key={i}>
-                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '10px', py: '9px' }}>
-                  <Box sx={{
-                    width: 28, height: 28, borderRadius: '50%',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    bgcolor: alert.pill === 'red' ? '#fef2f2' : alert.pill === 'green' ? '#f0fdf4' : '#fff7ed',
-                    fontSize: '13px', flexShrink: 0,
-                  }}>
-                    {alert.icon}
-                  </Box>
-                  <Box sx={{ flex: 1 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '6px' }}>
-                      <Typography sx={{ fontSize: '12px', fontWeight: 500, color: '#111827', lineHeight: 1.3 }}>{alert.text}</Typography>
-                      <Pill label={alert.pill === 'red' ? 'ด่วน' : alert.pill === 'orange' ? 'รอ' : alert.pill === 'green' ? 'ปกติ' : 'แจ้ง'} variant={alert.pill} />
-                    </Box>
-                    <Typography sx={{ fontSize: '11px', color: '#6b7280', mt: '2px' }}>{alert.sub}</Typography>
-                  </Box>
-                </Box>
-                {i < alerts.length - 1 && <Divider sx={{ borderColor: '#f3f4f6' }} />}
-              </React.Fragment>
-            ))}
-          </Box>
-        </SectionCard>
-
+      {/* ── Row 3: Recent activity + Quick actions ───────────────── */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '8fr 4fr' }, gap: 1.5, mb: 2 }}>
+        <RecentActivityCard activityData={activityData} onNavigate={() => navigate('/borrow/history')} />
+        <QuickActionsPanel onNavigate={navigate} />
       </Box>
 
-      {/* ── Row 5: Quick actions + Recent activity ──────────────── */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '14px' }}>
-
-        {/* Quick actions */}
-        <SectionCard title="⚡ ทางลัด">
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-            {quickLinks.map(lnk => (
-              <Box key={lnk.path} onClick={() => navigate(lnk.path)} sx={{
-                display: 'flex', alignItems: 'center', gap: '8px',
-                p: '10px 12px', borderRadius: '8px',
-                border: '0.5px solid #e5e7eb',
-                cursor: 'pointer',
-                transition: 'border-color .15s, background .15s',
-                '&:hover': { borderColor: lnk.color, bgcolor: alpha(lnk.color, 0.04) },
-              }}>
-                <Box sx={{ fontSize: '16px' }}>{lnk.icon}</Box>
-                <Typography sx={{ fontSize: '12px', fontWeight: 500, color: '#374151' }}>{lnk.label}</Typography>
-                <Box sx={{ ml: 'auto', fontSize: '12px', color: '#d1d5db' }}>›</Box>
-              </Box>
-            ))}
-          </Box>
-        </SectionCard>
-
-        {/* System health */}
-        <SectionCard title="💚 สถานะระบบ">
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {[
-              { label: 'ทะเบียน IT Asset', pct: 100, color: '#10b981' },
-              { label: 'ระบบยืม-คืน', pct: borrowOverdue > 0 ? 70 : 100, color: borrowOverdue > 0 ? '#f59e0b' : '#10b981' },
-              { label: 'ระบบ PM', pct: pmPct, color: pmPct > 80 ? '#10b981' : '#f59e0b' },
-              { label: 'การแจ้งเตือน', pct: 100, color: '#10b981' },
-            ].map(item => (
-              <Box key={item.label}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: '4px' }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: item.color }} />
-                    <Typography sx={{ fontSize: '11px', color: '#374151' }}>{item.label}</Typography>
-                  </Box>
-                  <Typography sx={{ fontSize: '11px', fontWeight: 600, color: item.color }}>{item.pct}%</Typography>
-                </Box>
-                <LinearProgress variant="determinate" value={item.pct} sx={{
-                  height: '4px', borderRadius: '2px',
-                  bgcolor: alpha(item.color, 0.12),
-                  '& .MuiLinearProgress-bar': { borderRadius: '2px', bgcolor: item.color },
-                }} />
-              </Box>
-            ))}
-          </Box>
-        </SectionCard>
-
+      {/* ── Row 4: Status breakdown + Location + Borrow + PM ─────── */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 1.5, mb: 2 }}>
+        <AssetStatusBreakdownCard byStatus={byStatus} total={total} onNavigate={() => navigate('/assets')} />
+        <LocationBreakdownCard byLocation={byLocation} total={total} onNavigate={() => navigate('/assets')} />
+        <BorrowSummaryCard borrowActive={borrowActive} borrowPending={borrowPending} borrowOverdue={borrowOverdue} onNavigate={() => navigate('/borrow/approval-queue')} />
+        <PMSummaryCard pmTotal={pmTotal} pmDone={pmDone} pmPct={pmPct} onNavigate={() => navigate('/pm')} />
       </Box>
 
-      {/* ── Pulse animation ─────────────────────────────────────── */}
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.4; }
-        }
-      `}</style>
+      {/* ── Row 5: Data Health + Warranty ────────────────────────── */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 1.5, mb: 2 }}>
+        <DataHealthCard dataHealth={dataHealth} navigate={navigate} />
+        <WarrantyAlertsCard warrantyData={warrantyData} navigate={navigate} />
+      </Box>
+
+      {/* ── Row 6: Executive Summary — Contract & License ─────── */}
+      <ContractLicenseSummary contractList={contractList} licenseList={licenseList} navigate={navigate} />
+
     </Box>
   );
 }

@@ -1,6 +1,58 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  Box,
+  Typography,
+  Button,
+  IconButton,
+  TextField,
+  Select,
+  MenuItem,
+  Chip,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  TableContainer,
+  Paper,
+  Card,
+  LinearProgress,
+  Snackbar,
+  Alert,
+  InputAdornment,
+  ToggleButtonGroup,
+  ToggleButton,
+  Tooltip,
+} from '@mui/material';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { alpha } from '@mui/material/styles';
+import dayjs from 'dayjs';
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import AddIcon from '@mui/icons-material/Add';
+import BoltIcon from '@mui/icons-material/Bolt';
+import BusinessIcon from '@mui/icons-material/Business';
+import EngineeringIcon from '@mui/icons-material/Engineering';
+import ComputerIcon from '@mui/icons-material/Computer';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import AutorenewIcon from '@mui/icons-material/Autorenew';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import FiberNewIcon from '@mui/icons-material/FiberNew';
+import EventIcon from '@mui/icons-material/Event';
+import EventAvailableIcon from '@mui/icons-material/EventAvailable';
+import SearchIcon from '@mui/icons-material/Search';
+import TableRowsIcon from '@mui/icons-material/TableRows';
+import ViewModuleIcon from '@mui/icons-material/ViewModule';
+import GpsFixedIcon from '@mui/icons-material/GpsFixed';
+import PersonIcon from '@mui/icons-material/Person';
+import PushPinIcon from '@mui/icons-material/PushPin';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import { pmAPI, assetAPI } from '../../services/api';
+import { formatDate } from '../../utils/dateUtils';
+import { Modal } from './components/Modal';
 
 /* ─────────────────────────────────────────────────────────────
    Types
@@ -18,43 +70,208 @@ interface PlanForm {
   templateId: string;
 }
 
-const THAI_YEAR = new Date().getFullYear() + 543;
-
 /* ─────────────────────────────────────────────────────────────
    Helpers
 ───────────────────────────────────────────────────────────────── */
 function fmtDate(d: string | null) {
   if (!d) return '—';
-  return new Date(d).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
+  return formatDate(d);
 }
 
-function progressColor(pct: number) {
-  if (pct >= 100) return '#10b981';
-  if (pct >= 50) return '#0ea5e9';
-  if (pct >= 20) return '#f59e0b';
-  return '#ef4444';
+function progressColor(pct: number): 'success' | 'info' | 'warning' | 'error' {
+  if (pct >= 100) return 'success';
+  if (pct >= 50) return 'info';
+  if (pct >= 20) return 'warning';
+  return 'error';
 }
 
-function Modal({ open, onClose, title, children }: {
-  open: boolean; onClose: () => void; title: string; children: React.ReactNode;
-}) {
-  if (!open) return null;
+function invalidDateRange(startDate: string, endDate: string) {
+  return Boolean(startDate && endDate && new Date(startDate) > new Date(endDate));
+}
+
+function getPlanStatus(plan: any) {
+  const runs = plan.runs || [];
+  const total = plan.totalCount ?? runs.length;
+  const done = plan.completedCount ?? runs.filter((r: any) => r.status === 'COMPLETED').length;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  const start = plan.startDate ? new Date(plan.startDate) : null;
+  const end = plan.endDate ? new Date(plan.endDate) : null;
+  const today = new Date();
+  const isActive = !!(start && end && today >= start && today <= end);
+  const isOverdue = !!(end && today > end && pct < 100);
+  const isDone = pct >= 100 && total > 0;
+  const notGenerated = total === 0;
+
+  if (isDone) return { total, done, pct, color: 'success' as const, label: 'เสร็จ', Icon: CheckCircleIcon };
+  if (isOverdue) return { total, done, pct, color: 'error' as const, label: 'เกินกำหนด', Icon: WarningAmberIcon };
+  if (isActive) return { total, done, pct, color: 'info' as const, label: 'ดำเนินการ', Icon: AutorenewIcon };
+  if (notGenerated) return { total, done, pct, color: 'secondary' as const, label: 'ยังไม่ Generate', Icon: FiberNewIcon };
+  return { total, done, pct, color: 'default' as const, label: 'กำหนดการ', Icon: EventIcon };
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Shared bits
+───────────────────────────────────────────────────────────────── */
+function EligibilityStats({ data }: { data: any }) {
+  const items: { label: string; value: number; color: 'primary' | 'inherit' | 'success' | 'warning' }[] = [
+    { label: 'ใน scope', value: data.totalInScope, color: 'primary' },
+    { label: 'มีงานปีนี้แล้ว', value: data.alreadyInYear, color: 'inherit' },
+    { label: 'เหลือสร้างได้', value: data.available, color: 'success' },
+    { label: 'จะสร้างได้', value: data.creatable, color: 'warning' },
+  ];
   return (
-    <div onClick={onClose} style={{
-      position: 'fixed', inset: 0, background: 'rgba(15,23,42,.5)',
-      zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
-    }}>
-      <div onClick={e => e.stopPropagation()} style={{
-        background: '#fff', borderRadius: 14, width: '100%', maxWidth: 560,
-        boxShadow: '0 20px 60px rgba(0,0,0,.2)', overflow: 'hidden', maxHeight: '90vh', display: 'flex', flexDirection: 'column',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #f1f5f9', flexShrink: 0 }}>
-          <span style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>{title}</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#94a3b8', padding: '2px 6px' }}>✕</button>
-        </div>
-        <div style={{ overflowY: 'auto', flex: 1 }}>{children}</div>
-      </div>
-    </div>
+    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 1 }}>
+      {items.map((item) => (
+        <Paper key={item.label} variant="outlined" sx={{ p: '8px 10px' }}>
+          <Typography sx={{ fontSize: 18, fontWeight: 800, lineHeight: 1, color: item.color === 'inherit' ? 'text.primary' : `${item.color}.main` }}>
+            {item.value}
+          </Typography>
+          <Typography sx={{ fontSize: 10, color: 'text.secondary', mt: 0.5 }}>{item.label}</Typography>
+        </Paper>
+      ))}
+    </Box>
+  );
+}
+
+function PlanFormFields({
+  form,
+  onChange,
+  yearOptions,
+  companyOptions,
+  locOptions,
+  deptOptions,
+  typeOptions,
+  templates,
+  disabled,
+  onNoTemplateClick,
+}: {
+  form: PlanForm;
+  onChange: (patch: Partial<PlanForm>) => void;
+  yearOptions: number[];
+  companyOptions: string[];
+  locOptions: string[];
+  deptOptions: string[];
+  typeOptions: string[];
+  templates: any[];
+  disabled?: { year?: boolean; company?: boolean; site?: boolean; dept?: boolean; template?: boolean; countMin?: number };
+  onNoTemplateClick?: () => void;
+}) {
+  const days = form.startDate && form.endDate
+    ? Math.round((new Date(form.endDate).getTime() - new Date(form.startDate).getTime()) / 86400000)
+    : 0;
+  const weeks = Math.ceil(days / 7);
+
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+      <Box>
+        <Typography sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary', mb: 0.5 }}>ปีที่วางแผน (พ.ศ.)</Typography>
+        <Select fullWidth size="small" value={form.year} disabled={disabled?.year} onChange={(e) => onChange({ year: Number(e.target.value) })}>
+          {yearOptions.map((y) => <MenuItem key={y} value={y}>พ.ศ. {y + 543} ({y})</MenuItem>)}
+        </Select>
+      </Box>
+
+      <Box>
+        <Typography sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary', mb: 0.5 }}>บริษัท (Company)</Typography>
+        <Select fullWidth size="small" displayEmpty value={form.company} disabled={disabled?.company} onChange={(e) => onChange({ company: e.target.value })}>
+          <MenuItem value="">ทุกบริษัท (All Companies)</MenuItem>
+          {companyOptions.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+        </Select>
+      </Box>
+
+      <Box>
+        <Typography sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary', mb: 0.5 }}>สถานที่ / ไซต์ (Location/Site)</Typography>
+        <Select fullWidth size="small" displayEmpty value={form.site} disabled={disabled?.site} onChange={(e) => onChange({ site: e.target.value })}>
+          <MenuItem value="">ทุกสถานที่ (All Locations)</MenuItem>
+          {locOptions.map((l) => <MenuItem key={l} value={l}>{l}</MenuItem>)}
+        </Select>
+      </Box>
+
+      <Box>
+        <Typography sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary', mb: 0.5 }}>แผนก (Department)</Typography>
+        <Select fullWidth size="small" displayEmpty value={form.deptTask} disabled={disabled?.dept} onChange={(e) => onChange({ deptTask: e.target.value })}>
+          <MenuItem value="">ทุกแผนก (All Departments)</MenuItem>
+          {deptOptions.map((d) => <MenuItem key={d} value={d}>{d}</MenuItem>)}
+        </Select>
+      </Box>
+
+      <Box>
+        <Typography sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary', mb: 0.5 }}>ประเภทอุปกรณ์ (Device Type)</Typography>
+        <Select fullWidth size="small" displayEmpty value={form.deviceType} onChange={(e) => onChange({ deviceType: e.target.value })}>
+          <MenuItem value="">ทุกประเภท (All Types)</MenuItem>
+          {typeOptions.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+        </Select>
+      </Box>
+
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.25 }}>
+        <Box>
+          <Typography sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary', mb: 0.5 }}>ผู้รับผิดชอบ (Lead)</Typography>
+          <TextField fullWidth size="small" placeholder="ชื่อผู้รับผิดชอบ" value={form.lead} onChange={(e) => onChange({ lead: e.target.value })} />
+        </Box>
+        <Box>
+          <Typography sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary', mb: 0.5 }}>จำนวนเครื่องตามแผน</Typography>
+          <TextField
+            fullWidth
+            size="small"
+            type="number"
+            inputProps={{ min: disabled?.countMin ?? 1 }}
+            value={form.plannedDeviceCount}
+            onChange={(e) => onChange({ plannedDeviceCount: Number(e.target.value) })}
+          />
+          {disabled?.countMin !== undefined && disabled.countMin > 0 && (
+            <Typography sx={{ fontSize: 10, color: 'text.secondary', mt: 0.5 }}>* ปรับเป้าหมายให้ตรงกับงานจริงได้</Typography>
+          )}
+        </Box>
+      </Box>
+
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.25 }}>
+        <Box>
+          <Typography sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary', mb: 0.5 }}>วันที่เริ่ม *</Typography>
+          <DatePicker
+            format="DD/MM/YYYY"
+            value={form.startDate ? dayjs(form.startDate) : null}
+            onChange={(newVal) => onChange({ startDate: newVal ? newVal.format('YYYY-MM-DD') : '' })}
+            slotProps={{ textField: { size: 'small', fullWidth: true } }}
+          />
+        </Box>
+        <Box>
+          <Typography sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary', mb: 0.5 }}>วันที่สิ้นสุด *</Typography>
+          <DatePicker
+            format="DD/MM/YYYY"
+            value={form.endDate ? dayjs(form.endDate) : null}
+            onChange={(newVal) => onChange({ endDate: newVal ? newVal.format('YYYY-MM-DD') : '' })}
+            slotProps={{ textField: { size: 'small', fullWidth: true } }}
+          />
+        </Box>
+      </Box>
+
+      {days > 0 && (
+        <Alert severity="info" icon={<EventIcon fontSize="inherit" />} sx={{ py: 0.25 }}>
+          ระยะเวลา {days} วัน ({weeks} สัปดาห์) · สิ้นสุด {fmtDate(form.endDate)}
+        </Alert>
+      )}
+
+      <Box>
+        <Typography sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary', mb: 0.5 }}>PM Template (Checklist)</Typography>
+        <Select fullWidth size="small" displayEmpty value={form.templateId} disabled={disabled?.template} onChange={(e) => onChange({ templateId: e.target.value })}>
+          <MenuItem value="">
+            <em>-- เลือก Template สำหรับตรวจ PM --</em>
+          </MenuItem>
+          {templates.map((t) => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
+        </Select>
+        {templates.length === 0 ? (
+          <Typography sx={{ fontSize: 10, color: 'text.secondary', mt: 0.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <LightbulbIcon sx={{ fontSize: 12 }} /> ยังไม่มี Template —{' '}
+            <Box component="span" sx={{ color: 'primary.main', cursor: 'pointer', textDecoration: 'underline' }} onClick={onNoTemplateClick}>
+              สร้าง Template
+            </Box>
+          </Typography>
+        ) : (
+          <Typography sx={{ fontSize: 10, color: 'text.secondary', mt: 0.5 }}>
+            จำเป็นต้องเลือก Template เพราะงาน PM ต้องมีรายการตรวจเช็คก่อนบันทึกผลได้
+          </Typography>
+        )}
+      </Box>
+    </Box>
   );
 }
 
@@ -79,6 +296,12 @@ export default function PMPlanListPage() {
   const [genMsg, setGenMsg] = useState('');
   const [toast, setToast] = useState('');
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
+  const [filterCompany, setFilterCompany] = useState('');
+  const [filterDept, setFilterDept] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterDeviceType, setFilterDeviceType] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedPlanForEdit, setSelectedPlanForEdit] = useState<any>(null);
   const [editForm, setEditForm] = useState<PlanForm>({
@@ -155,7 +378,7 @@ export default function PMPlanListPage() {
           const data = res.data;
           setEligibility(data);
           setForm((prev) => (
-            prev.plannedDeviceCount === 10 && data.available > 0
+            data.available > 0
               ? { ...prev, plannedDeviceCount: data.available }
               : prev
           ));
@@ -187,8 +410,10 @@ export default function PMPlanListPage() {
 
   const handleCreate = async () => {
     if (!form.startDate || !form.endDate) { showToast('⚠️ กรุณากำหนดวันเริ่มและวันสิ้นสุด'); return; }
-    
-    // Normalize target values
+    if (invalidDateRange(form.startDate, form.endDate)) { showToast('⚠️ วันที่สิ้นสุดต้องไม่น้อยกว่าวันที่เริ่ม'); return; }
+    if (!form.templateId) { showToast('⚠️ กรุณาเลือก Checklist Template ก่อนสร้างแผน PM'); return; }
+    if (form.plannedDeviceCount < 1) { showToast('⚠️ จำนวนเครื่องตามแผนต้องมากกว่า 0'); return; }
+
     const companyVal = (form.company === '__ALL__' || !form.company) ? '' : form.company;
     const siteVal = (form.site === '__ALL__' || !form.site) ? '' : form.site;
     const deptVal = (form.deptTask === '__ALL__' || !form.deptTask) ? '' : form.deptTask;
@@ -253,6 +478,9 @@ export default function PMPlanListPage() {
   const handleUpdate = async () => {
     if (!selectedPlanForEdit) return;
     if (!editForm.startDate || !editForm.endDate) { showToast('⚠️ กรุณากำหนดวันเริ่มและวันสิ้นสุด'); return; }
+    if (invalidDateRange(editForm.startDate, editForm.endDate)) { showToast('⚠️ วันที่สิ้นสุดต้องไม่น้อยกว่าวันที่เริ่ม'); return; }
+    if (!editForm.templateId) { showToast('⚠️ กรุณาเลือก Checklist Template ก่อนบันทึกแผน PM'); return; }
+    if (editForm.plannedDeviceCount < 1) { showToast('⚠️ จำนวนเครื่องตามแผนต้องมากกว่า 0'); return; }
 
     const companyVal = (editForm.company === '__ALL__' || !editForm.company) ? '' : editForm.company;
     const siteVal = (editForm.site === '__ALL__' || !editForm.site) ? '' : editForm.site;
@@ -302,380 +530,379 @@ export default function PMPlanListPage() {
   };
 
   const handleGenerate = async () => {
+    if (!generateModal.plan) return;
+    setSaving(true);
     try {
       const res = await pmAPI.generate(generateModal.plan.id);
       setGenMsg(res.data?.message || 'สร้างงาน PM สำเร็จ');
       fetchAll();
     } catch (err: any) {
       setGenMsg(err.response?.data?.error || 'เกิดข้อผิดพลาด');
-    }
+    } finally { setSaving(false); }
   };
 
-  const filteredPlans = plans.filter(p => p.year === filterYear);
+  const filteredPlans = plans.filter(p => {
+    if (p.year !== filterYear) return false;
+    if (filterCompany && p.company !== filterCompany) return false;
+    if (filterDept && p.deptTask !== filterDept) return false;
+    if (filterDeviceType && p.deviceType !== filterDeviceType) return false;
+    if (searchTerm) {
+      const q = searchTerm.toLowerCase();
+      const matchesSearch = (p.deptTask || '').toLowerCase().includes(q) ||
+        (p.company || '').toLowerCase().includes(q) ||
+        (p.site || '').toLowerCase().includes(q) ||
+        (p.lead || '').toLowerCase().includes(q) ||
+        (p.deviceType || '').toLowerCase().includes(q);
+      if (!matchesSearch) return false;
+    }
+    if (filterStatus) {
+      const completed = p.runs?.filter((r: any) => r.status === 'COMPLETED').length || p.completedCount || 0;
+      const total = p.runs?.length || p.totalCount || 0;
+      const isOverdue = p.endDate && new Date(p.endDate) < new Date() && completed < total;
+      if (filterStatus === 'COMPLETED' && completed < total) return false;
+      if (filterStatus === 'IN_PROGRESS' && (completed >= total || isOverdue)) return false;
+      if (filterStatus === 'OVERDUE' && !isOverdue) return false;
+      if (filterStatus === 'NOT_GENERATED' && total > 0) return false;
+    }
+    return true;
+  });
   const totalPlanned = filteredPlans.reduce((s: number, p: any) => s + (p.plannedDeviceCount || 0), 0);
   const totalRuns = filteredPlans.reduce((s: number, p: any) => s + (p.runs?.length || p.totalCount || 0), 0);
   const totalDone = filteredPlans.reduce((s: number, p: any) => s + (p.runs?.filter((r: any) => r.status === 'COMPLETED').length || p.completedCount || 0), 0);
   const overallPct = totalRuns > 0 ? Math.round(totalDone / totalRuns * 100) : 0;
 
+  // Plans that need generation (no runs yet)
+  const plansNeedGenerate = filteredPlans.filter(p => {
+    const total = p.totalCount ?? (p.runs?.length || 0);
+    return total === 0;
+  });
+
+  // Unique device types for filter
+  const deviceTypeFilterOptions = Array.from(new Set(plans.filter(p => p.year === filterYear).map((p: any) => p.deviceType).filter(Boolean))) as string[];
+
   const yearOptions = Array.from({ length: 4 }, (_, i) => new Date().getFullYear() - 1 + i);
 
   return (
-    <>
-      <style>{`
-        .pmp-root { font-family: 'Sarabun', sans-serif; }
-        .pmp-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-          background: #0f172a; color: #fff; padding: 10px 20px; border-radius: 8px;
-          font-size: 12px; z-index: 9999; box-shadow: 0 8px 24px rgba(0,0,0,.2);
-          animation: pmpFadeUp .2s ease; pointer-events: none; }
-        @keyframes pmpFadeUp { from { opacity: 0; transform: translateX(-50%) translateY(8px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
-        .pmp-btn { display: inline-flex; align-items: center; gap: 5px; padding: 7px 14px; border-radius: 8px;
-          font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'Sarabun', sans-serif;
-          transition: all .15s; border: 1px solid transparent; white-space: nowrap; }
-        .pmp-btn-primary { background: #0ea5e9; border-color: #0284c7; color: #fff; }
-        .pmp-btn-primary:hover { background: #0284c7; }
-        .pmp-btn-outline { background: #fff; border-color: #e2e8f0; color: #475569; }
-        .pmp-btn-outline:hover { border-color: #0ea5e9; color: #0ea5e9; }
-        .pmp-btn-success { background: #10b981; border-color: #059669; color: #fff; }
-        .pmp-btn:disabled { opacity: .5; cursor: not-allowed; }
-        .pmp-input { width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px;
-          font-size: 12px; font-family: 'Sarabun', sans-serif; outline: none; color: #334155;
-          box-sizing: border-box; background: #fff; }
-        .pmp-input:focus { border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,.1); }
-        .pmp-select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px; cursor: pointer; }
-        .pmp-label { font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 4px; display: block; }
-        .pmp-mode-btn { flex: 1; padding: 10px; border-radius: 8px; border: 1.5px solid #e2e8f0;
-          background: #fff; cursor: pointer; font-family: 'Sarabun', sans-serif; font-size: 12px;
-          font-weight: 600; color: #64748b; transition: all .15s; text-align: center; }
-        .pmp-mode-btn.active { border-color: #0ea5e9; background: #f0f9ff; color: #0369a1; }
-        .pmp-plan-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
-          overflow: hidden; transition: box-shadow .15s; }
-        .pmp-plan-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); }
-        .pmp-plan-stripe { height: 4px; }
-        .pmp-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px;
-          border-radius: 99px; font-size: 10px; font-weight: 700; }
-      `}</style>
+    <Box>
+      {/* ── Page Header ── */}
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5, mb: 1.75 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box sx={{ width: 40, height: 40, borderRadius: 2.5, bgcolor: (t) => alpha(t.palette.primary.main, t.palette.mode === 'dark' ? 0.16 : 0.08), border: '1px solid', borderColor: 'primary.main', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <AssignmentIcon color="primary" />
+          </Box>
+          <Box>
+            <Typography sx={{ fontSize: 16, fontWeight: 700 }}>แผน PM (PM Plans)</Typography>
+            <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 0.25 }}>วางแผนและกำหนดกลุ่มเป้าหมาย Preventive Maintenance</Typography>
+          </Box>
+        </Box>
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setModalOpen(true)}>สร้างแผน PM</Button>
+          {plansNeedGenerate.length > 0 && (
+            <Button
+              variant="contained"
+              color="success"
+              startIcon={<BoltIcon />}
+              disabled={saving}
+              onClick={async () => {
+                if (!window.confirm(`⚡ ยืนยัน Generate งาน PM ทั้ง ${plansNeedGenerate.length} แผนที่ยังไม่ได้สร้างงาน?`)) return;
+                setSaving(true);
+                let ok = 0, fail = 0;
+                for (const plan of plansNeedGenerate) {
+                  try {
+                    await pmAPI.generate(plan.id);
+                    ok++;
+                  } catch {
+                    fail++;
+                  }
+                }
+                showToast(`⚡ Generate สำเร็จ ${ok} แผน${fail > 0 ? `, ล้มเหลว ${fail} แผน` : ''}`);
+                fetchAll();
+                setSaving(false);
+              }}
+            >
+              Generate ทุกแผน ({plansNeedGenerate.length})
+            </Button>
+          )}
+        </Box>
+      </Box>
 
-      <div className="pmp-root">
+      {/* ── Filters Bar ── */}
+      <Card variant="outlined" sx={{ p: '10px 14px', mb: 1.75, display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+        <Select size="small" sx={{ width: 110 }} value={filterYear} onChange={e => setFilterYear(Number(e.target.value))}>
+          {yearOptions.map(y => <MenuItem key={y} value={y}>ปี {y + 543}</MenuItem>)}
+        </Select>
+        <Select size="small" displayEmpty sx={{ width: 140 }} value={filterCompany} onChange={e => setFilterCompany(e.target.value)}
+          renderValue={(v) => v || <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary' }}><BusinessIcon sx={{ fontSize: 14 }} /> ทุกบริษัท</Box>}>
+          <MenuItem value="">ทุกบริษัท</MenuItem>
+          {companyOptions.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+        </Select>
+        <Select size="small" displayEmpty sx={{ width: 140 }} value={filterDept} onChange={e => setFilterDept(e.target.value)}
+          renderValue={(v) => v || <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary' }}><EngineeringIcon sx={{ fontSize: 14 }} /> ทุกแผนก</Box>}>
+          <MenuItem value="">ทุกแผนก</MenuItem>
+          {deptOptions.map(d => <MenuItem key={d} value={d}>{d}</MenuItem>)}
+        </Select>
+        <Select size="small" displayEmpty sx={{ width: 150 }} value={filterDeviceType} onChange={e => setFilterDeviceType(e.target.value)}
+          renderValue={(v) => v || <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary' }}><ComputerIcon sx={{ fontSize: 14 }} /> ทุกประเภท</Box>}>
+          <MenuItem value="">ทุกประเภท</MenuItem>
+          {deviceTypeFilterOptions.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+        </Select>
+        <Select size="small" displayEmpty sx={{ width: 170 }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+          renderValue={(v) => v ? ({ COMPLETED: 'เสร็จสิ้นแล้ว', IN_PROGRESS: 'กำลังดำเนินการ', OVERDUE: 'ล่าช้ากว่ากำหนด', NOT_GENERATED: 'ยังไม่ Generate' } as any)[v as string] : <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary' }}><BarChartIcon sx={{ fontSize: 14 }} /> ทุกสถานะ</Box>}>
+          <MenuItem value="">ทุกสถานะ</MenuItem>
+          <MenuItem value="COMPLETED">เสร็จสิ้นแล้ว</MenuItem>
+          <MenuItem value="IN_PROGRESS">กำลังดำเนินการ</MenuItem>
+          <MenuItem value="OVERDUE">ล่าช้ากว่ากำหนด</MenuItem>
+          <MenuItem value="NOT_GENERATED">ยังไม่ Generate</MenuItem>
+        </Select>
+        <TextField
+          size="small"
+          sx={{ flex: 1, minWidth: 160 }}
+          placeholder="ค้นหาชื่อแผนก, บริษัท, ผู้รับผิดชอบ..."
+          value={searchTerm}
+          onChange={e => setSearchTerm(e.target.value)}
+          InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }}
+        />
+        <ToggleButtonGroup size="small" exclusive value={viewMode} onChange={(_, v) => v && setViewMode(v)}>
+          <ToggleButton value="table"><TableRowsIcon fontSize="small" sx={{ mr: 0.5 }} /> ตาราง</ToggleButton>
+          <ToggleButton value="card"><ViewModuleIcon fontSize="small" sx={{ mr: 0.5 }} /> การ์ด</ToggleButton>
+        </ToggleButtonGroup>
+      </Card>
 
-        {/* ── Page Header ── */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 18 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 10, background: '#f0f9ff', border: '1.5px solid #bae6fd', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>📋</div>
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a' }}>แผน PM (PM Plans)</div>
-              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>วางแผนและกำหนดกลุ่มเป้าหมาย Preventive Maintenance</div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <select className="pmp-input pmp-select" style={{ width: 110 }} value={filterYear} onChange={e => setFilterYear(+e.target.value)}>
-              {yearOptions.map(y => <option key={y} value={y}>ปี {y + 543}</option>)}
-            </select>
-            <button className="pmp-btn pmp-btn-primary" onClick={() => setModalOpen(true)}>＋ สร้างแผน PM</button>
-          </div>
-        </div>
+      {/* ── Stats + Progress (Combined compact) ── */}
+      <Card variant="outlined" sx={{ p: '10px 16px', mb: 1.75, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+        {[
+          { icon: AssignmentIcon, label: 'แผน', val: filteredPlans.length, color: 'info' as const },
+          { icon: GpsFixedIcon, label: 'เป้าหมาย', val: totalPlanned, color: 'secondary' as const },
+          { icon: CheckCircleIcon, label: 'เสร็จ', val: totalDone, color: 'success' as const },
+          { icon: EventIcon, label: 'เหลือ', val: totalRuns - totalDone, color: 'warning' as const },
+        ].map(s => (
+          <Box key={s.label} sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+            <s.icon sx={{ fontSize: 18, color: `${s.color}.main` }} />
+            <Box>
+              <Typography sx={{ fontSize: 16, fontWeight: 800, color: `${s.color}.main`, lineHeight: 1 }}>{s.val}</Typography>
+              <Typography sx={{ fontSize: 9, color: 'text.secondary' }}>{s.label}</Typography>
+            </Box>
+          </Box>
+        ))}
+        <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 180 }}>
+          <LinearProgress variant="determinate" value={overallPct} color={progressColor(overallPct)} sx={{ flex: 1, height: 7, borderRadius: 99 }} />
+          <Typography sx={{ fontSize: 13, fontWeight: 700, color: `${progressColor(overallPct)}.main`, minWidth: 36 }}>{overallPct}%</Typography>
+          <Typography sx={{ fontSize: 10, color: 'text.secondary', whiteSpace: 'nowrap' }}>{totalDone}/{totalRuns}</Typography>
+        </Box>
+      </Card>
 
-        {/* ── Stats Summary ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 10, marginBottom: 18 }}>
-          {[
-            { icon: '📋', label: 'แผน PM', val: filteredPlans.length, color: '#0ea5e9' },
-            { icon: '🎯', label: 'เป้าหมาย', val: totalPlanned, color: '#8b5cf6' },
-            { icon: '✅', label: 'เสร็จแล้ว', val: totalDone, color: '#10b981' },
-            { icon: '⏳', label: 'รอดำเนินการ', val: totalRuns - totalDone, color: '#f59e0b' },
-            { icon: '📊', label: 'ความคืบหน้า', val: `${overallPct}%`, color: progressColor(overallPct) },
-          ].map(s => (
-            <div key={s.label} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 22 }}>{s.icon}</span>
-              <div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.val}</div>
-                <div style={{ fontSize: 10, color: '#94a3b8' }}>{s.label}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* ── Overall progress bar ── */}
-        {totalRuns > 0 && (
-          <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 16px', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>ความคืบหน้ารวม ปี {filterYear + 543}</span>
-            <div style={{ flex: 1, background: '#f1f5f9', borderRadius: 99, height: 8, overflow: 'hidden' }}>
-              <div style={{ height: '100%', borderRadius: 99, background: progressColor(overallPct), width: `${overallPct}%`, transition: 'width .4s' }} />
-            </div>
-            <span style={{ fontSize: 12, fontWeight: 700, color: progressColor(overallPct), minWidth: 40 }}>{overallPct}%</span>
-            <span style={{ fontSize: 11, color: '#94a3b8' }}>{totalDone}/{totalRuns} เครื่อง</span>
-          </div>
-        )}
-
-        {/* ── Plan Cards ── */}
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: 40, color: '#0ea5e9' }}>⏳ กำลังโหลด...</div>
-        ) : filteredPlans.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 48, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#475569' }}>ยังไม่มีแผน PM ปี {filterYear + 543}</div>
-            <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4, marginBottom: 16 }}>กดปุ่ม "สร้างแผน PM" เพื่อเริ่มต้น</div>
-            <button className="pmp-btn pmp-btn-primary" onClick={() => setModalOpen(true)}>＋ สร้างแผน PM แรก</button>
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(320px,1fr))', gap: 14 }}>
-            {filteredPlans.map((plan: any) => {
-              const runs = plan.runs || [];
-              const total = plan.totalCount ?? runs.length;
-              const done = plan.completedCount ?? runs.filter((r: any) => r.status === 'COMPLETED').length;
-              const pct = total > 0 ? Math.round(done / total * 100) : 0;
-              const labelParts = [plan.company, plan.site].filter(Boolean);
-              const siteLabel = labelParts.length > 0 ? labelParts.join(' - ') : '';
-              const deptLabel = plan.deptTask || 'ทุกแผนก';
-
-              // Timeline
-              const start = plan.startDate ? new Date(plan.startDate) : null;
-              const end = plan.endDate ? new Date(plan.endDate) : null;
-              const today = new Date();
-              const isActive = start && end && today >= start && today <= end;
-              const isOverdue = end && today > end && pct < 100;
-              const isDone = pct >= 100;
-
-              return (
-                <div className="pmp-plan-card" key={plan.id}>
-                  <div className="pmp-plan-stripe" style={{ background: '#0ea5e9' }} />
-                  <div style={{ padding: '14px 16px' }}>
-                    {/* Plan header */}
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ width: 32, height: 32, borderRadius: 8, background: '#0ea5e915', border: '1px solid #0ea5e930', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>
-                          📋
-                        </div>
-                        <div>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{deptLabel}</div>
-                          <div style={{ fontSize: 10, color: '#64748b', fontWeight: 500, marginTop: 1 }}>🏢 {siteLabel || 'ทุกบริษัท/ทุกสถานที่'}</div>
-                          {plan.deviceType && <div style={{ fontSize: 10, color: '#0ea5e9', fontWeight: 600, marginTop: 2 }}>💻 {plan.deviceType}</div>}
-                        </div>
-                      </div>
-                      <span className="pmp-badge" style={{
-                        ...(isDone ? { background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0' }
-                          : isOverdue ? { background: '#fff5f5', color: '#dc2626', border: '1px solid #fecaca' }
-                          : isActive ? { background: '#f0f9ff', color: '#0369a1', border: '1px solid #bae6fd' }
-                          : { background: '#f8fafc', color: '#94a3b8', border: '1px solid #e2e8f0' }),
-                      }}>
-                        {isDone ? '✅ เสร็จสิ้น' : isOverdue ? '⚠️ เกินกำหนด' : isActive ? '🔄 กำลังดำเนิน' : '📅 กำหนดการ'}
-                      </span>
-                    </div>
-
-                    {/* Progress */}
-                    <div style={{ marginBottom: 10 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                        <span style={{ fontSize: 11, color: '#64748b' }}>ความคืบหน้า</span>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: progressColor(pct) }}>{pct}% ({done}/{total})</span>
-                      </div>
-                      <div style={{ background: '#f1f5f9', borderRadius: 99, height: 6, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', borderRadius: 99, background: progressColor(pct), width: `${pct}%`, transition: 'width .4s' }} />
-                      </div>
-                    </div>
-
-                    {/* Info row */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 12 }}>
-                      {[
-                        { lbl: '🎯 เป้าหมาย', val: `${plan.plannedDeviceCount} เครื่อง` },
-                        { lbl: '👤 ผู้รับผิดชอบ', val: plan.lead || '—' },
-                        { lbl: '📅 เริ่ม', val: fmtDate(plan.startDate) },
-                        { lbl: '🏁 สิ้นสุด', val: fmtDate(plan.endDate) },
-                      ].map(i => (
-                        <div key={i.lbl} style={{ background: '#f8fafc', borderRadius: 6, padding: '5px 8px' }}>
-                          <div style={{ fontSize: 9, color: '#94a3b8' }}>{i.lbl}</div>
-                          <div style={{ fontSize: 11, fontWeight: 600, color: '#334155' }}>{i.val}</div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Actions */}
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      {total === 0 ? (
-                        <button
-                          className="pmp-btn pmp-btn-success"
-                          style={{ flex: 1, justifyContent: 'center' }}
-                          onClick={() => { setGenerateModal({ open: true, plan }); setGenMsg(''); }}
-                        >
-                          ⚡ Generate งาน PM
-                        </button>
-                      ) : (
-                        <button
-                          className="pmp-btn pmp-btn-primary"
-                          style={{ flex: 1, justifyContent: 'center' }}
-                          onClick={() => navigate('/pm/runs')}
-                        >
-                          📋 ดูงาน PM ({total})
-                        </button>
+      {/* ── Plan List ── */}
+      {loading ? (
+        <Box sx={{ textAlign: 'center', p: 5, color: 'primary.main' }}>กำลังโหลด...</Box>
+      ) : filteredPlans.length === 0 ? (
+        <Card variant="outlined" sx={{ textAlign: 'center', p: 6 }}>
+          <AssignmentIcon sx={{ fontSize: 32, mb: 1, color: 'text.disabled' }} />
+          <Typography sx={{ fontSize: 14, fontWeight: 600 }}>ยังไม่มีแผน PM ปี {filterYear + 543}</Typography>
+          <Typography sx={{ fontSize: 12, color: 'text.secondary', mt: 0.5, mb: 2 }}>กดปุ่ม "สร้างแผน PM" เพื่อเริ่มต้น</Typography>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setModalOpen(true)}>สร้างแผน PM แรก</Button>
+        </Card>
+      ) : viewMode === 'table' ? (
+        <TableContainer component={Paper} variant="outlined">
+          <Table size="small">
+            <TableHead>
+              <TableRow sx={{ bgcolor: 'action.hover' }}>
+                <TableCell sx={{ fontSize: 11, fontWeight: 700, color: 'text.secondary' }}>แผนก / สถานที่</TableCell>
+                <TableCell sx={{ fontSize: 11, fontWeight: 700, color: 'text.secondary' }}>ประเภท</TableCell>
+                <TableCell sx={{ fontSize: 11, fontWeight: 700, color: 'text.secondary' }}>ระยะเวลา</TableCell>
+                <TableCell sx={{ fontSize: 11, fontWeight: 700, color: 'text.secondary' }}>ความคืบหน้า</TableCell>
+                <TableCell sx={{ fontSize: 11, fontWeight: 700, color: 'text.secondary' }}>สถานะ</TableCell>
+                <TableCell sx={{ fontSize: 11, fontWeight: 700, color: 'text.secondary', textAlign: 'right' }}>จัดการ</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {filteredPlans.map((plan: any) => {
+                const s = getPlanStatus(plan);
+                return (
+                  <TableRow key={plan.id} hover>
+                    <TableCell>
+                      <Box sx={{ fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                        {plan.deptTask || 'ทุกแผนก'}
+                        {plan.isAdhoc && <Chip size="small" label="นอกแผน" sx={{ height: 16, fontSize: 8 }} color="secondary" />}
+                      </Box>
+                      {!plan.isAdhoc && (
+                        <Box sx={{ fontSize: 10, color: 'text.secondary', mt: 0.25, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <BusinessIcon sx={{ fontSize: 11 }} /> {plan.company} {plan.site ? `- ${plan.site}` : ''}
+                        </Box>
                       )}
-                      <button
-                        className="pmp-btn pmp-btn-outline"
-                        onClick={() => navigate('/pm')}
-                        title="ดู Dashboard"
-                      >📊</button>
+                    </TableCell>
+                    <TableCell sx={{ fontSize: 10 }}>
+                      {plan.deviceType ? (
+                        <Box sx={{ color: 'primary.main', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <ComputerIcon sx={{ fontSize: 12 }} /> {plan.deviceType}
+                        </Box>
+                      ) : <Box component="span" sx={{ color: 'text.disabled' }}>—</Box>}
+                    </TableCell>
+                    <TableCell sx={{ fontSize: 10 }}>{fmtDate(plan.startDate)} — {fmtDate(plan.endDate)}</TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                        <LinearProgress variant="determinate" value={s.pct} color={s.color === 'default' || s.color === 'secondary' ? 'inherit' : s.color} sx={{ flex: 1, minWidth: 60, height: 5, borderRadius: 99 }} />
+                        <Typography sx={{ fontSize: 10, fontWeight: 700, minWidth: 30 }}>{s.pct}%</Typography>
+                      </Box>
+                      <Typography sx={{ fontSize: 9, color: 'text.secondary', mt: 0.25 }}>{s.done}/{s.total} (เป้า {plan.plannedDeviceCount})</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip size="small" color={s.color} icon={<s.Icon sx={{ fontSize: 13 }} />} label={s.label} sx={{ fontSize: 10, fontWeight: 700, height: 22 }} />
+                    </TableCell>
+                    <TableCell sx={{ textAlign: 'right' }}>
+                      <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+                        {s.total === 0 ? (
+                          <Button size="small" variant="contained" color="success" startIcon={<BoltIcon />} onClick={() => { setGenerateModal({ open: true, plan }); setGenMsg(''); }}>
+                            Generate
+                          </Button>
+                        ) : (
+                          <Button size="small" variant="contained" startIcon={<AssignmentIcon />} onClick={() => navigate(`/pm/runs?planId=${plan.id}`)}>
+                            ดูงาน ({s.total})
+                          </Button>
+                        )}
+                        <Tooltip title="แก้ไข">
+                          <IconButton size="small" onClick={() => handleOpenEdit(plan)}><EditIcon fontSize="small" /></IconButton>
+                        </Tooltip>
+                        <Tooltip title="ลบ">
+                          <IconButton size="small" color="error" onClick={() => handleDelete(plan.id)}><DeleteIcon fontSize="small" /></IconButton>
+                        </Tooltip>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      ) : (
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: 1.75 }}>
+          {filteredPlans.map((plan: any) => {
+            const s = getPlanStatus(plan);
+            const labelParts = [plan.company, plan.site].filter(Boolean);
+            const siteLabel = labelParts.length > 0 ? labelParts.join(' - ') : '';
+            const deptLabel = plan.deptTask || 'ทุกแผนก';
 
-                      <button
-                        className="pmp-btn pmp-btn-outline"
-                        onClick={() => handleOpenEdit(plan)}
-                        title="แก้ไขแผน PM"
-                      >✏️</button>
+            return (
+              <Card variant="outlined" key={plan.id} sx={{ overflow: 'hidden' }}>
+                <Box sx={{ height: 4, bgcolor: `${s.color === 'default' ? 'text.disabled' : `${s.color}.main`}` }} />
+                <Box sx={{ p: '14px 16px' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1, mb: 1.25 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box sx={{ width: 32, height: 32, borderRadius: 1.5, bgcolor: (t) => alpha(t.palette.primary.main, t.palette.mode === 'dark' ? 0.16 : 0.08), border: '1px solid', borderColor: 'primary.main', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <AssignmentIcon color="primary" sx={{ fontSize: 16 }} />
+                      </Box>
+                      <Box>
+                        <Box sx={{ fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                          {deptLabel}
+                          {plan.isAdhoc && <Chip size="small" icon={<PushPinIcon sx={{ fontSize: 11 }} />} label="นอกแผน" color="secondary" sx={{ height: 18, fontSize: 9 }} />}
+                        </Box>
+                        {!plan.isAdhoc && (
+                          <Box sx={{ fontSize: 10, color: 'text.secondary', fontWeight: 500, mt: 0.25, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <BusinessIcon sx={{ fontSize: 11 }} /> {siteLabel || 'ทุกบริษัท/ทุกสถานที่'}
+                          </Box>
+                        )}
+                        {plan.deviceType && (
+                          <Box sx={{ fontSize: 10, color: 'primary.main', fontWeight: 600, mt: 0.25, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <ComputerIcon sx={{ fontSize: 11 }} /> {plan.deviceType}
+                          </Box>
+                        )}
+                      </Box>
+                    </Box>
+                    <Chip size="small" color={s.color} icon={<s.Icon sx={{ fontSize: 13 }} />} label={s.label} sx={{ fontSize: 9, fontWeight: 700, height: 22 }} />
+                  </Box>
 
-                      <button
-                        className="pmp-btn pmp-btn-outline"
-                        style={{
-                          borderColor: '#fecaca',
-                          color: '#ef4444',
-                          cursor: 'pointer'
-                        }}
-                        onClick={() => handleDelete(plan.id)}
-                        title="ลบแผน PM (ระวัง: ลบข้อมูลที่ตรวจแล้วด้วย)"
-                      >🗑️</button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                  <Box sx={{ mb: 1.25 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                      <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>ความคืบหน้า</Typography>
+                      <Typography sx={{ fontSize: 12, fontWeight: 700, color: s.color === 'default' ? 'text.primary' : `${s.color}.main` }}>{s.pct}% ({s.done}/{s.total})</Typography>
+                    </Box>
+                    <LinearProgress variant="determinate" value={s.pct} color={s.color === 'default' || s.color === 'secondary' ? 'inherit' : s.color} sx={{ height: 6, borderRadius: 99 }} />
+                  </Box>
+
+                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75, mb: 1.5 }}>
+                    {[
+                      { Icon: GpsFixedIcon, lbl: 'เป้าหมาย', val: `${plan.plannedDeviceCount} เครื่อง` },
+                      { Icon: PersonIcon, lbl: 'ผู้รับผิดชอบ', val: plan.lead || '—' },
+                      { Icon: EventIcon, lbl: 'เริ่ม', val: fmtDate(plan.startDate) },
+                      { Icon: EventAvailableIcon, lbl: 'สิ้นสุด', val: fmtDate(plan.endDate) },
+                    ].map(i => (
+                      <Box key={i.lbl} sx={{ bgcolor: 'action.hover', borderRadius: 1, p: '5px 8px' }}>
+                        <Box sx={{ fontSize: 9, color: 'text.secondary', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <i.Icon sx={{ fontSize: 10 }} /> {i.lbl}
+                        </Box>
+                        <Typography sx={{ fontSize: 11, fontWeight: 600 }}>{i.val}</Typography>
+                      </Box>
+                    ))}
+                  </Box>
+
+                  <Box sx={{ display: 'flex', gap: 0.75 }}>
+                    {s.total === 0 ? (
+                      <Button size="small" variant="contained" color="success" startIcon={<BoltIcon />} sx={{ flex: 1 }} onClick={() => { setGenerateModal({ open: true, plan }); setGenMsg(''); }}>
+                        Generate งาน PM
+                      </Button>
+                    ) : (
+                      <Button size="small" variant="contained" startIcon={<AssignmentIcon />} sx={{ flex: 1 }} onClick={() => navigate(`/pm/runs?planId=${plan.id}`)}>
+                        ดูงาน PM ({s.total})
+                      </Button>
+                    )}
+                    <Tooltip title="ดู Dashboard">
+                      <IconButton size="small" onClick={() => navigate('/pm')}><BarChartIcon fontSize="small" /></IconButton>
+                    </Tooltip>
+                    <Tooltip title="แก้ไขแผน PM">
+                      <IconButton size="small" onClick={() => handleOpenEdit(plan)}><EditIcon fontSize="small" /></IconButton>
+                    </Tooltip>
+                    <Tooltip title="ลบแผน PM (ระวัง: ลบข้อมูลที่ตรวจแล้วด้วย)">
+                      <IconButton size="small" color="error" onClick={() => handleDelete(plan.id)}><DeleteIcon fontSize="small" /></IconButton>
+                    </Tooltip>
+                  </Box>
+                </Box>
+              </Card>
+            );
+          })}
+        </Box>
+      )}
 
       {/* ── Create Plan Modal ── */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="📋 สร้างแผน PM ใหม่">
-        <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-
-          {/* Year */}
-          <div>
-            <label className="pmp-label">ปีที่วางแผน (พ.ศ.)</label>
-            <select className="pmp-input pmp-select" value={form.year} onChange={e => setForm(p => ({ ...p, year: +e.target.value }))}>
-              {yearOptions.map(y => <option key={y} value={y}>พ.ศ. {y + 543} ({y})</option>)}
-            </select>
-          </div>
-
-          {/* Company selector */}
-          <div>
-            <label className="pmp-label">บริษัท (Company)</label>
-            <select className="pmp-input pmp-select" value={form.company} onChange={e => setForm(p => ({ ...p, company: e.target.value }))}>
-              <option value="">📌 ทุกบริษัท (All Companies)</option>
-              {companyOptions.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-
-          {/* Location selector */}
-          <div>
-            <label className="pmp-label">สถานที่ / ไซต์ (Location/Site)</label>
-            <select className="pmp-input pmp-select" value={form.site} onChange={e => setForm(p => ({ ...p, site: e.target.value }))}>
-              <option value="">📌 ทุกสถานที่ (All Locations)</option>
-              {locOptions.map(l => <option key={l} value={l}>{l}</option>)}
-            </select>
-          </div>
-
-          {/* Department selector */}
-          <div>
-            <label className="pmp-label">แผนก (Department)</label>
-            <select className="pmp-input pmp-select" value={form.deptTask} onChange={e => setForm(p => ({ ...p, deptTask: e.target.value }))}>
-              <option value="">📌 ทุกแผนก (All Departments)</option>
-              {deptOptions.map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
-          </div>
-
-          {/* Device Type selector */}
-          <div>
-            <label className="pmp-label">ประเภทอุปกรณ์ (Device Type)</label>
-            <select className="pmp-input pmp-select" value={form.deviceType} onChange={e => setForm(p => ({ ...p, deviceType: e.target.value }))}>
-              <option value="">📌 ทุกประเภท (All Types)</option>
-              {typeOptions.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
-
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="สร้างแผน PM ใหม่">
+        <Box sx={{ p: '16px 20px' }}>
+          <PlanFormFields
+            form={form}
+            onChange={(patch) => setForm((p) => ({ ...p, ...patch }))}
+            yearOptions={yearOptions}
+            companyOptions={companyOptions}
+            locOptions={locOptions}
+            deptOptions={deptOptions}
+            typeOptions={typeOptions}
+            templates={templates}
+            onNoTemplateClick={() => { setModalOpen(false); setTimeout(() => { window.location.href = '/pm/templates'; }, 100); }}
+          />
           {(eligibilityLoading || eligibility) && (
-            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: 12 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#334155', marginBottom: 8 }}>
-                สรุปเครื่องที่สามารถสร้างงาน PM ได้
-              </div>
+            <Paper variant="outlined" sx={{ p: 1.5, mt: 1.5 }}>
+              <Typography sx={{ fontSize: 11, fontWeight: 700, mb: 1 }}>สรุปเครื่องที่สามารถสร้างงาน PM ได้</Typography>
               {eligibilityLoading ? (
-                <div style={{ fontSize: 11, color: '#64748b' }}>กำลังคำนวณจำนวนเครื่อง...</div>
+                <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>กำลังคำนวณจำนวนเครื่อง...</Typography>
               ) : (
                 <>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
-                    {[
-                      { label: 'ใน scope', value: eligibility.totalInScope, color: '#0ea5e9' },
-                      { label: 'มีงานปีนี้แล้ว', value: eligibility.alreadyInYear, color: '#64748b' },
-                      { label: 'เหลือสร้างได้', value: eligibility.available, color: '#10b981' },
-                      { label: 'จะสร้างได้', value: eligibility.creatable, color: '#f59e0b' },
-                    ].map((item) => (
-                      <div key={item.label} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 10px' }}>
-                        <div style={{ fontSize: 18, fontWeight: 800, color: item.color, lineHeight: 1 }}>{item.value}</div>
-                        <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 3 }}>{item.label}</div>
-                      </div>
-                    ))}
-                  </div>
+                  <EligibilityStats data={eligibility} />
                   {eligibility.shortage > 0 && (
-                    <div style={{ marginTop: 8, fontSize: 11, color: '#dc2626' }}>
+                    <Typography sx={{ mt: 1, fontSize: 11, color: 'error.main' }}>
                       จำนวนตามแผนมากกว่าเครื่องที่เหลืออยู่ {eligibility.shortage} เครื่อง
-                    </div>
+                    </Typography>
                   )}
                 </>
               )}
-            </div>
+            </Paper>
           )}
-
-          {/* Lead + Target count */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <div>
-              <label className="pmp-label">ผู้รับผิดชอบ (Lead)</label>
-              <input className="pmp-input" placeholder="ชื่อผู้รับผิดชอบ" value={form.lead} onChange={e => setForm(p => ({ ...p, lead: e.target.value }))} />
-            </div>
-            <div>
-              <label className="pmp-label">จำนวนเครื่องตามแผน</label>
-              <input type="number" className="pmp-input" min={1} value={form.plannedDeviceCount} onChange={e => setForm(p => ({ ...p, plannedDeviceCount: +e.target.value }))} />
-            </div>
-          </div>
-
-          {/* Date range */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <div>
-              <label className="pmp-label">วันที่เริ่ม *</label>
-              <input type="date" className="pmp-input" value={form.startDate} onChange={e => setForm(p => ({ ...p, startDate: e.target.value }))} />
-            </div>
-            <div>
-              <label className="pmp-label">วันที่สิ้นสุด *</label>
-              <input type="date" className="pmp-input" value={form.endDate} onChange={e => setForm(p => ({ ...p, endDate: e.target.value }))} />
-            </div>
-          </div>
-
-          {/* Duration hint */}
-          {form.startDate && form.endDate && (() => {
-            const days = Math.round((new Date(form.endDate).getTime() - new Date(form.startDate).getTime()) / 86400000);
-            const weeks = Math.ceil(days / 7);
-            return days > 0 ? (
-              <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, padding: '8px 12px', fontSize: 11, color: '#0369a1' }}>
-                📅 ระยะเวลา {days} วัน ({weeks} สัปดาห์) · สิ้นสุด {fmtDate(form.endDate)}
-              </div>
-            ) : null;
-          })()}
-
-          {/* Template */}
-          <div>
-            <label className="pmp-label">PM Template (Checklist)</label>
-            <select className="pmp-input pmp-select" value={form.templateId} onChange={e => setForm(p => ({ ...p, templateId: e.target.value }))}>
-              <option value="">-- เลือก Template (ถ้ามี) --</option>
-              {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-            {templates.length === 0 && (
-              <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 4 }}>
-                💡 ยังไม่มี Template — <span style={{ color: '#0ea5e9', cursor: 'pointer', textDecoration: 'underline' }} onClick={() => { setModalOpen(false); setTimeout(() => window.location.href = '/pm/templates', 100); }}>สร้าง Template</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end', gap: 8, flexShrink: 0 }}>
-          <button className="pmp-btn pmp-btn-outline" onClick={() => setModalOpen(false)}>ยกเลิก</button>
-          <button className="pmp-btn pmp-btn-primary" onClick={handleCreate} disabled={saving}>
-            {saving ? '⏳ กำลังสร้าง...' : '✅ สร้างแผน PM'}
-          </button>
-        </div>
+        </Box>
+        <Box sx={{ p: '12px 20px', borderTop: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+          <Button variant="outlined" onClick={() => setModalOpen(false)}>ยกเลิก</Button>
+          <Button variant="contained" onClick={handleCreate} disabled={saving}>
+            {saving ? 'กำลังสร้าง...' : 'สร้างแผน PM'}
+          </Button>
+        </Box>
       </Modal>
 
       {/* ── Edit Plan Modal ── */}
-      <Modal open={editModalOpen} onClose={() => setEditModalOpen(false)} title="✏️ แก้ไขแผน PM">
+      <Modal open={editModalOpen} onClose={() => setEditModalOpen(false)} title="แก้ไขแผน PM">
         {selectedPlanForEdit && (() => {
           const runs = selectedPlanForEdit.runs || [];
           const totalRuns = selectedPlanForEdit.totalCount ?? runs.length;
@@ -684,205 +911,89 @@ export default function PMPlanListPage() {
           const hasDraftRunsOnly = totalRuns > 0 && completedRuns === 0;
           return (
             <>
-              <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-                
+              <Box sx={{ p: '16px 20px' }}>
                 {hasCompletedRuns && (
-                  <div style={{ background: '#fff7ed', border: '1px solid #ffedd5', borderRadius: 8, padding: '10px 14px', fontSize: 11, color: '#c2410c' }}>
-                    ⚠️ แผนนี้มีเครื่องที่ดำเนินการตรวจเช็คเสร็จสิ้นแล้ว ไม่สามารถแก้ไขกลุ่มเป้าหมายหรือ Template ได้ เพื่อป้องกันความถูกต้องของข้อมูลประวัติ
-                  </div>
+                  <Alert severity="warning" sx={{ mb: 1.5 }}>
+                    แผนนี้มีเครื่องที่ดำเนินการตรวจเช็คเสร็จสิ้นแล้ว ไม่สามารถแก้ไขกลุ่มเป้าหมายหรือ Template ได้ เพื่อป้องกันความถูกต้องของข้อมูลประวัติ
+                  </Alert>
                 )}
                 {hasDraftRunsOnly && (
-                  <div style={{ background: '#eff6ff', border: '1px solid #dbeafe', borderRadius: 8, padding: '10px 14px', fontSize: 11, color: '#1d4ed8' }}>
-                    💡 แผนนี้ยังไม่มีเครื่องที่เริ่มตรวจเช็ค (มีเฉพาะงานร่าง Draft) หากท่านแก้ไขกลุ่มเป้าหมายหรือ Template ระบบจะลบงานร่างเดิมและดึงรายการเครื่องชุดใหม่มา Generate ให้อัตโนมัติ
-                  </div>
+                  <Alert severity="info" sx={{ mb: 1.5 }}>
+                    แผนนี้ยังไม่มีเครื่องที่เริ่มตรวจเช็ค (มีเฉพาะงานร่าง Draft) หากท่านแก้ไขกลุ่มเป้าหมายหรือ Template ระบบจะลบงานร่างเดิมและดึงรายการเครื่องชุดใหม่มา Generate ให้อัตโนมัติ
+                  </Alert>
                 )}
 
-                {/* Year */}
-                <div>
-                  <label className="pmp-label">ปีที่วางแผน (พ.ศ.)</label>
-                  <select 
-                    className="pmp-input pmp-select" 
-                    value={editForm.year} 
-                    disabled={hasCompletedRuns}
-                    onChange={e => setEditForm(p => ({ ...p, year: +e.target.value }))}
-                  >
-                    {yearOptions.map(y => <option key={y} value={y}>พ.ศ. {y + 543} ({y})</option>)}
-                  </select>
-                </div>
+                <PlanFormFields
+                  form={editForm}
+                  onChange={(patch) => setEditForm((p) => ({ ...p, ...patch }))}
+                  yearOptions={yearOptions}
+                  companyOptions={companyOptions}
+                  locOptions={locOptions}
+                  deptOptions={deptOptions}
+                  typeOptions={typeOptions}
+                  templates={templates}
+                  disabled={{
+                    year: hasCompletedRuns,
+                    company: hasCompletedRuns,
+                    site: hasCompletedRuns,
+                    dept: hasCompletedRuns,
+                    template: hasCompletedRuns,
+                    countMin: completedRuns > 0 ? completedRuns : 1,
+                  }}
+                />
+              </Box>
 
-                {/* Company selector */}
-                <div>
-                  <label className="pmp-label">บริษัท (Company)</label>
-                  <select 
-                    className="pmp-input pmp-select" 
-                    value={editForm.company} 
-                    disabled={hasCompletedRuns}
-                    onChange={e => setEditForm(p => ({ ...p, company: e.target.value }))}
-                  >
-                    <option value="">📌 ทุกบริษัท (All Companies)</option>
-                    {companyOptions.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-
-                {/* Location selector */}
-                <div>
-                  <label className="pmp-label">สถานที่ / ไซต์ (Location/Site)</label>
-                  <select 
-                    className="pmp-input pmp-select" 
-                    value={editForm.site} 
-                    disabled={hasCompletedRuns}
-                    onChange={e => setEditForm(p => ({ ...p, site: e.target.value }))}
-                  >
-                    <option value="">📌 ทุกสถานที่ (All Locations)</option>
-                    {locOptions.map(l => <option key={l} value={l}>{l}</option>)}
-                  </select>
-                </div>
-
-                {/* Department selector */}
-                <div>
-                  <label className="pmp-label">แผนก (Department)</label>
-                  <select 
-                    className="pmp-input pmp-select" 
-                    value={editForm.deptTask} 
-                    disabled={hasCompletedRuns}
-                    onChange={e => setEditForm(p => ({ ...p, deptTask: e.target.value }))}
-                  >
-                    <option value="">📌 ทุกแผนก (All Departments)</option>
-                    {deptOptions.map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                </div>
-
-                {/* Device Type selector */}
-                <div>
-                  <label className="pmp-label">ประเภทอุปกรณ์ (Device Type)</label>
-                  <select 
-                    className="pmp-input pmp-select" 
-                    value={editForm.deviceType} 
-                    disabled={hasCompletedRuns}
-                    onChange={e => setEditForm(p => ({ ...p, deviceType: e.target.value }))}
-                  >
-                    <option value="">📌 ทุกประเภท (All Types)</option>
-                    {typeOptions.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-
-                {/* Lead + Target count */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <div>
-                    <label className="pmp-label">ผู้รับผิดชอบ (Lead)</label>
-                    <input className="pmp-input" placeholder="ชื่อผู้รับผิดชอบ" value={editForm.lead} onChange={e => setEditForm(p => ({ ...p, lead: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label className="pmp-label">จำนวนเครื่องตามแผน</label>
-                    <input 
-                      type="number" 
-                      className="pmp-input" 
-                      min={1} 
-                      value={editForm.plannedDeviceCount} 
-                      disabled={hasCompletedRuns}
-                      onChange={e => setEditForm(p => ({ ...p, plannedDeviceCount: +e.target.value }))} 
-                    />
-                  </div>
-                </div>
-
-                {/* Date range */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <div>
-                    <label className="pmp-label">วันที่เริ่ม *</label>
-                    <input type="date" className="pmp-input" value={editForm.startDate} onChange={e => setEditForm(p => ({ ...p, startDate: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label className="pmp-label">วันที่สิ้นสุด *</label>
-                    <input type="date" className="pmp-input" value={editForm.endDate} onChange={e => setEditForm(p => ({ ...p, endDate: e.target.value }))} />
-                  </div>
-                </div>
-
-                {/* Duration hint */}
-                {editForm.startDate && editForm.endDate && (() => {
-                  const days = Math.round((new Date(editForm.endDate).getTime() - new Date(editForm.startDate).getTime()) / 86400000);
-                  const weeks = Math.ceil(days / 7);
-                  return days > 0 ? (
-                    <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, padding: '8px 12px', fontSize: 11, color: '#0369a1' }}>
-                      📅 ระยะเวลา {days} วัน ({weeks} สัปดาห์) · สิ้นสุด {fmtDate(editForm.endDate)}
-                    </div>
-                  ) : null;
-                })()}
-
-                {/* Template */}
-                <div>
-                  <label className="pmp-label">PM Template (Checklist)</label>
-                  <select 
-                    className="pmp-input pmp-select" 
-                    value={editForm.templateId} 
-                    disabled={hasCompletedRuns}
-                    onChange={e => setEditForm(p => ({ ...p, templateId: e.target.value }))}
-                  >
-                    <option value="">-- เลือก Template (ถ้ามี) --</option>
-                    {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end', gap: 8, flexShrink: 0 }}>
-                <button className="pmp-btn pmp-btn-outline" onClick={() => setEditModalOpen(false)}>ยกเลิก</button>
-                <button className="pmp-btn pmp-btn-primary" onClick={handleUpdate} disabled={saving}>
-                  {saving ? '⏳ กำลังบันทึก...' : '✅ บันทึกการแก้ไข'}
-                </button>
-              </div>
+              <Box sx={{ p: '12px 20px', borderTop: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                <Button variant="outlined" onClick={() => setEditModalOpen(false)}>ยกเลิก</Button>
+                <Button variant="contained" onClick={handleUpdate} disabled={saving}>
+                  {saving ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}
+                </Button>
+              </Box>
             </>
           );
         })()}
       </Modal>
 
       {/* ── Generate Workload Modal ── */}
-      <Modal open={generateModal.open} onClose={() => setGenerateModal({ open: false, plan: null })} title="⚡ Generate งาน PM">
-        <div style={{ padding: '18px 20px' }}>
-          <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 10, padding: '12px 14px', marginBottom: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>
+      <Modal open={generateModal.open} onClose={() => setGenerateModal({ open: false, plan: null })} title="Generate งาน PM">
+        <Box sx={{ p: '18px 20px' }}>
+          <Alert severity="info" icon={<EventIcon fontSize="inherit" />} sx={{ mb: 1.5 }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 700, mb: 0.5 }}>
               แผน: {generateModal.plan?.deptTask || generateModal.plan?.site || 'ทั่วไป'}
-            </div>
-            <div style={{ fontSize: 11, color: '#0369a1' }}>
-              📅 {fmtDate(generateModal.plan?.startDate)} → {fmtDate(generateModal.plan?.endDate)}
-              · 🎯 เป้าหมาย {generateModal.plan?.plannedDeviceCount} เครื่อง
-            </div>
-          </div>
-          {generateEligibility && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, marginBottom: 12 }}>
-              {[
-                { label: 'ใน scope', value: generateEligibility.totalInScope, color: '#0ea5e9' },
-                { label: 'มีงานปีนี้แล้ว', value: generateEligibility.alreadyInYear, color: '#64748b' },
-                { label: 'เหลือสร้างได้', value: generateEligibility.available, color: '#10b981' },
-                { label: 'กดแล้วจะสร้าง', value: generateEligibility.creatable, color: '#f59e0b' },
-              ].map((item) => (
-                <div key={item.label} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 10px' }}>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: item.color, lineHeight: 1 }}>{item.value}</div>
-                  <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 3 }}>{item.label}</div>
-                </div>
-              ))}
-            </div>
-          )}
-          <p style={{ fontSize: 12, color: '#475569', lineHeight: 1.6, margin: 0 }}>
+            </Typography>
+            <Typography sx={{ fontSize: 11 }}>
+              {fmtDate(generateModal.plan?.startDate)} → {fmtDate(generateModal.plan?.endDate)} · เป้าหมาย {generateModal.plan?.plannedDeviceCount} เครื่อง
+            </Typography>
+          </Alert>
+          {generateEligibility && <Box sx={{ mb: 1.5 }}><EligibilityStats data={generateEligibility} /></Box>}
+          <Typography sx={{ fontSize: 12, color: 'text.secondary', lineHeight: 1.6 }}>
             ระบบจะสร้างรายการงาน PM สำหรับทรัพย์สินที่<strong>ยังไม่เคย PM</strong>ในปีนี้
             โดยกรองตาม{generateModal.plan?.deptTask ? 'แผนก' : 'Location'}ที่กำหนดในแผน
-          </p>
+          </Typography>
           {genMsg && (
-            <div style={{ marginTop: 12, background: genMsg.includes('ผิดพลาด') ? '#fff5f5' : '#f0fdf4', border: `1px solid ${genMsg.includes('ผิดพลาด') ? '#fecaca' : '#bbf7d0'}`, borderRadius: 8, padding: '10px 14px', fontSize: 12, color: genMsg.includes('ผิดพลาด') ? '#dc2626' : '#16a34a' }}>
-              {genMsg}
-            </div>
+            <Alert severity={genMsg.includes('ผิดพลาด') ? 'error' : 'success'} sx={{ mt: 1.5 }}>{genMsg}</Alert>
           )}
-        </div>
-        <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button className="pmp-btn pmp-btn-outline" onClick={() => setGenerateModal({ open: false, plan: null })}>ปิด</button>
-          {!genMsg && <button className="pmp-btn pmp-btn-success" onClick={handleGenerate}>⚡ Generate</button>}
+        </Box>
+        <Box sx={{ p: '12px 20px', borderTop: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+          <Button variant="outlined" onClick={() => setGenerateModal({ open: false, plan: null })}>ปิด</Button>
+          {!genMsg && (
+            <Button variant="contained" color="success" startIcon={<BoltIcon />} onClick={handleGenerate} disabled={saving || (generateEligibility && generateEligibility.creatable < 1)}>
+              {saving ? 'กำลัง Generate...' : 'Generate'}
+            </Button>
+          )}
           {genMsg && !genMsg.includes('ผิดพลาด') && (
-            <button className="pmp-btn pmp-btn-primary" onClick={() => { setGenerateModal({ open: false, plan: null }); navigate('/pm/runs'); }}>
-              📋 ไปหน้าทำ PM
-            </button>
+            <Button variant="contained" startIcon={<AssignmentIcon />} onClick={() => { const planId = generateModal.plan?.id; setGenerateModal({ open: false, plan: null }); navigate(planId ? `/pm/runs?planId=${planId}` : '/pm/runs'); }}>
+              ไปหน้าทำ PM
+            </Button>
           )}
-        </div>
+        </Box>
       </Modal>
 
-      {toast && <div className="pmp-toast">{toast}</div>}
-    </>
+      <Snackbar open={!!toast} autoHideDuration={2800} onClose={() => setToast('')} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert severity={toast.startsWith('❌') ? 'error' : toast.startsWith('⚠️') ? 'warning' : 'success'} variant="filled" sx={{ whiteSpace: 'nowrap' }}>
+          {toast}
+        </Alert>
+      </Snackbar>
+    </Box>
   );
 }

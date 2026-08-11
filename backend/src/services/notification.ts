@@ -1,4 +1,5 @@
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
+import { retryWithBackoff, isTransientError } from '../utils/dbRetry';
 
 let cachedSettings: any = null;
 let settingsCacheTime = 0;
@@ -11,8 +12,23 @@ export function invalidateSettingsCache() {
 async function getSettings() {
   const now = Date.now();
   if (!cachedSettings || now - settingsCacheTime > 30000) {
-    cachedSettings = await prisma.notificationSetting.findFirst();
-    settingsCacheTime = now;
+    try {
+      cachedSettings = await retryWithBackoff(
+        () => prisma.notificationSetting.findFirst(),
+        'getNotificationSettings',
+        { maxRetries: 3, initialDelayMs: 100 }
+      );
+      settingsCacheTime = now;
+    } catch (err) {
+      console.error(JSON.stringify({
+        type: 'NOTIFICATION_SETTINGS_ERROR',
+        timestamp: new Date().toISOString(),
+        message: 'Failed to fetch notification settings',
+        error: String(err),
+      }));
+      // Return default settings on failure
+      return { enableEmail: false, enableTeams: false, enableLine: false };
+    }
   }
   return cachedSettings;
 }
@@ -66,53 +82,87 @@ export async function createNotification(
 }
 
 export async function processNotificationQueue() {
-  const settings = await getSettings();
-  const enabledKeys = settings?.enabledEventKeys
-    ? settings.enabledEventKeys.split(',').map((k: string) => k.trim())
-    : [];
+  try {
+    const settings = await getSettings();
+    const enabledKeys = settings?.enabledEventKeys
+      ? settings.enabledEventKeys.split(',').map((k: string) => k.trim())
+      : [];
 
-  const pending = await prisma.notificationOutbox.findMany({
-    where: { status: 'PENDING' },
-    take: 20,
-  });
+    const pending = await retryWithBackoff(
+      () => prisma.notificationOutbox.findMany({
+        where: { status: 'PENDING' },
+        take: 20,
+      }),
+      'getNotificationQueue',
+      { maxRetries: 2, initialDelayMs: 50 }
+    );
 
-  for (const notif of pending) {
-    try {
-      const emailDisabled = notif.channel === 'EMAIL' && settings?.enableEmail === false;
-      const teamsDisabled = notif.channel === 'TEAMS' && settings?.enableTeams === false;
-      const lineDisabled = notif.channel === 'LINE' && settings?.enableLine === false;
-      const eventDisabled = enabledKeys.length > 0 && !enabledKeys.includes(notif.eventType);
+    for (const notif of pending) {
+      try {
+        const emailDisabled = notif.channel === 'EMAIL' && settings?.enableEmail === false;
+        const teamsDisabled = notif.channel === 'TEAMS' && settings?.enableTeams === false;
+        const lineDisabled = notif.channel === 'LINE' && settings?.enableLine === false;
+        const eventDisabled = enabledKeys.length > 0 && !enabledKeys.includes(notif.eventType);
 
-      if (emailDisabled || teamsDisabled || lineDisabled || eventDisabled) {
-        const reason = emailDisabled ? 'email disabled' : teamsDisabled ? 'teams disabled' : lineDisabled ? 'line disabled' : `event ${notif.eventType} disabled`;
-        await prisma.notificationOutbox.update({
-          where: { id: notif.id },
-          data: { status: 'FAILED', retryCount: notif.retryCount + 1, lastError: `Skipped: ${reason}` },
-        });
-        continue;
+        if (emailDisabled || teamsDisabled || lineDisabled || eventDisabled) {
+          const reason = emailDisabled ? 'email disabled' : teamsDisabled ? 'teams disabled' : lineDisabled ? 'line disabled' : `event ${notif.eventType} disabled`;
+          await retryWithBackoff(
+            () => prisma.notificationOutbox.update({
+              where: { id: notif.id },
+              data: { status: 'FAILED', retryCount: notif.retryCount + 1, lastError: `Skipped: ${reason}` },
+            }),
+            `updateNotificationStatus-${notif.id}`,
+            { maxRetries: 2, initialDelayMs: 50 }
+          );
+          continue;
+        }
+
+        if (notif.channel === 'EMAIL') {
+          await sendEmail(notif.recipient, notif.eventType, JSON.parse(notif.payloadJson));
+        } else if (notif.channel === 'TEAMS') {
+          await sendTeams(notif.eventType, JSON.parse(notif.payloadJson));
+        } else if (notif.channel === 'LINE') {
+          await sendLine(notif.eventType, JSON.parse(notif.payloadJson));
+        }
+        await retryWithBackoff(
+          () => prisma.notificationOutbox.update({
+            where: { id: notif.id },
+            data: { status: 'SENT', sentAt: new Date() },
+          }),
+          `updateNotificationStatus-sent-${notif.id}`,
+          { maxRetries: 2, initialDelayMs: 50 }
+        );
+      } catch (err: any) {
+        try {
+          await retryWithBackoff(
+            () => prisma.notificationOutbox.update({
+              where: { id: notif.id },
+              data: {
+                status: 'FAILED',
+                retryCount: notif.retryCount + 1,
+                lastError: err.message,
+              },
+            }),
+            `updateNotificationStatus-failed-${notif.id}`,
+            { maxRetries: 2, initialDelayMs: 50 }
+          );
+        } catch (updateErr) {
+          console.error(JSON.stringify({
+            type: 'NOTIFICATION_UPDATE_ERROR',
+            timestamp: new Date().toISOString(),
+            notificationId: notif.id,
+            error: String(updateErr),
+          }));
+        }
       }
-
-      if (notif.channel === 'EMAIL') {
-        await sendEmail(notif.recipient, notif.eventType, JSON.parse(notif.payloadJson));
-      } else if (notif.channel === 'TEAMS') {
-        await sendTeams(notif.eventType, JSON.parse(notif.payloadJson));
-      } else if (notif.channel === 'LINE') {
-        await sendLine(notif.eventType, JSON.parse(notif.payloadJson));
-      }
-      await prisma.notificationOutbox.update({
-        where: { id: notif.id },
-        data: { status: 'SENT', sentAt: new Date() },
-      });
-    } catch (err: any) {
-      await prisma.notificationOutbox.update({
-        where: { id: notif.id },
-        data: {
-          status: 'FAILED',
-          retryCount: notif.retryCount + 1,
-          lastError: err.message,
-        },
-      });
     }
+  } catch (err) {
+    console.error(JSON.stringify({
+      type: 'NOTIFICATION_QUEUE_PROCESSING_ERROR',
+      timestamp: new Date().toISOString(),
+      message: 'Failed to process notification queue',
+      error: String(err),
+    }));
   }
 }
 
@@ -123,7 +173,8 @@ async function sendEmail(to: string, eventType: string, payload: Record<string, 
 
   if (!template) {
     console.log(`No email template for ${eventType}, sending generic`);
-    await sendSimpleEmail(to, `แจ้งเตือน: ${eventType}`, `มีการแจ้งเตือนเหตุการณ์: ${JSON.stringify(payload)}`);
+    const settings = await getSettings();
+    await sendSimpleEmail(to, `แจ้งเตือน: ${eventType}`, `มีการแจ้งเตือนเหตุการณ์: ${JSON.stringify(payload)}`, settings?.emailCc);
     return;
   }
 
@@ -212,25 +263,33 @@ async function sendEmail(to: string, eventType: string, payload: Record<string, 
   body = body.replace(/{{\w+}}/g, '-');
   subject = subject.replace(/{{\w+}}/g, '-');
 
-  await sendSimpleEmail(to, subject, body);
+  const settings = await getSettings();
+  await sendSimpleEmail(to, subject, body, settings?.emailCc);
 }
 
-async function sendSimpleEmail(to: string, subject: string, body: string) {
+async function sendSimpleEmail(to: string, subject: string, body: string, cc?: string) {
   const nodemailer = await import('nodemailer');
   const transporter = nodemailer.default.createTransport({
     host: process.env.SMTP_HOST || 'smtp.office365.com',
     port: parseInt(process.env.SMTP_PORT || '587'),
     secure: false,
     auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    connectionTimeout: 10000,
   });
 
-  await transporter.sendMail({
+  const mailOptions: any = {
     from: process.env.SMTP_FROM || process.env.SMTP_USER,
     to,
     subject,
     html: body,
     text: body.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/\n{3,}/g, '\n\n'),
-  });
+  };
+
+  if (cc) {
+    mailOptions.cc = cc;
+  }
+
+  await transporter.sendMail(mailOptions);
 }
 
 async function sendTeams(eventType: string, payload: Record<string, any>) {
@@ -248,7 +307,26 @@ async function sendTeams(eventType: string, payload: Record<string, any>) {
   }
 
   const https = await import('https');
-  const payloadJson = JSON.stringify({ text: message });
+  const payloadJson = JSON.stringify({
+    type: "message",
+    attachments: [
+      {
+        contentType: "application/vnd.microsoft.card.adaptive",
+        content: {
+          $schema: "http://adaptivecards.io/schemas/adaptive-card.json",
+          type: "AdaptiveCard",
+          version: "1.2",
+          body: [
+            {
+              type: "TextBlock",
+              text: message,
+              wrap: true
+            }
+          ]
+        }
+      }
+    ]
+  });
 
   return new Promise((resolve, reject) => {
     const url = new URL(webhookUrl);
@@ -258,7 +336,7 @@ async function sendTeams(eventType: string, payload: Record<string, any>) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payloadJson) },
     }, (res) => {
-      if (res.statusCode === 200) resolve(undefined);
+      if (res.statusCode === 200 || res.statusCode === 202) resolve(undefined);
       else reject(new Error(`Teams webhook returned ${res.statusCode}`));
     });
     req.on('error', reject);
@@ -277,7 +355,7 @@ async function sendLine(eventType: string, payload: Record<string, any>) {
     where: { key: eventType, channel: 'LINE' }, // Assuming LINE is added to channel enum or we fallback
   });
 
-  let message = template?.bodyTh || `📢 **การแจ้งเตือนระบบ AssetHub**\nหัวข้อ: ${eventType}\n`;
+  let message = template?.bodyTh || `📢 **การแจ้งเตือนระบบ ITAM**\nหัวข้อ: ${eventType}\n`;
   if (!template) {
     if (eventType === 'borrow_request_pending') {
       message = `📝 มีคำขอยืมทรัพย์สินใหม่ (รออนุมัติ)\nผู้ขอ: ${payload.requester}\nแผนก: ${payload.department}\nใบเบิก: ${payload.requestNo}\nจำนวน: ${payload.itemsCount} รายการ`;
@@ -285,6 +363,18 @@ async function sendLine(eventType: string, payload: Record<string, any>) {
       message = `📦 มีการส่งมอบทรัพย์สิน\nใบเบิก: ${payload.requestNo}\nผู้ขอ: ${payload.requester}\nจำนวน: ${payload.itemsCount} รายการ`;
     } else if (eventType === 'return_recorded') {
       message = `🔄 มีการคืนทรัพย์สิน\nใบเบิก: ${payload.requestNo}\nผู้คืน: ${payload.requester}\nรหัสทรัพย์สิน: ${payload.assetCode}\nสภาพ: ${payload.condition}`;
+    } else if (eventType === 'overdue_borrow') {
+      const itemsList = Array.isArray(payload.items) 
+        ? payload.items.slice(0, 5).map((item: any) => `• ${item.assetCode} (${item.brand} ${item.model}) - ${item.status}`).join('\n')
+        : '';
+      message = `⚠️ **แจ้งเตือนการยืมเกินกำหนด**\nผู้ขอ: ${payload.requester}\nจำนวน: ${payload.itemsCount} รายการ\n\nรายการทรัพย์สิน:\n${itemsList}${payload.items && payload.items.length > 5 ? '\n...และรายการอื่นๆ' : ''}`;
+    } else if (eventType === 'daily_summary') {
+      message = `📊 **สรุปรายงานระบบ ITAM ประจำวัน**\n\n` +
+                `⏳ คำขอยืมรออนุมัติ: ${payload.pendingCount} รายการ\n` +
+                `⚠️ อุปกรณ์ค้างส่งคืน (เกินกำหนด): ${payload.overdueCount} เครื่อง\n` +
+                `🔧 แผนงาน PM คงเหลือ: ${payload.remainingPMCount} รายการ\n` +
+                `🛡️ ประกันใกล้หมดอายุ (ใน 30 วัน): ${payload.expiringWarrantyCount} เครื่อง\n\n` +
+                `เข้าสู่ระบบจัดการ: http://itam.trrgroup.com:5173`;
     } else {
       message += `\nรายละเอียด: ${JSON.stringify(payload, null, 2)}`;
     }

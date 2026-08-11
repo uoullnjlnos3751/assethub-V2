@@ -1,4 +1,4 @@
-# ============================================================
+﻿# ============================================================
 #  AssetHub V2 — Windows Auto-Install Script
 #  รองรับ: Windows 10/11, Windows Server 2019/2022
 #  สิ่งที่ script นี้ทำ:
@@ -51,7 +51,10 @@ if (-not $PGPassword) {
                       [Runtime.InteropServices.Marshal]::SecureStringToBSTR($_)) }
 }
 if (-not $JWTSecret) {
-    $JWTSecret = [System.Convert]::ToBase64String([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(48))
+    $bytes = New-Object byte[] 48
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    $rng.GetBytes($bytes)
+    $JWTSecret = [System.Convert]::ToBase64String($bytes)
     Write-Info "JWT Secret ถูก generate อัตโนมัติ"
 }
 
@@ -117,6 +120,8 @@ if ($pgService) {
     Write-OK "PostgreSQL (service: $($pgService.Name) — $($pgService.Status))"
     # หา pg_isready / psql path
     $pgPaths = @(
+        "C:\Program Files\PostgreSQL\18\bin",
+        "C:\Program Files\PostgreSQL\17\bin",
         "C:\Program Files\PostgreSQL\16\bin",
         "C:\Program Files\PostgreSQL\15\bin",
         "C:\Program Files\PostgreSQL\14\bin",
@@ -149,7 +154,7 @@ if ($pgService) {
     Start-Service -Name "postgresql*" -ErrorAction SilentlyContinue
     Write-OK "PostgreSQL ติดตั้งแล้ว"
 }
-if (-not $PG_BIN) { $PG_BIN = "C:\Program Files\PostgreSQL\16\bin" }
+if (-not $PG_BIN) { $PG_BIN = "C:\Program Files\PostgreSQL\18\bin" }
 $env:Path += ";$PG_BIN"
 
 # ── PM2 ─────────────────────────────────────────────────────
@@ -209,13 +214,13 @@ if ($LASTEXITCODE -ne 0) {
 
 # สร้าง user และ database
 $sqlCommands = @"
-DO \$\$
+DO `$`$
 BEGIN
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '$DBUser') THEN
     CREATE USER $DBUser WITH PASSWORD '$DBPassword';
   END IF;
 END
-\$\$;
+`$`$;
 
 CREATE DATABASE $DBName OWNER $DBUser;
 GRANT ALL PRIVILEGES ON DATABASE $DBName TO $DBUser;
@@ -321,7 +326,7 @@ module.exports = {
     },
     {
       name: 'assethub-web',
-      script: 'serve',
+      script: 'serve.cmd',
       args: '-s dist -p $FrontendPort',
       cwd: '$($InstallDir.Replace("\","\\"))\\frontend',
       interpreter: 'none',

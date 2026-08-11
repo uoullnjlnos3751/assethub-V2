@@ -5,7 +5,7 @@ import {
   TableContainer, TableHead, TableRow, Grid, alpha, IconButton, Tooltip,
   FormControl, InputLabel, Select, MenuItem, Dialog, DialogTitle, DialogContent,
   DialogContentText, DialogActions, Step, StepLabel, Stepper, Skeleton, Divider,
-  Backdrop,
+  Backdrop, useTheme,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PrintIcon from '@mui/icons-material/Print';
@@ -23,6 +23,8 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import { donationAPI } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
+import { formatDate } from '../../utils/dateUtils';
+
 
 const statusConfig: Record<string, { label: string; color: 'warning' | 'success' | 'default' }> = {
   PENDING:   { label: 'รอส่งมอบ',    color: 'warning' },
@@ -133,6 +135,7 @@ function Lightbox({ images, index, open, onClose, onPrev, onNext }: LightboxProp
 
 // ── Main page ──────────────────────────────────────────────────────────────
 export default function DonationDetailPage() {
+  const theme = useTheme();
   const { id } = useParams<{ id: string }>();
   const [donation, setDonation] = useState<any>(null);
   const [loading, setLoading]   = useState(true);
@@ -307,7 +310,7 @@ export default function DonationDetailPage() {
       )}
 
       {isCancelled && (
-        <Box className="no-print" sx={{ mb: 3, p: 1.5, bgcolor: alpha('#EF4444', 0.06), border: '1px solid', borderColor: alpha('#EF4444', 0.2), borderRadius: 2 }}>
+        <Box className="no-print" sx={{ mb: 3, p: 1.5, bgcolor: alpha(theme.palette.error.main, 0.06), border: '1px solid', borderColor: alpha(theme.palette.error.main, 0.2), borderRadius: 2 }}>
           <Typography variant="body2" color="error.main" fontWeight={500}>
             ⚠️ รายการนี้ถูกยกเลิกแล้ว
           </Typography>
@@ -318,7 +321,7 @@ export default function DonationDetailPage() {
       <Grid container spacing={2} sx={{ mb: 3 }} className="no-print">
         {/* Recipient */}
         <Grid item xs={12} sm={6} md={3}>
-          <InfoCard icon={<BusinessIcon sx={{ fontSize: 18 }} />} label="หน่วยงานผู้รับ" color="#6366F1">
+          <InfoCard icon={<BusinessIcon sx={{ fontSize: 18 }} />} label="หน่วยงานผู้รับ" color={theme.palette.primary.main}>
             <Typography variant="body1" fontWeight={600}>{donation.recipientName}</Typography>
             {donation.recipientAddress && <Typography variant="body2" color="text.secondary">{donation.recipientAddress}</Typography>}
             {donation.recipientContact && <Typography variant="caption" color="text.secondary">ผู้ติดต่อ: {donation.recipientContact}</Typography>}
@@ -327,21 +330,21 @@ export default function DonationDetailPage() {
         </Grid>
         {/* Date */}
         <Grid item xs={6} sm={3} md={3}>
-          <InfoCard icon={<CalendarTodayIcon sx={{ fontSize: 18 }} />} label="วันที่บริจาค" color="#f59e0b">
+          <InfoCard icon={<CalendarTodayIcon sx={{ fontSize: 18 }} />} label="วันที่บริจาค" color={theme.palette.warning.main}>
             <Typography variant="body1" fontWeight={600}>
-              {new Date(donation.donationDate).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}
+              {formatDate(donation.donationDate)}
             </Typography>
           </InfoCard>
         </Grid>
         {/* Approval */}
         <Grid item xs={6} sm={3} md={3}>
-          <InfoCard icon={<GavelIcon sx={{ fontSize: 18 }} />} label="เลขที่หนังสืออนุมัติ" color="#10B981">
+          <InfoCard icon={<GavelIcon sx={{ fontSize: 18 }} />} label="เลขที่หนังสืออนุมัติ" color={theme.palette.success.main}>
             <Typography variant="body1" fontWeight={600}>{donation.approvalRef || '—'}</Typography>
           </InfoCard>
         </Grid>
         {/* Total value */}
         <Grid item xs={12} sm={6} md={3}>
-          <InfoCard icon={<AccountBalanceWalletIcon sx={{ fontSize: 18 }} />} label="มูลค่ารวม" color="#EF4444">
+          <InfoCard icon={<AccountBalanceWalletIcon sx={{ fontSize: 18 }} />} label="มูลค่ารวม" color={theme.palette.error.main}>
             <Typography variant="body1" fontWeight={700} color="error.dark">
               {totalValue.toLocaleString()} บาท
             </Typography>
@@ -509,7 +512,7 @@ export default function DonationDetailPage() {
             </Grid>
             <Grid item xs={6}>
               <Typography variant="caption" fontWeight={600} display="block">วันที่บริจาค</Typography>
-              <Typography variant="body1" fontWeight={600}>{new Date(donation.donationDate).toLocaleDateString('th-TH')}</Typography>
+              <Typography variant="body1" fontWeight={600}>{formatDate(donation.donationDate)}</Typography>
               {donation.approvalRef && (
                 <>
                   <Typography variant="caption" fontWeight={600} display="block" sx={{ mt: 1 }}>เลขที่อนุมัติ</Typography>
@@ -523,7 +526,7 @@ export default function DonationDetailPage() {
           <TableContainer>
             <Table size="small">
               <TableHead>
-                <TableRow sx={{ bgcolor: alpha('#000', 0.04) }}>
+                <TableRow sx={{ bgcolor: 'action.hover' }}>
                   <TableCell sx={{ fontWeight: 600 }}>ลำดับ</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>เลขครุภัณฑ์</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>ชื่อทรัพย์สิน</TableCell>
@@ -598,7 +601,7 @@ export default function DonationDetailPage() {
           </TableContainer>
 
           {/* Total */}
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2, pt: 2, borderTop: '1px solid #e0e0e0' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2, pt: 2, borderTop: `1px solid ${theme.palette.divider}` }}>
             <Typography variant="subtitle1" fontWeight={700}>
               มูลค่ารวม: {totalValue.toLocaleString()} บาท
             </Typography>
@@ -606,7 +609,7 @@ export default function DonationDetailPage() {
 
           {/* Notes */}
           {donation.notes && (
-            <Box sx={{ mt: 3, p: 2, bgcolor: alpha('#000', 0.02), borderRadius: 1, border: '0.5px solid', borderColor: 'divider' }}>
+            <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1, border: '0.5px solid', borderColor: 'divider' }}>
               <Typography variant="caption" color="text.secondary" fontWeight={600}>หมายเหตุ</Typography>
               <Typography variant="body2">{donation.notes}</Typography>
             </Box>

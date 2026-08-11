@@ -1,0 +1,70 @@
+/**
+ * PM Module — Shared Design Tokens
+ * ----------------------------------
+ * Standardized on the "Slate / Sky" palette already used across the majority
+ * of the PM module.
+ */
+
+:root {
+  /* Surfaces */
+  --pm-bg: #ffffff;
+  --pm-surface: #f8fafc;
+  --pm-surface-alt: #f1f5f9;
+
+  /* Borders */
+  --pm-border: #e2e8f0;
+  --pm-border-light: #f1f5f9;
+
+  /* Text */
+  --pm-text-primary: #0f172a;
+  --pm-text-secondary: #475569;
+  --pm-text-muted: #64748b;
+  --pm-text-faint: #94a3b8;
+
+  /* Accent (info / primary actions) */
+  --pm-accent: #0ea5e9;
+  --pm-accent-dark: #0284c7;
+  --pm-accent-bg: #f0f9ff;
+  --pm-accent-border: #bae6fd;
+  --pm-accent-text: #0369a1;
+
+  /* Success */
+  --pm-success: #10b981;
+  --pm-success-dark: #059669;
+  --pm-success-bg: #f0fdf4;
+  --pm-success-border: #bbf7d0;
+  --pm-success-text: #16a34a;
+
+  /* Warning */
+  --pm-warning: #f59e0b;
+  --pm-warning-dark: #d97706;
+  --pm-warning-bg: #fffbeb;
+  --pm-warning-border: #fde68a;
+
+  /* Danger */
+  --pm-danger: #ef4444;
+  --pm-danger-dark: #dc2626;
+  --pm-danger-bg: #fff5f5;
+  --pm-danger-border: #fecaca;
+
+  /* Purple */
+  --pm-purple: #8b5cf6;
+  --pm-purple-bg: #f5f3ff;
+  --pm-purple-border: #ddd6fe;
+  --pm-purple-text: #7c3aed;
+
+  /* Radii */
+  --pm-radius-sm: 8px;
+  --pm-radius-md: 10px;
+  --pm-radius-lg: 12px;
+
+  /* Typography */
+  --pm-font: 'Sarabun', sans-serif;
+
+  /* RGB triplets */
+  --pm-accent-rgb: 14, 165, 233;
+  --pm-success-rgb: 16, 185, 129;
+  --pm-warning-rgb: 245, 158, 11;
+  --pm-danger-rgb: 239, 68, 68;
+  --pm-text-primary-rgb: 15, 23, 42;
+}

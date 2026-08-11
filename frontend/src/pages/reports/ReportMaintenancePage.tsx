@@ -1,12 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, Card, CardContent, Grid, CircularProgress, Chip, TextField, MenuItem, Select, FormControl, InputLabel, alpha, Dialog, DialogTitle, DialogContent, IconButton, Divider, Button } from '@mui/material';
+import { Box, Typography, Card, CardContent, Grid, CircularProgress, Chip, TextField, MenuItem, Select, FormControl, InputLabel, alpha, Dialog, DialogTitle, DialogContent, IconButton, Divider, Button, useTheme } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
 import { maintenanceAPI } from '../../services/api';
 import ReportHeaderTabs from './ReportHeaderTabs';
-import { Wrench, CheckCircle2, Clock, AlertTriangle, Eye, DollarSign } from 'lucide-react';
+import { Wrench, CheckCircle2, Clock, AlertTriangle, Eye, DollarSign, FileText } from 'lucide-react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { useNavigate } from 'react-router-dom';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
+import { formatDate, formatDateTime } from '../../utils/dateUtils';
+
 import 'dayjs/locale/th';
 
 dayjs.locale('th');
@@ -16,6 +21,7 @@ const statusLabels: Record<string, string> = { PENDING: 'รอดำเนิ�
 
 export default function ReportMaintenancePage() {
   const navigate = useNavigate();
+  const theme = useTheme();
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -24,6 +30,37 @@ export default function ReportMaintenancePage() {
   const [endDate, setEndDate] = useState('');
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [exportingPDF, setExportingPDF] = useState(false);
+
+  const handleExportPDF = async () => {
+    try {
+      setExportingPDF(true);
+      const element = document.getElementById('report-content');
+      if (!element) return;
+      const canvas = await html2canvas(element, { 
+        scale: 3, 
+        useCORS: true, 
+        backgroundColor: '#ffffff',
+        logging: false
+      });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      pdf.setFontSize(18);
+      pdf.setTextColor(15, 23, 42);
+      pdf.text('Maintenance Executive Summary', 14, 20);
+      pdf.setFontSize(10);
+      pdf.setTextColor(100, 116, 139);
+      pdf.text(`Exported Date: ${new Date().toLocaleString('th-TH')}`, 14, 28);
+      pdf.addImage(imgData, 'PNG', 10, 35, pdfWidth - 20, Math.min(pdfHeight, pdf.internal.pageSize.getHeight() - 40));
+      pdf.save(`Maintenance_Executive_Report_${new Date().getTime()}.pdf`);
+    } catch (err) {
+      console.error('Failed to export PDF', err);
+    } finally {
+      setExportingPDF(false);
+    }
+  };
 
   const handleOpenDialog = (record: any) => {
     setSelectedRecord(record);
@@ -39,13 +76,17 @@ export default function ReportMaintenancePage() {
     try {
       setLoading(true);
       const params: any = {};
-      if (status !== 'ALL') params.status = status;
+      if (status !== 'ALL' && status !== 'IN_PROGRESS_ALL') params.status = status;
       if (search) params.search = search;
       if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
 
       const res = await maintenanceAPI.reportAll(params);
-      setRecords(res.data);
+      let data = res.data || [];
+      if (status === 'IN_PROGRESS_ALL') {
+        data = data.filter((r: any) => r.status === 'IN_PROGRESS' || r.status === 'PENDING');
+      }
+      setRecords(data);
     } catch (err) {
       console.error('Failed to load maintenance report', err);
     } finally {
@@ -83,7 +124,7 @@ export default function ReportMaintenancePage() {
       field: 'startedAt', 
       headerName: 'วันที่แจ้งซ่อม', 
       width: 140,
-      renderCell: ({ value }) => value ? dayjs(value).format('DD MMM YYYY') : '-'
+      renderCell: ({ value }) => value ? formatDate(value) : '-'
     },
     { 
       field: 'totalCost', 
@@ -102,7 +143,7 @@ export default function ReportMaintenancePage() {
       width: 100,
       getActions: (params: any) => [
         <GridActionsCellItem
-          icon={<Eye size={18} color="#475569" />}
+          icon={<Eye size={18} color={theme.palette.text.secondary} />}
           label="ดูรายละเอียดการซ่อม"
           onClick={() => handleOpenDialog(params.row)}
           showInMenu={false}
@@ -117,50 +158,126 @@ export default function ReportMaintenancePage() {
       
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', mb: 3 }}>
         <Box>
-          <Typography variant="h4" fontWeight={800} sx={{ color: '#1e293b', mb: 1 }}>รายงานประวัติการซ่อมบำรุง</Typography>
+          <Typography variant="h4" fontWeight={800} sx={{ color: 'text.primary', mb: 1 }}>รายงานประวัติการซ่อมบำรุง</Typography>
           <Typography variant="body1" color="text.secondary">สรุปประวัติการซ่อมบำรุงทรัพย์สินทั้งหมดในระบบ</Typography>
+        </Box>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button 
+            variant="contained" 
+            startIcon={exportingPDF ? <CircularProgress size={16} color="inherit" /> : <FileText size={16} />} 
+            onClick={handleExportPDF}
+            disabled={exportingPDF}
+            sx={{
+              bgcolor: 'warning.dark',
+              '&:hover': { bgcolor: 'warning.dark', filter: 'brightness(0.9)' },
+              boxShadow: `0 4px 10px ${alpha(theme.palette.warning.dark, 0.15)}`,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600
+            }}
+          >
+            {exportingPDF ? 'Generating...' : 'Export PDF'}
+          </Button>
         </Box>
       </Box>
 
-      {/* Summary cards */}
-      <Grid container spacing={2.5} sx={{ mb: 4 }}>
-        <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '2px solid #4f46e5', bgcolor: 'rgba(79,70,229,0.02)' }}>
-            <CardContent sx={{ p: 2.5 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(99,102,241,0.1)', color: '#4f46e5', display: 'flex' }}><Wrench size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>รายการซ่อมทั้งหมด</Typography></Box>
-              <Typography variant="h4" fontWeight={800}>{totalRecords}</Typography>
-            </CardContent>
-          </Card>
+      <Box id="report-content" sx={{ bgcolor: 'background.paper', borderRadius: 4, p: 3, mb: 4, boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: `1px solid ${theme.palette.divider}` }}>
+        {/* Summary cards */}
+        <Grid container spacing={2.5}>
+          <Grid item xs={6} md={3}>
+            <Card 
+              onClick={() => setStatus('ALL')}
+              sx={{
+                borderLeft: `4px solid ${theme.palette.primary.main}`,
+                bgcolor: status === 'ALL' ? alpha(theme.palette.primary.main, 0.06) : alpha(theme.palette.primary.main, 0.01),
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                opacity: (status === 'ALL' || status === 'COMPLETED' || status === 'IN_PROGRESS_ALL') ? 1 : 0.45,
+                transform: status === 'ALL' ? 'scale(1.02)' : 'scale(1)',
+                boxShadow: status === 'ALL' ? `0 8px 20px ${alpha(theme.palette.primary.main, 0.15)}` : 'none',
+                '&:hover': { transform: 'translateY(-2px)', boxShadow: `0 6px 15px ${alpha(theme.palette.primary.main, 0.1)}` }
+              }}
+            >
+              <CardContent sx={{ p: 2.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                  <Box sx={{ p: 1, borderRadius: 2, bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', display: 'flex' }}>
+                    <Wrench size={20} />
+                  </Box>
+                  <Typography variant="body2" color="text.secondary" fontWeight={700}>รายการซ่อมทั้งหมด</Typography>
+                </Box>
+                <Typography variant="h4" fontWeight={800} color="primary.main">{totalRecords}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={6} md={3}>
+            <Card 
+              onClick={() => setStatus(status === 'COMPLETED' ? 'ALL' : 'COMPLETED')}
+              sx={{
+                borderLeft: `4px solid ${theme.palette.success.main}`,
+                bgcolor: status === 'COMPLETED' ? alpha(theme.palette.success.main, 0.06) : alpha(theme.palette.success.main, 0.01),
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                opacity: (status === 'ALL' || status === 'COMPLETED') ? 1 : 0.45,
+                transform: status === 'COMPLETED' ? 'scale(1.02)' : 'scale(1)',
+                boxShadow: status === 'COMPLETED' ? `0 8px 20px ${alpha(theme.palette.success.main, 0.15)}` : 'none',
+                '&:hover': { transform: 'translateY(-2px)', boxShadow: `0 6px 15px ${alpha(theme.palette.success.main, 0.1)}` }
+              }}
+            >
+              <CardContent sx={{ p: 2.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                  <Box sx={{ p: 1, borderRadius: 2, bgcolor: alpha(theme.palette.success.main, 0.1), color: 'success.dark', display: 'flex' }}>
+                    <CheckCircle2 size={20} />
+                  </Box>
+                  <Typography variant="body2" color="text.secondary" fontWeight={700}>ซ่อมเสร็จสิ้น</Typography>
+                </Box>
+                <Typography variant="h4" fontWeight={800} color="success.dark">{completed}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={6} md={3}>
+            <Card 
+              onClick={() => setStatus(status === 'IN_PROGRESS_ALL' ? 'ALL' : 'IN_PROGRESS_ALL')}
+              sx={{
+                borderLeft: `4px solid ${theme.palette.warning.main}`,
+                bgcolor: status === 'IN_PROGRESS_ALL' ? alpha(theme.palette.warning.main, 0.06) : alpha(theme.palette.warning.main, 0.01),
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                opacity: (status === 'ALL' || status === 'IN_PROGRESS_ALL') ? 1 : 0.45,
+                transform: status === 'IN_PROGRESS_ALL' ? 'scale(1.02)' : 'scale(1)',
+                boxShadow: status === 'IN_PROGRESS_ALL' ? `0 8px 20px ${alpha(theme.palette.warning.main, 0.15)}` : 'none',
+                '&:hover': { transform: 'translateY(-2px)', boxShadow: `0 6px 15px ${alpha(theme.palette.warning.main, 0.1)}` }
+              }}
+            >
+              <CardContent sx={{ p: 2.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                  <Box sx={{ p: 1, borderRadius: 2, bgcolor: alpha(theme.palette.warning.main, 0.1), color: 'warning.dark', display: 'flex' }}>
+                    <Clock size={20} />
+                  </Box>
+                  <Typography variant="body2" color="text.secondary" fontWeight={700}>กำลังดำเนินการ</Typography>
+                </Box>
+                <Typography variant="h4" fontWeight={800} color="warning.dark">{inProgress}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={6} md={3}>
+            <Card sx={{ borderLeft: `4px solid ${theme.palette.error.main}`, bgcolor: alpha(theme.palette.error.main, 0.01) }}>
+              <CardContent sx={{ p: 2.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                  <Box sx={{ p: 1, borderRadius: 2, bgcolor: alpha(theme.palette.error.main, 0.08), color: 'error.main', display: 'flex' }}>
+                    <DollarSign size={20} />
+                  </Box>
+                  <Typography variant="body2" color="text.secondary" fontWeight={700}>ค่าใช้จ่ายรวม (บาท)</Typography>
+                </Box>
+                <Typography variant="h4" fontWeight={800} color="error.main">{totalCost.toLocaleString()}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
         </Grid>
-        <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '2px solid #10b981', bgcolor: 'rgba(16,185,129,0.02)' }}>
-            <CardContent sx={{ p: 2.5 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(16,185,129,0.1)', color: '#059669', display: 'flex' }}><CheckCircle2 size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>ซ่อมเสร็จสิ้น</Typography></Box>
-              <Typography variant="h4" fontWeight={800}>{completed}</Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '2px solid #f59e0b', bgcolor: 'rgba(245,158,11,0.02)' }}>
-            <CardContent sx={{ p: 2.5 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(245,158,11,0.1)', color: '#d97706', display: 'flex' }}><Clock size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>กำลังดำเนินการ</Typography></Box>
-              <Typography variant="h4" fontWeight={800}>{inProgress}</Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={6} md={3}>
-          <Card sx={{ borderLeft: '2px solid #ef4444', bgcolor: 'rgba(239,68,68,0.02)' }}>
-            <CardContent sx={{ p: 2.5 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(239,68,68,0.08)', color: '#dc2626', display: 'flex' }}><DollarSign size={20} /></Box><Typography variant="body2" color="text.secondary" fontWeight={600}>ค่าใช้จ่ายรวม (บาท)</Typography></Box>
-              <Typography variant="h4" fontWeight={800}>{totalCost.toLocaleString()}</Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+      </Box>
 
       {/* Filters & Table */}
-      <Card sx={{ borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid rgba(229, 231, 235, 0.5)', overflow: 'visible' }}>
-        <Box sx={{ p: 2.5, borderBottom: '1px solid rgba(229, 231, 235, 0.5)', display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+      <Card sx={{ borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: `1px solid ${theme.palette.divider}`, overflow: 'visible' }}>
+        <Box sx={{ p: 2.5, borderBottom: `1px solid ${theme.palette.divider}`, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
           <TextField
             placeholder="ค้นหารหัส/ชื่อทรัพย์สิน, อาการเสีย..."
             size="small"
@@ -172,29 +289,25 @@ export default function ReportMaintenancePage() {
             <InputLabel>สถานะ</InputLabel>
             <Select value={status} label="สถานะ" onChange={(e) => setStatus(e.target.value)} sx={{ borderRadius: '8px' }}>
               <MenuItem value="ALL">ทั้งหมด</MenuItem>
+              <MenuItem value="IN_PROGRESS_ALL">🟠 กำลังดำเนินการ (รอ/กำลังซ่อม)</MenuItem>
+              <hr style={{ margin: '8px 0', border: 'none', borderTop: `1px solid ${theme.palette.divider}` }} />
               <MenuItem value="PENDING">รอดำเนินการ</MenuItem>
               <MenuItem value="IN_PROGRESS">กำลังซ่อม</MenuItem>
               <MenuItem value="COMPLETED">ซ่อมเสร็จสิ้น</MenuItem>
               <MenuItem value="CANCELLED">ยกเลิก</MenuItem>
             </Select>
           </FormControl>
-          <TextField
-            type="date"
-            size="small"
+          <DatePicker
             label="ตั้งแต่เริ่มซ่อม"
-            InputLabelProps={{ shrink: true }}
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
+            value={startDate ? dayjs(startDate) : null}
+            onChange={(newVal) => setStartDate(newVal ? newVal.format('YYYY-MM-DD') : '')}
+            slotProps={{ textField: { size: 'small', InputLabelProps: { shrink: true }, sx: { '& .MuiOutlinedInput-root': { borderRadius: '8px' } } } }}
           />
-          <TextField
-            type="date"
-            size="small"
+          <DatePicker
             label="ถึงวันที่"
-            InputLabelProps={{ shrink: true }}
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
+            value={endDate ? dayjs(endDate) : null}
+            onChange={(newVal) => setEndDate(newVal ? newVal.format('YYYY-MM-DD') : '')}
+            slotProps={{ textField: { size: 'small', InputLabelProps: { shrink: true }, sx: { '& .MuiOutlinedInput-root': { borderRadius: '8px' } } } }}
           />
         </Box>
         
@@ -210,11 +323,11 @@ export default function ReportMaintenancePage() {
             onRowClick={(params: any) => handleOpenDialog(params.row)}
             pageSizeOptions={[25, 50, 100]}
             initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
-            sx={{ 
+            sx={{
               border: 'none',
-              '& .MuiDataGrid-cell': { borderColor: 'rgba(229, 231, 235, 0.5)' },
-              '& .MuiDataGrid-columnHeaders': { bgcolor: '#f8fafc', borderBottom: '1px solid rgba(229, 231, 235, 0.8)' },
-              '& .MuiDataGrid-row:hover': { bgcolor: alpha('#4f46e5', 0.02), cursor: 'pointer' }
+              '& .MuiDataGrid-cell': { borderColor: theme.palette.divider },
+              '& .MuiDataGrid-columnHeaders': { bgcolor: 'action.hover', borderBottom: `1px solid ${theme.palette.divider}` },
+              '& .MuiDataGrid-row:hover': { bgcolor: alpha(theme.palette.primary.main, 0.02), cursor: 'pointer' }
             }}
           />
         )}
@@ -238,9 +351,9 @@ export default function ReportMaintenancePage() {
               </IconButton>
             </DialogTitle>
             <Divider />
-            <DialogContent sx={{ p: 3, bgcolor: '#f8fafc' }}>
+            <DialogContent sx={{ p: 3, bgcolor: 'action.hover' }}>
               {/* Asset Info */}
-              <Card sx={{ mb: 3, borderRadius: 2, boxShadow: 'none', border: '1px solid #e2e8f0' }}>
+              <Card sx={{ mb: 3, borderRadius: 2, boxShadow: 'none', border: `1px solid ${theme.palette.divider}` }}>
                 <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
                   <Typography variant="subtitle2" color="primary" fontWeight={600} gutterBottom>ข้อมูลอุปกรณ์</Typography>
                   <Grid container spacing={2}>
@@ -273,20 +386,20 @@ export default function ReportMaintenancePage() {
               {/* Maintenance Details */}
               <Grid container spacing={2}>
                 <Grid item xs={12} md={8}>
-                  <Card sx={{ height: '100%', borderRadius: 2, boxShadow: 'none', border: '1px solid #e2e8f0' }}>
+                  <Card sx={{ height: '100%', borderRadius: 2, boxShadow: 'none', border: `1px solid ${theme.palette.divider}` }}>
                     <CardContent>
                       <Typography variant="subtitle2" color="primary" fontWeight={600} gutterBottom>รายละเอียดการแจ้งซ่อม</Typography>
                       
                       <Box sx={{ mb: 2 }}>
                         <Typography variant="caption" color="text.secondary">อาการเสีย / ปัญหา</Typography>
-                        <Typography variant="body2" sx={{ p: 1.5, bgcolor: '#f1f5f9', borderRadius: 1, mt: 0.5 }}>
+                        <Typography variant="body2" sx={{ p: 1.5, bgcolor: 'action.hover', borderRadius: 1, mt: 0.5 }}>
                           {selectedRecord.reportedProblem || '-'}
                         </Typography>
                       </Box>
                       
                       <Box sx={{ mb: 2 }}>
                         <Typography variant="caption" color="text.secondary">การแก้ไข / เปลี่ยนอะไหล่</Typography>
-                        <Typography variant="body2" sx={{ p: 1.5, bgcolor: '#f1f5f9', borderRadius: 1, mt: 0.5, minHeight: 60 }}>
+                        <Typography variant="body2" sx={{ p: 1.5, bgcolor: 'action.hover', borderRadius: 1, mt: 0.5, minHeight: 60 }}>
                           {selectedRecord.resolutionNote || 'ยังไม่มีการบันทึกการแก้ไข'}
                         </Typography>
                       </Box>
@@ -306,7 +419,7 @@ export default function ReportMaintenancePage() {
                 </Grid>
 
                 <Grid item xs={12} md={4}>
-                  <Card sx={{ height: '100%', borderRadius: 2, boxShadow: 'none', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column' }}>
+                  <Card sx={{ height: '100%', borderRadius: 2, boxShadow: 'none', border: `1px solid ${theme.palette.divider}`, display: 'flex', flexDirection: 'column' }}>
                     <CardContent sx={{ flex: 1 }}>
                       <Typography variant="subtitle2" color="primary" fontWeight={600} gutterBottom>สถานะ และ ค่าใช้จ่าย</Typography>
                       
@@ -319,12 +432,12 @@ export default function ReportMaintenancePage() {
 
                       <Box sx={{ mb: 1.5 }}>
                         <Typography variant="caption" color="text.secondary">วันที่แจ้งซ่อม</Typography>
-                        <Typography variant="body2" fontWeight={500}>{selectedRecord.startedAt ? dayjs(selectedRecord.startedAt).format('DD MMM YYYY HH:mm') : '-'}</Typography>
+                        <Typography variant="body2" fontWeight={500}>{selectedRecord.startedAt ? formatDateTime(selectedRecord.startedAt) : '-'}</Typography>
                       </Box>
 
                       <Box sx={{ mb: 2 }}>
                         <Typography variant="caption" color="text.secondary">วันที่ซ่อมเสร็จ</Typography>
-                        <Typography variant="body2" fontWeight={500}>{selectedRecord.completedAt ? dayjs(selectedRecord.completedAt).format('DD MMM YYYY HH:mm') : '-'}</Typography>
+                        <Typography variant="body2" fontWeight={500}>{selectedRecord.completedAt ? formatDateTime(selectedRecord.completedAt) : '-'}</Typography>
                       </Box>
 
                       <Divider sx={{ my: 2 }} />

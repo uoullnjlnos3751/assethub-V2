@@ -6,8 +6,8 @@ import crypto from 'crypto';
 import fs from 'fs';
 import { authenticate, authorize } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
+import { prisma } from '../lib/prisma';
 
-const prisma = new PrismaClient();
 const router = express.Router();
 
 const UPLOAD_DIR = path.join(__dirname, '..', '..', 'uploads', 'maintenance');
@@ -66,7 +66,7 @@ router.post('/', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: 
 router.put('/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
-    const { resolutionNote, totalCost, status, parts } = req.body;
+    const { reportedProblem, repairType, vendorName, resolutionNote, totalCost, status, parts } = req.body;
     
     const existing = await prisma.maintenanceRecord.findUnique({ where: { id } });
     if (!existing) throw new AppError('ไม่พบรายการซ่อม', 404);
@@ -76,11 +76,14 @@ router.put('/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req
       completedAt = new Date();
     }
 
-    const updateData: any = {
-      resolutionNote,
-      totalCost,
-      status,
-    };
+    const updateData: any = {};
+    if (reportedProblem !== undefined) updateData.reportedProblem = reportedProblem;
+    if (repairType !== undefined) updateData.repairType = repairType;
+    if (vendorName !== undefined) updateData.vendorName = vendorName;
+    if (resolutionNote !== undefined) updateData.resolutionNote = resolutionNote;
+    if (totalCost !== undefined) updateData.totalCost = totalCost;
+    if (status !== undefined) updateData.status = status;
+
     if (completedAt) updateData.completedAt = completedAt;
 
     const record = await prisma.maintenanceRecord.update({
@@ -208,6 +211,30 @@ router.get('/report/all', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), asy
     });
 
     res.json(records);
+  } catch (err) { next(err); }
+});
+
+// Delete Image
+router.delete('/images/:imageId', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const imageId = parseInt(req.params.imageId);
+    const image = await prisma.maintenanceImage.findUnique({ where: { id: imageId } });
+    if (!image) throw new AppError('ไม่พบรูปภาพ', 404);
+
+    // Delete from DB
+    await prisma.maintenanceImage.delete({ where: { id: imageId } });
+
+    // Try to delete physical file
+    try {
+      const filePath = path.join(__dirname, '..', '..', image.imageUrl);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    } catch (e) {
+      console.error('Failed to delete physical file', e);
+    }
+
+    res.json({ message: 'ลบรูปภาพสำเร็จ' });
   } catch (err) { next(err); }
 });
 

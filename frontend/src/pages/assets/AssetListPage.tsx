@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Box,
@@ -17,50 +17,37 @@ import {
   IconButton,
   InputAdornment,
   InputLabel,
-  List,
-  ListItem,
   ListItemText,
+  Menu,
   MenuItem,
   Pagination,
+  Popover,
   Select,
-  Stack,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Tooltip,
   Typography,
-  Menu,
   alpha,
   useTheme,
   useMediaQuery,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import PageviewIcon from '@mui/icons-material/Pageview';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import SettingsIcon from '@mui/icons-material/Settings';
 import TableViewIcon from '@mui/icons-material/TableView';
-import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
-import ReturnIcon from '@mui/icons-material/AssignmentReturn';
+import GridViewIcon from '@mui/icons-material/GridView';
+import DensitySmallIcon from '@mui/icons-material/DensitySmall';
+import DensityLargeIcon from '@mui/icons-material/DensityLarge';
+import BookmarkAddIcon from '@mui/icons-material/BookmarkAdd';
+import BookmarksIcon from '@mui/icons-material/Bookmarks';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import ViewListIcon from '@mui/icons-material/ViewList';
 import ExtensionIcon from '@mui/icons-material/Extension';
 import SearchIcon from '@mui/icons-material/Search';
 import FilterListIcon from '@mui/icons-material/FilterList';
-import ImageIcon from '@mui/icons-material/Image';
-import ImageOffIcon from '@mui/icons-material/ImageNotSupported';
-import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
-import { WarningAmber as WarningAmberIcon, Verified as VerifiedIcon } from '@mui/icons-material';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import ComputerIcon from '@mui/icons-material/Computer';
-import LocationOnIcon from '@mui/icons-material/LocationOn';
-import DesktopWindowsIcon from '@mui/icons-material/DesktopWindows';
-import DevicesIcon from '@mui/icons-material/Devices';
-import PrintIcon from '@mui/icons-material/Print';
-import PhoneAndroidIcon from '@mui/icons-material/PhoneAndroid';
-import RouterIcon from '@mui/icons-material/Router';
-import HandymanIcon from '@mui/icons-material/Handyman';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { assetAPI, borrowAPI, categoryAPI } from '../../services/api';
 import ExportAssetsButton from '../../components/ExportAssetsButton';
@@ -70,142 +57,39 @@ import { useToast } from '../../contexts/ToastContext';
 import StatusChip from '../../components/StatusChip';
 import LoadingSkeleton from '../../components/LoadingSkeleton';
 import EmptyState from '../../components/EmptyState';
-
-type ColumnConfig = {
-  field: string;
-  label: string;
-  visible: boolean;
-};
-
-const COLUMN_PREF_KEY = 'assethub.assetList.columns.v3';
-
-const defaultColumnConfig: ColumnConfig[] = [
-  { field: 'hasImage', label: '📷', visible: true },
-  { field: 'assetName', label: 'ชื่อทรัพย์สิน', visible: true },
-  { field: 'serialNo', label: 'Serial No.', visible: true },
-  { field: 'type', label: 'ประเภท', visible: true },
-  { field: 'brand', label: 'ยี่ห้อ', visible: true },
-  { field: 'model', label: 'รุ่น', visible: true },
-  { field: 'status', label: 'สถานะ', visible: true },
-  { field: 'ownerName', label: 'ผู้ถือครอง', visible: true },
-  { field: 'departmentId', label: 'แผนก', visible: true },
-  { field: 'location', label: 'สถานที่ติดตั้ง/อาคาร', visible: true },
-  { field: 'floor', label: 'ชั้น', visible: true },
-  { field: 'id', label: 'ID', visible: false },
-  { field: 'assetCode', label: 'เลขครุภัณฑ์', visible: false },
-  { field: 'company', label: 'Company', visible: false },
-  { field: 'oldAssetCode', label: 'รหัสทรัพย์สินเดิม', visible: false },
-  { field: 'domainName', label: 'Domain Name', visible: false },
-  { field: 'osType', label: 'OS', visible: false },
-  { field: 'osVersion', label: 'Windows Version', visible: false },
-  { field: 'windowsLicense', label: 'Windows License', visible: false },
-  { field: 'officeLicense', label: 'MS Office', visible: false },
-  { field: 'antivirusStatus', label: 'Antivirus', visible: false },
-  { field: 'cpu', label: 'CPU', visible: false },
-  { field: 'cpuGeneration', label: 'Generation', visible: false },
-  { field: 'gpu', label: 'GPU', visible: false },
-  { field: 'ram', label: 'RAM', visible: false },
-  { field: 'ramDetail', label: 'RAM Detail', visible: false },
-  { field: 'ramSlot1', label: 'RAM Slot1', visible: false },
-  { field: 'ramSlot2', label: 'RAM Slot2', visible: false },
-  { field: 'storage1', label: 'Storage 1', visible: false },
-  { field: 'storage2', label: 'Storage 2', visible: false },
-  { field: 'snComputer', label: 'S/N Computer', visible: false },
-  { field: 'budget', label: 'งบประมาณ', visible: false },
-  { field: 'prNumber', label: 'PR No.', visible: false },
-  { field: 'poDate', label: 'PO Date', visible: false },
-  { field: 'poNumber', label: 'PO No.', visible: false },
-  { field: 'vendor', label: 'Vendor', visible: false },
-  { field: 'purchaseDate', label: 'วันที่จัดซื้อ', visible: false },
-  { field: 'age', label: 'อายุ (ปี)', visible: false },
-  { field: 'remark', label: 'หมายเหตุ', visible: false },
-  { field: 'createdAt', label: 'วันที่สร้าง', visible: false },
-  { field: 'updatedAt', label: 'วันที่แก้ไขล่าสุด', visible: false },
-];
-
-const statusLabels: Record<string, string> = {
-  Available: 'พร้อมใช้งาน',
-  Borrowed: 'กำลังยืม',
-  InUse: 'ใช้งานประจำ',
-  Maintenance: 'ซ่อมบำรุง',
-  Retired: 'ปลดระวาง',
-  Lost: 'สูญหาย',
-};
-
-const columnDefaultsByField = new Map(defaultColumnConfig.map((config) => [config.field, config]));
-
-const typeGroupLabels: Record<string, string> = {
-  computers: 'คอมพิวเตอร์',
-  monitors: 'จอภาพ',
-  devices: 'อุปกรณ์ต่อพ่วง',
-  printers: 'เครื่องพิมพ์',
-  phonesTablets: 'อุปกรณ์สื่อสาร',
-  network: 'อุปกรณ์เครือข่าย',
-  rack: 'Rack & Infrastructure',
-};
-
-const typeGroupIcons: Record<string, React.ReactNode> = {
-  computers: <ComputerIcon />,
-  monitors: <DesktopWindowsIcon />,
-  devices: <DevicesIcon />,
-  printers: <PrintIcon />,
-  phonesTablets: <PhoneAndroidIcon />,
-  network: <RouterIcon />,
-  rack: <HandymanIcon />,
-};
-
-const typeGroupDescriptions: Record<string, string> = {
-  computers: 'คอมพิวเตอร์ตั้งโต๊ะ โน๊ตบุ๊ค และอุปกรณ์ประมวลผล',
-  monitors: 'จอภาพทุกประเภทสำหรับการทำงาน',
-  devices: 'อุปกรณ์ต่อพ่วง เมาส์ คีย์บอร์ด เว็บแคม ไมค์ ลำโพง',
-  printers: 'เครื่องพิมพ์ทุกประเภท',
-  phonesTablets: 'สมาร์ทโฟน แท็บเล็ต และอุปกรณ์สื่อสาร',
-  network: 'อุปกรณ์เครือข่าย สวิตช์ เราเตอร์ ไฟร์วอลล์',
-  rack: 'แร็คเซิร์ฟเวอร์ PDU UPS และโครงสร้างพื้นฐาน',
-};
-
-const formatDate = (value: unknown) => {
-  if (!value) return '';
-  const date = new Date(String(value));
-  if (Number.isNaN(date.getTime())) return String(value);
-  return date.toLocaleDateString('th-TH');
-};
-
-const formatDateTime = (value: unknown) => {
-  if (!value) return '';
-  const date = new Date(String(value));
-  if (Number.isNaN(date.getTime())) return String(value);
-  return date.toLocaleString('th-TH');
-};
-
-const loadColumnConfig = () => {
-  try {
-    const saved = localStorage.getItem(COLUMN_PREF_KEY);
-    if (!saved) return defaultColumnConfig;
-    const parsed = JSON.parse(saved) as ColumnConfig[];
-    const known = new Set(defaultColumnConfig.map((c) => c.field));
-    const savedFields = new Set(parsed.map((c) => c.field));
-    const orderedSaved = parsed
-      .filter((c) => known.has(c.field))
-      .map((c) => ({ ...columnDefaultsByField.get(c.field)!, visible: c.visible }));
-    const missing = defaultColumnConfig.filter((c) => !savedFields.has(c.field));
-    return [...orderedSaved, ...missing];
-  } catch {
-    return defaultColumnConfig;
-  }
-};
+import BulkUpdateDialog from './components/BulkUpdateDialog';
+import AssetCard from './components/AssetCard';
+import { loadSavedViews, saveFilterView, deleteFilterView, SavedFilterView } from './components/savedFilterViews';
+import AssetQuickViewDrawer from './components/AssetQuickViewDrawer';
+import ColumnPickerDialog from './components/ColumnPickerDialog';
+import ExtendBorrowDialog from './components/ExtendBorrowDialog';
+import AssetRowActionsMenu from './components/AssetRowActionsMenu';
+import AssetKpiStrip from './components/AssetKpiStrip';
+import { assetColumnMap } from './components/assetListColumns';
+import {
+  ColumnConfig,
+  statusLabels,
+  warrantyStatusLabels,
+  typeGroupLabels,
+  typeGroupIcons,
+  typeGroupDescriptions,
+  loadColumnConfig,
+  COLUMN_PREF_KEY,
+  VIEW_MODE_KEY,
+  DENSITY_KEY,
+} from './assetListConfig';
 
 export default function AssetListPage() {
   const { user } = useAuth();
   const toast = useToast();
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [searchParams] = useSearchParams();
   const [assets, setAssets] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [status, setStatus] = useState(searchParams.get('status') || '');
+  const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [statuses, setStatuses] = useState<string[]>(searchParams.get('status') ? [searchParams.get('status') as string] : []);
   const [type, setType] = useState(searchParams.get('type') || '');
   const typeGroup = searchParams.get('typeGroup') || '';
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -213,16 +97,38 @@ export default function AssetListPage() {
   const [typeOptions, setTypeOptions] = useState<string[]>([]);
   const [companyOptions, setCompanyOptions] = useState<string[]>([]);
   const [company, setCompany] = useState(searchParams.get('company') || '');
+  const [warrantyStatus, setWarrantyStatus] = useState('');
+  const [purchaseDateFrom, setPurchaseDateFrom] = useState('');
+  const [purchaseDateTo, setPurchaseDateTo] = useState('');
+  const [advFilterAnchor, setAdvFilterAnchor] = useState<null | HTMLElement>(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(50);
   const [columnConfig, setColumnConfig] = useState<ColumnConfig[]>(loadColumnConfig);
   const [columnDialogOpen, setColumnDialogOpen] = useState(false);
+  const [columnSearch, setColumnSearch] = useState('');
   const [menuAnchor, setMenuAnchor] = useState<{ element: null | HTMLElement; row: any }>({ element: null, row: null });
   const [myBorrowedItems, setMyBorrowedItems] = useState<any[]>([]);
   const [extendDialog, setExtendDialog] = useState<{ open: boolean; item: any }>({ open: false, item: null });
-  const [extendDays, setExtendDays] = useState(3);
-  const [extendReason, setExtendReason] = useState('');
   const [categoryStats, setCategoryStats] = useState<{ total: number; byStatus: { status: string; _count: number }[] } | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  // View preferences (admin desktop): table vs grid, and DataGrid density
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => (localStorage.getItem(VIEW_MODE_KEY) as 'table' | 'grid') || 'table');
+  const [density, setDensity] = useState<'compact' | 'standard'>(() => (localStorage.getItem(DENSITY_KEY) as 'compact' | 'standard') || 'standard');
+
+  // Quick-view drawer (single click on a table row, without leaving the list)
+  const [quickView, setQuickView] = useState<{ open: boolean; asset: any }>({ open: false, asset: null });
+
+  // Saved filter views (localStorage, personal — no backend model)
+  const [savedViews, setSavedViews] = useState<SavedFilterView[]>(() => loadSavedViews());
+  const [savedViewsAnchor, setSavedViewsAnchor] = useState<null | HTMLElement>(null);
+  const [saveViewDialogOpen, setSaveViewDialogOpen] = useState(false);
+  const [saveViewName, setSaveViewName] = useState('');
+
+  // Bulk update states
+  const [rowSelectionModel, setRowSelectionModel] = useState<any[]>([]);
+  const [bulkUpdateOpen, setBulkUpdateOpen] = useState(false);
+
   const navigate = useNavigate();
   const isAdmin = user?.role === 'IT_ADMIN' || user?.role === 'SUPERADMIN';
   const isAvailableOnlyView = !typeGroup && user?.role === 'USER';
@@ -236,38 +142,60 @@ export default function AssetListPage() {
   // Fetch overall status stats for the stat cards
   useEffect(() => {
     if (!isAvailableOnlyView) {
-      assetAPI.stats(typeGroup || '').then((res) => setCategoryStats(res.data)).catch(() => {});
+      setStatsLoading(true);
+      assetAPI.stats(typeGroup || '')
+        .then((res) => setCategoryStats(res.data))
+        .catch(() => {})
+        .finally(() => setStatsLoading(false));
     }
   }, [typeGroup, isAvailableOnlyView]);
-
 
   useEffect(() => {
     localStorage.setItem(COLUMN_PREF_KEY, JSON.stringify(columnConfig));
   }, [columnConfig]);
 
-  const fetchAssets = async () => {
+  useEffect(() => { localStorage.setItem(VIEW_MODE_KEY, viewMode); }, [viewMode]);
+  useEffect(() => { localStorage.setItem(DENSITY_KEY, density); }, [density]);
+
+  // Guards against out-of-order responses: rapid filter changes (e.g. debounced
+  // search firing while a slower unfiltered request is still in flight) could
+  // otherwise let an older response overwrite newer state.
+  const fetchSeq = useRef(0);
+  const fetchAssets = async (overrideSearch?: string) => {
+    const seq = ++fetchSeq.current;
     setLoading(true);
     try {
+      const qSerialNo = searchParams.get('serialNo');
+      const qLocation = searchParams.get('location');
+      const qCompany = searchParams.has('company') ? searchParams.get('company') : null;
+      const qType = searchParams.has('type') ? searchParams.get('type') : null;
+
       const res = await assetAPI.list({
-        search,
-        status: status || undefined,
-        type: type || undefined,
+        search: overrideSearch !== undefined ? overrideSearch : search,
+        status: statuses.length > 0 ? statuses.join(',') : undefined,
+        type: qType !== null ? (qType === '' ? '__EMPTY__' : qType) : (type || undefined),
         typeGroup: !type && typeGroup ? typeGroup : undefined,
         categoryId: selectedCategoryId || undefined,
-        company: company || undefined,
+        company: qCompany !== null ? (qCompany === '' ? '__EMPTY__' : qCompany) : (company || undefined),
+        serialNo: qSerialNo !== null ? (qSerialNo === '' ? '__EMPTY__' : qSerialNo) : undefined,
+        location: qLocation !== null ? (qLocation === '' ? '__EMPTY__' : qLocation) : undefined,
+        warrantyStatus: warrantyStatus || undefined,
+        purchaseDateFrom: purchaseDateFrom || undefined,
+        purchaseDateTo: purchaseDateTo || undefined,
         page: page + 1,
         limit: pageSize,
       });
+      if (seq !== fetchSeq.current) return; // a newer request already superseded this one
       setAssets(res.data.data);
       setTotal(res.data.total);
     } finally {
-      setLoading(false);
+      if (seq === fetchSeq.current) setLoading(false);
     }
   };
 
   const groupedAssets = useMemo(() => {
     const groups: Record<string, { name: string; icon?: React.ReactNode; assets: any[] }> = {};
-    const filteredAssets = selectedCategoryId 
+    const filteredAssets = selectedCategoryId
       ? assets.filter(a => a.categoryId === selectedCategoryId)
       : assets;
 
@@ -282,9 +210,31 @@ export default function AssetListPage() {
     return groups;
   }, [assets, selectedCategoryId]);
 
-  useEffect(() => { fetchAssets(); }, [page, pageSize, status, type, typeGroup, selectedCategoryId, company]);
+  useEffect(() => {
+    fetchAssets();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, pageSize, statuses, type, typeGroup, selectedCategoryId, company, warrantyStatus, purchaseDateFrom, purchaseDateTo]);
+
+  const urlSearch = searchParams.get('search');
+  useEffect(() => {
+    if (urlSearch !== null) {
+      setSearch(urlSearch);
+      setPage(0);
+      fetchAssets(urlSearch);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlSearch]);
 
   const handleSearch = () => { setPage(0); fetchAssets(); };
+
+  // Debounced "search as you type" — the Enter key / button above still work instantly too.
+  const isFirstSearchEffect = useRef(true);
+  useEffect(() => {
+    if (isFirstSearchEffect.current) { isFirstSearchEffect.current = false; return; }
+    const t = setTimeout(() => { setPage(0); fetchAssets(); }, 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
 
   useEffect(() => {
     if (isAvailableOnlyView && user?.role === 'USER') {
@@ -293,24 +243,6 @@ export default function AssetListPage() {
         .catch(() => {});
     }
   }, [isAvailableOnlyView, user]);
-
-  const handleExtendSubmit = async () => {
-    if (!extendDialog.item) return;
-    try {
-      await borrowAPI.createExtension({
-        requestId: extendDialog.item.requestId,
-        itemIds: [extendDialog.item.id],
-        extraDays: extendDays,
-        reason: extendReason || 'ต้องการขยายวันยืม',
-      });
-      toast.success('ส่งคำขอขยายวันเรียบร้อย รอ IT Admin อนุมัติ');
-      setExtendDialog({ open: false, item: null });
-      setExtendReason('');
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'ไม่สามารถขยายวันได้');
-    }
-  };
-
 
   const handleDelete = async (id: number) => {
     if (window.confirm('ต้องการลบทรัพย์สินนี้ใช่หรือไม่?')) {
@@ -324,118 +256,52 @@ export default function AssetListPage() {
     }
   };
 
-  const textColumn = (field: string, headerName: string, width = 140): GridColDef => ({
-    field,
-    headerName,
-    width,
-  });
+  const clearAllFilters = () => {
+    setSearch('');
+    setStatuses([]);
+    setType('');
+    setCompany('');
+    setWarrantyStatus('');
+    setPurchaseDateFrom('');
+    setPurchaseDateTo('');
+    setPage(0);
+  };
 
-  const columnMap = useMemo<Record<string, GridColDef>>(() => ({
-    id: textColumn('id', 'ID', 90),
-    hasImage: {
-      field: 'hasImage',
-      headerName: '📷',
-      width: 50,
-      sortable: false,
-      filterable: false,
-      renderCell: ({ row }) => (
-        <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-          {row.image ? (
-            <Box
-              sx={{
-                width: 28,
-                height: 28,
-                borderRadius: 1.5,
-                bgcolor: alpha(theme.palette.success.main, 0.1),
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: theme.palette.success.main,
-              }}
-            >
-              <ImageIcon fontSize="small" sx={{ fontSize: 16 }} />
-            </Box>
-          ) : (
-            <Box
-              sx={{
-                width: 28,
-                height: 28,
-                borderRadius: 1.5,
-                bgcolor: alpha(theme.palette.grey[500], 0.08),
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: theme.palette.grey[400],
-              }}
-            >
-              <ImageOffIcon fontSize="small" sx={{ fontSize: 16 }} />
-            </Box>
-          )}
-        </Box>
-      ),
-    },
-    assetCode: textColumn('assetCode', 'เลขครุภัณฑ์', 140),
-    assetName: textColumn('assetName', 'ชื่อทรัพย์สิน', 180),
-    serialNo: textColumn('serialNo', 'Serial No.', 140),
-    type: textColumn('type', 'ประเภท', 120),
-    brand: textColumn('brand', 'ยี่ห้อ', 120),
-    model: textColumn('model', 'รุ่น', 150),
-    cpu: textColumn('cpu', 'CPU', 130),
-    cpuGeneration: textColumn('cpuGeneration', 'Generation', 120),
-    ram: textColumn('ram', 'RAM', 110),
-    ramDetail: textColumn('ramDetail', 'RAM Detail', 150),
-    ramSlot1: textColumn('ramSlot1', 'RAM Slot1', 130),
-    ramSlot2: textColumn('ramSlot2', 'RAM Slot2', 130),
-    storage1: textColumn('storage1', 'Storage 1', 130),
-    storage2: textColumn('storage2', 'Storage 2', 130),
-    osType: textColumn('osType', 'OS', 110),
-    snComputer: textColumn('snComputer', 'S/N Computer', 150),
-    osVersion: textColumn('osVersion', 'Windows', 160),
-    windowsLicense: textColumn('windowsLicense', 'Windows License', 160),
-    officeLicense: textColumn('officeLicense', 'MS Office', 150),
-    antivirusStatus: textColumn('antivirusStatus', 'Antivirus', 140),
-    domainName: textColumn('domainName', 'Domain Name', 150),
-    vendor: textColumn('vendor', 'Vendor', 150),
-    poNumber: textColumn('poNumber', 'PO No.', 130),
-    poDate: {
-      ...textColumn('poDate', 'PO Date', 130),
-      renderCell: ({ value }) => formatDate(value),
-    },
-    prNumber: textColumn('prNumber', 'PR No.', 130),
-    purchaseDate: {
-      ...textColumn('purchaseDate', 'วันที่ซื้อ', 130),
-      renderCell: ({ value }) => formatDate(value),
-    },
-    age: textColumn('age', 'อายุ (ปี)', 110),
-    ownerName: textColumn('ownerName', 'ผู้ถือครอง', 170),
-    departmentId: textColumn('departmentId', 'แผนก', 130),
-    location: textColumn('location', 'สถานที่ติดตั้ง/อาคาร', 160),
-    floor: textColumn('floor', 'ชั้น', 90),
-    company: textColumn('company', 'บริษัท', 130),
-    oldAssetCode: textColumn('oldAssetCode', 'Computer Name เดิม', 150),
-    gpu: textColumn('gpu', 'GPU', 120),
-    budget: textColumn('budget', 'งบประมาณ', 130),
-    status: {
-      field: 'status',
-      headerName: 'สถานะ',
-      width: 140,
-      renderCell: ({ value }) => <StatusChip status={value} />,
-    },
-    remark: textColumn('remark', 'หมายเหตุ', 220),
-    createdAt: {
-      ...textColumn('createdAt', 'วันที่สร้าง', 170),
-      renderCell: ({ value }) => formatDateTime(value),
-    },
-    updatedAt: {
-      ...textColumn('updatedAt', 'วันที่แก้ไขล่าสุด', 170),
-      renderCell: ({ value }) => formatDateTime(value),
-    },
-  }), []);
+  const applySavedView = (v: SavedFilterView) => {
+    setSearch(v.filters.search);
+    setStatuses(v.filters.statuses);
+    setType(v.filters.type);
+    setCompany(v.filters.company);
+    setWarrantyStatus(v.filters.warrantyStatus);
+    setPurchaseDateFrom(v.filters.purchaseDateFrom);
+    setPurchaseDateTo(v.filters.purchaseDateTo);
+    setPage(0);
+    setSavedViewsAnchor(null);
+  };
+
+  const activeFilterChips = useMemo(() => {
+    const chips: { key: string; label: string; onDelete: () => void }[] = [];
+    if (search) chips.push({ key: 'search', label: `ค้นหา: "${search}"`, onDelete: () => setSearch('') });
+    statuses.forEach((s) => chips.push({ key: `status-${s}`, label: statusLabels[s] || s, onDelete: () => setStatuses((prev) => prev.filter((x) => x !== s)) }));
+    if (type) chips.push({ key: 'type', label: `ประเภท: ${type}`, onDelete: () => setType('') });
+    if (company) chips.push({ key: 'company', label: `บริษัท: ${company}`, onDelete: () => setCompany('') });
+    if (warrantyStatus) chips.push({ key: 'warranty', label: `ประกัน: ${warrantyStatusLabels[warrantyStatus] || warrantyStatus}`, onDelete: () => setWarrantyStatus('') });
+    if (purchaseDateFrom || purchaseDateTo) {
+      chips.push({
+        key: 'purchaseDate',
+        label: `วันที่ซื้อ: ${purchaseDateFrom || '…'} – ${purchaseDateTo || '…'}`,
+        onDelete: () => { setPurchaseDateFrom(''); setPurchaseDateTo(''); },
+      });
+    }
+    return chips;
+  }, [search, statuses, type, company, warrantyStatus, purchaseDateFrom, purchaseDateTo]);
+
+  const advancedFilterCount = (warrantyStatus ? 1 : 0) + (purchaseDateFrom || purchaseDateTo ? 1 : 0);
 
   const columns = useMemo<GridColDef[]>(() => {
     const selectedColumns = columnConfig
       .filter((config) => config.visible)
-      .map((config) => columnMap[config.field])
+      .map((config) => assetColumnMap[config.field])
       .filter(Boolean);
 
     return [
@@ -447,16 +313,16 @@ export default function AssetListPage() {
         sortable: false,
         renderCell: ({ row }) => {
           const role = user?.role;
-          
+
           return (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               {/* Primary Action based on Role */}
               {role === 'USER' ? (
                 row.status === 'Available' ? (
-                  <Button 
-                    variant="contained" 
-                    size="small" 
-                    color="primary" 
+                  <Button
+                    variant="contained"
+                    size="small"
+                    color="primary"
                     onClick={() => navigate(`/borrow/new?assetId=${row.id}`)}
                     sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}
                   >
@@ -475,10 +341,10 @@ export default function AssetListPage() {
 
               {/* Secondary Actions (More Menu) */}
               <Tooltip title="จัดการเพิ่มเติม">
-                <IconButton 
-                  size="small" 
+                <IconButton
+                  size="small"
                   onClick={(e) => handleMenuOpen(e, row)}
-                  sx={{ 
+                  sx={{
                     color: 'text.secondary',
                     bgcolor: alpha(theme.palette.primary.main, 0.05),
                     '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.15) }
@@ -492,30 +358,7 @@ export default function AssetListPage() {
         },
       },
     ];
-  }, [columnConfig, columnMap, navigate, isAdmin]);
-
-  const visibleCount = columnConfig.filter((config) => config.visible).length;
-
-  const toggleColumn = (field: string) => {
-    setColumnConfig((current) => current.map((config) => {
-      if (config.field !== field) return config;
-      if (config.visible && visibleCount <= 1) return config;
-      return { ...config, visible: !config.visible };
-    }));
-  };
-
-  const moveColumn = (field: string, direction: 'up' | 'down') => {
-    setColumnConfig((current) => {
-      const index = current.findIndex((config) => config.field === field);
-      const targetIndex = direction === 'up' ? index - 1 : index + 1;
-      if (index < 0 || targetIndex < 0 || targetIndex >= current.length) return current;
-      const next = [...current];
-      [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
-      return next;
-    });
-  };
-
-  const resetColumns = () => setColumnConfig(defaultColumnConfig);
+  }, [columnConfig, navigate, isAdmin]);
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, row: any) => {
     setMenuAnchor({ element: event.currentTarget, row });
@@ -525,38 +368,98 @@ export default function AssetListPage() {
     setMenuAnchor({ element: null, row: null });
   };
 
+  const showGridView = !isAvailableOnlyView && isAdmin && !isMobile && viewMode === 'grid';
+
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, gap: 2, flexWrap: 'wrap' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3, gap: 2, flexWrap: 'wrap' }}>
         <Box>
-          <Typography variant="h4" fontWeight={700}>
+          <Typography variant="h4" fontWeight={800} sx={{ letterSpacing: '-0.02em', mb: 0.5 }}>
             {isAvailableOnlyView ? 'รายการอุปกรณ์พร้อมยืม' : typeGroupLabels[typeGroup] || 'ทะเบียนทรัพย์สิน'}
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            {isAvailableOnlyView ? 'เลือกอุปกรณ์ที่ต้องการยืม' : `ทั้งหมด ${total} รายการ`}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="body2" color="text.secondary" fontWeight={500}>
+              {isAvailableOnlyView ? 'เลือกอุปกรณ์ที่ต้องการยืมเพื่อส่งคำขอ' : `จัดการและติดตามทรัพย์สินทั้งหมดในระบบ`}
+            </Typography>
+            {!isAvailableOnlyView && (
+              <Chip
+                label={`${total} รายการ`}
+                size="small"
+                sx={{
+                  height: 20,
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  bgcolor: alpha(theme.palette.primary.main, 0.1),
+                  color: theme.palette.primary.main
+                }}
+              />
+            )}
+          </Box>
         </Box>
-        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: isMobile ? 2 : 0, width: isMobile ? '100%' : 'auto' }}>
+        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: isMobile ? 1 : 0, width: isMobile ? '100%' : 'auto' }}>
           {isAdmin && (
-            <IconButton onClick={(e) => handleMenuOpen(e, { isHeaderMenu: true })} sx={{ display: { xs: 'flex', sm: 'none' }, ml: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+            <IconButton
+              onClick={(e) => handleMenuOpen(e, { isHeaderMenu: true })}
+              sx={{
+                display: { xs: 'flex', sm: 'none' },
+                ml: 'auto',
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: '8px'
+              }}
+            >
               <SettingsIcon />
             </IconButton>
           )}
-          {isAdmin && <Box sx={{ display: { xs: 'none', sm: 'block' } }}><ImportAssetsButton /></Box>}
-          {isAdmin && <Box sx={{ display: { xs: 'none', sm: 'block' } }}><ExportAssetsButton /></Box>}
-          {isAdmin && <Button variant="outlined" startIcon={<TableViewIcon />} sx={{ display: { xs: 'none', sm: 'flex' } }} onClick={() => setColumnDialogOpen(true)}>จัดคอลัมน์</Button>}
-          {isAdmin && <Button variant="contained" startIcon={<AddIcon />} sx={{ flex: isMobile ? 1 : 'none' }} onClick={() => navigate('/assets/new' + (typeGroup ? `?typeGroup=${typeGroup}` : ''))}>เพิ่มทรัพย์สิน</Button>}
+          <Box sx={{ display: { xs: 'none', sm: 'flex' }, gap: 1 }}>
+            {isAdmin && <ImportAssetsButton />}
+            {isAdmin && <ExportAssetsButton />}
+            {isAdmin && (
+              <Button
+                variant="outlined"
+                startIcon={<TableViewIcon />}
+                onClick={() => setColumnDialogOpen(true)}
+                sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600 }}
+              >
+                ตั้งค่าคอลัมน์
+              </Button>
+            )}
+          </Box>
+          {isAdmin && (
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              sx={{
+                flex: isMobile ? 1 : 'none',
+                borderRadius: '10px',
+                textTransform: 'none',
+                fontWeight: 600,
+                boxShadow: theme.shadows[2]
+              }}
+              onClick={() => navigate('/assets/new' + (typeGroup ? `?typeGroup=${typeGroup}` : ''))}
+            >
+              เพิ่มทรัพย์สินใหม่
+            </Button>
+          )}
         </Box>
       </Box>
 
+      <AssetKpiStrip
+        isAvailableOnlyView={isAvailableOnlyView}
+        statsLoading={statsLoading}
+        categoryStats={categoryStats}
+        statuses={statuses}
+        setStatuses={setStatuses}
+        setPage={setPage}
+      />
+
       <Card sx={{
         p: 2,
-        mb: 2,
-        background: 'rgba(255, 255, 255, 0.7)',
-        backdropFilter: 'blur(20px)',
-        border: '1px solid rgba(0, 0, 0, 0.05)',
-        borderRadius: '12px',
-        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
+        mb: 1.5,
+        bgcolor: theme.palette.background.paper,
+        border: `1px solid ${theme.palette.divider}`,
+        borderRadius: 2,
+        boxShadow: theme.shadows[1],
       }}>
         <Box sx={{ display: 'flex', gap: 1.5, flexDirection: isMobile ? 'column' : 'row', flexWrap: 'wrap', alignItems: 'center' }}>
           <TextField
@@ -565,7 +468,7 @@ export default function AssetListPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            sx={{ minWidth: 280, width: isMobile ? '100%' : 'auto', flex: 1 }}
+            sx={{ minWidth: 240, width: isMobile ? '100%' : 'auto', flex: 1 }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -574,82 +477,162 @@ export default function AssetListPage() {
               ),
             }}
           />
-          <FormControl size="small" sx={{ minWidth: 160, width: isMobile ? '100%' : 'auto' }}>
-            <InputLabel>ประเภท</InputLabel>
-            <Select value={type} label="ประเภท" onChange={(e) => { setType(e.target.value); setPage(0); }}>
+          <FormControl size="small" sx={{ minWidth: 140, width: isMobile ? '100%' : 'auto' }}>
+            <InputLabel id="asset-filter-type-label">ประเภท</InputLabel>
+            <Select labelId="asset-filter-type-label" value={type} label="ประเภท" onChange={(e) => { setType(e.target.value); setPage(0); }}>
               <MenuItem value="">ทั้งหมด</MenuItem>
               {typeOptions.map((option) => (
                 <MenuItem key={option} value={option}>{option}</MenuItem>
               ))}
             </Select>
           </FormControl>
-          <FormControl size="small" sx={{ minWidth: 160, width: isMobile ? '100%' : 'auto' }}>
-            <InputLabel>บริษัท (Company)</InputLabel>
-            <Select value={company} label="บริษัท (Company)" onChange={(e) => { setCompany(e.target.value); setPage(0); }}>
+          <FormControl size="small" sx={{ minWidth: 140, width: isMobile ? '100%' : 'auto' }}>
+            <InputLabel id="asset-filter-company-label">บริษัท (Company)</InputLabel>
+            <Select labelId="asset-filter-company-label" value={company} label="บริษัท (Company)" onChange={(e) => { setCompany(e.target.value); setPage(0); }}>
               <MenuItem value="">ทั้งหมด</MenuItem>
               {companyOptions.map((option) => (
                 <MenuItem key={option} value={option}>{option}</MenuItem>
               ))}
             </Select>
           </FormControl>
+          <FormControl size="small" sx={{ minWidth: 170, width: isMobile ? '100%' : 'auto' }}>
+            <InputLabel id="asset-filter-status-label">สถานะ</InputLabel>
+            <Select
+              labelId="asset-filter-status-label"
+              multiple
+              value={statuses}
+              label="สถานะ"
+              onChange={(e) => { const v = e.target.value; setStatuses(typeof v === 'string' ? v.split(',') : v as string[]); setPage(0); }}
+              renderValue={(selected) => (selected as string[]).length === 0 ? 'ทั้งหมด' : (selected as string[]).map((s) => statusLabels[s] || s).join(', ')}
+            >
+              {Object.entries(statusLabels).map(([val, lbl]) => (
+                <MenuItem key={val} value={val}>
+                  <Checkbox size="small" checked={statuses.indexOf(val) > -1} />
+                  <ListItemText primary={lbl} />
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           <Button variant="contained" startIcon={<SearchIcon />} sx={{ width: isMobile ? '100%' : 'auto', borderRadius: '8px', textTransform: 'none' }} onClick={handleSearch}>ค้นหา</Button>
+          <Button
+            variant="outlined"
+            startIcon={<FilterListIcon />}
+            onClick={(e) => setAdvFilterAnchor(e.currentTarget)}
+            sx={{ width: isMobile ? '100%' : 'auto', borderRadius: '8px', textTransform: 'none' }}
+          >
+            ตัวกรองเพิ่มเติม{advancedFilterCount > 0 ? ` (${advancedFilterCount})` : ''}
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<BookmarksIcon />}
+            onClick={(e) => setSavedViewsAnchor(e.currentTarget)}
+            sx={{ width: isMobile ? '100%' : 'auto', borderRadius: '8px', textTransform: 'none' }}
+          >
+            มุมมองของฉัน{savedViews.length > 0 ? ` (${savedViews.length})` : ''}
+          </Button>
+          <Button variant="outlined" startIcon={<RestartAltIcon />} sx={{ width: isMobile ? '100%' : 'auto', borderRadius: '8px', textTransform: 'none' }} onClick={() => { clearAllFilters(); fetchAssets(); }}>ล้าง</Button>
+          {isAdmin && rowSelectionModel.length > 0 && (
+            <Button
+              variant="contained"
+              color="secondary"
+              startIcon={<EditIcon />}
+              sx={{ width: isMobile ? '100%' : 'auto', borderRadius: '8px', textTransform: 'none' }}
+              onClick={() => setBulkUpdateOpen(true)}
+            >
+              แก้ไขที่เลือก ({rowSelectionModel.length})
+            </Button>
+          )}
         </Box>
-
-        {/* Unified Status Filters & Stats Ribbon */}
-        {!isAvailableOnlyView && (
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1.5, pt: 1.5, borderTop: '1px solid rgba(0,0,0,0.05)', alignItems: 'center' }}>
-            <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ mr: 0.5, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}>สถานะ:</Typography>
-            {[
-              { value: '',            label: 'ทั้งหมด',      color: '#6366F1', bg: alpha('#6366F1', 0.08), dot: '#6366F1' },
-              { value: 'Available',   label: 'พร้อมใช้งาน',   color: '#34c759', bg: alpha('#34c759', 0.08), dot: '#34c759' },
-              { value: 'InUse',       label: 'ใช้งานประจำ',   color: '#0071e3', bg: alpha('#0071e3', 0.08), dot: '#0071e3' },
-              { value: 'Borrowed',    label: 'กำลังยืม',     color: '#5856d6', bg: alpha('#5856d6', 0.08), dot: '#5856d6' },
-              { value: 'Maintenance', label: 'ซ่อมบำรุง',    color: '#ff9500', bg: alpha('#ff9500', 0.08), dot: '#ff9500' },
-              { value: 'Retired',     label: 'ปลดระวาง',    color: '#8e8e93', bg: alpha('#8e8e93', 0.08), dot: '#8e8e93' },
-              { value: 'Lost',        label: 'สูญหาย',      color: '#ff3b30', bg: alpha('#ff3b30', 0.08), dot: '#ff3b30' },
-            ].map((opt) => {
-              const count = opt.value === ''
-                ? total
-                : (categoryStats?.byStatus.find((b) => b.status === opt.value)?._count ?? 0);
-              const isActive = status === opt.value;
-              return (
-                <Button
-                  key={opt.value}
-                  onClick={() => { setStatus(opt.value); setPage(0); }}
-                  size="small"
-                  sx={{
-                    py: 0.25,
-                    px: 1.25,
-                    borderRadius: '20px',
-                    textTransform: 'none',
-                    fontSize: '0.72rem',
-                    fontWeight: isActive ? 700 : 500,
-                    color: isActive ? opt.color : 'text.secondary',
-                    bgcolor: isActive ? opt.bg : 'transparent',
-                    border: '1px solid',
-                    borderColor: isActive ? opt.dot : 'rgba(0, 0, 0, 0.08)',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 0.75,
-                    minWidth: 'auto',
-                    height: 28,
-                    '&:hover': {
-                      bgcolor: opt.bg,
-                      borderColor: opt.dot,
-                      color: opt.color
-                    }
-                  }}
-                >
-                  <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: opt.dot, flexShrink: 0 }} />
-                  <span>{opt.label}</span>
-                  <span style={{ opacity: 0.8, fontWeight: 700 }}>({count})</span>
-                </Button>
-              );
-            })}
-          </Box>
-        )}
       </Card>
-      
+
+      {/* Active filter chips — quick per-filter clear, replaces having to remember which control set what */}
+      {activeFilterChips.length > 0 && (
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, alignItems: 'center', mb: 2 }}>
+          <Typography variant="caption" color="text.secondary" fontWeight={600}>ตัวกรองที่ใช้อยู่:</Typography>
+          {activeFilterChips.map((chip) => (
+            <Chip key={chip.key} label={chip.label} size="small" onDelete={chip.onDelete} sx={{ fontWeight: 600 }} />
+          ))}
+          <Chip label="ล้างทั้งหมด" size="small" variant="outlined" onClick={() => { clearAllFilters(); fetchAssets(); }} sx={{ fontWeight: 600, cursor: 'pointer' }} />
+        </Box>
+      )}
+
+      <Popover
+        open={Boolean(advFilterAnchor)}
+        anchorEl={advFilterAnchor}
+        onClose={() => setAdvFilterAnchor(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+      >
+        <Box sx={{ p: 2.5, width: 300, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Typography variant="subtitle2">ตัวกรองเพิ่มเติม</Typography>
+          <FormControl size="small" fullWidth>
+            <InputLabel id="asset-filter-warranty-label">สถานะประกัน</InputLabel>
+            <Select labelId="asset-filter-warranty-label" value={warrantyStatus} label="สถานะประกัน" onChange={(e) => { setWarrantyStatus(e.target.value); setPage(0); }}>
+              <MenuItem value="">ทั้งหมด</MenuItem>
+              {Object.entries(warrantyStatusLabels).map(([val, lbl]) => (
+                <MenuItem key={val} value={val}>{lbl}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Box>
+            <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ display: 'block', mb: 0.75 }}>ช่วงวันที่จัดซื้อ</Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <TextField size="small" type="date" label="จาก" InputLabelProps={{ shrink: true }} value={purchaseDateFrom} onChange={(e) => { setPurchaseDateFrom(e.target.value); setPage(0); }} fullWidth />
+              <TextField size="small" type="date" label="ถึง" InputLabelProps={{ shrink: true }} value={purchaseDateTo} onChange={(e) => { setPurchaseDateTo(e.target.value); setPage(0); }} fullWidth />
+            </Box>
+          </Box>
+          <Button size="small" onClick={() => { setWarrantyStatus(''); setPurchaseDateFrom(''); setPurchaseDateTo(''); setPage(0); }}>ล้างตัวกรองเพิ่มเติม</Button>
+        </Box>
+      </Popover>
+
+      <Menu anchorEl={savedViewsAnchor} open={Boolean(savedViewsAnchor)} onClose={() => setSavedViewsAnchor(null)}>
+        <MenuItem onClick={() => { setSavedViewsAnchor(null); setSaveViewDialogOpen(true); }}>
+          <BookmarkAddIcon fontSize="small" sx={{ mr: 1, color: 'primary.main' }} /> บันทึกตัวกรองปัจจุบัน...
+        </MenuItem>
+        {savedViews.length > 0 && <Divider />}
+        {savedViews.map((v) => (
+          <MenuItem key={v.id} onClick={() => applySavedView(v)} sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
+            <span>{v.name}</span>
+            <IconButton
+              size="small"
+              onClick={(e) => { e.stopPropagation(); setSavedViews(deleteFilterView(v.id)); }}
+            >
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          </MenuItem>
+        ))}
+      </Menu>
+
+      <Dialog open={saveViewDialogOpen} onClose={() => setSaveViewDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>บันทึกมุมมองตัวกรอง</DialogTitle>
+        <DialogContent dividers>
+          <TextField
+            autoFocus
+            fullWidth
+            label="ชื่อมุมมอง"
+            value={saveViewName}
+            onChange={(e) => setSaveViewName(e.target.value)}
+            placeholder="เช่น คอมพิวเตอร์ที่ประกันใกล้หมด"
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSaveViewDialogOpen(false)}>ยกเลิก</Button>
+          <Button
+            variant="contained"
+            disabled={!saveViewName.trim()}
+            onClick={() => {
+              const updated = saveFilterView(saveViewName.trim(), { search, statuses, type, company, warrantyStatus, purchaseDateFrom, purchaseDateTo });
+              setSavedViews(updated);
+              setSaveViewDialogOpen(false);
+              setSaveViewName('');
+              toast.success('บันทึกมุมมองเรียบร้อย');
+            }}
+          >
+            บันทึก
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Category Filter Chips — for user available-view */}
       {isAvailableOnlyView && (
         <Box sx={{ display: 'flex', gap: 1, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -671,90 +654,36 @@ export default function AssetListPage() {
           ))}
         </Box>
       )}
- 
-      {/* Category Header — shown when typeGroup is active */}
 
+      {/* Category context bar — shown when typeGroup is active (slim, not a full hero card) */}
       {typeGroup && typeGroupLabels[typeGroup] && (
-        <Card sx={{ mb: 3, overflow: 'visible' }}>
-          <Box sx={{ height: 4, borderRadius: '16px 16px 0 0', background: 'linear-gradient(90deg, #FF6B00, #FF8C00)' }} />
-          <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
-            <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5 }}>
-                <Box sx={{
-                  width: 56, height: 56, borderRadius: 3,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  bgcolor: alpha(theme.palette.primary.main, 0.08), color: 'primary.main',
-                  fontSize: 28,
-                }}>
-                  {typeGroupIcons[typeGroup]}
-                </Box>
-                <Box>
-                  <Typography variant="h5" fontWeight={700}>{typeGroupLabels[typeGroup]}</Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.3 }}>{typeGroupDescriptions[typeGroup]}</Typography>
-                </Box>
-              </Box>
-              {isAdmin && (
-                <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate(`/assets/new?typeGroup=${typeGroup}`)} sx={{ borderRadius: 2, flexShrink: 0 }}>
-                  เพิ่ม{typeGroupLabels[typeGroup]}
-                </Button>
-              )}
+        <Box sx={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap',
+          mb: 2, px: 2, py: 1.25, borderRadius: 2,
+          bgcolor: alpha(theme.palette.primary.main, 0.04),
+          border: `1px solid ${alpha(theme.palette.primary.main, 0.15)}`,
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
+            <Box sx={{
+              width: 36, height: 36, borderRadius: 1.5,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', flexShrink: 0,
+            }}>
+              {typeGroupIcons[typeGroup]}
             </Box>
-
-            {/* Stats row */}
-            {categoryStats && (
-              <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: 2.5, pt: 2.5, borderTop: `1px solid ${theme.palette.divider}` }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 1, bgcolor: alpha(theme.palette.success.main, 0.08), borderRadius: 2 }}>
-                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'success.main' }} />
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" fontWeight={600}>พร้อมใช้</Typography>
-                    <Typography variant="body2" fontWeight={700}>{categoryStats.byStatus.find(s => s.status === 'Available')?._count || 0}</Typography>
-                  </Box>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 1, bgcolor: alpha(theme.palette.warning.main, 0.08), borderRadius: 2 }}>
-                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'warning.main' }} />
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" fontWeight={600}>กำลังยืม</Typography>
-                    <Typography variant="body2" fontWeight={700}>{categoryStats.byStatus.find(s => s.status === 'Borrowed')?._count || 0}</Typography>
-                  </Box>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 1, bgcolor: alpha(theme.palette.info.main, 0.08), borderRadius: 2 }}>
-                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'info.main' }} />
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" fontWeight={600}>ใช้งานประจำ</Typography>
-                    <Typography variant="body2" fontWeight={700}>{categoryStats.byStatus.find(s => s.status === 'InUse')?._count || 0}</Typography>
-                  </Box>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 1, bgcolor: alpha(theme.palette.warning.dark, 0.08), borderRadius: 2 }}>
-                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#f59e0b' }} />
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" fontWeight={600}>ซ่อมบำรุง</Typography>
-                    <Typography variant="body2" fontWeight={700}>{categoryStats.byStatus.find(s => s.status === 'Maintenance')?._count || 0}</Typography>
-                  </Box>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 1, bgcolor: alpha(theme.palette.grey[500], 0.08), borderRadius: 2 }}>
-                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'grey.400' }} />
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" fontWeight={600}>ปลดระวาง</Typography>
-                    <Typography variant="body2" fontWeight={700}>{categoryStats.byStatus.find(s => s.status === 'Retired')?._count || 0}</Typography>
-                  </Box>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 1, bgcolor: alpha(theme.palette.error.main, 0.08), borderRadius: 2 }}>
-                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'error.main' }} />
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" fontWeight={600}>สูญหาย</Typography>
-                    <Typography variant="body2" fontWeight={700}>{categoryStats.byStatus.find(s => s.status === 'Lost')?._count || 0}</Typography>
-                  </Box>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 1, bgcolor: alpha(theme.palette.primary.main, 0.08), borderRadius: 2 }}>
-                  <Typography variant="caption" color="text.secondary" fontWeight={600}>รวม</Typography>
-                  <Typography variant="body2" fontWeight={700} color="primary.main">{categoryStats.total}</Typography>
-                </Box>
-              </Box>
-            )}
-          </CardContent>
-        </Card>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography variant="subtitle1" fontWeight={700} noWrap>{typeGroupLabels[typeGroup]}</Typography>
+              <Typography variant="caption" color="text.secondary" noWrap sx={{ display: { xs: 'none', sm: 'block' } }}>{typeGroupDescriptions[typeGroup]}</Typography>
+            </Box>
+          </Box>
+          {isAdmin && (
+            <Button size="small" variant="contained" startIcon={<AddIcon />} onClick={() => navigate(`/assets/new?typeGroup=${typeGroup}`)} sx={{ borderRadius: 2, flexShrink: 0 }}>
+              เพิ่ม{typeGroupLabels[typeGroup]}
+            </Button>
+          )}
+        </Box>
       )}
-  
+
       {/* Borrowed Items Section — for user available-view */}
       {isAvailableOnlyView && myBorrowedItems.length > 0 && (
         <Box sx={{ mb: 4 }}>
@@ -788,7 +717,7 @@ export default function AssetListPage() {
                     <Divider />
                     <Box sx={{ display: 'flex', gap: 0.5, p: 1.5 }}>
                       <Button size="small" variant="outlined" startIcon={<PageviewIcon />} onClick={() => navigate(`/assets/${item.assetId}`)} sx={{ flex: 1 }}>รายละเอียด</Button>
-                      <Button size="small" variant="outlined" color="warning" startIcon={<ExtensionIcon />} onClick={() => { setExtendDialog({ open: true, item }); setExtendDays(3); }} sx={{ flex: 1 }}>ขยายวัน</Button>
+                      <Button size="small" variant="outlined" color="warning" startIcon={<ExtensionIcon />} onClick={() => setExtendDialog({ open: true, item })} sx={{ flex: 1 }}>ขยายวัน</Button>
                     </Box>
                   </Card>
                 </Grid>
@@ -798,41 +727,41 @@ export default function AssetListPage() {
         </Box>
       )}
 
-      {/* Extend Dialog */}
-      <Dialog open={extendDialog.open} onClose={() => { setExtendDialog({ open: false, item: null }); setExtendReason(''); }} maxWidth="xs" fullWidth>
-        <DialogTitle>ขยายวันยืม</DialogTitle>
-        <DialogContent dividers>
-          {extendDialog.item && (
-            <Box sx={{ pt: 1 }}>
-              <Typography variant="body2" fontWeight={600} gutterBottom>{extendDialog.item.assetCode}</Typography>
-              <Typography variant="body2" color="text.secondary" gutterBottom>กำหนดคืนปัจจุบัน: {new Date(extendDialog.item.dueDate).toLocaleDateString('th-TH')}</Typography>
-              <TextField type="number" label="จำนวนวันที่ต้องการขยาย" fullWidth value={extendDays} onChange={(e) => setExtendDays(parseInt(e.target.value) || 1)} inputProps={{ min: 1, max: 30 }} sx={{ mt: 2 }} />
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                วันสิ้นสุดใหม่: {new Date(new Date(extendDialog.item.dueDate).getTime() + extendDays * 86400000).toLocaleDateString('th-TH')}
-              </Typography>
-              <TextField
-                label="เหตุผลในการขยายวัน"
-                fullWidth
-                multiline
-                rows={2}
-                value={extendReason}
-                onChange={(e) => setExtendReason(e.target.value)}
-                placeholder="เช่น ยังใช้งานไม่เสร็จ, ต้องการทำงานต่อ"
-                sx={{ mt: 2 }}
-              />
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => { setExtendDialog({ open: false, item: null }); setExtendReason(''); }}>ยกเลิก</Button>
-          <Button variant="contained" onClick={handleExtendSubmit}>ส่งคำขอ</Button>
-        </DialogActions>
-      </Dialog>
+      <ExtendBorrowDialog
+        open={extendDialog.open}
+        item={extendDialog.item}
+        onClose={() => setExtendDialog({ open: false, item: null })}
+        onSuccess={() => setExtendDialog({ open: false, item: null })}
+      />
 
       {isAvailableOnlyView && (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
           <Typography variant="h6" fontWeight={700}>อุปกรณ์พร้อมให้ยืม</Typography>
           <Chip label={`${total} รายการ`} size="small" sx={{ bgcolor: alpha(theme.palette.success.main, 0.1), color: theme.palette.success.dark, fontWeight: 700 }} />
+        </Box>
+      )}
+
+      {/* Table/Grid + density toggle — admin desktop only */}
+      {!isAvailableOnlyView && isAdmin && !isMobile && (
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, mb: 1.5 }}>
+          {viewMode === 'table' && (
+            <ToggleButtonGroup size="small" value={density} exclusive onChange={(_e, v) => v && setDensity(v)}>
+              <ToggleButton value="standard" sx={{ textTransform: 'none', px: 1.25 }}>
+                <Tooltip title="สบายตา"><DensityLargeIcon fontSize="small" /></Tooltip>
+              </ToggleButton>
+              <ToggleButton value="compact" sx={{ textTransform: 'none', px: 1.25 }}>
+                <Tooltip title="กระชับ"><DensitySmallIcon fontSize="small" /></Tooltip>
+              </ToggleButton>
+            </ToggleButtonGroup>
+          )}
+          <ToggleButtonGroup size="small" value={viewMode} exclusive onChange={(_e, v) => v && setViewMode(v)}>
+            <ToggleButton value="table" sx={{ textTransform: 'none', px: 1.25 }}>
+              <Tooltip title="มุมมองตาราง"><TableViewIcon fontSize="small" /></Tooltip>
+            </ToggleButton>
+            <ToggleButton value="grid" sx={{ textTransform: 'none', px: 1.25 }}>
+              <Tooltip title="มุมมองการ์ด"><GridViewIcon fontSize="small" /></Tooltip>
+            </ToggleButton>
+          </ToggleButtonGroup>
         </Box>
       )}
 
@@ -856,106 +785,12 @@ export default function AssetListPage() {
                 <Grid container spacing={2.5}>
                   {group.assets.map((asset) => (
                     <Grid item xs={12} sm={6} lg={4} key={asset.id}>
-                      <Card
-                        sx={{
-                          height: '100%', display: 'flex', flexDirection: 'column',
-                          position: 'relative', overflow: 'visible',
-                          '&:hover': { boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.12)}` },
-                        }}
-                      >
-                        <Box sx={{ display: 'flex', gap: 2, p: 3, pb: 1.5 }}>
-                          <Box
-                            sx={{
-                              width: 80, height: 80, borderRadius: 2, overflow: 'hidden',
-                              flexShrink: 0, bgcolor: alpha(theme.palette.grey[500], 0.08),
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            }}
-                          >
-                            {asset.image ? (
-                              <Box component="img" src={asset.image} alt="" sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            ) : (
-                              <ImageIcon sx={{ fontSize: 32, color: theme.palette.grey[400] }} />
-                            )}
-                          </Box>
-                          <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
-                              <Typography fontWeight={800} fontSize="1.1rem" color="#0F172A" noWrap>{asset.assetCode}</Typography>
-                              <StatusChip status={asset.status} />
-                            </Box>
-                            {asset.assetName && (
-                              <Typography variant="body2" fontWeight={600} color="text.primary" noWrap sx={{ mt: 0.25 }}>
-                                {asset.assetName}
-                              </Typography>
-                            )}
-                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
-                              {[asset.type, asset.brand, asset.model].filter(Boolean).join(' · ')}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
-                              SN: {asset.serialNo}
-                            </Typography>
-                          </Box>
-                        </Box>
-
-                        {(asset.cpu || asset.ram || asset.storage1 || asset.osType) && (
-                          <Box sx={{ px: 3, pb: 2 }}>
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px', bgcolor: alpha(theme.palette.grey[500], 0.04), borderRadius: 2, p: 1.5 }}>
-                              {asset.cpu && (
-                                <Box><Typography variant="caption" fontWeight={600} color="text.secondary">CPU</Typography><Typography variant="body2" fontWeight={600}>{asset.cpu}</Typography></Box>
-                              )}
-                              {asset.ram && (
-                                <Box><Typography variant="caption" fontWeight={600} color="text.secondary">RAM</Typography><Typography variant="body2" fontWeight={600}>{asset.ram}</Typography></Box>
-                              )}
-                              {asset.storage1 && (
-                                <Box><Typography variant="caption" fontWeight={600} color="text.secondary">Storage</Typography><Typography variant="body2" fontWeight={600}>{asset.storage1}</Typography></Box>
-                              )}
-                              {asset.osType && (
-                                <Box><Typography variant="caption" fontWeight={600} color="text.secondary">OS</Typography><Typography variant="body2" fontWeight={600}>{asset.osType}</Typography></Box>
-                              )}
-                            </Box>
-                          </Box>
-                        )}
-
-                        <Box sx={{ px: 3, pb: 2, display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
-                          {(asset.location || asset.floor) && (
-                            <Chip
-                              icon={<LocationOnIcon sx={{ fontSize: 14 }} />}
-                              label={[asset.location, asset.floor && `ชั้น ${asset.floor}`].filter(Boolean).join(' ')}
-                              size="small" variant="outlined"
-                              sx={{ height: 24, '& .MuiChip-icon': { fontSize: 14, ml: 0.5 } }}
-                            />
-                          )}
-                          {asset.company && (
-                            <Chip label={asset.company} size="small" variant="outlined" sx={{ height: 24 }} />
-                          )}
-                          {asset.warrantyDaysLeft !== null && asset.warrantyDaysLeft !== undefined && (
-                            <Chip
-                              icon={<VerifiedIcon sx={{ fontSize: 14 }} />}
-                              label={asset.warrantyDaysLeft > 0 ? `รับประกัน ${asset.warrantyDaysLeft} วัน` : 'หมดประกัน'}
-                              size="small"
-                              variant="outlined"
-                              color={asset.warrantyDaysLeft > 90 ? 'success' : asset.warrantyDaysLeft > 0 ? 'warning' : 'error'}
-                              sx={{ height: 24, '& .MuiChip-icon': { fontSize: 14, ml: 0.5 } }}
-                            />
-                          )}
-                          {asset.ownerName && (
-                            <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
-                              {asset.ownerName}
-                            </Typography>
-                          )}
-                        </Box>
-
-                        <Box sx={{ mt: 'auto', p: 2, pt: 0 }}>
-                          <Button
-                            variant="contained"
-                            fullWidth
-                            size="large"
-                            onClick={() => navigate(`/borrow/new?assetId=${asset.id}`)}
-                            sx={{ borderRadius: 2, py: 1.5, fontWeight: 700, fontSize: '0.95rem', boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}` }}
-                          >
-                            ขอยืมอุปกรณ์
-                          </Button>
-                        </Box>
-                      </Card>
+                      <AssetCard
+                        asset={asset}
+                        variant="borrow"
+                        onView={(id) => navigate(`/assets/${id}`)}
+                        onBorrow={(id) => navigate(`/borrow/new?assetId=${id}`)}
+                      />
                     </Grid>
                   ))}
                 </Grid>
@@ -965,51 +800,38 @@ export default function AssetListPage() {
         )
       ) : (
         assets.length === 0 ? (
-          <EmptyState title="ไม่พบข้อมูลทรัพย์สิน" description="ลองปรับเงื่อนไขการค้นหาหรือตัวกรอง" secondaryActionLabel="รีเซ็ตตัวกรอง" onSecondaryAction={() => { setSearch(''); setStatus(''); setType(''); setCompany(''); setPage(0); }} />
+          <EmptyState title="ไม่พบข้อมูลทรัพย์สิน" description="ลองปรับเงื่อนไขการค้นหาหรือตัวกรอง" secondaryActionLabel="รีเซ็ตตัวกรอง" onSecondaryAction={() => clearAllFilters()} />
         ) : isMobile ? (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Typography variant="body2" color="text.secondary" fontWeight={600} sx={{ mb: -1 }}>แสดงผลแบบการ์ด ({total} รายการ)</Typography>
             {assets.map((asset) => (
-              <Card key={asset.id} sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5, position: 'relative', overflow: 'visible' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
-                  <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-                     {asset.image ? (
-                        <Box component="img" src={asset.image} alt="" sx={{ width: 56, height: 56, borderRadius: 1.5, objectFit: 'cover' }} />
-                     ) : (
-                        <Box sx={{ width: 56, height: 56, borderRadius: 1.5, bgcolor: 'grey.100', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <ImageIcon sx={{ color: 'grey.400' }} />
-                        </Box>
-                     )}
-                     <Box sx={{ flex: 1, minWidth: 0 }}>
-                       <Typography fontWeight={700} noWrap sx={{ color: 'text.primary', fontSize: '1rem' }}>{asset.assetName || asset.assetCode || 'ไม่ระบุชื่อ'}</Typography>
-                       <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{asset.assetCode} • {asset.serialNo}</Typography>
-                     </Box>
-                  </Box>
-                  <StatusChip status={asset.status} />
-                </Box>
-                <Divider sx={{ my: 0.5 }} />
-                <Grid container spacing={1}>
-                  <Grid item xs={6}><Typography variant="caption" color="text.secondary" display="block">ประเภท</Typography><Typography variant="body2" fontWeight={500}>{asset.type || '-'}</Typography></Grid>
-                  <Grid item xs={6}><Typography variant="caption" color="text.secondary" display="block">ยี่ห้อ/รุ่น</Typography><Typography variant="body2" fontWeight={500} noWrap>{[asset.brand, asset.model].filter(Boolean).join(' ') || '-'}</Typography></Grid>
-                  <Grid item xs={6}><Typography variant="caption" color="text.secondary" display="block">ผู้ถือครอง</Typography><Typography variant="body2" fontWeight={500} noWrap>{asset.ownerName || '-'}</Typography></Grid>
-                  <Grid item xs={6}><Typography variant="caption" color="text.secondary" display="block">สถานที่/อาคาร</Typography><Typography variant="body2" fontWeight={500} noWrap>{asset.location || '-'}</Typography></Grid>
-                </Grid>
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 1 }}>
-
-                  <Button size="small" variant="outlined" startIcon={<PageviewIcon />} onClick={() => navigate(`/assets/${asset.id}`)}>เปิดดู</Button>
-                  <Button 
-                    size="small" 
-                    variant="outlined" 
-                    onClick={(e) => handleMenuOpen(e, asset)}
-                    startIcon={<MoreVertIcon />}
-                    sx={{ borderRadius: '8px' }}
-                  >
-                    จัดการ
-                  </Button>
-                </Box>
-              </Card>
+              <AssetCard
+                key={asset.id}
+                asset={asset}
+                variant="manage"
+                onView={(id) => navigate(`/assets/${id}`)}
+                onMenu={handleMenuOpen}
+              />
             ))}
             <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3, mb: 4 }}>
+              <Pagination count={Math.ceil(total / pageSize) || 1} page={page + 1} onChange={(_e, p) => setPage(p - 1)} color="primary" shape="rounded" />
+            </Box>
+          </Box>
+        ) : showGridView ? (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Grid container spacing={2.5}>
+              {assets.map((asset) => (
+                <Grid item xs={12} sm={6} lg={4} key={asset.id}>
+                  <AssetCard
+                    asset={asset}
+                    variant="manage"
+                    onView={(id) => navigate(`/assets/${id}`)}
+                    onMenu={handleMenuOpen}
+                  />
+                </Grid>
+              ))}
+            </Grid>
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1, mb: 2 }}>
               <Pagination count={Math.ceil(total / pageSize) || 1} page={page + 1} onChange={(_e, p) => setPage(p - 1)} color="primary" shape="rounded" />
             </Box>
           </Box>
@@ -1025,103 +847,66 @@ export default function AssetListPage() {
             onPaginationModelChange={(m) => { setPage(m.page); setPageSize(m.pageSize); }}
             getRowId={(r) => r.id}
             autoHeight
+            density={density}
             disableRowSelectionOnClick
             disableColumnFilter
+            checkboxSelection={isAdmin}
+            rowSelectionModel={rowSelectionModel}
+            onRowSelectionModelChange={(newSelection) => {
+              setRowSelectionModel([...newSelection]);
+            }}
+            onCellClick={(params) => {
+              if (params.field === 'actions' || params.field === '__check__') return;
+              setQuickView({ open: true, asset: params.row });
+            }}
+            onRowDoubleClick={(params) => navigate(`/assets/${params.id}`)}
+            sx={{
+              '& .MuiDataGrid-row': {
+                cursor: 'pointer',
+              }
+            }}
           />
         )
       )}
 
-      <Dialog open={columnDialogOpen} onClose={() => setColumnDialogOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>จัดคอลัมน์ที่แสดง</DialogTitle>
-        <DialogContent dividers>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-            เลือกหัวข้อจากข้อมูล Asset ทั้งหมดในฐานข้อมูล และใช้ปุ่มลูกศรเพื่อสลับตำแหน่งคอลัมน์
-          </Typography>
-          <List dense disablePadding>
-            {columnConfig.map((config, index) => (
-              <ListItem key={config.field} divider>
-                <Checkbox
-                  edge="start"
-                  checked={config.visible}
-                  onChange={() => toggleColumn(config.field)}
-                  disabled={config.visible && visibleCount <= 1}
-                />
-                <ListItemText primary={config.label} secondary={config.visible ? 'แสดงในตาราง' : 'ซ่อนจากตาราง'} />
-                <Box sx={{ display: 'flex', gap: 0.5 }}>
-                  <IconButton size="small" onClick={() => moveColumn(config.field, 'up')} disabled={index === 0}>
-                    <ArrowUpwardIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton size="small" onClick={() => moveColumn(config.field, 'down')} disabled={index === columnConfig.length - 1}>
-                    <ArrowDownwardIcon fontSize="small" />
-                  </IconButton>
-                </Box>
-              </ListItem>
-            ))}
-          </List>
-        </DialogContent>
-        <DialogActions sx={{ justifyContent: 'space-between', px: 3, py: 2 }}>
-          <Button startIcon={<RestartAltIcon />} onClick={resetColumns}>คืนค่าเริ่มต้น</Button>
-          <Button variant="contained" onClick={() => setColumnDialogOpen(false)}>เสร็จสิ้น</Button>
-        </DialogActions>
-      </Dialog>
+      <AssetQuickViewDrawer
+        open={quickView.open}
+        asset={quickView.asset}
+        onClose={() => setQuickView({ open: false, asset: null })}
+        onViewFull={(id) => navigate(`/assets/${id}`)}
+      />
 
-      <Menu
+      <ColumnPickerDialog
+        open={columnDialogOpen}
+        onClose={() => setColumnDialogOpen(false)}
+        columnConfig={columnConfig}
+        setColumnConfig={setColumnConfig}
+        columnSearch={columnSearch}
+        setColumnSearch={setColumnSearch}
+      />
+
+      <AssetRowActionsMenu
         anchorEl={menuAnchor.element}
-        open={Boolean(menuAnchor.element)}
+        row={menuAnchor.row}
         onClose={handleMenuClose}
-        PaperProps={{
-          sx: { minWidth: 160, mt: 1, boxShadow: 3 }
+        user={user}
+        isAvailableOnlyView={isAvailableOnlyView}
+        navigate={navigate}
+        onDelete={handleDelete}
+        onOpenColumnDialog={() => setColumnDialogOpen(true)}
+      />
+
+      <BulkUpdateDialog
+        open={bulkUpdateOpen}
+        onClose={() => setBulkUpdateOpen(false)}
+        assetIds={rowSelectionModel}
+        onSuccess={() => {
+          setBulkUpdateOpen(false);
+          setRowSelectionModel([]);
+          fetchAssets();
+          toast.success('อัปเดตข้อมูลสำเร็จ');
         }}
-      >
-        {menuAnchor.row && (
-          menuAnchor.row.isHeaderMenu ? (
-            <Box>
-              <MenuItem key="import" sx={{ p: 0 }}><Box sx={{ width: '100%', px: 2, py: 1 }}><ImportAssetsButton /></Box></MenuItem>
-              <MenuItem key="export" sx={{ p: 0 }}><Box sx={{ width: '100%', px: 2, py: 1 }}><ExportAssetsButton /></Box></MenuItem>
-              <MenuItem key="columns" onClick={() => { handleMenuClose(); setColumnDialogOpen(true); }}>
-                <TableViewIcon sx={{ mr: 1, fontSize: 20, color: 'text.secondary' }} /> จัดคอลัมน์ตาราง
-              </MenuItem>
-            </Box>
-          ) : (
-          <>
-            {/* USER view on Available page — friendly actions */}
-            {user?.role === 'USER' && isAvailableOnlyView && (
-              <>
-                <MenuItem onClick={() => { handleMenuClose(); navigate(`/assets/${menuAnchor.row.id}`); }}>
-                  <PageviewIcon fontSize="small" sx={{ mr: 1, color: 'primary.main' }} /> ดูรายละเอียด
-                </MenuItem>
-                {menuAnchor.row.status === 'Available' && (
-                  <MenuItem onClick={() => { handleMenuClose(); navigate(`/borrow/new?assetId=${menuAnchor.row.id}`); }}>
-                    <ShoppingCartIcon fontSize="small" sx={{ mr: 1, color: 'success.main' }} /> ยืมอุปกรณ์
-                  </MenuItem>
-                )}
-              </>
-            )}
-            {/* Admin Actions — only on non-user pages */}
-            {(user?.role === 'IT_ADMIN' || user?.role === 'SUPERADMIN') && !isAvailableOnlyView && (
-              <>
-                <MenuItem onClick={() => { handleMenuClose(); navigate(`/assets/${menuAnchor.row.id}`); }}>
-                  <PageviewIcon fontSize="small" sx={{ mr: 1, color: 'primary.main' }} /> ดูรายละเอียด
-                </MenuItem>
-                <MenuItem onClick={() => { handleMenuClose(); navigate(`/assets/${menuAnchor.row.id}/edit`); }}>
-                  <EditIcon fontSize="small" sx={{ mr: 1, color: 'info.main' }} /> แก้ไขข้อมูล
-                </MenuItem>
-                {user?.role === 'IT_ADMIN' && (
-                  <MenuItem onClick={() => { handleMenuClose(); navigate(`/borrow/checkout?assetId=${menuAnchor.row.id}`); }}>
-                    <ShoppingCartIcon fontSize="small" sx={{ mr: 1, color: 'warning.main' }} /> ส่งมอบ/Check-out
-                  </MenuItem>
-                )}
-                {user?.role === 'SUPERADMIN' && (
-                  <MenuItem onClick={() => { handleMenuClose(); handleDelete(menuAnchor.row.id); }} sx={{ color: 'error.main' }}>
-                    <DeleteIcon fontSize="small" sx={{ mr: 1 }} /> ลบทรัพย์สิน
-                  </MenuItem>
-                )}
-              </>
-            )}
-          </>
-          )
-        )}
-      </Menu>
+      />
     </Box>
   );
 }

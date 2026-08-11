@@ -1,7 +1,124 @@
 node_modules/
+node_modules_old/
 dist/
+# Incremental build cache — churns on every build, no value in git
+*.tsbuildinfo
 .env
 .env.local
+.env.docker.prod
 *.log
 .DS_Store
-backend/prisma/migrations/
+Thumbs.db
+
+# Database dumps / backups — never commit, may contain real user data
+*.sql
+*.dump
+*.pg_dump
+# ...except schema definitions that belong in git
+!backend/prisma/migrations/**/*.sql
+!database/schema.sql
+
+# Archives produced by ad-hoc migration/backup work
+*.zip
+
+# Runtime data written by the app — user uploads and generated backups.
+# These live on a Docker volume in production and must never enter git
+# (they are large binaries and may contain real user data).
+backend/uploads/
+backend/backups/
+uploads/
+
+# Process managers / local runtime state
+.pm2/
+*.pid.txt
+
+# Recovery/backup artifacts left by editors or restore scripts
+*.recovered
+
+# Scratch space for one-off debug/check/test scripts — put throwaway
+# scripts here instead of backend/src/ or backend/ root so they never
+# get committed by accident
+backend/scratch/
+scratch/
+
+# ── Ad-hoc working files left at the repository root ──────────────────────
+# Captured tool output and logs that do not end in .log
+*_logs.txt
+*-logs*.txt
+pm2*.txt
+api-logs-check.txt
+backend/backend-log.txt
+
+# Screenshots and pasted images dropped at the root (docs/ images stay tracked)
+/*.png
+/*.jpg
+/*.jpeg
+
+# One-off debug/patch/inspection scripts — see scratch/ above for new ones
+/patch_*.js
+/extract_css.js
+/format_css.js
+/replace_vars.js
+/read_checklist.js
+/mockup_*.py
+backend/check-*.ts
+backend/check_*.ts
+backend/inspect-*.ts
+backend/inspect_*.ts
+
+# Request/response payloads captured while debugging the browser bridge
+webbridge-req-*.json
+ad_test.json
+
+# Editor recovery leftovers and stray captures
+temp_restore.tsx
+/5173
+
+# ── Ad-hoc scripts and dumps in backend/ and frontend/ ────────────────────
+# These accumulated from debugging data directly instead of through routes.
+# All patterns are anchored to the package root, so real source under src/
+# (including src/**/*.test.ts) is unaffected. New throwaways go in scratch/.
+backend/check*.js
+backend/check*.ts
+backend/test*.js
+backend/test*.ts
+backend/glpi-test*.js
+backend/ldap-test.js
+backend/debug-*.ts
+backend/inject-*.ts
+backend/patch_*.js
+backend/fix_*.js
+backend/migrate_*.js
+backend/update_*.js
+backend/reorder_*.js
+backend/cleanup_*.js
+backend/clear-*.js
+backend/gen-*.js
+backend/query-*.js
+backend/temp.js
+backend/*_dump.json
+backend/pm_runs.json
+backend/where_log.json
+backend/*_report.xlsx
+
+frontend/*.cjs
+# ...but dotfile configs are real config, not throwaways
+!frontend/.*.cjs
+frontend/ldap-test.js
+frontend/ad-test.txt
+frontend/best_view.txt
+frontend/pmtab_edits.txt
+frontend/login-test.json
+# Project standardised on npm — a stray bun lockfile only causes drift
+frontend/bun.lock
+
+# One-off data-fixing scripts that talk to the database directly, outside the
+# normal routes. Kept out of git so they are not mistaken for supported tools.
+backend/scripts/
+
+# Separate Next.js prototype living inside this repo — not part of the build
+temp-itam-borrow/
+
+# Playwright deps and captured screenshots (the specs themselves are tracked)
+playwright-tests/node_modules/
+playwright-tests/screenshots/

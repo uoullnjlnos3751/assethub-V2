@@ -21,19 +21,29 @@ import {
   Link,
   Avatar,
   Chip,
-  alpha
+  alpha,
+  useTheme,
+  Autocomplete,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails
 } from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
-import SaveIcon from '@mui/icons-material/Save';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { assetAPI } from '../../services/api';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs from 'dayjs';
+import LoadingSkeleton from '../../components/LoadingSkeleton';
+import { getTypeIcon, SectionCard, ToggleWrap, getBrandSuggestionsForType } from './components/AssetFormHelpers';
 
 /* ─── Types / Defaults ─────────────────────────────────────────── */
 const initialData = {
-  assetCode: '', assetName: '', serialNo: '', type: '', brand: '', model: '',
+  assetCode: '', accountingCode: '', assetName: '', serialNo: '', type: '', brand: '', model: '',
   cpu: '', cpuGeneration: '', ram: '', ramSlot1: '', ramSlot2: '', gpu: '',
+  memoryType: 'Slot', ramOnboard: '', ramType: '', ramSpeed: '',
+  ramMaxSupported: '', ramAvailableSlots: '', ramUpgradeable: '',
   storage1: '', storage2: '', osType: 'Windows', osVersion: '',
   officeLicense: '', antivirusStatus: '', domainName: '',
   vendor: '', poNumber: '', poDate: '', prNumber: '', purchaseDate: '',
@@ -44,12 +54,12 @@ const initialData = {
 };
 
 const fallbackStatusOptions = [
-  { value: 'Available', label: '✅ พร้อมใช้งาน', cls: 's-available' },
-  { value: 'Borrowed',  label: '🔒 กำลังยืม',    cls: 's-reserved' },
-  { value: 'InUse',     label: '💼 ใช้งานประจำ',  cls: 's-reserved' },
-  { value: 'Maintenance', label: '🔧 ซ่อมบำรุง',  cls: 's-maintenance' },
-  { value: 'Retired',   label: '🗑 ปลดระวาง',    cls: 's-retired' },
-  { value: 'Lost',      label: '❌ สูญหาย',       cls: 's-maintenance' },
+  { value: 'Available', label: '✅ Available - พร้อมใช้งาน', cls: 's-available' },
+  { value: 'Borrowed',  label: '🔒 Borrowed - กำลังยืม',    cls: 's-reserved' },
+  { value: 'InUse',     label: '💼 InUse - ใช้งานประจำ',  cls: 's-reserved' },
+  { value: 'Maintenance', label: '🔧 Maintenance - ซ่อมบำรุง',  cls: 's-maintenance' },
+  { value: 'Retired',   label: '🗑 Retired - ปลดระวาง',    cls: 's-retired' },
+  { value: 'Lost',      label: '❌ Lost - สูญหาย',       cls: 's-maintenance' },
 ];
 
 const calculateAge = (purchaseDate: string) => {
@@ -69,114 +79,26 @@ const typeGroupCategoryMap: Record<string, string> = {
   rack: 'Rack & Infrastructure',
 };
 
-function getTypeIcon(type: string): string {
-  const t = type?.toLowerCase() || '';
-  if (['notebook', 'laptop', 'macbook'].some(k => t.includes(k))) return '💻';
-  if (['desktop', 'pc', 'workstation', 'all-in-one'].some(k => t.includes(k))) return '🖥';
-  if (t.includes('monitor')) return '🖥';
-  if (t.includes('printer')) return '🖨';
-  if (['phone', 'tablet', 'smartphone'].some(k => t.includes(k))) return '📱';
-  if (['switch', 'router', 'firewall', 'access point', 'network'].some(k => t.includes(k))) return '🌐';
-  if (t.includes('projector')) return '📽';
-  return '🔧';
-}
-
-/* ─── Shared Section Card Component ────────────────────────────── */
-function SectionCard({ title, sub, barColor, children }: {
-  title: string; sub?: string; barColor?: string; children: React.ReactNode;
-}) {
-  return (
-    <Card sx={{
-      background: 'rgba(255, 255, 255, 0.68)',
-      border: '1px solid rgba(255, 255, 255, 0.88)',
-      backdropFilter: 'blur(22px)',
-      borderRadius: '14px',
-      boxShadow: '0 4px 24px rgba(99, 102, 241, 0.07), 0 1px 3px rgba(0, 0, 0, 0.04)',
-      p: { xs: 2.5, sm: 3 },
-      mb: 2.5,
-      position: 'relative',
-      overflow: 'visible'
-    }}>
-      <Box sx={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 1.5,
-        mb: 3,
-        pb: 1.5,
-        borderBottom: '1px solid rgba(99, 102, 241, 0.07)'
-      }}>
-        <Box sx={{
-          width: 3.5,
-          height: 16,
-          borderRadius: '2px',
-          background: barColor || 'linear-gradient(180deg,#4f46e5,#7c3aed)'
-        }} />
-        <Typography variant="subtitle2" fontWeight={700} color="text.primary" sx={{ fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          {title}
-        </Typography>
-        {sub && (
-          <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
-            {sub}
-          </Typography>
-        )}
-      </Box>
-      {children}
-    </Card>
-  );
-}
-
-/* ─── Toggle Wrap Component ────────────────────────────────────── */
-function ToggleWrap({ label, desc, checked, onChange }: {
-  label: string; desc?: string; checked: boolean; onChange: (v: boolean) => void;
-}) {
-  return (
-    <Box sx={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      p: 1.5,
-      bgcolor: 'rgba(248, 247, 255, 0.65)',
-      border: '1px solid rgba(99, 102, 241, 0.09)',
-      borderRadius: 2,
-      transition: 'background 0.15s',
-      '&:hover': { bgcolor: 'rgba(99, 102, 241, 0.04)' }
-    }}>
-      <Box>
-        <Typography variant="body2" fontWeight={500} color="text.primary">
-          {label}
-        </Typography>
-        {desc && (
-          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.25, display: 'block' }}>
-            {desc}
-          </Typography>
-        )}
-      </Box>
-      <Switch
-        checked={checked}
-        onChange={e => onChange(e.target.checked)}
-        color="primary"
-      />
-    </Box>
-  );
-}
-
 /* ─── Main Component ───────────────────────────────────────────── */
 export default function AssetFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const theme = useTheme();
   const [searchParams] = useSearchParams();
   const typeGroupFromUrl = searchParams.get('typeGroup') || '';
-  const [form, setForm] = useState<any>(initialData);
+  const [form, setForm] = useState<Record<string, any>>(initialData);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(!!id);
   const [error, setError] = useState('');
+  const [submitAttempted, setSubmitAttempted] = useState(false);
   const [detail, setDetail] = useState<Record<string, any>>({});
 
   // Dropdown options
   const [typeOptions, setTypeOptions] = useState<string[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
+  const [categories, setCategories] = useState<Record<string, any>[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
-  const [availableTypes, setAvailableTypes] = useState<any[]>([]);
+  const [availableTypes, setAvailableTypes] = useState<Record<string, any>[]>([]);
+  const [brandOptions, setBrandOptions] = useState<string[]>([]);
   const [locationOptions, setLocationOptions] = useState<string[]>([]);
   const [vendorOptions, setVendorOptions] = useState<string[]>([]);
   const [osTypeOptions, setOsTypeOptions] = useState<string[]>([]);
@@ -201,43 +123,43 @@ export default function AssetFormPage() {
   const [toastMsg, setToastMsg] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
   const [toastColor, setToastColor] = useState('#1e1b4b');
-  const toastTimer = useRef<any>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Duplicate check
   const [duplicates, setDuplicates] = useState<Record<string, boolean>>({});
-  const checkTimer = useRef<any>(null);
+  const checkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // GLPI Spec
-  const [glpiSpec, setGlpiSpec] = useState<any>(null);
+  const [glpiSpec, setGlpiSpec] = useState<Record<string, any> | null>(null);
   const [fetchingGLPI, setFetchingGLPI] = useState(false);
   const [glpiError, setGlpiError] = useState('');
 
+  // Owner Search AD
+  const [ownerSearchQuery, setOwnerSearchQuery] = useState('');
+  const [ownerOptions, setOwnerOptions] = useState<Record<string, any>[]>([]);
+  const [ownerLoading, setOwnerLoading] = useState(false);
+
+  useEffect(() => {
+    if (ownerSearchQuery.trim().length < 2) {
+      setOwnerOptions([]);
+      return;
+    }
+    const delayDebounceFn = setTimeout(async () => {
+      setOwnerLoading(true);
+      try {
+        const res = await assetAPI.searchOwners(ownerSearchQuery);
+        setOwnerOptions(Array.isArray(res.data) ? res.data : []);
+      } catch (err) {
+        console.error('Failed to search owners', err);
+      } finally {
+        setOwnerLoading(false);
+      }
+    }, 500);
+    return () => clearTimeout(delayDebounceFn);
+  }, [ownerSearchQuery]);
+
   // Brand suggestions
   const [brandSuggestions, setBrandSuggestions] = useState<string[]>([]);
-  const getBrandSuggestionsForType = (type: string): string[] => {
-    const suggestions: Record<string, string[]> = {
-      'notebook': ['Apple', 'ASUS', 'Dell', 'HP', 'Lenovo'],
-      'laptop': ['Apple', 'ASUS', 'Dell', 'HP', 'Lenovo'],
-      'macbook': ['Apple'],
-      'pc desktop': ['ASUS', 'Dell', 'HP', 'Lenovo'],
-      'desktop': ['ASUS', 'Dell', 'HP', 'Lenovo'],
-      'workstation': ['ASUS', 'Dell', 'HP', 'Lenovo'],
-      'monitor': ['ASUS', 'BenQ', 'Dell', 'HP', 'LG'],
-      'printer': ['Brother', 'Canon', 'HP', 'Xerox'],
-      'router': ['Cisco', 'D-Link', 'Fortinet', 'TP-Link', 'Ubiquiti'],
-      'switch': ['Cisco', 'D-Link', 'Fortinet', 'TP-Link', 'Ubiquiti'],
-      'access point': ['Cisco', 'D-Link', 'Ubiquiti'],
-      'keyboard': ['ASUS', 'Cherry', 'Corsair', 'Logitech', 'Razer'],
-      'mouse': ['ASUS', 'Corsair', 'Logitech', 'Razer', 'SteelSeries'],
-      'headset': ['ASUS', 'Corsair', 'Logitech', 'Plantronics', 'Razer'],
-      'webcam': ['Corsair', 'Logitech', 'Microsoft', 'Razer'],
-    };
-    const t = type?.toLowerCase() || '';
-    for (const [key, brands] of Object.entries(suggestions)) {
-      if (t.includes(key)) return brands;
-    }
-    return [];
-  };
 
   const handleFetchGLPISpec = async () => {
     const serial = form.serialNo?.trim();
@@ -274,16 +196,35 @@ export default function AssetFormPage() {
     if (glpiSpec.user) setFormField('ownerName', 'ผู้ใช้งานหลัก (End User)', glpiSpec.user);
     if (glpiSpec.msOffice) setFormField('officeLicense', 'MS Office', glpiSpec.msOffice);
     if (glpiSpec.antivirus) setFormField('antivirusStatus', 'Antivirus', glpiSpec.antivirus);
+    if (glpiSpec.brand) setFormField('brand', 'ยี่ห้อ', glpiSpec.brand);
+    if (glpiSpec.model) setFormField('model', 'รุ่น', glpiSpec.model);
+
+    // New fields from expanded GLPI fetch
+    if (glpiSpec.storage1) setFormField('storage1', 'Storage 1', glpiSpec.storage1);
+    if (glpiSpec.storage2) setFormField('storage2', 'Storage 2', glpiSpec.storage2);
+    if (glpiSpec.gpu) setFormField('gpu', 'GPU', glpiSpec.gpu);
+    if (glpiSpec.osType) setFormField('osType', 'OS Type', glpiSpec.osType);
+    if (glpiSpec.ramSlot1) setFormField('ramSlot1', 'RAM Slot 1', glpiSpec.ramSlot1);
+    if (glpiSpec.ramSlot2) setFormField('ramSlot2', 'RAM Slot 2', glpiSpec.ramSlot2);
+    if (glpiSpec.domainName) setFormField('domainName', 'Domain Name', glpiSpec.domainName);
+    if (glpiSpec.location) setFormField('location', 'Location', glpiSpec.location);
     
     showToast('กรอกข้อมูลสเปคลงฟอร์มเรียบร้อยแล้ว', '#10b981');
   };
 
-  const checkDuplicate = useCallback(async (assetCode?: string, serialNo?: string, assetName?: string) => {
-    if (!assetCode && !serialNo && !assetName) { setDuplicates({}); return; }
+  const checkDuplicate = useCallback(async (assetCode?: string, serialNo?: string, assetName?: string, accountingCode?: string) => {
+    if (!assetCode && !serialNo && !assetName && !accountingCode) {
+      setDuplicates({});
+      return {};
+    }
     try {
-      const res = await assetAPI.checkDuplicate({ assetCode, serialNo, assetName, excludeId: id ? parseInt(id) : undefined });
-      setDuplicates(res.data.duplicates || {});
-    } catch { /* ignore */ }
+      const res = await assetAPI.checkDuplicate({ assetCode, accountingCode, serialNo, assetName, excludeId: id ? parseInt(id) : undefined });
+      const next = res.data.duplicates || {};
+      setDuplicates(next);
+      return next;
+    } catch {
+      return {};
+    }
   }, [id]);
 
   useEffect(() => {
@@ -291,9 +232,10 @@ export default function AssetFormPage() {
     const code = form.assetCode?.trim();
     const serial = form.serialNo?.trim();
     const name = form.assetName?.trim();
-    checkTimer.current = setTimeout(() => checkDuplicate(code || undefined, serial || undefined, name || undefined), 600);
+    const accountingCode = form.accountingCode?.trim();
+    checkTimer.current = setTimeout(() => checkDuplicate(code || undefined, serial || undefined, name || undefined, accountingCode || undefined), 600);
     return () => { if (checkTimer.current) clearTimeout(checkTimer.current); };
-  }, [form.assetCode, form.serialNo, form.assetName, checkDuplicate]);
+  }, [form.assetCode, form.serialNo, form.assetName, form.accountingCode, checkDuplicate]);
 
   const assetAge = useMemo(() => calculateAge(form.purchaseDate), [form.purchaseDate]);
 
@@ -319,36 +261,50 @@ export default function AssetFormPage() {
   /* ─── Load asset ─── */
   useEffect(() => {
     if (!id) return;
-    assetAPI.get(parseInt(id)).then((res) => {
-      const a = res.data;
-      const loaded: any = {
-        assetCode: a.assetCode || '', assetName: a.assetName || '',
-        serialNo: a.serialNo || '', type: a.type || '',
-        brand: a.brand || '', model: a.model || '',
-        cpu: a.cpu || '', cpuGeneration: a.cpuGeneration || '',
-        ram: a.ram || '', ramSlot1: a.ramSlot1 || '', ramSlot2: a.ramSlot2 || '',
-        gpu: a.gpu || '', storage1: a.storage1 || '', storage2: a.storage2 || '',
-        osType: a.osType || 'Windows', osVersion: a.osVersion || '',
-        officeLicense: a.officeLicense || '', antivirusStatus: a.antivirusStatus || '',
-        domainName: a.domainName || '', snComputer: a.snComputer || '',
-        windowsLicense: a.windowsLicense || '',
-        vendor: a.vendor || '', poNumber: a.poNumber || '',
-        poDate: a.poDate ? a.poDate.split('T')[0] : '',
-        prNumber: a.prNumber || '',
-        purchaseDate: a.purchaseDate ? a.purchaseDate.split('T')[0] : '',
-        purchasePrice: a.purchasePrice != null ? String(a.purchasePrice) : '',
-        warrantyEndDate: a.warrantyEndDate ? a.warrantyEndDate.split('T')[0] : '',
-        ownerName: a.ownerName || '', departmentId: a.departmentId || '',
-        location: a.location || '', floor: a.floor || '',
-        company: a.company || '', oldAssetCode: a.oldAssetCode || '',
-        budget: a.budget || '', status: a.status || 'Available', remark: a.remark || '',
-      };
-      setForm(loaded);
-      setOriginalSnapshot({ ...loaded });
-      if (a.image) setImagePreview(a.image);
-      if (a.detail) setDetail(a.detail);
-      if (a.categoryId) setInitialCategoryId(a.categoryId);
-    }).finally(() => setFetching(false));
+    setFetching(true);
+    setError('');
+    setSubmitAttempted(false);
+    assetAPI.get(parseInt(id))
+      .then((res) => {
+        const a = res.data;
+        const loaded: Record<string, any> = {
+          assetCode: a.assetCode || '', accountingCode: a.accountingCode || '', assetName: a.assetName || '',
+          serialNo: a.serialNo || '', type: a.type || '',
+          brand: a.brand || '', model: a.model || '',
+          cpu: a.cpu || '', cpuGeneration: a.cpuGeneration || '',
+          ram: a.ram || '', ramSlot1: a.ramSlot1 || '', ramSlot2: a.ramSlot2 || '',
+          memoryType: a.memoryType || 'Slot', ramOnboard: a.ramOnboard || '',
+          ramType: a.ramType || '', ramSpeed: a.ramSpeed || '',
+          ramMaxSupported: a.ramMaxSupported || '', ramAvailableSlots: a.ramAvailableSlots || '',
+          ramUpgradeable: a.ramUpgradeable || '',
+          gpu: a.gpu || '', storage1: a.storage1 || '', storage2: a.storage2 || '',
+          osType: a.osType || 'Windows', osVersion: a.osVersion || '',
+          officeLicense: a.officeLicense || '', antivirusStatus: a.antivirusStatus || '',
+          domainName: a.domainName || '', snComputer: a.snComputer || '',
+          windowsLicense: a.windowsLicense || '',
+          vendor: a.vendor || '', poNumber: a.poNumber || '',
+          poDate: a.poDate ? a.poDate.split('T')[0] : '',
+          prNumber: a.prNumber || '',
+          purchaseDate: a.purchaseDate ? a.purchaseDate.split('T')[0] : '',
+          purchasePrice: a.purchasePrice != null ? String(a.purchasePrice) : '',
+          warrantyEndDate: a.warrantyEndDate ? a.warrantyEndDate.split('T')[0] : '',
+          ownerName: a.ownerName || '', departmentId: a.departmentId || '',
+          location: a.location || '', floor: a.floor || '',
+          company: a.company || '', oldAssetCode: a.oldAssetCode || '',
+          budget: a.budget || '', status: a.status || 'Available', remark: a.remark || '',
+        };
+        setForm(loaded);
+        setOriginalSnapshot({ ...loaded });
+        if (a.image) setImagePreview(a.image);
+        if (a.detail) setDetail(a.detail);
+        if (a.categoryId) setInitialCategoryId(a.categoryId);
+      })
+      .catch((err: any) => {
+        const msg = err.response?.data?.error || 'ไม่สามารถโหลดข้อมูลทรัพย์สินได้';
+        setError(msg);
+        showToast('❌ ' + msg, '#dc2626');
+      })
+      .finally(() => setFetching(false));
   }, [id]);
 
   /* ─── Load options ─── */
@@ -357,6 +313,7 @@ export default function AssetFormPage() {
     import('../../services/api').then(({ categoryAPI }) => {
       categoryAPI.list().then((res) => setCategories(res.data || [])).catch(() => {});
     });
+    assetAPI.brandOptions().then((res) => setBrandOptions(res.data || [])).catch(() => {});
     assetAPI.locationOptions().then((res) => setLocationOptions(res.data || [])).catch(() => {});
     assetAPI.vendorOptions().then((res) => setVendorOptions(res.data || [])).catch(() => {});
     assetAPI.osTypeOptions().then((res) => setOsTypeOptions(res.data || [])).catch(() => {});
@@ -366,10 +323,31 @@ export default function AssetFormPage() {
     assetAPI.antivirusOptions().then((res) => setAntivirusOptions(res.data || [])).catch(() => {});
     assetAPI.statusOptions()
       .then((res) => {
-        const opts = (res.data || []).map((item: any) => ({
-          value: item.code, label: item.name,
-          cls: item.code === 'Available' ? 's-available' : item.code === 'Maintenance' ? 's-maintenance' : item.code === 'Retired' ? 's-retired' : 's-reserved',
-        }));
+        const opts = (res.data || []).map((item: Record<string, any>) => {
+          let icon = '';
+          if (item.code === 'Available') icon = '✅ ';
+          else if (item.code === 'Borrowed') icon = '🔒 ';
+          else if (item.code === 'InUse') icon = '💼 ';
+          else if (item.code === 'Maintenance') icon = '🔧 ';
+          else if (item.code === 'Retired') icon = '🗑 ';
+          else if (item.code === 'Lost') icon = '❌ ';
+
+          const thaiNames: Record<string, string> = {
+            Available: 'พร้อมใช้งาน',
+            Borrowed: 'กำลังยืม',
+            InUse: 'ใช้งานประจำ',
+            Maintenance: 'ซ่อมบำรุง',
+            Retired: 'ปลดระวาง/เตรียมบริจาค',
+            Lost: 'สูญหาย'
+          };
+          const thaiName = thaiNames[item.code] || item.name;
+
+          return {
+            value: item.code, 
+            label: `${icon}${item.code} - ${thaiName}`,
+            cls: item.code === 'Available' ? 's-available' : item.code === 'Maintenance' ? 's-maintenance' : item.code === 'Retired' ? 's-retired' : 's-reserved',
+          };
+        });
         setStatusOptions(opts.length ? opts : fallbackStatusOptions);
       })
       .catch(() => setStatusOptions(fallbackStatusOptions));
@@ -403,7 +381,7 @@ export default function AssetFormPage() {
   }, [form.type]);
 
   /* ─── Field change tracking ─── */
-  function trackChange(field: string, label: string, newVal: string) {
+  const trackChange = useCallback((field: string, label: string, newVal: string) => {
     const orig = originalSnapshot[field] ?? '';
     setChanges(prev => {
       const next = { ...prev };
@@ -414,29 +392,32 @@ export default function AssetFormPage() {
       }
       return next;
     });
-  }
+  }, [originalSnapshot]);
 
-  function setFormField(field: string, label: string, value: string) {
-    setForm((prev: any) => ({ ...prev, [field]: value }));
+  const setFormField = useCallback((field: string, label: string, value: string) => {
+    setForm((prev: Record<string, any>) => ({ ...prev, [field]: value }));
     if (id) trackChange(field, label, value);
-  }
+  }, [id, trackChange]);
 
-  function setDetailField(field: string, value: any) {
+  const setDetailField = useCallback((field: string, value: any) => {
     setDetail(prev => ({ ...prev, [field]: value }));
-  }
+  }, []);
 
   /* ─── Toast ─── */
   function showToast(msg: string, color = '#1e1b4b') {
     setToastMsg(msg);
     setToastColor(color);
     setToastVisible(true);
-    clearTimeout(toastTimer.current);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToastVisible(false), 3000);
   }
 
   /* ─── Submit ─── */
   const validateForm = (): string => {
     // Required fields validation
+    if (!id && !form.assetCode?.trim()) {
+      return 'เลขครุภัณฑ์ ต้องไม่ว่างเปล่า (สำหรับการสร้างใหม่)';
+    }
     if (!form.serialNo?.trim()) {
       return 'Serial Number ต้องไม่ว่างเปล่า';
     }
@@ -455,9 +436,6 @@ export default function AssetFormPage() {
     if (!form.departmentId?.trim()) {
       return 'แผนก ต้องไม่ว่างเปล่า';
     }
-    if (!form.ownerName?.trim()) {
-      return 'ผู้ถือครอง ต้องไม่ว่างเปล่า';
-    }
 
     // Warranty date validation
     if (form.purchaseDate && form.warrantyEndDate) {
@@ -475,6 +453,26 @@ export default function AssetFormPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitAttempted(true);
+
+    const latestDuplicates = await checkDuplicate(
+      form.assetCode?.trim() || undefined,
+      form.serialNo?.trim() || undefined,
+      form.assetName?.trim() || undefined,
+      form.accountingCode?.trim() || undefined
+    );
+    if ((!id && latestDuplicates.assetCode) || latestDuplicates.serialNo || latestDuplicates.assetName || latestDuplicates.accountingCode) {
+      const msg = latestDuplicates.assetCode
+        ? 'เลขครุภัณฑ์นี้มีอยู่ในระบบแล้ว'
+        : latestDuplicates.accountingCode
+          ? 'เลขครุภัณฑ์ (ฝ่ายบัญชี) นี้มีอยู่ในระบบแล้ว'
+          : latestDuplicates.serialNo
+            ? 'Serial number นี้มีอยู่ในระบบแล้ว'
+            : 'ชื่อทรัพย์สินนี้มีอยู่ในระบบแล้ว';
+      setError(msg);
+      showToast('⚠️ ' + msg, '#b45309');
+      return;
+    }
     
     // Validate all required fields
     const validError = validateForm();
@@ -502,7 +500,7 @@ export default function AssetFormPage() {
   const handleImageUpload = async (file: File) => {
     if (!id) { setImageError('กรุณาบันทึกทรัพย์สินก่อนอัพโหลดรูปภาพ'); return; }
     if (!file.type.startsWith('image/')) { setImageError('กรุณาเลือกไฟล์รูปภาพเท่านั้น'); return; }
-    if (file.size > 5 * 1024 * 1024) { setImageError('ขนาดไฟล์ต้องไม่เกิน 5MB'); return; }
+    if (file.size > 10 * 1024 * 1024) { setImageError('ขนาดไฟล์ต้องไม่เกิน 10MB'); return; }
     setImageUploading(true); setImageError('');
     try {
       const formData = new FormData();
@@ -524,24 +522,26 @@ export default function AssetFormPage() {
   const hasChanges = changeCount > 0;
 
   /* ─── Loading state ─── */
-  if (fetching) return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-      <CircularProgress size={32} />
-    </Box>
-  );
+  if (fetching) return <LoadingSkeleton type="form" count={6} />;
 
   const icon = getTypeIcon(form.type);
 
   return (
     <Box sx={{ position: 'relative', minHeight: '80vh', pb: 10 }}>
       {/* Background Orbs */}
-      <Box sx={{ position: 'fixed', borderRadius: '50%', filter: 'blur(80px)', pointerEvents: 'none', zIndex: 0, width: 420, height: 420, bgcolor: 'rgba(99,102,241,.08)', top: -140, left: -100 }} />
-      <Box sx={{ position: 'fixed', borderRadius: '50%', filter: 'blur(80px)', pointerEvents: 'none', zIndex: 0, width: 300, height: 300, bgcolor: 'rgba(139,92,246,.07)', bottom: -80, right: -60 }} />
-      <Box sx={{ position: 'fixed', inset: 0, backgroundImage: 'radial-gradient(circle,rgba(99,102,241,.08) 1px,transparent 1px)', backgroundSize: '28px 28px', pointerEvents: 'none', zIndex: 0 }} />
+      <Box sx={{ position: 'fixed', borderRadius: '50%', filter: 'blur(80px)', pointerEvents: 'none', zIndex: 0, width: 420, height: 420, bgcolor: alpha(theme.palette.primary.main, .08), top: -140, left: -100 }} />
+      <Box sx={{ position: 'fixed', borderRadius: '50%', filter: 'blur(80px)', pointerEvents: 'none', zIndex: 0, width: 300, height: 300, bgcolor: alpha(theme.palette.info.main, .07), bottom: -80, right: -60 }} />
+      <Box sx={{ position: 'fixed', inset: 0, backgroundImage: `radial-gradient(circle,${alpha(theme.palette.primary.main, .08)} 1px,transparent 1px)`, backgroundSize: '28px 28px', pointerEvents: 'none', zIndex: 0 }} />
 
       <Container maxWidth="md" sx={{ position: 'relative', zIndex: 1, pt: 1 }}>
-        
-        {/* Breadcrumb */}
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h4" fontWeight={800} sx={{ letterSpacing: '-0.02em', mb: 0.5 }}>
+            {id ? 'แก้ไขข้อมูลทรัพย์สิน' : 'ลงทะเบียนทรัพย์สินใหม่'}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" fontWeight={500}>
+            {id ? `เลขครุภัณฑ์: ${form.assetCode || form.serialNo}` : 'กรอกข้อมูลพื้นฐานและรายละเอียดเพื่อนำอุปกรณ์เข้าสู่ระบบ'}
+          </Typography>
+        </Box>
         <Breadcrumbs separator={<NavigateNextIcon fontSize="small" sx={{ color: 'text.disabled' }} />} aria-label="breadcrumb" sx={{ mb: 2 }}>
           <Link component="button" onClick={() => navigate('/assets')} sx={{ textDecoration: 'none', color: 'primary.main', fontWeight: 600, border: 'none', bg: 'none', p: 0, cursor: 'pointer', outline: 'none' }}>
             ทรัพย์สิน IT
@@ -558,11 +558,11 @@ export default function AssetFormPage() {
 
         {/* Page header */}
         <Card sx={{
-          background: 'rgba(255, 255, 255, 0.65)',
-          border: '1px solid rgba(255, 255, 255, 0.85)',
+          background: alpha(theme.palette.background.paper, 0.72),
+          border: `1px solid ${alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.22 : 0.14)}`,
           backdropFilter: 'blur(20px)',
           borderRadius: '14px',
-          boxShadow: '0 4px 24px rgba(99, 102, 241, 0.07), 0 1px 3px rgba(0, 0, 0, 0.04)',
+          boxShadow: `0 4px 24px ${alpha(theme.palette.primary.main, 0.08)}, 0 1px 3px rgba(0, 0, 0, 0.04)`,
           p: 1,
           mb: 2.5
         }}>
@@ -571,9 +571,9 @@ export default function AssetFormPage() {
               width: 46,
               height: 46,
               borderRadius: '12px',
-              background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+              background: `linear-gradient(135deg, ${theme.palette.primary.light}, ${theme.palette.primary.dark})`,
               fontSize: '22px',
-              boxShadow: '0 4px 14px rgba(99, 102, 241, 0.3)',
+              boxShadow: `0 4px 14px ${alpha(theme.palette.primary.main, 0.3)}`,
               flexShrink: 0
             }}>
               {icon}
@@ -584,7 +584,7 @@ export default function AssetFormPage() {
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mt: 0.5 }}>
                 {form.assetCode && (
-                  <Chip label={form.assetCode} size="small" sx={{ fontFamily: 'monospace', fontWeight: 700, height: 20, bgcolor: 'rgba(99,102,241,.09)', color: 'primary.dark' }} />
+                  <Chip label={form.assetCode} size="small" sx={{ fontFamily: 'monospace', fontWeight: 700, height: 20, bgcolor: alpha(theme.palette.primary.main, .09), color: 'primary.dark' }} />
                 )}
                 {(form.brand || form.model) && (
                   <Typography variant="caption" color="text.secondary">
@@ -674,14 +674,27 @@ export default function AssetFormPage() {
             <Grid container spacing={2}>
               <Grid item xs={12} sm={6}>
                 <TextField
-                  label="เลขครุภัณฑ์ (Asset Code)"
+                  label="เลขครุภัณฑ์ (Asset Code) *"
                   value={form.assetCode}
                   onChange={e => setFormField('assetCode', 'เลขครุภัณฑ์ (Asset Code)', e.target.value)}
                   placeholder="เช่น HQ-PS-N001"
                   fullWidth
                   size="small"
-                  error={!!duplicates.assetCode}
-                  helperText={duplicates.assetCode ? '⚠️ เลขครุภัณฑ์นี้มีอยู่ในระบบแล้ว' : ''}
+                  required={!id}
+                  error={!!duplicates.assetCode || (submitAttempted && !id && !form.assetCode?.trim())}
+                  helperText={duplicates.assetCode ? '⚠️ เลขครุภัณฑ์นี้มีอยู่ในระบบแล้ว' : (submitAttempted && !id && !form.assetCode?.trim() ? 'กรุณาระบุเลขครุภัณฑ์' : '')}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="เลขครุภัณฑ์ (ฝ่ายบัญชี) — ถ้ามี"
+                  value={form.accountingCode}
+                  onChange={e => setFormField('accountingCode', 'เลขครุภัณฑ์ (ฝ่ายบัญชี)', e.target.value)}
+                  placeholder="กรอกเมื่อทราบเลขครุภัณฑ์จริงจากฝ่ายบัญชี ไม่ทราบเว้นว่างไว้ได้"
+                  fullWidth
+                  size="small"
+                  error={!!duplicates.accountingCode}
+                  helperText={duplicates.accountingCode ? '⚠️ เลขครุภัณฑ์นี้มีอยู่ในระบบแล้ว' : ''}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -693,21 +706,28 @@ export default function AssetFormPage() {
                   fullWidth
                   size="small"
                   required
-                  error={!form.assetName?.trim() && form.assetName !== ''}
-                  helperText={duplicates.assetName ? '⚠️ ชื่อทรัพย์สินนี้มีอยู่ในระบบแล้ว' : ''}
+                  error={!!duplicates.assetName || (submitAttempted && !form.assetName?.trim())}
+                  helperText={duplicates.assetName ? '⚠️ ชื่อทรัพย์สินนี้มีอยู่ในระบบแล้ว' : (submitAttempted && !form.assetName?.trim() ? 'กรุณาระบุชื่อทรัพย์สิน' : '')}
                 />
               </Grid>
               <Grid item xs={12} sm={4}>
-                <TextField
-                  label="ยี่ห้อ (Brand) *"
+                <Autocomplete
+                  freeSolo
+                  options={brandSuggestions.length > 0 ? brandSuggestions : brandOptions}
                   value={form.brand}
-                  onChange={e => setFormField('brand', 'ยี่ห้อ', e.target.value)}
-                  placeholder="เช่น Dell, HP, Lenovo"
-                  fullWidth
-                  size="small"
-                  required
-                  error={!form.brand?.trim() && form.brand !== ''}
-                  helperText={brandSuggestions.length > 0 && !form.brand ? `💡 แนะนำ: ${brandSuggestions.join(', ')}` : ''}
+                  onInputChange={(_, newInputValue) => setFormField('brand', 'ยี่ห้อ', newInputValue)}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="ยี่ห้อ (Brand) *"
+                      placeholder="เช่น Dell, HP, Lenovo"
+                      fullWidth
+                      size="small"
+                      required
+                      error={submitAttempted && !form.brand?.trim()}
+                      helperText={submitAttempted && !form.brand?.trim() ? 'กรุณาระบุยี่ห้อ' : (brandSuggestions.length > 0 && !form.brand ? `💡 แนะนำ: ${brandSuggestions.join(', ')}` : '')}
+                    />
+                  )}
                 />
               </Grid>
               <Grid item xs={12} sm={4}>
@@ -730,8 +750,16 @@ export default function AssetFormPage() {
                     fullWidth
                     size="small"
                     required
-                    error={!form.serialNo?.trim() && form.serialNo !== ''}
-                    helperText={duplicates.serialNo ? '⚠️ Serial number นี้มีอยู่ในระบบแล้ว' : ''}
+                    error={!!duplicates.serialNo || (submitAttempted && (!form.serialNo?.trim() || !/^[A-Z0-9\-_\.]+$/i.test(form.serialNo)))}
+                    helperText={
+                      duplicates.serialNo
+                        ? '⚠️ Serial number นี้มีอยู่ในระบบแล้ว'
+                        : (submitAttempted && !form.serialNo?.trim()
+                          ? 'กรุณาระบุ Serial Number'
+                          : (submitAttempted && form.serialNo?.trim() && !/^[A-Z0-9\-_\.]+$/i.test(form.serialNo)
+                            ? 'Serial Number ต้องเป็นตัวอักษร ตัวเลข หรือ ขีดกลาง'
+                            : ''))
+                    }
                   />
                   {isComputer && (
                     <Button
@@ -746,11 +774,11 @@ export default function AssetFormPage() {
                         fontSize: '0.75rem',
                         py: 0.5,
                         borderRadius: '8px',
-                        borderColor: '#0071e3',
-                        color: '#0071e3',
+                        borderColor: theme.palette.primary.main,
+                        color: theme.palette.primary.main,
                         '&:hover': {
-                          borderColor: '#0077ed',
-                          bgcolor: 'rgba(0, 113, 227, 0.04)'
+                          borderColor: theme.palette.primary.dark,
+                          bgcolor: alpha(theme.palette.primary.main, 0.04)
                         }
                       }}
                     >
@@ -758,37 +786,60 @@ export default function AssetFormPage() {
                     </Button>
                   )}
                   {glpiSpec && (
-                    <Card sx={{
-                      mt: 1,
-                      border: '1px solid rgba(0, 113, 227, 0.15)',
-                      borderRadius: '10px',
-                      bgcolor: 'rgba(0, 113, 227, 0.02)',
-                      boxShadow: 'none',
-                      overflow: 'hidden'
-                    }}>
-                      <Box sx={{ bgcolor: 'rgba(0, 113, 227, 0.05)', p: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Accordion
+                      defaultExpanded={true}
+                      sx={{
+                        mt: 1,
+                        border: `1px solid ${alpha(theme.palette.primary.main, 0.15)}`,
+                        borderRadius: '10px !important',
+                        bgcolor: alpha(theme.palette.primary.main, 0.02),
+                        boxShadow: 'none',
+                        overflow: 'hidden',
+                        '&:before': { display: 'none' }
+                      }}
+                    >
+                      <AccordionSummary
+                        expandIcon={<ExpandMoreIcon sx={{ fontSize: 18, color: 'primary.main' }} />}
+                        sx={{
+                          bgcolor: alpha(theme.palette.primary.main, 0.05),
+                          p: '0 8px',
+                          minHeight: '36px !important',
+                          '& .MuiAccordionSummary-content': { 
+                            m: '0 !important',
+                            display: 'flex', 
+                            justifyContent: 'space-between', 
+                            alignItems: 'center',
+                            mr: 1
+                          } 
+                        }}
+                      >
                         <Typography variant="caption" fontWeight={700} color="primary.main">
                           พบข้อมูลสเปคใน GLPI
                         </Typography>
                         <Button
                           variant="contained"
                           size="small"
-                          onClick={handleAutoFillGLPI}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAutoFillGLPI();
+                          }}
                           sx={{
                             fontSize: '0.65rem',
                             fontWeight: 700,
                             py: 0.25,
                             px: 1,
                             borderRadius: '5px',
-                            bgcolor: '#0071e3',
-                            '&:hover': { bgcolor: '#0077ed' },
-                            textTransform: 'none'
+                            bgcolor: theme.palette.primary.main,
+                            '&:hover': { bgcolor: theme.palette.primary.dark },
+                            textTransform: 'none',
+                            ml: 'auto',
+                            mr: 1
                           }}
                         >
                           กรอกอัตโนมัติ
                         </Button>
-                      </Box>
-                      <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                      </AccordionSummary>
+                      <AccordionDetails sx={{ p: 1.5 }}>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                           <Typography variant="caption" sx={{ fontSize: '0.75rem', color: 'text.secondary', display: 'flex', justifyContent: 'space-between' }}>
                             <strong>ชื่อ:</strong> <span>{glpiSpec.name || '—'}</span>
@@ -807,9 +858,29 @@ export default function AssetFormPage() {
                               <strong>License:</strong> <span style={{ textAlign: 'right', maxWidth: '70%', wordBreak: 'break-all' }}>{glpiSpec.license || '—'}</span>
                             </Typography>
                           )}
+                          {glpiSpec.storage1 && (
+                            <Typography variant="caption" sx={{ fontSize: '0.75rem', color: 'text.secondary', display: 'flex', justifyContent: 'space-between' }}>
+                              <strong>Storage:</strong> <span>{glpiSpec.storage1}{glpiSpec.storage2 ? ` / ${glpiSpec.storage2}` : ''}</span>
+                            </Typography>
+                          )}
+                          {glpiSpec.gpu && (
+                            <Typography variant="caption" sx={{ fontSize: '0.75rem', color: 'text.secondary', display: 'flex', justifyContent: 'space-between' }}>
+                              <strong>GPU:</strong> <span style={{ textAlign: 'right', maxWidth: '70%', wordBreak: 'break-all' }}>{glpiSpec.gpu}</span>
+                            </Typography>
+                          )}
+                          {glpiSpec.location && (
+                            <Typography variant="caption" sx={{ fontSize: '0.75rem', color: 'text.secondary', display: 'flex', justifyContent: 'space-between' }}>
+                              <strong>Location:</strong> <span>{glpiSpec.location}</span>
+                            </Typography>
+                          )}
+                          {glpiSpec.domainName && (
+                            <Typography variant="caption" sx={{ fontSize: '0.75rem', color: 'text.secondary', display: 'flex', justifyContent: 'space-between' }}>
+                              <strong>Domain:</strong> <span>{glpiSpec.domainName}</span>
+                            </Typography>
+                          )}
                         </Box>
-                      </CardContent>
-                    </Card>
+                      </AccordionDetails>
+                    </Accordion>
                   )}
                 </Box>
               </Grid>
@@ -842,10 +913,11 @@ export default function AssetFormPage() {
                   fullWidth
                   size="small"
                   required
-                  error={!form.type?.trim() && form.type !== ''}
+                  error={submitAttempted && !form.type?.trim()}
+                  helperText={submitAttempted && !form.type?.trim() ? 'กรุณาเลือกประเภทอุปกรณ์' : ''}
                 >
                   <MenuItem value="">ไม่ระบุ</MenuItem>
-                  {(selectedCategory ? availableTypes : typeOptions.map(t => ({ name: t }))).map((opt: any) => (
+                  {(selectedCategory ? availableTypes : typeOptions.map(t => ({ name: t }))).map((opt: Record<string, any>) => (
                     <MenuItem key={opt.name || opt} value={opt.name || opt}>{opt.name || opt}</MenuItem>
                   ))}
                 </TextField>
@@ -856,69 +928,166 @@ export default function AssetFormPage() {
           {/* ② ข้อมูลการครอบครองและตำแหน่งพิกัด */}
           <SectionCard title="ข้อมูลการครอบครองและตำแหน่งพิกัด" sub="Ownership & Location" barColor="linear-gradient(180deg,#8b5cf6,#a855f7)">
             <Grid container spacing={2}>
+
+              {/* — Sub-group: ผู้ใช้งาน / บริษัท / แผนก — */}
+              <Grid item xs={12}>
+                <Typography variant="caption" fontWeight={700} color="text.disabled" sx={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: '0.7rem' }}>
+                  👤 ผู้ครอบครองและองค์กร
+                </Typography>
+              </Grid>
+
               <Grid item xs={12} sm={4}>
-                <TextField
-                  label="ผู้ใช้งานหลัก (End User) *"
-                  value={form.ownerName}
-                  onChange={e => setFormField('ownerName', 'ผู้รับผิดชอบหลัก', e.target.value)}
-                  placeholder="ชื่อ-นามสกุล ผู้ใช้งานหลัก"
-                  fullWidth
-                  size="small"
-                  required
-                  error={!form.ownerName?.trim() && form.ownerName !== ''}
+                <Autocomplete
+                  freeSolo
+                  options={ownerOptions}
+                  getOptionLabel={(option) => {
+                    if (typeof option === 'string') return option;
+                    if (option.displayName) return option.displayName;
+                    if (option.adUsername) return option.adUsername;
+                    return '';
+                  }}
+                  filterOptions={(x) => x}
+                  loading={ownerLoading}
+                  value={form.ownerName || ''}
+                  onInputChange={(_, newInputValue) => {
+                    setOwnerSearchQuery(newInputValue);
+                    setFormField('ownerName', 'ผู้ใช้งานหลัก (End User)', newInputValue);
+                  }}
+                  onChange={(_, newValue) => {
+                    if (typeof newValue === 'object' && newValue !== null) {
+                      setFormField('ownerName', 'ผู้ใช้งานหลัก (End User)', newValue.displayName || '');
+                      if (newValue.department && !form.departmentId) {
+                        setFormField('departmentId', 'แผนก', newValue.department);
+                        setDepartmentOptions(prev => prev.includes(newValue.department) ? prev : [...prev, newValue.department].sort());
+                      }
+                      if (newValue.company && !form.company) {
+                        setFormField('company', 'บริษัท', newValue.company);
+                        setCompanyOptions(prev => prev.includes(newValue.company) ? prev : [...prev, newValue.company].sort());
+                      }
+                    }
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="ผู้ใช้งานหลัก (ถ้ามี)"
+                      placeholder="พิมพ์ค้นหา..."
+                      fullWidth
+                      size="small"
+                      InputProps={{
+                        ...params.InputProps,
+                        endAdornment: (
+                          <React.Fragment>
+                            {ownerLoading ? <CircularProgress color="inherit" size={20} /> : null}
+                            {params.InputProps.endAdornment}
+                          </React.Fragment>
+                        ),
+                      }}
+                    />
+                  )}
+                  renderOption={(props, option) => {
+                    const { key, ...otherProps } = props as Record<string, any>;
+                    return (
+                      <li key={option.adUsername || option.displayName || Math.random()} {...otherProps}>
+                        <Box>
+                          <Typography variant="body2">{option.displayName || option.adUsername}</Typography>
+                          {(option.department || option.company) && (
+                            <Typography variant="caption" color="textSecondary" sx={{ display: 'block' }}>
+                              {[option.department, option.company].filter(Boolean).join(' · ')}
+                            </Typography>
+                          )}
+                        </Box>
+                      </li>
+                    );
+                  }}
                 />
               </Grid>
+
               <Grid item xs={12} sm={4}>
-                <TextField
-                  select
-                  label="แผนกที่ใช้งาน *"
-                  value={form.departmentId}
-                  onChange={e => setFormField('departmentId', 'แผนก', e.target.value)}
-                  fullWidth
-                  size="small"
-                  required
-                  error={!form.departmentId?.trim() && form.departmentId !== ''}
-                >
-                  <MenuItem value="">ไม่ระบุ</MenuItem>
-                  {departmentOptions.map(d => <MenuItem key={d} value={d}>{d}</MenuItem>)}
-                </TextField>
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <TextField
-                  select
-                  label="บริษัท (Company)"
+                <Autocomplete
+                  freeSolo
+                  options={companyOptions}
                   value={form.company}
-                  onChange={e => setFormField('company', 'Company', e.target.value)}
-                  fullWidth
-                  size="small"
-                >
-                  <MenuItem value="">ไม่ระบุ</MenuItem>
-                  {companyOptions.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}
-                </TextField>
+                  onInputChange={(_, newInputValue) => setFormField('company', 'Company', newInputValue)}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="บริษัท (Company)"
+                      fullWidth
+                      size="small"
+                    />
+                  )}
+                />
               </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  select
-                  label="สถานที่ติดตั้ง / อาคาร"
+
+              <Grid item xs={12} sm={4}>
+                <Autocomplete
+                  freeSolo
+                  options={departmentOptions}
+                  value={form.departmentId}
+                  onInputChange={(_, newInputValue) => setFormField('departmentId', 'แผนก', newInputValue)}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="แผนกที่ใช้งาน *"
+                      fullWidth
+                      size="small"
+                      required
+                      error={submitAttempted && !form.departmentId?.trim()}
+                      helperText={submitAttempted && !form.departmentId?.trim() ? 'กรุณาระบุแผนก' : ''}
+                    />
+                  )}
+                />
+              </Grid>
+
+              {/* — Divider — */}
+              <Grid item xs={12}>
+                <Box sx={{ borderTop: '1px dashed rgba(139,92,246,0.15)', pt: 1.5, mt: 0.5 }}>
+                  <Typography variant="caption" fontWeight={700} color="text.disabled" sx={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: '0.7rem' }}>
+                    📍 ตำแหน่งที่ตั้ง
+                  </Typography>
+                </Box>
+              </Grid>
+
+              <Grid item xs={12} sm={4}>
+                <Autocomplete
+                  freeSolo
+                  options={locationOptions}
                   value={form.location}
-                  onChange={e => setFormField('location', 'Location', e.target.value)}
-                  fullWidth
-                  size="small"
-                >
-                  <MenuItem value="">ไม่ระบุ</MenuItem>
-                  {locationOptions.map(l => <MenuItem key={l} value={l}>{l}</MenuItem>)}
-                </TextField>
+                  onInputChange={(_, newInputValue) => setFormField('location', 'Location', newInputValue)}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="สถานที่ติดตั้ง / อาคาร"
+                      fullWidth
+                      size="small"
+                    />
+                  )}
+                />
               </Grid>
-              <Grid item xs={12} sm={6}>
+
+              <Grid item xs={12} sm={4}>
                 <TextField
                   label="ชั้น / บริเวณห้อง"
                   value={form.floor}
                   onChange={e => setFormField('floor', 'ชั้น', e.target.value)}
-                  placeholder="เช่น ชั้น 4 ห้องประชุมใหญ่, B1 คลังพัสดุ"
+                  placeholder="เช่น ชั้น 4, ห้องประชุมใหญ่, B1"
                   fullWidth
                   size="small"
                 />
               </Grid>
+
+              <Grid item xs={12} sm={4}>
+                <TextField
+                  label="รหัสทรัพย์สินเดิม (Old Code)"
+                  value={form.oldAssetCode}
+                  onChange={e => setFormField('oldAssetCode', 'รหัสเดิม', e.target.value)}
+                  placeholder="เช่น IT-2022-001"
+                  fullWidth
+                  size="small"
+                  helperText="รหัสจากระบบเดิม (ถ้ามี)"
+                />
+              </Grid>
+
             </Grid>
           </SectionCard>
 
@@ -958,24 +1127,232 @@ export default function AssetFormPage() {
                 </Grid>
                 <Grid item xs={12} sm={4}>
                   <TextField
-                    label="RAM Slot 1"
-                    value={form.ramSlot1}
-                    onChange={e => setFormField('ramSlot1', 'RAM Slot 1', e.target.value)}
-                    placeholder="เช่น 8 GB"
+                    label="RAM"
+                    value={form.ram}
+                    onChange={e => setFormField('ram', 'RAM', e.target.value)}
+                    placeholder="เช่น 16 GB DDR5"
                     fullWidth
                     size="small"
                   />
                 </Grid>
-                <Grid item xs={12} sm={4}>
+              </Grid>
+            </SectionCard>
+          )}
+
+          {/* ③-B Memory Specification (Computer only) */}
+          {isComputer && !isMonitor && (
+            <SectionCard title="Memory Specification" barColor="linear-gradient(180deg,#7c3aed,#a78bfa)">
+              <Grid container spacing={2}>
+                {/* Memory Type Selector */}
+                <Grid item xs={12}>
+                  <Box sx={{
+                    display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap',
+                    p: 1.5, borderRadius: 2,
+                    background: 'linear-gradient(135deg, rgba(124,58,237,0.06) 0%, rgba(167,139,250,0.04) 100%)',
+                    border: '1px solid rgba(124,58,237,0.15)',
+                  }}>
+                    <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ minWidth: 'max-content' }}>
+                      Memory Type:
+                    </Typography>
+                    {[
+                      { value: 'Soldered', label: '🔩 Soldered (On-board)', desc: 'RAM บัดกรีติดเมนบอร์ด ถอดไม่ได้' },
+                      { value: 'Slot', label: '🧩 RAM Slot Only', desc: 'ติดตั้งผ่านสล็อตทั้งหมด' },
+                      { value: 'Hybrid', label: '⚡ Hybrid', desc: 'มีทั้ง On-board + Slot' },
+                    ].map(opt => (
+                      <Box
+                        key={opt.value}
+                        onClick={() => setFormField('memoryType', 'Memory Type', opt.value)}
+                        sx={{
+                          flex: '1 1 140px', cursor: 'pointer', borderRadius: 2,
+                          border: form.memoryType === opt.value
+                            ? '2px solid #7c3aed'
+                            : '2px solid transparent',
+                          background: form.memoryType === opt.value
+                            ? 'linear-gradient(135deg, rgba(124,58,237,0.12), rgba(167,139,250,0.08))'
+                            : 'rgba(0,0,0,0.03)',
+                          p: 1.2, textAlign: 'center', transition: 'all .2s',
+                          '&:hover': { borderColor: '#a78bfa', background: 'rgba(124,58,237,0.06)' },
+                          boxShadow: form.memoryType === opt.value ? '0 0 0 3px rgba(124,58,237,0.15)' : 'none',
+                        }}
+                      >
+                        <Typography variant="body2" fontWeight={600} sx={{ mb: 0.3, color: form.memoryType === opt.value ? '#7c3aed' : 'text.primary' }}>
+                          {opt.label}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.3, display: 'block' }}>
+                          {opt.desc}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </Grid>
+
+                {/* On-board RAM: shown for Soldered and Hybrid */}
+                {(form.memoryType === 'Soldered' || form.memoryType === 'Hybrid') && (
+                  <Grid item xs={12} sm={6} md={4}>
+                    <TextField
+                      label="On-board RAM (Soldered)"
+                      value={form.ramOnboard}
+                      onChange={e => setFormField('ramOnboard', 'On-board RAM', e.target.value)}
+                      placeholder="เช่น 8 GB"
+                      fullWidth size="small"
+                      InputProps={{
+                        startAdornment: <Box sx={{ mr: 1, fontSize: '1rem', lineHeight: 1 }}>🔩</Box>
+                      }}
+                      helperText="แรมฝังบัดกรี ถอดเปลี่ยนไม่ได้"
+                    />
+                  </Grid>
+                )}
+
+                {/* RAM Slot 1: shown for Slot and Hybrid */}
+                {(form.memoryType === 'Slot' || form.memoryType === 'Hybrid') && (
+                  <Grid item xs={12} sm={6} md={4}>
+                    <TextField
+                      label="RAM Slot 1"
+                      value={form.ramSlot1}
+                      onChange={e => setFormField('ramSlot1', 'RAM Slot 1', e.target.value)}
+                      placeholder="เช่น 16 GB"
+                      fullWidth size="small"
+                      InputProps={{
+                        startAdornment: <Box sx={{ mr: 1, fontSize: '1rem', lineHeight: 1 }}>🧩</Box>
+                      }}
+                    />
+                  </Grid>
+                )}
+
+                {/* RAM Slot 2: shown for Slot and Hybrid */}
+                {(form.memoryType === 'Slot' || form.memoryType === 'Hybrid') && (
+                  <Grid item xs={12} sm={6} md={4}>
+                    <TextField
+                      label="RAM Slot 2"
+                      value={form.ramSlot2}
+                      onChange={e => setFormField('ramSlot2', 'RAM Slot 2', e.target.value)}
+                      placeholder="เช่น 16 GB (ว่าง = ไม่มี)"
+                      fullWidth size="small"
+                      InputProps={{
+                        startAdornment: <Box sx={{ mr: 1, fontSize: '1rem', lineHeight: 1 }}>🧩</Box>
+                      }}
+                    />
+                  </Grid>
+                )}
+
+                {/* Total Installed RAM – Auto Calculated */}
+                <Grid item xs={12} sm={6} md={4}>
                   <TextField
-                    label="RAM Slot 2"
-                    value={form.ramSlot2}
-                    onChange={e => setFormField('ramSlot2', 'RAM Slot 2', e.target.value)}
-                    placeholder="เช่น 8 GB"
-                    fullWidth
-                    size="small"
+                    label="Total Installed RAM"
+                    value={(() => {
+                      const parseGB = (s: string) => {
+                        if (!s) return 0;
+                        const upper = s.toUpperCase();
+                        const matchGB = upper.match(/(\d+(?:\.\d+)?)\s*G/);
+                        if (matchGB) return parseFloat(matchGB[1]);
+                        const matchMB = upper.match(/(\d+(?:\.\d+)?)\s*M/);
+                        if (matchMB) return parseFloat(matchMB[1]) / 1024;
+                        
+                        const cleaned = upper.replace(/DDR\d/g, '').replace(/PC\d?-?\d+/g, '').replace(/\d+\s*MHZ/g, '');
+                        const m = cleaned.match(/(\d+(?:\.\d+)?)/);
+                        return m ? parseFloat(m[1]) : 0;
+                      };
+                      let total = 0;
+                      if (form.memoryType === 'Soldered') total = parseGB(form.ramOnboard);
+                      else if (form.memoryType === 'Slot') total = parseGB(form.ramSlot1) + parseGB(form.ramSlot2);
+                      else total = parseGB(form.ramOnboard) + parseGB(form.ramSlot1) + parseGB(form.ramSlot2);
+                      return total > 0 ? `${total} GB` : '';
+                    })()}
+                    placeholder="คำนวณอัตโนมัติ"
+                    fullWidth size="small"
+                    InputProps={{
+                      readOnly: true,
+                      startAdornment: <Box sx={{ mr: 1, fontSize: '1rem', lineHeight: 1 }}>💾</Box>,
+                      sx: {
+                        bgcolor: 'rgba(124,58,237,0.06)',
+                        '& .MuiInputBase-input': { fontWeight: 600, color: '#7c3aed' }
+                      }
+                    }}
+                    helperText="คำนวณจากฟิลด์ด้านบนอัตโนมัติ"
                   />
                 </Grid>
+
+                {/* RAM Type */}
+                <Grid item xs={12} sm={6} md={4}>
+                  <TextField
+                    select
+                    label="RAM Type"
+                    value={form.ramType}
+                    onChange={e => setFormField('ramType', 'RAM Type', e.target.value)}
+                    fullWidth size="small"
+                  >
+                    <MenuItem value="">ไม่ระบุ</MenuItem>
+                    {['DDR3', 'DDR4', 'DDR5', 'LPDDR3', 'LPDDR4', 'LPDDR4X', 'LPDDR5', 'LPDDR5X'].map(t => (
+                      <MenuItem key={t} value={t}>{t}</MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
+
+                {/* RAM Speed */}
+                <Grid item xs={12} sm={6} md={4}>
+                  <TextField
+                    label="RAM Speed"
+                    value={form.ramSpeed}
+                    onChange={e => setFormField('ramSpeed', 'RAM Speed', e.target.value)}
+                    placeholder="เช่น 4800 MHz, 6400 MT/s"
+                    fullWidth size="small"
+                  />
+                </Grid>
+
+                {/* Max Supported RAM */}
+                <Grid item xs={12} sm={6} md={4}>
+                  <TextField
+                    label="Maximum Supported RAM"
+                    value={form.ramMaxSupported}
+                    onChange={e => setFormField('ramMaxSupported', 'RAM Max Supported', e.target.value)}
+                    placeholder="เช่น 64 GB"
+                    fullWidth size="small"
+                    helperText="RAM สูงสุดที่เครื่องรองรับ"
+                  />
+                </Grid>
+
+                {/* Available Slots */}
+                {(form.memoryType === 'Slot' || form.memoryType === 'Hybrid') && (
+                  <Grid item xs={12} sm={6} md={4}>
+                    <TextField
+                      select
+                      label="Available Slots"
+                      value={form.ramAvailableSlots}
+                      onChange={e => setFormField('ramAvailableSlots', 'Available Slots', e.target.value)}
+                      fullWidth size="small"
+                      helperText="จำนวนสล็อตที่ว่างอยู่"
+                    >
+                      <MenuItem value="">ไม่ระบุ</MenuItem>
+                      {['0', '1', '2', '3', '4'].map(n => (
+                        <MenuItem key={n} value={n}>{n} slot{Number(n) > 1 ? 's' : ''} ว่าง</MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+                )}
+
+                {/* Upgradeable */}
+                <Grid item xs={12} sm={6} md={4}>
+                  <TextField
+                    select
+                    label="Upgradeable"
+                    value={form.ramUpgradeable}
+                    onChange={e => setFormField('ramUpgradeable', 'Upgradeable', e.target.value)}
+                    fullWidth size="small"
+                  >
+                    <MenuItem value="">ไม่ระบุ</MenuItem>
+                    <MenuItem value="Yes">✅ Yes – อัพเกรดได้</MenuItem>
+                    <MenuItem value="No">❌ No – อัพเกรดไม่ได้</MenuItem>
+                    <MenuItem value="Limited">⚠️ Limited – มีข้อจำกัด</MenuItem>
+                  </TextField>
+                </Grid>
+              </Grid>
+            </SectionCard>
+          )}
+
+          {/* ③-C GPU & Storage (Computer only) */}
+          {isComputer && !isMonitor && (
+            <SectionCard title="GPU & Storage" barColor="linear-gradient(180deg,#2563eb,#60a5fa)">
+              <Grid container spacing={2}>
                 <Grid item xs={12} sm={4}>
                   <TextField
                     label="GPU"
@@ -1648,14 +2025,12 @@ export default function AssetFormPage() {
                   />
                 </Grid>
                 <Grid item xs={12} sm={4}>
-                  <TextField
-                    type="date"
+                  <DatePicker
                     label="วันหมดอายุ"
-                    value={detail.expiryDate ? String(detail.expiryDate).split('T')[0] : ''}
-                    onChange={e => setDetailField('expiryDate', e.target.value)}
-                    fullWidth
-                    size="small"
-                    InputLabelProps={{ shrink: true }}
+                    format="DD/MM/YYYY"
+                    value={detail.expiryDate ? dayjs(detail.expiryDate) : null}
+                    onChange={(newVal) => setDetailField('expiryDate', newVal ? newVal.format('YYYY-MM-DD') : '')}
+                    slotProps={{ textField: { size: 'small', fullWidth: true, InputLabelProps: { shrink: true } } }}
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
@@ -1686,14 +2061,12 @@ export default function AssetFormPage() {
           <SectionCard title="ข้อมูลการจัดซื้อและการเงิน" sub="Procurement & Finance" barColor="linear-gradient(180deg,#059669,#34d399)">
             <Grid container spacing={2}>
               <Grid item xs={12} sm={4}>
-                <TextField
-                  type="date"
+                <DatePicker
                   label="วันที่จัดซื้อ / วันรับมอบ"
-                  value={form.purchaseDate}
-                  onChange={e => setFormField('purchaseDate', 'วันที่จัดซื้อ / วันรับมอบ', e.target.value)}
-                  fullWidth
-                  size="small"
-                  InputLabelProps={{ shrink: true }}
+                  format="DD/MM/YYYY"
+                  value={form.purchaseDate ? dayjs(form.purchaseDate) : null}
+                  onChange={(newVal) => setFormField('purchaseDate', 'วันที่จัดซื้อ / วันรับมอบ', newVal ? newVal.format('YYYY-MM-DD') : '')}
+                  slotProps={{ textField: { size: 'small', fullWidth: true, InputLabelProps: { shrink: true } } }}
                 />
               </Grid>
               <Grid item xs={12} sm={4}>
@@ -1739,14 +2112,12 @@ export default function AssetFormPage() {
                 />
               </Grid>
               <Grid item xs={12} sm={4}>
-                <TextField
-                  type="date"
+                <DatePicker
                   label="วันที่ออกใบสั่งซื้อ (PO Date)"
-                  value={form.poDate}
-                  onChange={e => setFormField('poDate', 'PO Date', e.target.value)}
-                  fullWidth
-                  size="small"
-                  InputLabelProps={{ shrink: true }}
+                  format="DD/MM/YYYY"
+                  value={form.poDate ? dayjs(form.poDate) : null}
+                  onChange={(newVal) => setFormField('poDate', 'PO Date', newVal ? newVal.format('YYYY-MM-DD') : '')}
+                  slotProps={{ textField: { size: 'small', fullWidth: true, InputLabelProps: { shrink: true } } }}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -1779,15 +2150,12 @@ export default function AssetFormPage() {
           <SectionCard title="การรับประกันและประวัติ" sub="Warranty & Lifecycle" barColor="linear-gradient(180deg,#e11d48,#f43f5e)">
             <Grid container spacing={2}>
               <Grid item xs={12} sm={6}>
-                <TextField
-                  type="date"
+                <DatePicker
                   label="วันสิ้นสุดระยะรับประกัน"
-                  value={form.warrantyEndDate}
-                  onChange={e => setFormField('warrantyEndDate', 'วันสิ้นสุดระยะรับประกัน', e.target.value)}
-                  fullWidth
-                  size="small"
-                  InputLabelProps={{ shrink: true }}
-                  helperText={(() => {
+                  format="DD/MM/YYYY"
+                  value={form.warrantyEndDate ? dayjs(form.warrantyEndDate) : null}
+                  onChange={(newVal) => setFormField('warrantyEndDate', 'วันสิ้นสุดระยะรับประกัน', newVal ? newVal.format('YYYY-MM-DD') : '')}
+                  slotProps={{ textField: { size: 'small', fullWidth: true, InputLabelProps: { shrink: true }, helperText: (() => {
                     if (!form.warrantyEndDate) return '';
                     const today = new Date();
                     const warrantyDate = new Date(form.warrantyEndDate);
@@ -1796,7 +2164,7 @@ export default function AssetFormPage() {
                     if (daysLeft < 0) return `⚠️ หมดประกันแล้ว ${Math.abs(daysLeft)} วัน`;
                     if (daysLeft < 30) return `⚠️ เตือน: ประกันจะหมดใน ${daysLeft} วัน`;
                     return `✅ ประกันคงเหลือ ${daysLeft} วัน`;
-                  })()}
+                  })() } }}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -1882,16 +2250,7 @@ export default function AssetFormPage() {
                 </Box>
               </Grid>
 
-              <Grid item xs={12}>
-                <TextField
-                  label="รหัสทรัพย์สินเดิม (ถ้ามี)"
-                  value={form.oldAssetCode}
-                  onChange={e => setFormField('oldAssetCode', 'รหัสทรัพย์สินเดิม', e.target.value)}
-                  placeholder="กรณีต้องการอ้างอิงรหัสเดิมของโครงการหรือแท็กเกรดเดิม"
-                  fullWidth
-                  size="small"
-                />
-              </Grid>
+
               <Grid item xs={12}>
                 <TextField
                   multiline
@@ -2042,10 +2401,10 @@ export default function AssetFormPage() {
             sx={{
               borderRadius: '10px',
               fontWeight: 600,
-              background: 'linear-gradient(135deg,#4f46e5,#7c3aed)',
-              boxShadow: '0 3px 12px rgba(99, 102, 241, 0.28)',
+              background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
+              boxShadow: `0 3px 12px ${alpha(theme.palette.primary.main, 0.28)}`,
               '&:hover': {
-                background: 'linear-gradient(135deg,#4338ca,#6d28d9)',
+                background: `linear-gradient(135deg, ${theme.palette.primary.dark}, ${theme.palette.primary.dark})`,
               }
             }}
           >
