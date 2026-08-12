@@ -704,7 +704,7 @@ export const PMChecklistModal: React.FC<PMChecklistModalProps> = ({ open, onClos
                           placeholder={item.key === 'issue_note' ? 'ระบุข้อเสนอแนะหรือปัญหาที่พบ...' : 'ระบุรายละเอียด...'}
                           value={answers[item.key] || ''}
                           onChange={(e) => setAnswers((p) => ({ ...p, [item.key]: e.target.value }))}
-                          onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+                          onFocus={(e) => e.target.style.borderColor = '#0891b2'}
                           onBlur={(e) => e.target.style.borderColor = '#cbd5e1'}
                         />
                       )}
@@ -724,7 +724,7 @@ export const PMChecklistModal: React.FC<PMChecklistModalProps> = ({ open, onClos
                                     <button
                                       type="button"
                                       onClick={() => setAnswers((p: Record<string, any>) => ({ ...p, [item.key]: String(suggested) }))}
-                                      style={{ marginLeft: 'auto', border: '1px solid #3b82f6', background: '#fff', color: '#3b82f6', borderRadius: 6, padding: '3px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                                      style={{ marginLeft: 'auto', border: '1px solid #0891b2', background: '#fff', color: '#0891b2', borderRadius: 6, padding: '3px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
                                     >
                                       ใช้ค่านี้
                                     </button>

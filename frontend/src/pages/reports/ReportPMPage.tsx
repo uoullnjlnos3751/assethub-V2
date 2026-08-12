@@ -362,21 +362,21 @@ export default function ReportPMPage() {
             </Card>
           </Grid>
           <Grid item xs={6} md={3}>
-            <Card 
-              sx={{ 
-                borderLeft: '4px solid #7c3aed', 
-                bgcolor: 'rgba(124,58,237,0.01)',
+            <Card
+              sx={{
+                borderLeft: `4px solid ${theme.palette.secondary.main}`,
+                bgcolor: alpha(theme.palette.secondary.main, 0.03),
                 opacity: 1
               }}
             >
               <CardContent sx={{ p: 2.5 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
-                  <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(139,92,246,0.1)', color: '#7c3aed', display: 'flex' }}>
+                  <Box sx={{ p: 1, borderRadius: 2, bgcolor: alpha(theme.palette.secondary.main, 0.1), color: theme.palette.secondary.main, display: 'flex' }}>
                     <ArrowRight size={20} />
                   </Box>
                   <Typography variant="body2" color="text.secondary" fontWeight={700}>ความคืบหน้า</Typography>
                 </Box>
-                <Typography variant="h4" fontWeight={800} color="#7c3aed">{completionRate}%</Typography>
+                <Typography variant="h4" fontWeight={800} sx={{ color: theme.palette.secondary.main }}>{completionRate}%</Typography>
               </CardContent>
             </Card>
           </Grid>

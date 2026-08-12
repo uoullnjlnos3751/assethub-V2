@@ -926,7 +926,7 @@ export default function AssetFormPage() {
           </SectionCard>
 
           {/* ② ข้อมูลการครอบครองและตำแหน่งพิกัด */}
-          <SectionCard title="ข้อมูลการครอบครองและตำแหน่งพิกัด" sub="Ownership & Location" barColor="linear-gradient(180deg,#8b5cf6,#a855f7)">
+          <SectionCard title="ข้อมูลการครอบครองและตำแหน่งพิกัด" sub="Ownership & Location" barColor={`linear-gradient(180deg, ${theme.palette.secondary.main}, ${alpha(theme.palette.secondary.main, 0.55)})`}>
             <Grid container spacing={2}>
 
               {/* — Sub-group: ผู้ใช้งาน / บริษัท / แผนก — */}
@@ -1141,7 +1141,7 @@ export default function AssetFormPage() {
 
           {/* ③-B Memory Specification (Computer only) */}
           {isComputer && !isMonitor && (
-            <SectionCard title="Memory Specification" barColor="linear-gradient(180deg,#7c3aed,#a78bfa)">
+            <SectionCard title="Memory Specification" barColor={`linear-gradient(180deg, ${theme.palette.secondary.main}, ${alpha(theme.palette.secondary.main, 0.55)})`}>
               <Grid container spacing={2}>
                 {/* Memory Type Selector */}
                 <Grid item xs={12}>
@@ -1165,17 +1165,17 @@ export default function AssetFormPage() {
                         sx={{
                           flex: '1 1 140px', cursor: 'pointer', borderRadius: 2,
                           border: form.memoryType === opt.value
-                            ? '2px solid #7c3aed'
+                            ? `2px solid ${theme.palette.secondary.main}`
                             : '2px solid transparent',
                           background: form.memoryType === opt.value
-                            ? 'linear-gradient(135deg, rgba(124,58,237,0.12), rgba(167,139,250,0.08))'
-                            : 'rgba(0,0,0,0.03)',
+                            ? `linear-gradient(135deg, ${alpha(theme.palette.secondary.main, 0.12)}, ${alpha(theme.palette.secondary.main, 0.08)})`
+                            : alpha(theme.palette.text.primary, 0.03),
                           p: 1.2, textAlign: 'center', transition: 'all .2s',
-                          '&:hover': { borderColor: '#a78bfa', background: 'rgba(124,58,237,0.06)' },
-                          boxShadow: form.memoryType === opt.value ? '0 0 0 3px rgba(124,58,237,0.15)' : 'none',
+                          '&:hover': { borderColor: alpha(theme.palette.secondary.main, 0.6), background: alpha(theme.palette.secondary.main, 0.06) },
+                          boxShadow: form.memoryType === opt.value ? `0 0 0 3px ${alpha(theme.palette.secondary.main, 0.15)}` : 'none',
                         }}
                       >
-                        <Typography variant="body2" fontWeight={600} sx={{ mb: 0.3, color: form.memoryType === opt.value ? '#7c3aed' : 'text.primary' }}>
+                        <Typography variant="body2" fontWeight={600} sx={{ mb: 0.3, color: form.memoryType === opt.value ? theme.palette.secondary.main : 'text.primary' }}>
                           {opt.label}
                         </Typography>
                         <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.3, display: 'block' }}>
@@ -1264,8 +1264,8 @@ export default function AssetFormPage() {
                       readOnly: true,
                       startAdornment: <Box sx={{ mr: 1, fontSize: '1rem', lineHeight: 1 }}>💾</Box>,
                       sx: {
-                        bgcolor: 'rgba(124,58,237,0.06)',
-                        '& .MuiInputBase-input': { fontWeight: 600, color: '#7c3aed' }
+                        bgcolor: alpha(theme.palette.secondary.main, 0.06),
+                        '& .MuiInputBase-input': { fontWeight: 600, color: theme.palette.secondary.main }
                       }
                     }}
                     helperText="คำนวณจากฟิลด์ด้านบนอัตโนมัติ"
@@ -1478,7 +1478,7 @@ export default function AssetFormPage() {
 
           {/* Monitor detail */}
           {isMonitor && (
-            <SectionCard title="ข้อมูลจอภาพ" barColor="linear-gradient(180deg,#7c3aed,#a855f7)">
+            <SectionCard title="ข้อมูลจอภาพ" barColor={`linear-gradient(180deg, ${theme.palette.secondary.main}, ${alpha(theme.palette.secondary.main, 0.55)})`}>
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={4}>
                   <TextField
@@ -1561,7 +1561,7 @@ export default function AssetFormPage() {
 
           {/* Phone detail */}
           {isPhone && (
-            <SectionCard title="ข้อมูลอุปกรณ์สื่อสาร" barColor="linear-gradient(180deg,#7c3aed,#a855f7)">
+            <SectionCard title="ข้อมูลอุปกรณ์สื่อสาร" barColor={`linear-gradient(180deg, ${theme.palette.secondary.main}, ${alpha(theme.palette.secondary.main, 0.55)})`}>
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={4}>
                   <TextField
@@ -2196,20 +2196,20 @@ export default function AssetFormPage() {
                     
                     if (opt.cls === 's-available') {
                       activeColor = 'success.main';
-                      borderColor = isSelected ? 'success.main' : 'rgba(16, 185, 129, 0.3)';
-                      activeBg = alpha('#10b981', 0.12);
+                      borderColor = isSelected ? 'success.main' : alpha(theme.palette.success.main, 0.3);
+                      activeBg = alpha(theme.palette.success.main, 0.12);
                     } else if (opt.cls === 's-reserved') {
                       activeColor = 'secondary.main';
-                      borderColor = isSelected ? 'secondary.main' : 'rgba(99, 102, 241, 0.25)';
-                      activeBg = alpha('#6366f1', 0.1);
+                      borderColor = isSelected ? 'secondary.main' : alpha(theme.palette.secondary.main, 0.25);
+                      activeBg = alpha(theme.palette.secondary.main, 0.1);
                     } else if (opt.cls === 's-maintenance') {
                       activeColor = 'error.main';
-                      borderColor = isSelected ? 'error.main' : 'rgba(239, 68, 68, 0.25)';
-                      activeBg = alpha('#ef4444', 0.08);
+                      borderColor = isSelected ? 'error.main' : alpha(theme.palette.error.main, 0.25);
+                      activeBg = alpha(theme.palette.error.main, 0.08);
                     } else if (opt.cls === 's-retired') {
                       activeColor = 'text.secondary';
-                      borderColor = isSelected ? 'text.secondary' : 'rgba(107, 114, 128, 0.2)';
-                      activeBg = alpha('#6b7280', 0.08);
+                      borderColor = isSelected ? 'text.secondary' : alpha(theme.palette.text.secondary, 0.2);
+                      activeBg = alpha(theme.palette.text.secondary, 0.08);
                     }
 
                     return (
@@ -2267,7 +2267,7 @@ export default function AssetFormPage() {
           </SectionCard>
 
           {/* ⑥ รูปภาพ */}
-          <SectionCard title="รูปภาพทะเบียนทรัพย์สิน" barColor="linear-gradient(180deg,#6366f1,#8b5cf6)">
+          <SectionCard title="รูปภาพทะเบียนทรัพย์สิน" barColor={`linear-gradient(180deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`}>
             {imageError && (
               <Alert severity="error" sx={{ mb: 2, borderRadius: '10px' }}>
                 {imageError}
@@ -2284,8 +2284,8 @@ export default function AssetFormPage() {
                     aspectRatio: '4/3',
                     borderRadius: '12px',
                     border: '2px dashed',
-                    borderColor: alpha('#6366f1', 0.2),
-                    bgcolor: 'rgba(248, 247, 255, 0.5)',
+                    borderColor: alpha(theme.palette.primary.main, 0.2),
+                    bgcolor: alpha(theme.palette.primary.main, 0.04),
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',

@@ -1018,11 +1018,11 @@ export default function Layout() {
               height: 64, 
               background: 'transparent',
               '& .MuiBottomNavigationAction-root': {
-                color: '#94a3b8',
+                color: theme.palette.text.disabled,
                 padding: '6px 0 8px',
                 transition: 'all 0.2s',
                 '&.Mui-selected': {
-                  color: '#2563eb',
+                  color: theme.palette.info.main,
                   fontWeight: 700,
                   '& .MuiSvgIcon-root': {
                     transform: 'scale(1.1)',

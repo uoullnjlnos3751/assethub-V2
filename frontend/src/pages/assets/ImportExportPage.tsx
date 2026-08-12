@@ -437,14 +437,14 @@ export default function ImportExportPage() {
 
           {/* Template */}
           <ActionCard
-            icon="📋" color="#8b5cf6"
+            icon="📋" color="#7c3aed"
             title="Template นำเข้า"
             badge="TEMPLATE"
             desc="ดาวน์โหลดแบบฟอร์มคอลัมน์มาตรฐานพร้อม Sheet แยกตามประเภทอุปกรณ์ที่มีในระบบ"
           >
             <ActionBtn
               icon="⬇️" label="ดาวน์โหลด Template"
-              variant="solid" color="#8b5cf6"
+              variant="solid" color="#7c3aed"
               onClick={downloadTemplate} disabled={loading}
             />
           </ActionCard>

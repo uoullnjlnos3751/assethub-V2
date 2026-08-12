@@ -13,7 +13,7 @@ function TabPanel({ children, value, index }: TabPanelProps) {
 
 const TABS = [
   { label: 'ประเภทอุปกรณ์', icon: '📦', color: '#0ea5e9' },
-  { label: 'สถานที่ตั้ง', icon: '📍', color: '#8b5cf6' },
+  { label: 'สถานที่ตั้ง', icon: '📍', color: '#7c3aed' },
   { label: 'ผู้จำหน่าย', icon: '🏪', color: '#f59e0b' },
   { label: 'สถานะอุปกรณ์', icon: '✅', color: '#10b981' },
   { label: 'บริษัท', icon: '🏢', color: '#ef4444' },
@@ -70,7 +70,7 @@ export default function MasterDataManagementPage() {
               subtitle="จัดการสถานที่ตั้งและบริษัท"
               itemLabel="สถานที่"
               icon="📍"
-              accentColor="#8b5cf6"
+              accentColor="#7c3aed"
               fetchItems={() => assetAPI.locations()}
               createItem={(data: any) => assetAPI.createLocation(data)}
               updateItem={(id: number, data: any) => assetAPI.updateLocation(id, data)}
