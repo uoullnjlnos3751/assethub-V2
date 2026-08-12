@@ -1,65 +1,112 @@
 import { createTheme, PaletteMode } from '@mui/material/styles';
 
-// ─── Design tokens — "blue hi-tech" direction ───────────────────────────────
-// Light values map 1:1 to the approved design concept's CSS custom properties
-// (--bg/--surface/--accent/etc). Dark values are a derived companion palette —
-// the concept itself pins identical tokens for light/dark ("single visual
-// world by request"), but this app's dark mode is a real, separately-tested
-// feature, so dark keeps its own contrast-checked variant of the same accents
-// rather than being dropped. `accent` dark value (#7db6ff) is lifted directly
-// from the concept's own dark-context highlight color (used on its bulk-action
-// bar) so it stays a deliberate reference point, not a guess.
+// ─── Design tokens ──────────────────────────────────────────────────────────
+// Light values are taken verbatim from design_handoff_itam/DESIGN-TOKENS.md —
+// treat that file as the source of truth and don't hand-tune these.
+//
+// The handoff only specifies light mode (plus a dark palette for the ops-room
+// floor plan). Dark mode is a real, separately-tested feature of this app, so
+// it stays: every dark accent below is lifted from the handoff's own dark
+// floor-plan palette (#22d3ee / #60a5fa / #a78bfa / #34d399 / #fbbf24 /
+// #f87171) and the surfaces are derived from its #071120 → #0b1524 pair, so
+// dark reads as the same visual family rather than a separate guess.
 const tokens = {
   light: {
-    bg: '#f3f6fc',
+    bg: '#f4f7fc',
+    // Full app background from the handoff. `bg` above is the flat fallback
+    // (the gradient's outer stop) for anywhere a solid color is required.
+    bgGradient: 'radial-gradient(1200px 700px at 60% -10%, #eef3fb 0%, #f4f7fc 60%)',
     surface: '#ffffff',
-    surface2: '#eef2f9',
-    surface3: '#e3e9f3',
-    border: '#e5eaf3',
-    borderStrong: '#cfd8e8',
-    text: '#101828',
-    textMute: '#64748b',
-    textFaint: '#98a2b8',
-    accent: '#2563eb',
-    accentSoft: 'rgba(37,99,235,.08)',
-    accent2: '#06b6d4',
-    available: '#16a34a',
-    availableSoft: 'rgba(22,163,74,.1)',
-    maintenance: '#d97706',
-    maintenanceSoft: 'rgba(217,119,6,.1)',
+    surface2: '#f8fafc', // surface-sunken — inputs, sub-rows, in-card panels
+    surface3: '#f4f7fb', // surface-alt — sub-table headers, icon boxes
+    border: '#e3e9f2',
+    borderStrong: '#dde5f0',
+    borderInput: '#d6dfec',
+    divider: '#edf1f7',
+    borderDashed: '#cfd9e8',
+    text: '#15243c',
+    textStrong: '#1f3350',
+    textBody: '#31435c',
+    textMute: '#68788e',
+    textMute2: '#54637a',
+    textSubtle: '#7a889c',
+    textFaint: '#a3b0c2',
+    textDisabled: '#c9d4e3',
+    accent: '#0891b2',
+    accentDark: '#0e7490',
+    accentSoft: 'rgba(8,145,178,.1)',
+    accentBg: '#f0fbfe',
+    accent2: '#2563eb', // info blue — second stop of the primary gradient
+    available: '#059669',
+    availableDark: '#047857',
+    availableSoft: 'rgba(5,150,105,.1)',
+    availableBg: '#f0fdf4',
+    maintenance: '#c2820a',
+    maintenanceDark: '#b45309',
+    maintenanceSoft: 'rgba(194,130,10,.1)',
+    maintenanceBg: '#fffaf5',
     danger: '#dc2626',
-    dangerSoft: 'rgba(220,38,38,.09)',
-    retired: '#64748b',
-    retiredSoft: 'rgba(100,116,139,.1)',
+    dangerDark: '#b91c1c',
+    dangerSoft: 'rgba(220,38,38,.1)',
+    dangerBg: '#fff5f5',
+    purple: '#7c3aed', // company scope / borrow
+    purpleDark: '#6d28d9',
+    purpleSoft: 'rgba(124,58,237,.1)',
+    purpleBg: '#faf7ff',
+    retired: '#54637a',
+    retiredSoft: 'rgba(107,120,140,.1)',
+    retiredBg: '#f8fafc',
   },
   dark: {
-    bg: '#0f172a',
-    surface: '#1a2332',
-    surface2: '#212c40',
-    surface3: '#29354c',
-    border: '#2b3852',
-    borderStrong: '#3c4a68',
-    text: '#eef2f9',
-    textMute: '#94a3b8',
-    textFaint: '#64748b',
-    accent: '#7db6ff',
-    accentSoft: 'rgba(125,182,255,.15)',
-    accent2: '#22d3ee',
-    available: '#4ade80',
-    availableSoft: 'rgba(74,222,128,.14)',
-    maintenance: '#fb923c',
-    maintenanceSoft: 'rgba(251,146,60,.14)',
+    bg: '#071120',
+    bgGradient: 'radial-gradient(1200px 700px at 60% -10%, #0b1524 0%, #071120 60%)',
+    surface: '#0b1524',
+    surface2: '#101d31',
+    surface3: '#16263d',
+    border: '#1c2f49',
+    borderStrong: '#294060',
+    borderInput: '#294060',
+    divider: '#16263d',
+    borderDashed: '#294060',
+    text: '#eaf6ff',
+    textStrong: '#ffffff',
+    textBody: '#d3e3f5',
+    textMute: '#9fb3cc',
+    textMute2: '#b3c5da',
+    textSubtle: '#8298b3',
+    textFaint: '#6b8099',
+    textDisabled: '#44586f',
+    accent: '#22d3ee',
+    accentDark: '#67e8f9',
+    accentSoft: 'rgba(34,211,238,.15)',
+    accentBg: 'rgba(34,211,238,.08)',
+    accent2: '#60a5fa',
+    available: '#34d399',
+    availableDark: '#6ee7b7',
+    availableSoft: 'rgba(52,211,153,.15)',
+    availableBg: 'rgba(52,211,153,.08)',
+    maintenance: '#fbbf24',
+    maintenanceDark: '#fcd34d',
+    maintenanceSoft: 'rgba(251,191,36,.15)',
+    maintenanceBg: 'rgba(251,191,36,.08)',
     danger: '#f87171',
-    dangerSoft: 'rgba(248,113,113,.14)',
+    dangerDark: '#fca5a5',
+    dangerSoft: 'rgba(248,113,113,.15)',
+    dangerBg: 'rgba(248,113,113,.08)',
+    purple: '#a78bfa',
+    purpleDark: '#c4b5fd',
+    purpleSoft: 'rgba(167,139,250,.15)',
+    purpleBg: 'rgba(167,139,250,.08)',
     retired: '#94a3b8',
     retiredSoft: 'rgba(148,163,184,.14)',
+    retiredBg: 'rgba(148,163,184,.08)',
   },
 };
 
 export const getAppTheme = (mode: PaletteMode) => {
   const isDark = mode === 'dark';
   const t = isDark ? tokens.dark : tokens.light;
-  const gradient = `linear-gradient(150deg, ${t.accent}, ${t.accent2})`;
+  const gradient = `linear-gradient(120deg, ${t.accent}, ${t.accent2})`;
 
   return createTheme({
     breakpoints: {
@@ -75,35 +122,35 @@ export const getAppTheme = (mode: PaletteMode) => {
       mode,
       primary: {
         main: t.accent,
-        light: isDark ? '#a8d1ff' : '#4d7ff0',
-        dark: isDark ? '#4d7ff0' : '#1d4ed8',
+        light: t.accentSoft,
+        dark: t.accentDark,
         contrastText: '#ffffff',
       },
       secondary: {
-        main: t.accent2,
-        light: isDark ? '#67e3f5' : '#22d3ee',
-        dark: isDark ? '#0891b2' : '#0e7490',
-        contrastText: isDark ? '#001b21' : '#ffffff',
+        main: t.purple,
+        light: t.purpleSoft,
+        dark: t.purpleDark,
+        contrastText: '#ffffff',
       },
       success: {
         main: t.available,
         light: t.availableSoft,
-        dark: isDark ? '#16a34a' : '#15803d',
+        dark: t.availableDark,
       },
       error: {
         main: t.danger,
         light: t.dangerSoft,
-        dark: isDark ? '#dc2626' : '#b91c1c',
+        dark: t.dangerDark,
       },
       info: {
-        main: t.accent,
-        light: isDark ? '#a8d1ff' : '#4d7ff0',
-        dark: isDark ? '#4d7ff0' : '#1d4ed8',
+        main: t.accent2,
+        light: isDark ? 'rgba(96,165,250,.15)' : 'rgba(37,99,235,.1)',
+        dark: isDark ? '#93c5fd' : '#1d4ed8',
       },
       warning: {
         main: t.maintenance,
         light: t.maintenanceSoft,
-        dark: isDark ? '#d97706' : '#b45309',
+        dark: t.maintenanceDark,
       },
       background: {
         default: t.bg,
@@ -116,23 +163,33 @@ export const getAppTheme = (mode: PaletteMode) => {
       divider: t.border,
     },
 
-    shape: { borderRadius: 14 },
+    // Base radius = inputs/buttons (11–12px). Larger surfaces set their own:
+    // cards 20px, KPI cards 18px, tabs 10px, icon buttons 8–9px, chips 999px.
+    shape: { borderRadius: 12 },
 
     typography: {
-      fontFamily: 'Inter, "Sarabun", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+      // Thai-first pairing from the handoff. `numeric` below is exported for
+      // figures/codes/IDs, which the handoff pins to the Latin cut so digits
+      // stay tabular.
+      fontFamily: '"IBM Plex Sans Thai", "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
       fontSize: 14,
-      h1: { fontWeight: 600, letterSpacing: '-0.02em', lineHeight: 1.2 },
-      h2: { fontWeight: 600, letterSpacing: '-0.015em', lineHeight: 1.25 },
-      h3: { fontWeight: 600, letterSpacing: '-0.01em', lineHeight: 1.3 },
-      h4: { fontWeight: 600, letterSpacing: '-0.01em', lineHeight: 1.3, color: t.text },
-      h5: { fontWeight: 600, letterSpacing: '0', lineHeight: 1.35 },
-      h6: { fontWeight: 600, letterSpacing: '0', lineHeight: 1.35 },
-      body1: { fontSize: '1rem', lineHeight: 1.5, color: t.text },
-      body2: { fontSize: '0.875rem', lineHeight: 1.45, color: t.textMute },
-      button: { fontWeight: 600, textTransform: 'none', letterSpacing: '0.01em', fontSize: '0.875rem' },
+      h1: { fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.2 },
+      h2: { fontWeight: 700, letterSpacing: '-0.015em', lineHeight: 1.25 },
+      h3: { fontWeight: 700, letterSpacing: '-0.01em', lineHeight: 1.3 },
+      // Page title — 24px/700
+      h4: { fontWeight: 700, fontSize: '1.5rem', letterSpacing: '-0.01em', lineHeight: 1.3, color: t.text },
+      h5: { fontWeight: 700, fontSize: '1.125rem', letterSpacing: '0', lineHeight: 1.35 },
+      // Card title — 15px/600
+      h6: { fontWeight: 600, fontSize: '0.9375rem', letterSpacing: '0', lineHeight: 1.35 },
+      // Body / table text — 13px
+      body1: { fontSize: '0.8125rem', lineHeight: 1.5, color: t.text },
+      // Descriptions — 12.5px
+      body2: { fontSize: '0.78125rem', lineHeight: 1.45, color: t.textMute },
+      button: { fontWeight: 600, textTransform: 'none', letterSpacing: '0.01em', fontSize: '0.84375rem' },
+      // Sub-headings — 14px / 13.5px
       subtitle1: { fontWeight: 600, color: t.text, fontSize: '0.875rem' },
-      subtitle2: { fontWeight: 600, color: t.textMute, fontSize: '0.8125rem' },
-      caption: { fontSize: '0.75rem', fontWeight: 500, color: t.textMute },
+      subtitle2: { fontWeight: 600, color: t.textMute, fontSize: '0.84375rem' },
+      caption: { fontSize: '0.75rem', fontWeight: 400, color: t.textMute },
     },
 
     components: {
@@ -142,6 +199,8 @@ export const getAppTheme = (mode: PaletteMode) => {
           'img, video, svg': { maxWidth: '100%', height: 'auto' },
           body: {
             backgroundColor: t.bg,
+            backgroundImage: t.bgGradient,
+            backgroundAttachment: 'fixed',
             minHeight: '100vh',
             margin: 0,
             overflowX: 'hidden',
@@ -463,24 +522,69 @@ export const getAppTheme = (mode: PaletteMode) => {
         },
       },
       MuiAlert: {
+        // Handoff "กล่องข้อความเตือน": padding 12/14, radius 13–14, 12.5px.
+        // Text color is pinned per severity — MUI's own computed color for the
+        // standard variant resolved to a near-transparent tint here, which
+        // made alert text unreadable against the soft background.
         styleOverrides: {
-          root: { borderRadius: 10, borderWidth: '1px', fontSize: '0.8125rem' },
-          // Light mode: MUI's built-in standard-variant text color for these
-          // severities was resolving to a near-transparent tint (alpha ~0.1),
-          // making the text unreadable against the soft background. Pin an
-          // explicit solid, dark shade per severity instead of relying on
-          // MUI's default computation.
-          standardSuccess: { backgroundColor: t.availableSoft, borderColor: t.available, color: isDark ? t.text : '#065f46' },
-          standardError: { backgroundColor: t.dangerSoft, borderColor: t.danger, color: isDark ? t.text : '#7f1d1d' },
-          standardWarning: { backgroundColor: t.maintenanceSoft, borderColor: t.maintenance, color: isDark ? t.text : '#78350f' },
-          standardInfo: { backgroundColor: t.accentSoft, borderColor: t.accent, color: isDark ? t.text : '#1e3a8a' },
+          root: { borderRadius: 14, borderWidth: '1px', borderStyle: 'solid', padding: '12px 14px', fontSize: '0.78125rem' },
+          standardSuccess: { backgroundColor: t.availableBg, borderColor: 'rgba(5,150,105,.3)', color: isDark ? t.text : t.availableDark },
+          standardError: { backgroundColor: t.dangerBg, borderColor: 'rgba(220,38,38,.26)', color: isDark ? t.text : t.dangerDark },
+          standardWarning: { backgroundColor: t.maintenanceBg, borderColor: 'rgba(194,130,10,.3)', color: isDark ? t.text : '#92400e' },
+          standardInfo: { backgroundColor: t.accentBg, borderColor: 'rgba(8,145,178,.3)', color: isDark ? t.text : t.accentDark },
         },
       },
       MuiDivider: {
         styleOverrides: { root: { borderColor: t.border, borderWidth: '0.5px' } },
       },
+      // Handoff "สวิตช์เปิด/ปิด": 30×17 track, 13×13 thumb, 2px inset.
+      MuiSwitch: {
+        styleOverrides: {
+          root: { width: 30, height: 17, padding: 0, display: 'flex' },
+          switchBase: {
+            padding: 2,
+            color: '#ffffff',
+            '&.Mui-checked': {
+              transform: 'translateX(13px)',
+              color: '#ffffff',
+              '& + .MuiSwitch-track': { backgroundColor: t.accent, opacity: 1 },
+            },
+          },
+          thumb: { width: 13, height: 13, boxShadow: 'none' },
+          track: { borderRadius: 999, backgroundColor: t.border, opacity: 1 },
+        },
+      },
+      // Handoff "แถบความคืบหน้า": 6–9px rail, fully rounded.
+      MuiLinearProgress: {
+        styleOverrides: {
+          root: { height: 6, borderRadius: 99, backgroundColor: isDark ? t.surface3 : '#eef2f7' },
+          bar: { borderRadius: 99 },
+        },
+      },
+      // Handoff "Avatar": 2-letter initials in the Latin cut, tinted disc.
+      MuiAvatar: {
+        styleOverrides: {
+          root: {
+            width: 28,
+            height: 28,
+            fontSize: '0.65625rem',
+            fontWeight: 700,
+            fontFamily: numericFontFamily,
+          },
+        },
+      },
     },
   });
 };
+
+/**
+ * Figures, codes, serials and IDs use the Latin cut so digits stay tabular —
+ * the Thai family's digits are proportional and misalign in tables.
+ * Apply as `sx={{ fontFamily: numericFontFamily }}`.
+ */
+export const numericFontFamily = '"IBM Plex Sans", system-ui, sans-serif';
+
+/** Raw design tokens, for the rare spot that needs a value the theme doesn't expose. */
+export const designTokens = tokens;
 
 export default getAppTheme;

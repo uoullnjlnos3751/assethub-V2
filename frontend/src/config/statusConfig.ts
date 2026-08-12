@@ -21,7 +21,7 @@ import { alpha } from '@mui/material/styles';
  *   neutral → Retired / Returned / DRAFT
  */
 
-export type StatusColorKey = 'success' | 'warning' | 'error' | 'info' | 'neutral';
+export type StatusColorKey = 'success' | 'warning' | 'error' | 'info' | 'neutral' | 'purple';
 
 export interface StatusConfigEntry {
   /** Thai label (primary). */
@@ -71,6 +71,8 @@ function paletteColor(theme: Theme, key: StatusColorKey): string {
     case 'warning': return theme.palette.warning.main;
     case 'error':   return theme.palette.error.main;
     case 'info':    return (theme.palette as any).info?.main || '#0288d1';
+    // Company scope / borrow, per the handoff's purple semantic color.
+    case 'purple':  return theme.palette.secondary.main;
     case 'neutral':
     default:        return theme.palette.text.secondary;
   }
@@ -100,8 +102,9 @@ export function getStatusMeta(status: string, theme: Theme, customLabel?: string
     labelEn: entry.labelEn ?? entry.label,
     Icon: entry.icon,
     color,
+    // Handoff "Chip สถานะ": background rgba(color,.1) · border rgba(color,.35)
     bg: alpha(color, 0.10),
-    border: alpha(color, 0.22),
+    border: alpha(color, 0.35),
   };
 }
 
