@@ -17,6 +17,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { StatBox, StatusRow } from './settings/SharedComponents';
 import SystemSettingsTab from './SystemSettingsTab';
 import EmailTemplateEditor from './settings/EmailTemplateEditor';
+import { SectionCard } from '../../components/SectionCard';
 import type { SystemSettings, NotificationTemplate, HealthCheckResult, NotificationLog } from './settings/types';
 
 const TAB_GROUPS = [
@@ -200,132 +201,112 @@ export default function SettingsPage() {
 
       {/* ── Tab Content ── */}
       {tab === 0 && (
-        <Box sx={{ maxWidth: 720 }}>
-          {/* Identity Card */}
-          <Card sx={{ borderRadius: 3, mb: 3, overflow: 'visible' }}>
-            <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2.5 }}>
-                <Building2 size={20} color={theme.palette.primary.main} />
-                <Typography variant="subtitle1" fontWeight={700}>ข้อมูลระบบ</Typography>
-              </Box>
-              <Grid container spacing={2.5}>
-                <Grid item xs={12} sm={6}>
-                  <TextField label="ชื่อระบบ" fullWidth size="small" value={settings?.systemName || ''} onChange={e => setSettings({ ...settings, systemName: e.target.value })} />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField label="ชื่อองค์กร" fullWidth size="small" value={settings?.organizationName || ''} onChange={e => setSettings({ ...settings, organizationName: e.target.value })} />
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField label="URL รูปโลโก้" fullWidth size="small" value={settings?.logoUrl || ''} onChange={e => setSettings({ ...settings, logoUrl: e.target.value })} placeholder="https://example.com/logo.png" />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <FormControl fullWidth size="small">
-                    <InputLabel>เขตเวลา</InputLabel>
-                    <Select value={settings?.timezone || 'Asia/Bangkok'} label="เขตเวลา" onChange={e => setSettings({ ...settings, timezone: e.target.value })}>
-                      <MenuItem value="Asia/Bangkok">Asia/Bangkok (GMT+7)</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, height: '100%', pl: 0.5 }}>
-                    <Switch checked={settings?.showWelcomeBanner ?? true} onChange={e => setSettings({ ...settings, showWelcomeBanner: e.target.checked })} />
-                    <Box>
-                      <Typography variant="body2" fontWeight={600}>แบนเนอร์ต้อนรับ</Typography>
-                      <Typography variant="caption" color="text.secondary">แสดงข้อความต้อนรับที่หน้าแรก</Typography>
-                    </Box>
-                  </Box>
-                </Grid>
+        <Box sx={{ maxWidth: 720, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <SectionCard title="ข้อมูลระบบ" icon={Building2}>
+            <Grid container spacing={2.5}>
+              <Grid item xs={12} sm={6}>
+                <TextField label="ชื่อระบบ" fullWidth size="small" value={settings?.systemName || ''} onChange={e => setSettings({ ...settings, systemName: e.target.value })} />
               </Grid>
-            </CardContent>
-          </Card>
+              <Grid item xs={12} sm={6}>
+                <TextField label="ชื่อองค์กร" fullWidth size="small" value={settings?.organizationName || ''} onChange={e => setSettings({ ...settings, organizationName: e.target.value })} />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField label="URL รูปโลโก้" fullWidth size="small" value={settings?.logoUrl || ''} onChange={e => setSettings({ ...settings, logoUrl: e.target.value })} placeholder="https://example.com/logo.png" />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>เขตเวลา</InputLabel>
+                  <Select value={settings?.timezone || 'Asia/Bangkok'} label="เขตเวลา" onChange={e => setSettings({ ...settings, timezone: e.target.value })}>
+                    <MenuItem value="Asia/Bangkok">Asia/Bangkok (GMT+7)</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, height: '100%', pl: 0.5 }}>
+                  <Switch checked={settings?.showWelcomeBanner ?? true} onChange={e => setSettings({ ...settings, showWelcomeBanner: e.target.checked })} />
+                  <Box>
+                    <Typography variant="body2" fontWeight={600}>แบนเนอร์ต้อนรับ</Typography>
+                    <Typography variant="caption" color="text.secondary">แสดงข้อความต้อนรับที่หน้าแรก</Typography>
+                  </Box>
+                </Box>
+              </Grid>
+            </Grid>
+          </SectionCard>
 
-          {/* Preview Card */}
-          <Card sx={{ borderRadius: 3, overflow: 'hidden' }}>
-            <Box sx={{ px: 3, py: 2, borderBottom: '0.5px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Image size={18} color={theme.palette.primary.main} />
-              <Typography variant="subtitle2" fontWeight={700}>ตัวอย่างหน้าตาระบบ</Typography>
-            </Box>
-            <Box sx={{ p: 3 }}>
-              {/* Mock Browser Frame */}
-              <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden', bgcolor: '#fafafa' }}>
-                {/* Mock Title Bar */}
-                <Box sx={{ px: 2, py: 1, bgcolor: '#f0f0f0', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Box sx={{ display: 'flex', gap: 0.5 }}>
-                    <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: '#ef4444' }} />
-                    <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: '#eab308' }} />
-                    <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: '#22c55e' }} />
-                  </Box>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', fontSize: '0.65rem' }}>IT Asset Management (ITAM)</Typography>
+          <SectionCard title="ตัวอย่างหน้าตาระบบ" icon={Image}>
+            {/* Mock Browser Frame */}
+            <Box sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 2, overflow: 'hidden', bgcolor: theme.palette.background.default }}>
+              {/* Mock Title Bar */}
+              <Box sx={{ px: 2, py: 1, bgcolor: theme.palette.action.hover, borderBottom: `1px solid ${theme.palette.divider}`, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box sx={{ display: 'flex', gap: 0.5 }}>
+                  <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: theme.palette.error.main }} />
+                  <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: theme.palette.warning.main }} />
+                  <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: theme.palette.success.main }} />
                 </Box>
-                {/* Mock Navbar */}
-                <Box sx={{ px: 3, py: 2, bgcolor: '#fff', borderBottom: '0.5px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    {settings?.logoUrl ? (
-                      <img src={settings.logoUrl} alt="logo" style={{ height: 32, maxWidth: 100, objectFit: 'contain' }} onError={e => (e.target as HTMLElement).style.display = 'none'} />
-                    ) : (
-                      <Box sx={{ width: 32, height: 32, borderRadius: '8px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '13px', color: '#fff', letterSpacing: 1 }}>
-                        {(settings?.systemName || 'IT').substring(0, 2).toUpperCase()}
-                      </Box>
-                    )}
-                    <Box>
-                      <Typography noWrap sx={{ fontSize: '14px', fontWeight: 700, lineHeight: 1.2 }}>{settings?.systemName || 'IT Asset Management (ITAM)'}</Typography>
-                      <Typography noWrap sx={{ fontSize: '11px', color: '#6b7280', lineHeight: 1.2 }}>{settings?.organizationName || 'ระบบจัดการทรัพย์สิน IT'}</Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', fontSize: '0.65rem' }}>IT Asset Management (ITAM)</Typography>
+              </Box>
+              {/* Mock Navbar */}
+              <Box sx={{ px: 3, py: 2, bgcolor: theme.palette.background.paper, borderBottom: `1px solid ${theme.palette.divider}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  {settings?.logoUrl ? (
+                    <img src={settings.logoUrl} alt="logo" style={{ height: 32, maxWidth: 100, objectFit: 'contain' }} onError={e => (e.target as HTMLElement).style.display = 'none'} />
+                  ) : (
+                    <Box sx={{ width: 32, height: 32, borderRadius: '8px', background: `linear-gradient(120deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '13px', color: '#fff', letterSpacing: 1 }}>
+                      {(settings?.systemName || 'IT').substring(0, 2).toUpperCase()}
                     </Box>
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#22c55e' }} />
-                    <Typography variant="caption" color="text.secondary">ออนไลน์</Typography>
+                  )}
+                  <Box>
+                    <Typography noWrap sx={{ fontSize: '14px', fontWeight: 700, lineHeight: 1.2 }}>{settings?.systemName || 'IT Asset Management (ITAM)'}</Typography>
+                    <Typography noWrap sx={{ fontSize: '11px', color: theme.palette.text.secondary, lineHeight: 1.2 }}>{settings?.organizationName || 'ระบบจัดการทรัพย์สิน IT'}</Typography>
                   </Box>
                 </Box>
-                {/* Welcome Banner */}
-                {settings?.showWelcomeBanner && (
-                  <Box sx={{ px: 3, py: 2.5, background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', color: '#fff' }}>
-                    <Typography variant="body2" fontWeight={700}>ยินดีต้อนรับสู่ {settings?.systemName || 'IT Asset Management (ITAM)'}</Typography>
-                    <Typography variant="caption" sx={{ opacity: 0.85 }}>ระบบจัดการทรัพย์สินและครุภัณฑ์ IT</Typography>
-                  </Box>
-                )}
-                {/* Mock Content */}
-                <Box sx={{ p: 3 }}>
-                  <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                    {[80, 60, 90].map((w, i) => (
-                      <Box key={i} sx={{ flex: 1, h: 60, p: 1.5, bgcolor: '#fff', border: '0.5px solid', borderColor: 'divider', borderRadius: 1.5 }}>
-                        <Box sx={{ width: '60%', height: 8, bgcolor: '#e5e7eb', borderRadius: 1, mb: 1 }} />
-                        <Box sx={{ width: '80%', height: 16, bgcolor: '#e5e7eb', borderRadius: 1 }} />
-                      </Box>
-                    ))}
-                  </Box>
-                  <Box sx={{ width: '100%', height: 8, bgcolor: '#e5e7eb', borderRadius: 1, mb: 1 }} />
-                  <Box sx={{ width: '70%', height: 8, bgcolor: '#e5e7eb', borderRadius: 1 }} />
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: theme.palette.success.main }} />
+                  <Typography variant="caption" color="text.secondary">ออนไลน์</Typography>
                 </Box>
               </Box>
+              {/* Welcome Banner */}
+              {settings?.showWelcomeBanner && (
+                <Box sx={{ px: 3, py: 2.5, background: `linear-gradient(120deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`, color: '#fff' }}>
+                  <Typography variant="body2" fontWeight={700}>ยินดีต้อนรับสู่ {settings?.systemName || 'IT Asset Management (ITAM)'}</Typography>
+                  <Typography variant="caption" sx={{ opacity: 0.85 }}>ระบบจัดการทรัพย์สินและครุภัณฑ์ IT</Typography>
+                </Box>
+              )}
+              {/* Mock Content */}
+              <Box sx={{ p: 3, bgcolor: theme.palette.background.default }}>
+                <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                  {[80, 60, 90].map((w, i) => (
+                    <Box key={i} sx={{ flex: 1, h: 60, p: 1.5, bgcolor: theme.palette.background.paper, border: `1px solid ${theme.palette.divider}`, borderRadius: 1.5 }}>
+                      <Box sx={{ width: '60%', height: 8, bgcolor: theme.palette.action.hover, borderRadius: 1, mb: 1 }} />
+                      <Box sx={{ width: '80%', height: 16, bgcolor: theme.palette.action.hover, borderRadius: 1 }} />
+                    </Box>
+                  ))}
+                </Box>
+                <Box sx={{ width: '100%', height: 8, bgcolor: theme.palette.action.hover, borderRadius: 1, mb: 1 }} />
+                <Box sx={{ width: '70%', height: 8, bgcolor: theme.palette.action.hover, borderRadius: 1 }} />
+              </Box>
             </Box>
-          </Card>
+          </SectionCard>
         </Box>
       )}
 
       {tab === 1 && (
-        <Grid container spacing={3}>
+        <Grid container spacing={2}>
           <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>ระยะเวลาการยืม</Typography>
-                <TextField label="วันยืมมาตรฐาน (วัน)" type="number" fullWidth size="small" value={borrowDays} onChange={e => setSettings({ ...settings, borrowDays: e.target.value })} inputProps={{ min: 1 }} sx={{ mb: 2 }} />
-                <TextField label="จำนวนวันยืมสูงสุด (วัน)" type="number" fullWidth size="small" value={settings?.maxBorrowDays || 30} onChange={e => setSettings({ ...settings, maxBorrowDays: e.target.value })} inputProps={{ min: 1 }} sx={{ mb: 2 }} />
-                <TextField label="ระยะเวลาเตือนก่อนเกินกำหนด (วัน)" type="number" fullWidth size="small" value={settings?.overdueWarningDays || 3} onChange={e => setSettings({ ...settings, overdueWarningDays: e.target.value })} inputProps={{ min: 1 }} />
-              </CardContent>
-            </Card>
+            <SectionCard title="ระยะเวลาการยืม" icon={Clock}>
+              <TextField label="วันยืมมาตรฐาน (วัน)" type="number" fullWidth size="small" value={borrowDays} onChange={e => setSettings({ ...settings, borrowDays: e.target.value })} inputProps={{ min: 1 }} sx={{ mb: 2 }} />
+              <TextField label="จำนวนวันยืมสูงสุด (วัน)" type="number" fullWidth size="small" value={settings?.maxBorrowDays || 30} onChange={e => setSettings({ ...settings, maxBorrowDays: e.target.value })} inputProps={{ min: 1 }} sx={{ mb: 2 }} />
+              <TextField label="ระยะเวลาเตือนก่อนเกินกำหนด (วัน)" type="number" fullWidth size="small" value={settings?.overdueWarningDays || 3} onChange={e => setSettings({ ...settings, overdueWarningDays: e.target.value })} inputProps={{ min: 1 }} />
+            </SectionCard>
           </Grid>
           <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>ข้อจำกัด</Typography>
-                <TextField label="จำนวนรายการสูงสุดต่อคำขอ" type="number" fullWidth size="small" value={settings?.maxItemsPerRequest || 5} onChange={e => setSettings({ ...settings, maxItemsPerRequest: e.target.value })} inputProps={{ min: 1, max: 20 }} sx={{ mb: 2 }} />
-                <FormControlLabel control={<Switch checked={settings?.allowExtension ?? true} onChange={e => setSettings({ ...settings, allowExtension: e.target.checked })} />} label="อนุญาตให้ขอต่ออายุ (Extension)" sx={{ mb: 1 }} />
-                {settings?.allowExtension && (
-                  <TextField label="จำนวนครั้งขอต่ออายุสูงสุด" type="number" fullWidth size="small" value={settings?.maxExtensionsPerRequest || 2} onChange={e => setSettings({ ...settings, maxExtensionsPerRequest: e.target.value })} inputProps={{ min: 1, max: 10 }} />
-                )}
-              </CardContent>
-            </Card>
+            <SectionCard title="ข้อจำกัด" icon={Shield}>
+              <TextField label="จำนวนรายการสูงสุดต่อคำขอ" type="number" fullWidth size="small" value={settings?.maxItemsPerRequest || 5} onChange={e => setSettings({ ...settings, maxItemsPerRequest: e.target.value })} inputProps={{ min: 1, max: 20 }} sx={{ mb: 2 }} />
+              <FormControlLabel control={<Switch checked={settings?.allowExtension ?? true} onChange={e => setSettings({ ...settings, allowExtension: e.target.checked })} />} label="อนุญาตให้ขอต่ออายุ (Extension)" sx={{ mb: 1 }} />
+              {settings?.allowExtension && (
+                <TextField label="จำนวนครั้งขอต่ออายุสูงสุด" type="number" fullWidth size="small" value={settings?.maxExtensionsPerRequest || 2} onChange={e => setSettings({ ...settings, maxExtensionsPerRequest: e.target.value })} inputProps={{ min: 1, max: 10 }} />
+              )}
+            </SectionCard>
           </Grid>
         </Grid>
       )}
@@ -349,37 +330,27 @@ export default function SettingsPage() {
             <Grid item xs={6} sm={3}><StatBox label="วันนี้" value={logs.filter((l: any) => new Date(l.createdAt).toDateString() === new Date().toDateString()).length} color={theme.palette.warning.main} icon="📅" /></Grid>
           </Grid>
 
-          <Grid container spacing={3}>
+          <Grid container spacing={2}>
             <Grid item xs={12} md={6}>
-              <Card>
-                <Box sx={{ px: 2.5, py: 1.5, borderBottom: '0.5px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Smartphone size={18} color="#00B900" />
-                  <Typography variant="subtitle2" fontWeight={700}>ตั้งค่า LINE</Typography>
+              <SectionCard title="ตั้งค่า LINE" icon={Smartphone}>
+                <FormControlLabel control={<Switch checked={settings?.enableLine ?? false} onChange={e => setSettings({ ...settings, enableLine: e.target.checked })} color="success" />} label="เปิด LINE Notification" sx={{ mb: 2 }} />
+                <TextField label="Channel Access Token" fullWidth size="small" type={settings?.lineChannelAccessToken ? 'password' : 'text'} value={settings?.lineChannelAccessToken || ''} onChange={e => setSettings({ ...settings, lineChannelAccessToken: e.target.value })} sx={{ mb: 2 }} />
+                <TextField label="Webhook URL" fullWidth size="small" value={settings?.lineWebhookUrl || ''} onChange={e => setSettings({ ...settings, lineWebhookUrl: e.target.value })} sx={{ mb: 2 }} />
+                <TextField label="Verify Token" fullWidth size="small" value={settings?.lineWebhookVerifyToken || ''} onChange={e => setSettings({ ...settings, lineWebhookVerifyToken: e.target.value })} sx={{ mb: 2 }} />
+                <Divider sx={{ my: 2 }} />
+                <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>รูปแบบการส่ง</Typography>
+                <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                  <Chip label="📢 Broadcast" variant={settings?.lineSendMode === 'broadcast' ? 'filled' : 'outlined'} color={settings?.lineSendMode === 'broadcast' ? 'success' : 'default'} onClick={() => setSettings({ ...settings, lineSendMode: 'broadcast' })} sx={{ cursor: 'pointer', fontWeight: 600 }} />
+                  <Chip label="📨 Push (ระบุ ID)" variant={settings?.lineSendMode === 'push' ? 'filled' : 'outlined'} color={settings?.lineSendMode === 'push' ? 'primary' : 'default'} onClick={() => setSettings({ ...settings, lineSendMode: 'push' })} sx={{ cursor: 'pointer', fontWeight: 600 }} />
                 </Box>
-                <CardContent sx={{ p: 2.5 }}>
-                  <FormControlLabel control={<Switch checked={settings?.enableLine ?? false} onChange={e => setSettings({ ...settings, enableLine: e.target.checked })} color="success" />} label="เปิด LINE Notification" sx={{ mb: 2 }} />
-                  <TextField label="Channel Access Token" fullWidth size="small" type={settings?.lineChannelAccessToken ? 'password' : 'text'} value={settings?.lineChannelAccessToken || ''} onChange={e => setSettings({ ...settings, lineChannelAccessToken: e.target.value })} sx={{ mb: 2 }} />
-                  <TextField label="Webhook URL" fullWidth size="small" value={settings?.lineWebhookUrl || ''} onChange={e => setSettings({ ...settings, lineWebhookUrl: e.target.value })} sx={{ mb: 2 }} />
-                  <TextField label="Verify Token" fullWidth size="small" value={settings?.lineWebhookVerifyToken || ''} onChange={e => setSettings({ ...settings, lineWebhookVerifyToken: e.target.value })} sx={{ mb: 2 }} />
-                  <Divider sx={{ my: 2 }} />
-                  <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>รูปแบบการส่ง</Typography>
-                  <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                    <Chip label="📢 Broadcast" variant={settings?.lineSendMode === 'broadcast' ? 'filled' : 'outlined'} color={settings?.lineSendMode === 'broadcast' ? 'success' : 'default'} onClick={() => setSettings({ ...settings, lineSendMode: 'broadcast' })} sx={{ cursor: 'pointer', fontWeight: 600 }} />
-                    <Chip label="📨 Push (ระบุ ID)" variant={settings?.lineSendMode === 'push' ? 'filled' : 'outlined'} color={settings?.lineSendMode === 'push' ? 'primary' : 'default'} onClick={() => setSettings({ ...settings, lineSendMode: 'push' })} sx={{ cursor: 'pointer', fontWeight: 600 }} />
-                  </Box>
-                  {settings?.lineSendMode === 'push' && (
-                    <TextField label="User/Group IDs" fullWidth size="small" multiline rows={2} value={settings?.lineUserIds || ''} onChange={e => setSettings({ ...settings, lineUserIds: e.target.value })} />
-                  )}
-                </CardContent>
-              </Card>
+                {settings?.lineSendMode === 'push' && (
+                  <TextField label="User/Group IDs" fullWidth size="small" multiline rows={2} value={settings?.lineUserIds || ''} onChange={e => setSettings({ ...settings, lineUserIds: e.target.value })} />
+                )}
+              </SectionCard>
             </Grid>
             <Grid item xs={12} md={6}>
-              <Card>
-                <Box sx={{ px: 2.5, py: 1.5, borderBottom: '0.5px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Mail size={18} color="#e74c3c" />
-                  <Typography variant="subtitle2" fontWeight={700}>SMTP Email</Typography>
-                </Box>
-                <CardContent sx={{ p: 2.5 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <SectionCard title="SMTP Email" icon={Mail}>
                   <FormControlLabel control={<Switch checked={settings?.enableEmail ?? true} onChange={e => setSettings({ ...settings, enableEmail: e.target.checked })} color="success" />} label="เปิดอีเมลแจ้งเตือน" sx={{ mb: 2 }} />
                   <Grid container spacing={1.5}>
                     <Grid item xs={8}><TextField label="Host" fullWidth size="small" value={settings?.smtpHost || ''} onChange={e => setSettings({ ...settings, smtpHost: e.target.value })} /></Grid>
@@ -390,30 +361,21 @@ export default function SettingsPage() {
                     <Grid item xs={5}><TextField label="From Name" fullWidth size="small" value={settings?.smtpFromName || ''} onChange={e => setSettings({ ...settings, smtpFromName: e.target.value })} /></Grid>
                     <Grid item xs={12}><TextField label="CC Emails (คั่นด้วยลูกน้ำ)" fullWidth size="small" value={settings?.emailCc || ''} onChange={e => setSettings({ ...settings, emailCc: e.target.value })} placeholder="admin@trrgroup.com, support@trrgroup.com" /></Grid>
                   </Grid>
-                </CardContent>
-              </Card>
-              <Card sx={{ mt: 2 }}>
-                <Box sx={{ px: 2.5, py: 1.5, borderBottom: '0.5px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <MessageSquare size={18} color="#6366f1" />
-                  <Typography variant="subtitle2" fontWeight={700}>Microsoft Teams</Typography>
-                </Box>
-                <CardContent sx={{ p: 2.5 }}>
+                </SectionCard>
+                <SectionCard title="Microsoft Teams" icon={MessageSquare}>
                   <FormControlLabel control={<Switch checked={settings?.enableTeams ?? false} onChange={e => setSettings({ ...settings, enableTeams: e.target.checked })} />} label="เปิด Teams Notification" sx={{ mb: 2 }} />
                   {settings?.enableTeams && (
                     <TextField label="Webhook URL" fullWidth size="small" value={settings?.teamsWebhookUrl || ''} onChange={e => setSettings({ ...settings, teamsWebhookUrl: e.target.value })} />
                   )}
-                </CardContent>
-              </Card>
+                </SectionCard>
+              </Box>
             </Grid>
           </Grid>
 
           {/* Event Toggles */}
-          <Card sx={{ mt: 3 }}>
-            <Box sx={{ px: 2.5, py: 1.5, borderBottom: '0.5px solid', borderColor: 'divider' }}>
-              <Typography variant="subtitle2" fontWeight={700}>เหตุการณ์ที่ต้องการแจ้งเตือน</Typography>
-            </Box>
-            <CardContent sx={{ p: 2.5 }}>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+          <Box sx={{ mt: 2 }}>
+            <SectionCard title="เหตุการณ์ที่ต้องการแจ้งเตือน" icon={Bell}>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                 {[
                   { key: 'borrow_request_pending', icon: '📋', label: 'คำขอยืมใหม่' },
                   { key: 'borrow_approved', icon: '✅', label: 'อนุมัติ' },
@@ -435,11 +397,11 @@ export default function SettingsPage() {
                   );
                 })}
               </Box>
-            </CardContent>
-          </Card>
+            </SectionCard>
+          </Box>
 
           {/* Log Table */}
-          <Card sx={{ mt: 3 }}>
+          <Card sx={{ mt: 2 }}>
             <Box sx={{ px: 2.5, py: 1.5, borderBottom: '0.5px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Typography variant="subtitle2" fontWeight={700}>ประวัติการแจ้งเตือนล่าสุด</Typography>
               <Button size="small" startIcon={<RefreshCw size={14} />} onClick={fetchLogs} disabled={logLoading}>รีเฟรช</Button>
@@ -484,132 +446,109 @@ export default function SettingsPage() {
       )}
 
       {tab === 4 && (
-        <Grid container spacing={3}>
+        <Grid container spacing={2}>
           <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>นโยบายรหัสผ่าน</Typography>
-                <FormControlLabel control={<Switch checked={settings?.requireStrongPassword ?? true} onChange={e => setSettings({ ...settings, requireStrongPassword: e.target.checked })} />} label="บังคับใช้รหัสผ่านที่ซับซ้อน" sx={{ mb: 2 }} />
-                <TextField label="อายุรหัสผ่าน (วัน)" type="number" fullWidth size="small" value={settings?.passwordExpiryDays || '90'} onChange={e => setSettings({ ...settings, passwordExpiryDays: e.target.value })} />
-              </CardContent>
-            </Card>
+            <SectionCard title="นโยบายรหัสผ่าน" icon={Shield}>
+              <FormControlLabel control={<Switch checked={settings?.requireStrongPassword ?? true} onChange={e => setSettings({ ...settings, requireStrongPassword: e.target.checked })} />} label="บังคับใช้รหัสผ่านที่ซับซ้อน" sx={{ mb: 2 }} />
+              <TextField label="อายุรหัสผ่าน (วัน)" type="number" fullWidth size="small" value={settings?.passwordExpiryDays || '90'} onChange={e => setSettings({ ...settings, passwordExpiryDays: e.target.value })} />
+            </SectionCard>
           </Grid>
           <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>การจัดการเซสชัน</Typography>
-                <TextField label="หมดอายุเซสชัน (ชั่วโมง)" type="number" fullWidth size="small" value={settings?.sessionTimeoutHours || '8'} onChange={e => setSettings({ ...settings, sessionTimeoutHours: e.target.value })} sx={{ mb: 3 }} />
-                <Divider sx={{ mb: 2 }} />
-                <Typography variant="subtitle2" fontWeight={700} color="error" sx={{ mb: 1 }}>ยกเลิกเซสชันทั้งหมด</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>ทุกคนในระบบจะต้องล็อกอินใหม่ทันที</Typography>
-                <Button variant="contained" color="error" size="small" onClick={async () => { if (window.confirm('ยืนยัน? ทุกคนจะต้องล็อกอินใหม่')) { try { await adminAPI.forceLogoutAll(); toast.success('ยกเลิกเซสชันทั้งหมดแล้ว'); } catch { toast.error('เกิดข้อผิดพลาด'); } } }}>
-                  บังคับยกเลิกเซสชัน
-                </Button>
-              </CardContent>
-            </Card>
+            <SectionCard title="การจัดการเซสชัน" icon={Clock}>
+              <TextField label="หมดอายุเซสชัน (ชั่วโมง)" type="number" fullWidth size="small" value={settings?.sessionTimeoutHours || '8'} onChange={e => setSettings({ ...settings, sessionTimeoutHours: e.target.value })} sx={{ mb: 3 }} />
+              <Divider sx={{ mb: 2 }} />
+              <Typography variant="subtitle2" fontWeight={700} color="error" sx={{ mb: 1 }}>ยกเลิกเซสชันทั้งหมด</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>ทุกคนในระบบจะต้องล็อกอินใหม่ทันที</Typography>
+              <Button variant="contained" color="error" size="small" onClick={async () => { if (window.confirm('ยืนยัน? ทุกคนจะต้องล็อกอินใหม่')) { try { await adminAPI.forceLogoutAll(); toast.success('ยกเลิกเซสชันทั้งหมดแล้ว'); } catch { toast.error('เกิดข้อผิดพลาด'); } } }}>
+                บังคับยกเลิกเซสชัน
+              </Button>
+            </SectionCard>
           </Grid>
         </Grid>
       )}
 
       {tab === 5 && (
-        <Grid container spacing={3}>
+        <Grid container spacing={2}>
           <Grid item xs={12} md={7}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                  <Typography variant="h6" fontWeight={700}>สถานะระบบ (Health Check)</Typography>
-                  <Button size="small" startIcon={<RefreshCw size={14} />} onClick={fetchPing} disabled={pingLoading}>รีเฟรช</Button>
-                </Box>
-                <Stack spacing={2}>
-                  <StatusRow icon={<Database />} label="ฐานข้อมูล (PostgreSQL)" {...pingResult?.database} />
-                  <StatusRow icon={<Server />} label="Active Directory / LDAP" {...pingResult?.ldap} />
-                  <StatusRow icon={<Mail />} label="SMTP Mail Server" {...pingResult?.smtp} />
-                </Stack>
-                {pingResult?.ldap?.status !== 'ok' && (
-                  <Alert severity="warning" sx={{ mt: 2 }}>
-                    <strong>LDAP แสดง OFFLINE</strong> — เนื่องจากไม่ได้กำหนด <code>LDAP_SEARCH_USER</code> และ <code>LDAP_SEARCH_PASSWORD</code> ใน <code>backend/.env</code> ถ้าไม่ได้ใช้ AD Direct ก็ไม่ต้องตั้งค่า
-                  </Alert>
-                )}
-              </CardContent>
-            </Card>
+            <SectionCard title="สถานะระบบ (Health Check)" icon={Server} action={fetchPing} actionLabel={pingLoading ? 'กำลังตรวจสอบ...' : 'รีเฟรช'}>
+              <Stack spacing={2}>
+                <StatusRow icon={<Database />} label="ฐานข้อมูล (PostgreSQL)" {...pingResult?.database} />
+                <StatusRow icon={<Server />} label="Active Directory / LDAP" {...pingResult?.ldap} />
+                <StatusRow icon={<Mail />} label="SMTP Mail Server" {...pingResult?.smtp} />
+              </Stack>
+              {pingResult?.ldap?.status !== 'ok' && (
+                <Alert severity="warning" sx={{ mt: 2 }}>
+                  <strong>LDAP แสดง OFFLINE</strong> — เนื่องจากไม่ได้กำหนด <code>LDAP_SEARCH_USER</code> และ <code>LDAP_SEARCH_PASSWORD</code> ใน <code>backend/.env</code> ถ้าไม่ได้ใช้ AD Direct ก็ไม่ต้องตั้งค่า
+                </Alert>
+              )}
+            </SectionCard>
           </Grid>
           <Grid item xs={12} md={5}>
-            <Card sx={{ height: '100%' }}>
-              <CardContent>
-                <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>ข้อมูลเซิร์ฟเวอร์</Typography>
-                <Stack spacing={1.5}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 1.5, bgcolor: 'action.hover', borderRadius: 1.5 }}>
-                    <Typography variant="body2" color="text.secondary">เวอร์ชัน</Typography>
-                    <Typography variant="body2" fontWeight={600}>2.0.0</Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 1.5, bgcolor: 'action.hover', borderRadius: 1.5 }}>
-                    <Typography variant="body2" color="text.secondary">API Status</Typography>
-                    <Chip label={pingResult?.server?.status === 'ok' ? 'Running' : 'ตรวจสอบ...'} size="small" color={pingResult?.server?.status === 'ok' ? 'success' : 'default'} />
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 1.5, bgcolor: 'action.hover', borderRadius: 1.5 }}>
-                    <Typography variant="body2" color="text.secondary">Timestamp</Typography>
-                    <Typography variant="body2" fontWeight={600}>{pingResult?.server?.timestamp ? new Date(pingResult.server.timestamp).toLocaleString('th-TH') : '-'}</Typography>
-                  </Box>
-                </Stack>
-              </CardContent>
-            </Card>
+            <SectionCard title="ข้อมูลเซิร์ฟเวอร์" icon={Settings}>
+              <Stack spacing={1.5}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 1.5, bgcolor: 'action.hover', borderRadius: 1.5 }}>
+                  <Typography variant="body2" color="text.secondary">เวอร์ชัน</Typography>
+                  <Typography variant="body2" fontWeight={600}>2.0.0</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 1.5, bgcolor: 'action.hover', borderRadius: 1.5 }}>
+                  <Typography variant="body2" color="text.secondary">API Status</Typography>
+                  <Chip label={pingResult?.server?.status === 'ok' ? 'Running' : 'ตรวจสอบ...'} size="small" color={pingResult?.server?.status === 'ok' ? 'success' : 'default'} />
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 1.5, bgcolor: 'action.hover', borderRadius: 1.5 }}>
+                  <Typography variant="body2" color="text.secondary">Timestamp</Typography>
+                  <Typography variant="body2" fontWeight={600}>{pingResult?.server?.timestamp ? new Date(pingResult.server.timestamp).toLocaleString('th-TH') : '-'}</Typography>
+                </Box>
+              </Stack>
+            </SectionCard>
           </Grid>
         </Grid>
       )}
 
       {tab === 6 && (
-        <Grid container spacing={3}>
+        <Grid container spacing={2}>
           <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-                  <Download size={24} color={theme.palette.primary.main} />
-                  <Typography variant="h6" fontWeight={700}>Backup</Typography>
-                </Box>
-                <Button variant="outlined" startIcon={backingUp ? <CircularProgress size={18} /> : <Download size={18} />} disabled={backingUp}
-                  onClick={async () => {
-                    setBackingUp(true);
-                    try {
-                      const res = await adminAPI.backup();
-                      const blob = new Blob([res.data], { type: 'application/json' });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a'); a.href = url; a.download = `assethub-backup-${new Date().toISOString().split('T')[0]}.json`;
-                      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-                      toast.success('ดาวน์โหลด Backup สำเร็จ');
-                    } catch { toast.error('เกิดข้อผิดพลาด'); }
-                    finally { setBackingUp(false); }
-                  }}>
-                  {backingUp ? 'กำลังดาวน์โหลด...' : 'ดาวน์โหลด Backup'}
-                </Button>
-              </CardContent>
-            </Card>
+            <SectionCard title="Backup" icon={Download}>
+              <Button variant="outlined" startIcon={backingUp ? <CircularProgress size={18} /> : <Download size={18} />} disabled={backingUp}
+                onClick={async () => {
+                  setBackingUp(true);
+                  try {
+                    const res = await adminAPI.backup();
+                    const blob = new Blob([res.data], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a'); a.href = url; a.download = `assethub-backup-${new Date().toISOString().split('T')[0]}.json`;
+                    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+                    toast.success('ดาวน์โหลด Backup สำเร็จ');
+                  } catch { toast.error('เกิดข้อผิดพลาด'); }
+                  finally { setBackingUp(false); }
+                }}>
+                {backingUp ? 'กำลังดาวน์โหลด...' : 'ดาวน์โหลด Backup'}
+              </Button>
+            </SectionCard>
           </Grid>
           <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-                  <Upload size={24} color={theme.palette.warning.main} />
-                  <Typography variant="h6" fontWeight={700}>Restore</Typography>
-                </Box>
-                <Button variant="outlined" component="label" sx={{ mb: 1 }}>
-                  เลือกไฟล์ <input type="file" hidden accept=".json" onChange={e => setRestoreFile(e.target.files?.[0] || null)} />
-                </Button>
-                {restoreFile && <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>{restoreFile.name}</Typography>}
-                <Button variant="contained" color="warning" disabled={!restoreFile} onClick={async () => {
-                  if (!restoreFile) return;
-                  try { const res = await adminAPI.restore(restoreFile); toast.success(res.data.message || 'Restore สำเร็จ'); setRestoreFile(null); } catch { toast.error('เกิดข้อผิดพลาด'); }
-                }}>กู้คืนข้อมูล</Button>
-              </CardContent>
-            </Card>
+            <SectionCard title="Restore" icon={Upload}>
+              <Button variant="outlined" component="label" sx={{ mb: 1 }}>
+                เลือกไฟล์ <input type="file" hidden accept=".json" onChange={e => setRestoreFile(e.target.files?.[0] || null)} />
+              </Button>
+              {restoreFile && <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>{restoreFile.name}</Typography>}
+              <Button variant="contained" color="warning" disabled={!restoreFile} onClick={async () => {
+                if (!restoreFile) return;
+                try { const res = await adminAPI.restore(restoreFile); toast.success(res.data.message || 'Restore สำเร็จ'); setRestoreFile(null); } catch { toast.error('เกิดข้อผิดพลาด'); }
+              }}>กู้คืนข้อมูล</Button>
+            </SectionCard>
           </Grid>
           <Grid item xs={12}>
-            <Card sx={{ border: '2px solid', borderColor: alpha(theme.palette.error.main, 0.3) }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-                  <Trash2 size={24} color={theme.palette.error.main} />
-                  <Typography variant="h6" fontWeight={700} color="error">ล้างข้อมูล</Typography>
-                </Box>
-                <Alert severity="error" sx={{ mb: 2 }}>
+            <Box sx={{
+              bgcolor: theme.palette.background.paper,
+              border: `1px solid ${alpha(theme.palette.error.main, 0.3)}`,
+              borderRadius: '14px', p: 2.5,
+              boxShadow: theme.palette.mode === 'dark' ? '0 6px 18px rgba(0,0,0,0.35)' : '0 6px 18px rgba(16,24,40,.06)',
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: 2 }}>
+                <Trash2 size={18} strokeWidth={2.2} color={theme.palette.error.main} />
+                <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color: theme.palette.error.main }}>ล้างข้อมูล</Typography>
+              </Box>
+              <Alert severity="error" sx={{ mb: 2 }}>
                   <strong>คำเตือน:</strong> การลบข้อมูลไม่สามารถย้อนกลับได้
                 </Alert>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 2 }}>
@@ -655,8 +594,7 @@ export default function SettingsPage() {
                     </TableBody>
                   </Table>
                 </TableContainer>
-              </CardContent>
-            </Card>
+            </Box>
           </Grid>
         </Grid>
       )}

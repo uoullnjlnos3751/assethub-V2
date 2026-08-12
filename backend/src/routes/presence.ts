@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { authenticate, authorize } from '../middleware/auth';
-import { touch, listOnline, labelForPath } from '../services/presence';
+import { touch, listOnline, labelForPath, zoneForPath } from '../services/presence';
 
 const router = Router();
 
@@ -22,6 +22,7 @@ router.get('/online', authenticate, authorize('IT_ADMIN', 'SUPERADMIN', 'VIEWER'
     role: e.role,
     avatarUrl: e.avatarUrl,
     activity: labelForPath(e.path),
+    zone: zoneForPath(e.path),
     lastSeen: e.lastSeen,
   }));
   res.json(online);

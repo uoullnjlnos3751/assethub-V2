@@ -76,3 +76,19 @@ export function labelForPath(path: string): string {
   const hit = PATH_LABELS.find((p) => p.pattern.test(path));
   return hit?.label || 'กำลังใช้งานระบบ';
 }
+
+// Buckets a path into one of the dashboard ops-room "desks". Only desks that
+// correspond to a real menu are listed here — the mockup's "เครื่องใหม่ &
+// ส่งมอบ" and standalone "ซ่อมบำรุง" desks have no equivalent menu in this
+// app yet, so a path never resolves to them.
+export type OpsRoomZone = 'borrow' | 'pm' | 'inventory' | null;
+
+const ZONE_PATTERNS: { pattern: RegExp; zone: OpsRoomZone }[] = [
+  { pattern: /^\/borrow/, zone: 'borrow' },
+  { pattern: /^\/pm/, zone: 'pm' },
+  { pattern: /^\/inventory/, zone: 'inventory' },
+];
+
+export function zoneForPath(path: string): OpsRoomZone {
+  return ZONE_PATTERNS.find((p) => p.pattern.test(path))?.zone ?? null;
+}

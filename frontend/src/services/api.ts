@@ -307,6 +307,9 @@ export const dashboardAPI = {
   recentActivity: () => api.get('/dashboard/recent-activity'),
   proactiveAlerts: () => api.get('/dashboard/proactive-alerts'),
   warrantyExpiring: (days?: number) => api.get('/dashboard/warranty-expiring', { params: { days } }),
+  moduleStatus: () => api.get('/dashboard/module-status'),
+  categoryUtilization: () => api.get('/dashboard/category-utilization'),
+  inventoryLowStock: () => api.get('/dashboard/inventory-low-stock'),
 };
 
 // Inventory

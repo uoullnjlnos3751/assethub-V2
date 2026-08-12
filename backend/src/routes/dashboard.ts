@@ -6,7 +6,7 @@ const router = Router();
 
 router.get('/asset-summary', authenticate, authorize('IT_ADMIN', 'SUPERADMIN', 'VIEWER'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const [byStatus, byDepartment, byCompany, byType, byLocation, total, byCategory] = await Promise.all([
+    const [byStatus, byDepartment, byCompany, byType, byLocation, total, byCategory, costAgg] = await Promise.all([
       prisma.asset.groupBy({ by: ['status'], _count: true }),
       prisma.asset.groupBy({ by: ['departmentId'], _count: true }),
       prisma.asset.groupBy({ by: ['company'], _count: true }),
@@ -18,11 +18,95 @@ router.get('/asset-summary', authenticate, authorize('IT_ADMIN', 'SUPERADMIN', '
         select: { id: true, name: true, icon: true, _count: { select: { assets: true } } },
         orderBy: { sortOrder: 'asc' },
       }),
+      // Total acquisition cost — a real, simple sum. Not a depreciated "book
+      // value" (that needs a depreciation policy — useful-life years per
+      // category, salvage value — which nothing in this system defines yet).
+      prisma.asset.aggregate({ _sum: { purchasePrice: true } }),
     ]);
     const byCategoryFlat = byCategory.map(c => ({
       id: c.id, name: c.name, icon: c.icon, assetCount: c._count.assets,
     }));
-    res.json({ total, byStatus, byDepartment, byCompany, byType, byLocation, byCategory: byCategoryFlat });
+    res.json({
+      total, byStatus, byDepartment, byCompany, byType, byLocation, byCategory: byCategoryFlat,
+      totalPurchaseCost: costAgg._sum.purchasePrice || 0,
+    });
+  } catch (err) { next(err); }
+});
+
+// Small real-data health strip for the dashboard's "module status" card —
+// each metric reuses a query already proven elsewhere on the dashboard
+// rather than inventing a new health concept.
+router.get('/module-status', authenticate, authorize('IT_ADMIN', 'SUPERADMIN', 'VIEWER'), async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const now = new Date();
+    const [
+      totalAssets, missingSerial, missingLocation,
+      overdueItems,
+      pmTotal, pmDone,
+      notifSent, notifTotal,
+    ] = await Promise.all([
+      prisma.asset.count(),
+      prisma.asset.count({ where: { OR: [{ serialNo: '' }, { serialNo: '-' }] } }),
+      prisma.asset.count({ where: { OR: [{ location: null }, { location: '' }, { location: '-' }] } }),
+      prisma.borrowRequestItem.count({ where: { itemStatus: 'CheckedOut', dueDate: { lt: now } } }),
+      prisma.pMRun.count({ where: { year: now.getFullYear() } }),
+      prisma.pMRun.count({ where: { year: now.getFullYear(), status: 'COMPLETED' } }),
+      prisma.notificationOutbox.count({ where: { status: 'SENT' } }),
+      prisma.notificationOutbox.count(),
+    ]);
+    const dataHealthPct = totalAssets > 0
+      ? Math.round(((totalAssets * 2 - missingSerial - missingLocation) / (totalAssets * 2)) * 1000) / 10
+      : 100;
+    res.json({
+      assetRegistry: { healthPct: dataHealthPct },
+      borrow: { overdueItems },
+      pm: { total: pmTotal, done: pmDone, pct: pmTotal > 0 ? Math.round((pmDone / pmTotal) * 1000) / 10 : 0 },
+      notifications: { sent: notifSent, total: notifTotal, successPct: notifTotal > 0 ? Math.round((notifSent / notifTotal) * 1000) / 10 : 100 },
+    });
+  } catch (err) { next(err); }
+});
+
+// Top categories with utilization = assets currently deployed (InUse or
+// CheckedOut) / total in that category.
+router.get('/category-utilization', authenticate, authorize('IT_ADMIN', 'SUPERADMIN', 'VIEWER'), async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const categories = await prisma.category.findMany({
+      where: { isActive: true },
+      select: {
+        id: true, name: true, icon: true,
+        assets: { select: { status: true } },
+      },
+    });
+    const rows = categories
+      .map(c => {
+        const total = c.assets.length;
+        const inUse = c.assets.filter(a => a.status === 'InUse' || a.status === 'Borrowed').length;
+        return {
+          id: c.id, name: c.name, icon: c.icon, total,
+          utilizationPct: total > 0 ? Math.round((inUse / total) * 1000) / 10 : 0,
+        };
+      })
+      .filter(c => c.total > 0)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 5);
+    res.json(rows);
+  } catch (err) { next(err); }
+});
+
+// Low-stock inventory count — feeds the ops-room parts-shelf desk.
+router.get('/inventory-low-stock', authenticate, authorize('IT_ADMIN', 'SUPERADMIN', 'VIEWER'), async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Prisma's query builder can't compare two columns of the same row
+    // directly in `where`, so pull the two small fields and compare in JS.
+    const [items, totalQty] = await Promise.all([
+      prisma.inventoryItem.findMany({
+        where: { isActive: true },
+        select: { availableQuantity: true, minStockLevel: true },
+      }),
+      prisma.inventoryItem.aggregate({ where: { isActive: true }, _sum: { totalQuantity: true } }),
+    ]);
+    const lowStockCount = items.filter(i => i.availableQuantity <= i.minStockLevel).length;
+    res.json({ lowStockCount, totalQuantity: totalQty._sum.totalQuantity || 0 });
   } catch (err) { next(err); }
 });
 
