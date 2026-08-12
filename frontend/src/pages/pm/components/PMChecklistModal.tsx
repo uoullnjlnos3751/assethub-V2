@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Box, Typography, Button, TextField, Select, MenuItem, alpha, useTheme } from '@mui/material';
 import { pmAPI } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { resolveMediaUrl } from '../../../utils/mediaUrl';
@@ -17,6 +18,7 @@ interface PMChecklistModalProps {
 }
 
 export const PMChecklistModal: React.FC<PMChecklistModalProps> = ({ open, onClose, run, onSuccess }) => {
+  const theme = useTheme();
   const { user } = useAuth();
   const [answers, setAnswersState] = useState<Record<string, any>>({});
   const [saving, setSaving] = useState(false);
@@ -135,26 +137,19 @@ export const PMChecklistModal: React.FC<PMChecklistModalProps> = ({ open, onClos
     return base;
   };
 
-  const renderReadonlyAnswer = (item: any) => {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a' }}>{item.label}</div>
-        <div style={{
-          padding: '14px 18px',
-          borderRadius: 12,
-          background: '#f8fafc',
-          border: '1px solid #cbd5e1',
-          color: '#334155',
-          fontSize: 13,
-          lineHeight: 1.6,
-          whiteSpace: 'pre-wrap',
-          wordBreak: 'break-word',
-        }}>
-          {formatAnswerValue(item)}
-        </div>
-      </div>
-    );
-  };
+  const renderReadonlyAnswer = (item: any) => (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+      <Typography sx={{ fontSize: 14, fontWeight: 600, color: theme.palette.text.primary }}>{item.label}</Typography>
+      <Box sx={{
+        px: 2.25, py: 1.75, borderRadius: '12px',
+        bgcolor: theme.palette.background.default, border: `1px solid ${theme.palette.divider}`,
+        color: theme.palette.text.secondary, fontSize: 13, lineHeight: 1.6,
+        whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+      }}>
+        {formatAnswerValue(item)}
+      </Box>
+    </Box>
+  );
 
   const rawItems = getChecklistItems();
   const GROUP_ORDER = ['user', 'os', 'security', 'agent', 'hardware', 'result', 'other'];
@@ -285,10 +280,10 @@ export const PMChecklistModal: React.FC<PMChecklistModalProps> = ({ open, onClos
         useWebWorker: true,
       };
       const compressedFile = await imageCompression(file, options);
-      
+
       const formData = new FormData();
       formData.append('file', compressedFile, file.name);
-      
+
       const res = await pmAPI.uploadPMPhoto(run.id, formData);
       setPhotoUrl(res.data.photoUrl || file.name);
       alert('📸 อัปโหลดรูปภาพสำเร็จ!');
@@ -359,6 +354,29 @@ export const PMChecklistModal: React.FC<PMChecklistModalProps> = ({ open, onClos
     }
   };
 
+  const BOOL_OPTS = [
+    { val: 'yes', lbl: '✓ ใช่', key: 'success' as const },
+    { val: 'no', lbl: '✗ ไม่', key: 'error' as const },
+    { val: 'na', lbl: '— N/A', key: 'neutral' as const },
+  ];
+  const boolActiveSx = (key: 'success' | 'error' | 'neutral') => key === 'neutral'
+    ? { bgcolor: theme.palette.background.default, borderColor: theme.palette.text.disabled, color: theme.palette.text.primary }
+    : { bgcolor: alpha(theme.palette[key].main, 0.1), borderColor: theme.palette[key].main, color: theme.palette[key].dark };
+
+  const greenNoteBox = (label: string, icon: string, item: any) => (
+    <Box sx={{ mt: 0.5 }}>
+      <Box sx={{ bgcolor: alpha(theme.palette.success.main, 0.08), border: `1px solid ${alpha(theme.palette.success.main, 0.4)}`, borderRadius: '10px', p: '14px 18px', display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <Typography sx={{ fontSize: 12, color: theme.palette.success.dark, fontWeight: 700 }}>{icon} {label}</Typography>
+        <TextField
+          fullWidth size="small"
+          value={answers[`${item.key}_note`] || ''}
+          onChange={(e) => setAnswers((p: any) => ({ ...p, [`${item.key}_note`]: e.target.value }))}
+          sx={{ '& .MuiOutlinedInput-root': { bgcolor: theme.palette.background.paper } }}
+        />
+      </Box>
+    </Box>
+  );
+
   return (
     <Modal
       open={open}
@@ -366,21 +384,16 @@ export const PMChecklistModal: React.FC<PMChecklistModalProps> = ({ open, onClos
       maxWidth={940}
       title={`🔧 บันทึกข้อมูล PM: ${run?.asset?.assetName || run?.asset?.assetCode || ''} — ${run?.asset?.brand || ''} ${run?.asset?.model || ''}`}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '85vh', backgroundColor: '#F9FAFB' }}>
-        
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '85vh', bgcolor: theme.palette.background.default }}>
+
         {/* Header Section */}
-        <div style={{ 
-          padding: '12px 24px', 
-          background: 'linear-gradient(to right, #ffffff, #f8fafc)',
-          borderBottom: '1px solid #e2e8f0', 
-          display: 'flex', 
-          flexWrap: 'wrap', 
-          alignItems: 'flex-start', 
-          justifyContent: 'space-between', 
-          gap: '12px', 
-          flexShrink: 0 
+        <Box sx={{
+          px: 3, py: 1.5,
+          bgcolor: theme.palette.background.paper,
+          borderBottom: `1px solid ${theme.palette.divider}`,
+          display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1.5, flexShrink: 0,
         }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 24px' }}>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '8px 24px' }}>
             {[
               { lbl: 'ผู้ถือครอง', val: run.asset?.ownerName || '—' },
               { lbl: 'แผนก', val: run.asset?.departmentId || run.plan?.deptTask || '—' },
@@ -388,558 +401,405 @@ export const PMChecklistModal: React.FC<PMChecklistModalProps> = ({ open, onClos
               { lbl: 'Serial No.', val: run.asset?.serialNo || '—' },
               { lbl: 'อายุเครื่อง', val: run.asset?.age != null ? `${run.asset.age} ปี` : '—' },
             ].map((i) => (
-              <div key={i.lbl} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{i.lbl}</span>
-                <span style={{ fontSize: 15, fontWeight: 600, color: '#0f172a' }}>{i.val}</span>
-              </div>
+              <Box key={i.lbl} sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                <Typography sx={{ fontSize: 11, color: theme.palette.text.secondary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{i.lbl}</Typography>
+                <Typography sx={{ fontSize: 15, fontWeight: 600, color: theme.palette.text.primary }}>{i.val}</Typography>
+              </Box>
             ))}
-          </div>
+          </Box>
           {run.asset?.serialNo && (
-            <button
-              type="button"
-              className="pmr-btn pmr-btn-outline"
+            <Button
+              variant="outlined"
               onClick={() => fetchGLPI(run.id)}
               disabled={fetchingGLPI}
-              style={{ 
-                borderRadius: 8, 
-                fontSize: 13, 
-                padding: '8px 16px',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                backgroundColor: '#fff',
-                borderColor: '#cbd5e1',
-                color: '#334155',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-              }}
+              sx={{ fontSize: 13, fontWeight: 600 }}
             >
-              {fetchingGLPI ? (
-                <>⏳ <span>กำลังดึงข้อมูล...</span></>
-              ) : (
-                <>🔌 <span>ดึงสเปคจาก GLPI</span></>
-              )}
-            </button>
+              {fetchingGLPI ? '⏳ กำลังดึงข้อมูล...' : '🔌 ดึงสเปคจาก GLPI'}
+            </Button>
           )}
-        </div>
+        </Box>
 
         {/* Progress & Actions Section */}
-        <div style={{ 
-          padding: '10px 24px', 
-          borderBottom: '1px solid #e2e8f0', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'space-between', 
-          flexShrink: 0, 
-          flexWrap: 'wrap', 
-          gap: 12, 
-          background: '#ffffff' 
+        <Box sx={{
+          px: 3, py: 1.25, borderBottom: `1px solid ${theme.palette.divider}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, flexWrap: 'wrap', gap: 1.5,
+          bgcolor: theme.palette.background.paper,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: 1, minWidth: 280 }}>
-            <span style={{ fontSize: 13, color: '#475569', fontWeight: 600 }}>ความคืบหน้า</span>
-            <div style={{ flex: 1, background: '#f1f5f9', borderRadius: 12, height: 8, overflow: 'hidden', boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.05)' }}>
-              <div style={{ 
-                height: '100%', 
-                borderRadius: 12, 
-                background: 'linear-gradient(90deg, #10b981 0%, #34d399 100%)', 
-                width: `${checkPct}%`, 
-                transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)' 
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1, minWidth: 280 }}>
+            <Typography sx={{ fontSize: 13, color: theme.palette.text.secondary, fontWeight: 600 }}>ความคืบหน้า</Typography>
+            <Box sx={{ flex: 1, bgcolor: theme.palette.background.default, borderRadius: '12px', height: 8, overflow: 'hidden' }}>
+              <Box sx={{
+                height: '100%', borderRadius: '12px',
+                background: `linear-gradient(90deg, ${theme.palette.success.main} 0%, ${alpha(theme.palette.success.main, 0.7)} 100%)`,
+                width: `${checkPct}%`, transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
               }} />
-            </div>
-            <span style={{ fontSize: 14, fontWeight: 800, color: '#059669', minWidth: 44 }}>{checkPct}%</span>
-          </div>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button 
-              type="button" 
-              className="pmr-btn" 
-              style={{ 
-                padding: '8px 16px', fontSize: 13, background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', borderRadius: 8, fontWeight: 600, transition: 'all 0.2s' 
-              }} 
+            </Box>
+            <Typography sx={{ fontSize: 14, fontWeight: 800, color: theme.palette.success.main, minWidth: 44 }}>{checkPct}%</Typography>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1.25 }}>
+            <Button
+              size="small"
               onClick={() => setAll('yes')}
+              sx={{ fontSize: 13, fontWeight: 600, bgcolor: alpha(theme.palette.success.main, 0.1), color: theme.palette.success.dark, border: `1px solid ${alpha(theme.palette.success.main, 0.3)}`, '&:hover': { bgcolor: alpha(theme.palette.success.main, 0.18) } }}
             >
               ✓ ทำทั้งหมด (Yes)
-            </button>
-            <button
-              type="button"
-              className="pmr-btn"
-              style={{ 
-                padding: '8px 16px', fontSize: 13, background: '#fff', color: '#64748b', border: '1px solid #cbd5e1', borderRadius: 8, fontWeight: 600, transition: 'all 0.2s' 
-              }}
+            </Button>
+            <Button
+              size="small" variant="outlined"
               onClick={() => {
                 setAnswersState({});
                 setIsDirty(false);
                 localStorage.removeItem(`pm_draft_${run.id}`);
               }}
+              sx={{ fontSize: 13, fontWeight: 600 }}
             >
               ↺ ล้างข้อมูล
-            </button>
-          </div>
-        </div>
+            </Button>
+          </Box>
+        </Box>
 
         {/* Scrollable Content Container */}
-        <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column' }}>
 
           {/* GLPI Spec Display */}
           {glpiSpec && (
-            <div style={{ 
-              background: 'linear-gradient(to right, #ecfdf5, #f0fdf4)', 
-              borderBottom: '1px solid #a7f3d0', 
-              padding: '10px 24px', 
-              display: 'flex', 
-              flexDirection: 'column', 
-              gap: 8, 
-              fontSize: 12, 
-              color: '#065f46',
-              flexShrink: 0
+            <Box sx={{
+              background: `linear-gradient(to right, ${alpha(theme.palette.success.main, 0.08)}, ${alpha(theme.palette.success.main, 0.04)})`,
+              borderBottom: `1px solid ${alpha(theme.palette.success.main, 0.3)}`,
+              px: 3, py: 1.25, display: 'flex', flexDirection: 'column', gap: 1, fontSize: 12, color: theme.palette.success.dark, flexShrink: 0,
             }}>
-              <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+              <Box sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.75, fontSize: 13 }}>
                 📡 <span>ข้อมูลฮาร์ดแวร์สแกนอัตโนมัติจาก GLPI:</span>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '6px 16px' }}>
-                <div><strong style={{ opacity: 0.8 }}>CPU:</strong> {glpiSpec.cpu || '—'}</div>
-                <div><strong style={{ opacity: 0.8 }}>RAM:</strong> {glpiSpec.ram || '—'}</div>
-                <div><strong style={{ opacity: 0.8 }}>OS:</strong> {glpiSpec.os || '—'}</div>
-                <div><strong style={{ opacity: 0.8 }}>Office:</strong> {glpiSpec.msOffice || '—'}</div>
-                <div><strong style={{ opacity: 0.8 }}>Antivirus:</strong> {glpiSpec.antivirus || '—'}</div>
-                <div><strong style={{ opacity: 0.8 }}>License:</strong> {glpiSpec.license || '—'}</div>
+              </Box>
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '6px 16px' }}>
+                <Box><strong style={{ opacity: 0.8 }}>CPU:</strong> {glpiSpec.cpu || '—'}</Box>
+                <Box><strong style={{ opacity: 0.8 }}>RAM:</strong> {glpiSpec.ram || '—'}</Box>
+                <Box><strong style={{ opacity: 0.8 }}>OS:</strong> {glpiSpec.os || '—'}</Box>
+                <Box><strong style={{ opacity: 0.8 }}>Office:</strong> {glpiSpec.msOffice || '—'}</Box>
+                <Box><strong style={{ opacity: 0.8 }}>Antivirus:</strong> {glpiSpec.antivirus || '—'}</Box>
+                <Box><strong style={{ opacity: 0.8 }}>License:</strong> {glpiSpec.license || '—'}</Box>
                 {glpiSpec.monitors && glpiSpec.monitors.length > 0 && (
-                  <div style={{ gridColumn: '1 / -1', marginTop: 4, background: '#ffffff50', padding: '10px 14px', borderRadius: 8 }}>
+                  <Box sx={{ gridColumn: '1 / -1', mt: 0.5, bgcolor: alpha(theme.palette.background.paper, 0.5), px: 1.75, py: 1.25, borderRadius: '8px' }}>
                     <strong style={{ opacity: 0.8, display: 'block', marginBottom: 6 }}>จอภาพที่เชื่อมต่อ:</strong>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
                       {glpiSpec.monitors.map((m: any, idx: number) => (
-                        <span key={idx} style={{ 
-                          background: '#fff', 
-                          padding: '6px 12px', 
-                          borderRadius: 6, 
-                          border: '1px solid #a7f3d0',
-                          display: 'inline-flex', 
-                          alignItems: 'center', 
-                          gap: 6,
-                          fontWeight: 500,
-                          color: '#064e3b'
+                        <Box key={idx} sx={{
+                          bgcolor: theme.palette.background.paper, px: 1.5, py: 0.75, borderRadius: '6px',
+                          border: `1px solid ${alpha(theme.palette.success.main, 0.3)}`,
+                          display: 'inline-flex', alignItems: 'center', gap: 0.75, fontWeight: 500,
                         }}>
-                          📺 {m.brand} {m.model} <span style={{ opacity: 0.7 }}>(S/N: {m.serial})</span>
-                        </span>
+                          📺 {m.brand} {m.model} <Box component="span" sx={{ opacity: 0.7 }}>(S/N: {m.serial})</Box>
+                        </Box>
                       ))}
-                    </div>
-                  </div>
+                    </Box>
+                  </Box>
                 )}
-              </div>
-            </div>
+              </Box>
+            </Box>
           )}
 
           {/* Photo Upload Section */}
-          <div style={{ padding: '12px 24px', borderBottom: '1px solid #e2e8f0', background: '#ffffff', flexShrink: 0 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>📸 รูปถ่ายขณะทำ PM (Photo attachment)</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <Box sx={{ px: 3, py: 1.5, borderBottom: `1px solid ${theme.palette.divider}`, bgcolor: theme.palette.background.paper, flexShrink: 0 }}>
+            <Typography sx={{ fontSize: 11, fontWeight: 700, color: theme.palette.text.secondary, mb: 1, textTransform: 'uppercase', letterSpacing: '0.05em' }}>📸 รูปถ่ายขณะทำ PM (Photo attachment)</Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               {photoUrl ? (
-                <div style={{ position: 'relative', width: 64, height: 64, borderRadius: 8, border: '2px solid #e2e8f0', overflow: 'hidden', background: '#f8fafc', boxShadow: '0 2px 4px -1px rgba(0,0,0,0.05)' }}>
-                  <img src={
-                    photoUrl.startsWith('data:') || photoUrl.startsWith('http') 
-                      ? photoUrl 
+                <Box sx={{ position: 'relative', width: 64, height: 64, borderRadius: '8px', border: `2px solid ${theme.palette.divider}`, overflow: 'hidden', bgcolor: theme.palette.background.default }}>
+                  <Box component="img" src={
+                    photoUrl.startsWith('data:') || photoUrl.startsWith('http')
+                      ? photoUrl
                       : resolveMediaUrl(photoUrl.startsWith('/') ? photoUrl : `/uploads/pm/${photoUrl}`)
-                  } style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="PM Attachment" />
-                </div>
+                  } sx={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="PM Attachment" />
+                </Box>
               ) : (
-                <div style={{ width: 64, height: 64, borderRadius: 8, border: '2px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, color: '#94a3b8', background: '#f8fafc' }}>📷</div>
+                <Box sx={{ width: 64, height: 64, borderRadius: '8px', border: `2px dashed ${theme.palette.divider}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, color: theme.palette.text.disabled, bgcolor: theme.palette.background.default }}>📷</Box>
               )}
               {!isDoneRun ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <label className="pmr-btn pmr-btn-outline" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, background: '#fff' }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  <Button component="label" variant="outlined" size="small" disabled={uploadingPhoto} sx={{ fontSize: 13, fontWeight: 600 }}>
                     {uploadingPhoto ? '⏳ กำลังอัปโหลด...' : '📸 เลือกรูปภาพใหม่'}
-                    <input type="file" accept="image/*" onChange={handlePhotoUpload} style={{ display: 'none' }} disabled={uploadingPhoto} />
-                  </label>
-                  <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>รองรับไฟล์ JPG, PNG, GIF, WEBP ขนาดไม่เกิน 10MB</div>
-                </div>
+                    <input type="file" accept="image/*" onChange={handlePhotoUpload} hidden disabled={uploadingPhoto} />
+                  </Button>
+                  <Typography sx={{ fontSize: 11, color: theme.palette.text.disabled, fontWeight: 500 }}>รองรับไฟล์ JPG, PNG, GIF, WEBP ขนาดไม่เกิน 10MB</Typography>
+                </Box>
               ) : (
-                <div style={{ fontSize: 12, color: '#475569', fontWeight: 500 }}>รายการนี้เสร็จสิ้นแล้ว จึงไม่สามารถอัปโหลดรูปใหม่ได้</div>
+                <Typography sx={{ fontSize: 12, color: theme.palette.text.secondary, fontWeight: 500 }}>รายการนี้เสร็จสิ้นแล้ว จึงไม่สามารถอัปโหลดรูปใหม่ได้</Typography>
               )}
-            </div>
-          </div>
+            </Box>
+          </Box>
 
           {/* Checklist Items Area */}
-          <div style={{ padding: '16px 24px', flex: 1 }}>
+          <Box sx={{ px: 3, py: 2, flex: 1 }}>
             {isDoneRun ? (
-              <div style={{ display: 'grid', gap: 18 }}>
+              <Box sx={{ display: 'grid', gap: 2.25 }}>
                 {groups.map((group: any) => {
                   const groupItems = items.filter((i: any) => i.group === group);
                   const gi = GROUP_INFO[group] || { label: group, icon: '📌' };
                   return (
-                    <div key={group} style={{
-                      background: '#ffffff',
-                      borderRadius: 16,
-                      border: '1px solid #e2e8f0',
-                      boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.02)',
-                      overflow: 'hidden',
+                    <Box key={group} sx={{
+                      bgcolor: theme.palette.background.paper, borderRadius: '16px', border: `1px solid ${theme.palette.divider}`, overflow: 'hidden',
                     }}>
-                      <div style={{
-                        padding: '14px 24px',
-                        background: '#f8fafc',
-                        borderBottom: '1px solid #e2e8f0',
-                        fontSize: 13,
-                        fontWeight: 700,
-                        color: '#334155',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 10,
+                      <Box sx={{
+                        px: 3, py: 1.75, bgcolor: theme.palette.background.default, borderBottom: `1px solid ${theme.palette.divider}`,
+                        fontSize: 13, fontWeight: 700, color: theme.palette.text.primary, display: 'flex', alignItems: 'center', gap: 1.25,
                       }}>
-                        <span style={{ fontSize: 16 }}>{gi.icon}</span> {gi.label}
-                      </div>
-                      <div style={{ display: 'grid', gap: 16, padding: '20px 24px' }}>
+                        <Box component="span" sx={{ fontSize: 16 }}>{gi.icon}</Box> {gi.label}
+                      </Box>
+                      <Box sx={{ display: 'grid', gap: 2, px: 3, py: 2.5 }}>
                         {groupItems.map((item: any) => (
-                          <div key={item.key}>{renderReadonlyAnswer(item)}</div>
+                          <Box key={item.key}>{renderReadonlyAnswer(item)}</Box>
                         ))}
-                      </div>
-                    </div>
+                      </Box>
+                    </Box>
                   );
                 })}
-              </div>
+              </Box>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-            {groups.map((group: any) => {
-              const groupItems = items.filter((i: any) => i.group === group);
-              const gi = GROUP_INFO[group] || { label: group, icon: '📌' };
-              return (
-                <div key={group} style={{ 
-                  background: '#ffffff', 
-                  borderRadius: 16, 
-                  border: '1px solid #e2e8f0',
-                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.02)',
-                  overflow: 'hidden'
-                }}>
-                  <div style={{ 
-                    padding: '14px 24px', 
-                    background: '#f8fafc', 
-                    borderBottom: '1px solid #e2e8f0',
-                    fontSize: 13, 
-                    fontWeight: 700, 
-                    color: '#334155', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: 10 
-                  }}>
-                    <span style={{ fontSize: 16 }}>{gi.icon}</span> {gi.label}
-                  </div>
-                  
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    {groupItems.map((item: any, idx: number) => (
-                      <div key={item.key} style={{ 
-                        display: 'flex', 
-                        alignItems: 'flex-start', 
-                        gap: 20, 
-                        padding: '20px 24px', 
-                        borderBottom: idx === groupItems.length - 1 ? 'none' : '1px solid #f1f5f9',
-                        transition: 'background 0.2s ease',
-                      }}
-                      onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
-                      onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                      >
-                        <div style={{ 
-                          width: 28, 
-                          height: 28, 
-                          borderRadius: '50%', 
-                          background: '#f1f5f9', 
-                          border: '1px solid #e2e8f0', 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          justifyContent: 'center', 
-                          fontSize: 12, 
-                          fontWeight: 700, 
-                          color: '#64748b', 
-                          flexShrink: 0 
-                        }}>
-                          {items.indexOf(item) + 1}
-                        </div>
-                        
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                      <div style={{
-                        display: 'flex',
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                        alignItems: 'flex-start',
-                        flexWrap: 'wrap',
-                        gap: 16 
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {groups.map((group: any) => {
+                  const groupItems = items.filter((i: any) => i.group === group);
+                  const gi = GROUP_INFO[group] || { label: group, icon: '📌' };
+                  return (
+                    <Box key={group} sx={{
+                      bgcolor: theme.palette.background.paper, borderRadius: '16px', border: `1px solid ${theme.palette.divider}`, overflow: 'hidden',
+                    }}>
+                      <Box sx={{
+                        px: 3, py: 1.75, bgcolor: theme.palette.background.default, borderBottom: `1px solid ${theme.palette.divider}`,
+                        fontSize: 13, fontWeight: 700, color: theme.palette.text.primary, display: 'flex', alignItems: 'center', gap: 1.25,
                       }}>
-                        <div style={{ fontSize: 14, color: '#0f172a', fontWeight: 600, flex: 1, minWidth: 260, marginTop: 4 }}>
-                          {item.label}
-                        </div>
-                        
-                        {/* Boolean Action Buttons aligned to the right */}
-                        {item.type?.toLowerCase() === 'boolean' && (
-                          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                            {[{ val: 'yes', lbl: '✓ ใช่', activeBg: '#ecfdf5', activeBorder: '#10b981', activeColor: '#047857' },
-                            { val: 'no', lbl: '✗ ไม่', activeBg: '#fef2f2', activeBorder: '#ef4444', activeColor: '#b91c1c' },
-                            { val: 'na', lbl: '— N/A', activeBg: '#f1f5f9', activeBorder: '#94a3b8', activeColor: '#334155' }].map((opt) => {
-                              const isActive = answers[item.key] === opt.val;
-                              return (
-                                <button
-                                  key={opt.val}
-                                  type="button"
-                                  onClick={() => setAnswers((p) => ({ ...p, [item.key]: opt.val }))}
-                                  style={{
-                                    padding: '8px 16px',
-                                    borderRadius: 20,
-                                    fontSize: 13,
-                                    fontWeight: 600,
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s',
-                                    background: isActive ? opt.activeBg : '#ffffff',
-                                    border: `1px solid ${isActive ? opt.activeBorder : '#cbd5e1'}`,
-                                    color: isActive ? opt.activeColor : '#64748b',
-                                    boxShadow: isActive ? 'none' : '0 1px 2px rgba(0,0,0,0.05)',
-                                  }}
-                                >
-                                  {opt.lbl}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Inputs based on type */}
-                      {item.type?.toLowerCase() === 'text' && (
-                        <textarea
-                          style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 8, padding: '12px 16px', fontSize: 13, fontFamily: 'inherit', minHeight: 80, resize: 'vertical', outline: 'none', transition: 'border-color 0.2s', color: '#0f172a' }}
-                          placeholder={item.key === 'issue_note' ? 'ระบุข้อเสนอแนะหรือปัญหาที่พบ...' : 'ระบุรายละเอียด...'}
-                          value={answers[item.key] || ''}
-                          onChange={(e) => setAnswers((p) => ({ ...p, [item.key]: e.target.value }))}
-                          onFocus={(e) => e.target.style.borderColor = '#0891b2'}
-                          onBlur={(e) => e.target.style.borderColor = '#cbd5e1'}
-                        />
-                      )}
-                          
-                          {item.type?.toLowerCase() === 'rating' && (() => {
-                            const category = getRatingCategory(run.asset?.type);
-                            const rubric = RATING_RUBRIC[category];
-                            const stars = ['⭐⭐⭐⭐⭐', '⭐⭐⭐⭐', '⭐⭐⭐', '⭐⭐', '⭐'];
-                            const suggested = suggestRating(answers);
-                            const current = parseInt(answers[item.key] || '0');
-                            return (
-                              <div>
-                                <StarRating value={current} onChange={(v) => setAnswers((p) => ({ ...p, [item.key]: String(v) }))} />
-                                {!isDoneRun && suggested != null && suggested !== current && (
-                                  <div style={{ marginTop: 6, fontSize: 12.5, color: '#0f172a', background: '#eff6ff', padding: '8px 12px', borderRadius: 8, border: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <span>🤖 แนะนำจากผลตรวจเช็คลิสต์: <strong>{suggested} ดาว</strong></span>
-                                    <button
-                                      type="button"
-                                      onClick={() => setAnswers((p: Record<string, any>) => ({ ...p, [item.key]: String(suggested) }))}
-                                      style={{ marginLeft: 'auto', border: '1px solid #0891b2', background: '#fff', color: '#0891b2', borderRadius: 6, padding: '3px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
-                                    >
-                                      ใช้ค่านี้
-                                    </button>
-                                  </div>
+                        <Box component="span" sx={{ fontSize: 16 }}>{gi.icon}</Box> {gi.label}
+                      </Box>
+
+                      <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                        {groupItems.map((item: any, idx: number) => (
+                          <Box key={item.key} sx={{
+                            display: 'flex', alignItems: 'flex-start', gap: 2.5, px: 3, py: 2.5,
+                            borderBottom: idx === groupItems.length - 1 ? 'none' : `1px solid ${theme.palette.divider}`,
+                            transition: 'background 0.2s ease',
+                            '&:hover': { bgcolor: theme.palette.background.default },
+                          }}>
+                            <Box sx={{
+                              width: 28, height: 28, borderRadius: '50%',
+                              bgcolor: theme.palette.background.default, border: `1px solid ${theme.palette.divider}`,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: 12, fontWeight: 700, color: theme.palette.text.secondary, flexShrink: 0,
+                            }}>
+                              {items.indexOf(item) + 1}
+                            </Box>
+
+                            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                              <Box sx={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
+                                <Typography sx={{ fontSize: 14, color: theme.palette.text.primary, fontWeight: 600, flex: 1, minWidth: 260, mt: 0.5 }}>
+                                  {item.label}
+                                </Typography>
+
+                                {/* Boolean Action Buttons aligned to the right */}
+                                {item.type?.toLowerCase() === 'boolean' && (
+                                  <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
+                                    {BOOL_OPTS.map((opt) => {
+                                      const isActive = answers[item.key] === opt.val;
+                                      return (
+                                        <Button
+                                          key={opt.val}
+                                          size="small"
+                                          onClick={() => setAnswers((p: any) => ({ ...p, [item.key]: opt.val }))}
+                                          sx={{
+                                            borderRadius: '20px', fontSize: 13, fontWeight: 600,
+                                            border: '1px solid', bgcolor: theme.palette.background.paper, color: theme.palette.text.secondary, borderColor: theme.palette.divider,
+                                            ...(isActive ? boolActiveSx(opt.key) : {}),
+                                          }}
+                                        >
+                                          {opt.lbl}
+                                        </Button>
+                                      );
+                                    })}
+                                  </Box>
                                 )}
-                                <div style={{ marginTop: 8, fontSize: 12, color: '#64748b', background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-                                  <div style={{ fontWeight: 600, marginBottom: 4, color: '#475569' }}>💡 เกณฑ์การประเมินเพื่อช่วย IT Admin ตัดสินใจ:</div>
-                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 4 }}>
-                                    {rubric.map((desc, i) => (
-                                      <div key={i}>
-                                        <span style={{ color: '#fbbf24', letterSpacing: '2px' }}>{stars[i]}</span>
-                                        <span style={{ opacity: 0 }}>{'⭐'.repeat(i)}</span>
-                                        {' '}({5 - i}) - {desc}
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })()}
-                          
-                          {['select', 'select_physical', 'select_speed', 'select_result'].includes(item.type?.toLowerCase()) && (
-                            <div>
-                              <select
-                                style={{
-                                  width: '100%',
-                                  maxWidth: 400,
-                                  border: (['select_physical', 'select_result'].includes(item.type?.toLowerCase()) && (answers[item.key] === 'ชำรุดรอซ่อม' || answers[item.key] === 'ไม่ผ่านเกณฑ์')) ? '2px solid #ef4444' : '1px solid #cbd5e1',
-                                  borderRadius: 8, padding: '10px 16px', fontSize: 13, fontFamily: 'inherit', outline: 'none',
-                                  background: (['select_physical', 'select_result'].includes(item.type?.toLowerCase()) && (answers[item.key] === 'ชำรุดรอซ่อม' || answers[item.key] === 'ไม่ผ่านเกณฑ์')) ? '#fef2f2' : '#fff',
-                                  color: '#0f172a',
-                                  appearance: 'none',
-                                  backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%2364748b\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3E%3Cpolyline points=\'6 9 12 15 18 9\'/%3E%3C/svg%3E")',
-                                  backgroundRepeat: 'no-repeat', backgroundPosition: 'right 16px center',
-                                }}
-                                value={answers[item.key] || ''}
-                                onChange={(e) => setAnswers((p) => ({ ...p, [item.key]: e.target.value }))}
-                              >
-                                <option value="">-- กรุณาเลือก --</option>
-                                {item.type?.toLowerCase() === 'select_physical' && ['สภาพปกติ', 'ชำรุดเล็กน้อย', 'ชำรุดรอซ่อม', 'หมดสภาพ'].map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                {item.type?.toLowerCase() === 'select_speed' && ['เร็วปกติ', 'เริ่มหน่วงหนืด', 'ช้ามาก'].map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                {item.type?.toLowerCase() === 'select_result' && ['ผ่านเกณฑ์', 'แก้ไขเรียบร้อย', 'ไม่ผ่านเกณฑ์'].map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                {item.type?.toLowerCase() === 'select' && item.options?.split(',').map((opt: string) => opt.trim()).filter(Boolean).map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
-                              </select>
-                            </div>
-                          )}
-                          
-                          {item.type?.toLowerCase() === 'monitor_array' && (
-                            <div style={{ marginTop: 4 }}>
-                              <PMDeviceArrayInput
-                                type="monitor"
-                                value={answers[item.key] || ''}
-                                onChange={(v) => setAnswers((p) => ({ ...p, [item.key]: v }))}
-                                parentAsset={run?.asset}
-                                readOnly={isDoneRun}
-                              />
-                            </div>
-                          )}
-                          
-                          {item.type?.toLowerCase() === 'printer_array' && (
-                            <div style={{ marginTop: 4 }}>
-                              <PMDeviceArrayInput
-                                type="printer"
-                                value={answers[item.key] || ''}
-                                onChange={(v) => setAnswers((p) => ({ ...p, [item.key]: v }))}
-                                parentAsset={run?.asset}
-                                readOnly={isDoneRun}
-                              />
-                            </div>
-                          )}
+                              </Box>
 
-                          {/* Inline Note for No/NA */}
-                          {item.type?.toLowerCase() === 'boolean' && (answers[item.key] === 'no' || answers[item.key] === 'na') && (
-                            <div style={{ marginTop: 4 }}>
-                              <input
-                                type="text"
-                                style={{ width: '100%', border: '1px solid #f59e0b', borderRadius: 8, padding: '10px 14px', fontSize: 13, background: '#fffbeb', outline: 'none', fontFamily: 'inherit', color: '#b45309' }}
-                                placeholder="ระบุสาเหตุประกอบการเลือกไม่ใช่หรือไม่ระบุ..."
-                                value={answers[`${item.key}_note`] || ''}
-                                onChange={(e) => setAnswers((p) => ({ ...p, [`${item.key}_note`]: e.target.value }))}
-                              />
-                            </div>
-                          )}
-                          
-                          {/* Green Box for IP Phone (Yes) */}
-                          {item.type?.toLowerCase() === 'boolean' && item.key === 'ip_phone' && answers[item.key] === 'yes' && (
-                            <div style={{ marginTop: 4 }}>
-                              <div style={{ background: '#ecfdf5', border: '1px solid #6ee7b7', borderRadius: 10, padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                <label style={{ fontSize: 12, color: '#047857', fontWeight: 700 }}>📞 ระบุหมายเลขโทรศัพท์ภายใน (Extension Number)</label>
-                                <input
-                                  type="text"
-                                  style={{ width: '100%', maxWidth: 300, border: '1px solid #34d399', borderRadius: 6, padding: '8px 12px', fontSize: 13, background: '#fff', outline: 'none', fontFamily: 'inherit', color: '#0f172a' }}
-                                  placeholder="ตัวอย่าง: 1035, 1036..."
-                                  value={answers[`${item.key}_note`] || ''}
-                                  onChange={(e) => setAnswers((p) => ({ ...p, [`${item.key}_note`]: e.target.value }))}
+                              {/* Inputs based on type */}
+                              {item.type?.toLowerCase() === 'text' && (
+                                <TextField
+                                  fullWidth multiline minRows={3} size="small"
+                                  placeholder={item.key === 'issue_note' ? 'ระบุข้อเสนอแนะหรือปัญหาที่พบ...' : 'ระบุรายละเอียด...'}
+                                  value={answers[item.key] || ''}
+                                  onChange={(e) => setAnswers((p: any) => ({ ...p, [item.key]: e.target.value }))}
                                 />
-                              </div>
-                            </div>
-                          )}
+                              )}
 
-                          {/* Green Box for Windows Version (Yes) */}
-                          {item.type?.toLowerCase() === 'boolean' && item.key === 'windows_version' && answers[item.key] === 'yes' && (
-                            <div style={{ marginTop: 4 }}>
-                              <div style={{ background: '#ecfdf5', border: '1px solid #6ee7b7', borderRadius: 10, padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                <label style={{ fontSize: 12, color: '#047857', fontWeight: 700 }}>🪟 โปรดระบุเวอร์ชันของ Windows ที่ติดตั้ง</label>
-                                <input
-                                  type="text"
-                                  style={{ width: '100%', border: '1px solid #34d399', borderRadius: 6, padding: '8px 12px', fontSize: 13, background: '#fff', outline: 'none', fontFamily: 'inherit', color: '#0f172a' }}
-                                  placeholder="ตัวอย่าง: Windows 10 Pro, Windows 11 Enterprise..."
-                                  value={answers[`${item.key}_note`] || ''}
-                                  onChange={(e) => setAnswers((p) => ({ ...p, [`${item.key}_note`]: e.target.value }))}
-                                />
-                              </div>
-                            </div>
-                          )}
+                              {item.type?.toLowerCase() === 'rating' && (() => {
+                                const category = getRatingCategory(run.asset?.type);
+                                const rubric = RATING_RUBRIC[category];
+                                const stars = ['⭐⭐⭐⭐⭐', '⭐⭐⭐⭐', '⭐⭐⭐', '⭐⭐', '⭐'];
+                                const suggested = suggestRating(answers);
+                                const current = parseInt(answers[item.key] || '0');
+                                return (
+                                  <Box>
+                                    <StarRating value={current} onChange={(v) => setAnswers((p: any) => ({ ...p, [item.key]: String(v) }))} />
+                                    {!isDoneRun && suggested != null && suggested !== current && (
+                                      <Box sx={{ mt: 0.75, fontSize: 12.5, color: theme.palette.text.primary, bgcolor: alpha(theme.palette.info.main, 0.06), px: 1.5, py: 1, borderRadius: '8px', border: `1px solid ${alpha(theme.palette.info.main, 0.3)}`, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <Box component="span">🤖 แนะนำจากผลตรวจเช็คลิสต์: <strong>{suggested} ดาว</strong></Box>
+                                        <Button
+                                          size="small"
+                                          onClick={() => setAnswers((p: Record<string, any>) => ({ ...p, [item.key]: String(suggested) }))}
+                                          sx={{ ml: 'auto', fontSize: 12, fontWeight: 600, minWidth: 0, px: 1.25, border: `1px solid ${theme.palette.info.main}`, color: theme.palette.info.main }}
+                                        >
+                                          ใช้ค่านี้
+                                        </Button>
+                                      </Box>
+                                    )}
+                                    <Box sx={{ mt: 1, fontSize: 12, color: theme.palette.text.secondary, bgcolor: theme.palette.background.default, px: 1.75, py: 1.25, borderRadius: '8px', border: `1px solid ${theme.palette.divider}` }}>
+                                      <Box sx={{ fontWeight: 600, mb: 0.5, color: theme.palette.text.primary }}>💡 เกณฑ์การประเมินเพื่อช่วย IT Admin ตัดสินใจ:</Box>
+                                      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 0.5 }}>
+                                        {rubric.map((desc, i) => (
+                                          <Box key={i}>
+                                            <Box component="span" sx={{ color: theme.palette.warning.main, letterSpacing: '2px' }}>{stars[i]}</Box>
+                                            {' '}({5 - i}) - {desc}
+                                          </Box>
+                                        ))}
+                                      </Box>
+                                    </Box>
+                                  </Box>
+                                );
+                              })()}
 
-                          {/* Green Box for Windows Update (winver) (Yes) */}
-                          {item.type?.toLowerCase() === 'boolean' && item.key === 'windows_update' && answers[item.key] === 'yes' && (
-                            <div style={{ marginTop: 4 }}>
-                              <div style={{ background: '#ecfdf5', border: '1px solid #6ee7b7', borderRadius: 10, padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                <label style={{ fontSize: 12, color: '#047857', fontWeight: 700 }}>🔄 โปรดระบุข้อมูลเวอร์ชัน (winver) และอัปเดตล่าสุด</label>
-                                <input
-                                  type="text"
-                                  style={{ width: '100%', border: '1px solid #34d399', borderRadius: 6, padding: '8px 12px', fontSize: 13, background: '#fff', outline: 'none', fontFamily: 'inherit', color: '#0f172a' }}
-                                  placeholder="ตัวอย่าง: 22H2 (OS Build 19045.4291)..."
-                                  value={answers[`${item.key}_note`] || ''}
-                                  onChange={(e) => setAnswers((p) => ({ ...p, [`${item.key}_note`]: e.target.value }))}
-                                />
-                              </div>
-                            </div>
-                          )}
+                              {['select', 'select_physical', 'select_speed', 'select_result'].includes(item.type?.toLowerCase()) && (() => {
+                                const isDefect = ['select_physical', 'select_result'].includes(item.type?.toLowerCase()) && (answers[item.key] === 'ชำรุดรอซ่อม' || answers[item.key] === 'ไม่ผ่านเกณฑ์');
+                                return (
+                                  <Select
+                                    displayEmpty
+                                    size="small"
+                                    sx={{
+                                      width: '100%', maxWidth: 400,
+                                      ...(isDefect ? {
+                                        '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.error.main, borderWidth: '2px' },
+                                        bgcolor: alpha(theme.palette.error.main, 0.06),
+                                      } : {}),
+                                    }}
+                                    value={answers[item.key] || ''}
+                                    onChange={(e) => setAnswers((p: any) => ({ ...p, [item.key]: e.target.value }))}
+                                  >
+                                    <MenuItem value=""><em>-- กรุณาเลือก --</em></MenuItem>
+                                    {item.type?.toLowerCase() === 'select_physical' && ['สภาพปกติ', 'ชำรุดเล็กน้อย', 'ชำรุดรอซ่อม', 'หมดสภาพ'].map(opt => <MenuItem key={opt} value={opt}>{opt}</MenuItem>)}
+                                    {item.type?.toLowerCase() === 'select_speed' && ['เร็วปกติ', 'เริ่มหน่วงหนืด', 'ช้ามาก'].map(opt => <MenuItem key={opt} value={opt}>{opt}</MenuItem>)}
+                                    {item.type?.toLowerCase() === 'select_result' && ['ผ่านเกณฑ์', 'แก้ไขเรียบร้อย', 'ไม่ผ่านเกณฑ์'].map(opt => <MenuItem key={opt} value={opt}>{opt}</MenuItem>)}
+                                    {item.type?.toLowerCase() === 'select' && item.options?.split(',').map((opt: string) => opt.trim()).filter(Boolean).map((opt: string) => <MenuItem key={opt} value={opt}>{opt}</MenuItem>)}
+                                  </Select>
+                                );
+                              })()}
 
-                          {/* Green Box for Microsoft Office (Yes) */}
-                          {item.type?.toLowerCase() === 'boolean' && item.key === 'office_check' && answers[item.key] === 'yes' && (
-                            <div style={{ marginTop: 4 }}>
-                              <div style={{ background: '#ecfdf5', border: '1px solid #6ee7b7', borderRadius: 10, padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                <label style={{ fontSize: 12, color: '#047857', fontWeight: 700 }}>📄 โปรดระบุเวอร์ชันของ Microsoft Office ที่ติดตั้ง</label>
-                                <input
-                                  type="text"
-                                  style={{ width: '100%', border: '1px solid #34d399', borderRadius: 6, padding: '8px 12px', fontSize: 13, background: '#fff', outline: 'none', fontFamily: 'inherit', color: '#0f172a' }}
-                                  placeholder="ตัวอย่าง: Office 2019, Microsoft 365..."
-                                  value={answers[`${item.key}_note`] || ''}
-                                  onChange={(e) => setAnswers((p) => ({ ...p, [`${item.key}_note`]: e.target.value }))}
-                                />
-                              </div>
-                            </div>
-                          )}
-                          
-                          {/* Note for Select physical/result */}
-                          {['select_physical', 'select_result'].includes(item.type?.toLowerCase()) && (answers[item.key] === 'ชำรุดรอซ่อม' || answers[item.key] === 'ไม่ผ่านเกณฑ์') && (
-                            <div style={{ marginTop: 4 }}>
-                              <input
-                                type="text"
-                                style={{ width: '100%', border: '1px solid #ef4444', borderRadius: 8, padding: '10px 14px', fontSize: 13, background: '#fef2f2', outline: 'none', fontFamily: 'inherit', color: '#991b1b' }}
-                                placeholder={item.type?.toLowerCase() === 'select_physical' ? "ระบุสาเหตุที่ชำรุด / อาการ..." : "ระบุเหตุผลที่ไม่ผ่านเกณฑ์..."}
-                                value={answers[`${item.key}_note`] || ''}
-                                onChange={(e) => setAnswers((p) => ({ ...p, [`${item.key}_note`]: e.target.value }))}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-              </div>
+                              {item.type?.toLowerCase() === 'monitor_array' && (
+                                <Box sx={{ mt: 0.5 }}>
+                                  <PMDeviceArrayInput
+                                    type="monitor"
+                                    value={answers[item.key] || ''}
+                                    onChange={(v) => setAnswers((p: any) => ({ ...p, [item.key]: v }))}
+                                    parentAsset={run?.asset}
+                                    readOnly={isDoneRun}
+                                  />
+                                </Box>
+                              )}
+
+                              {item.type?.toLowerCase() === 'printer_array' && (
+                                <Box sx={{ mt: 0.5 }}>
+                                  <PMDeviceArrayInput
+                                    type="printer"
+                                    value={answers[item.key] || ''}
+                                    onChange={(v) => setAnswers((p: any) => ({ ...p, [item.key]: v }))}
+                                    parentAsset={run?.asset}
+                                    readOnly={isDoneRun}
+                                  />
+                                </Box>
+                              )}
+
+                              {/* Inline Note for No/NA */}
+                              {item.type?.toLowerCase() === 'boolean' && (answers[item.key] === 'no' || answers[item.key] === 'na') && (
+                                <Box sx={{ mt: 0.5 }}>
+                                  <TextField
+                                    fullWidth size="small"
+                                    placeholder="ระบุสาเหตุประกอบการเลือกไม่ใช่หรือไม่ระบุ..."
+                                    value={answers[`${item.key}_note`] || ''}
+                                    onChange={(e) => setAnswers((p: any) => ({ ...p, [`${item.key}_note`]: e.target.value }))}
+                                    sx={{
+                                      '& .MuiOutlinedInput-root': { bgcolor: alpha(theme.palette.warning.main, 0.06) },
+                                      '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.warning.main },
+                                    }}
+                                  />
+                                </Box>
+                              )}
+
+                              {/* Green Box for IP Phone (Yes) */}
+                              {item.type?.toLowerCase() === 'boolean' && item.key === 'ip_phone' && answers[item.key] === 'yes' &&
+                                greenNoteBox('ระบุหมายเลขโทรศัพท์ภายใน (Extension Number)', '📞', item)}
+
+                              {/* Green Box for Windows Version (Yes) */}
+                              {item.type?.toLowerCase() === 'boolean' && item.key === 'windows_version' && answers[item.key] === 'yes' &&
+                                greenNoteBox('โปรดระบุเวอร์ชันของ Windows ที่ติดตั้ง', '🪟', item)}
+
+                              {/* Green Box for Windows Update (winver) (Yes) */}
+                              {item.type?.toLowerCase() === 'boolean' && item.key === 'windows_update' && answers[item.key] === 'yes' &&
+                                greenNoteBox('โปรดระบุข้อมูลเวอร์ชัน (winver) และอัปเดตล่าสุด', '🔄', item)}
+
+                              {/* Green Box for Microsoft Office (Yes) */}
+                              {item.type?.toLowerCase() === 'boolean' && item.key === 'office_check' && answers[item.key] === 'yes' &&
+                                greenNoteBox('โปรดระบุเวอร์ชันของ Microsoft Office ที่ติดตั้ง', '📄', item)}
+
+                              {/* Note for Select physical/result */}
+                              {['select_physical', 'select_result'].includes(item.type?.toLowerCase()) && (answers[item.key] === 'ชำรุดรอซ่อม' || answers[item.key] === 'ไม่ผ่านเกณฑ์') && (
+                                <Box sx={{ mt: 0.5 }}>
+                                  <TextField
+                                    fullWidth size="small"
+                                    placeholder={item.type?.toLowerCase() === 'select_physical' ? 'ระบุสาเหตุที่ชำรุด / อาการ...' : 'ระบุเหตุผลที่ไม่ผ่านเกณฑ์...'}
+                                    value={answers[`${item.key}_note`] || ''}
+                                    onChange={(e) => setAnswers((p: any) => ({ ...p, [`${item.key}_note`]: e.target.value }))}
+                                    sx={{
+                                      '& .MuiOutlinedInput-root': { bgcolor: alpha(theme.palette.error.main, 0.04) },
+                                      '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.error.main },
+                                    }}
+                                  />
+                                </Box>
+                              )}
+                            </Box>
+                          </Box>
+                        ))}
+                      </Box>
+                    </Box>
+                  );
+                })}
+              </Box>
             )}
-          </div>
-        </div>
+          </Box>
+        </Box>
 
         {/* Footer Actions */}
-        <div style={{ 
-          padding: '12px 24px', 
-          borderTop: '1px solid #e2e8f0', 
-          display: 'flex', 
-          justifyContent: 'flex-end', 
-          gap: 12, 
-          background: '#ffffff', 
-          flexShrink: 0,
-          boxShadow: '0 -4px 6px -1px rgba(0,0,0,0.02)'
+        <Box sx={{
+          px: 3, py: 1.5, borderTop: `1px solid ${theme.palette.divider}`,
+          display: 'flex', justifyContent: 'flex-end', gap: 1.5, bgcolor: theme.palette.background.paper, flexShrink: 0,
         }}>
-          <button 
-            type="button" 
-            className="pmr-btn pmr-btn-outline" 
-            onClick={onClose}
-            style={{ padding: '10px 20px', borderRadius: 8, fontWeight: 600, fontSize: 14 }}
-          >
+          <Button variant="outlined" onClick={onClose} sx={{ px: 2.5, fontWeight: 600, fontSize: 14 }}>
             ปิด
-          </button>
+          </Button>
           {isDoneRun ? null : (
             <>
-              <button 
-                type="button" 
-                className="pmr-btn pmr-btn-outline" 
-                onClick={() => handleSave('IN_PROGRESS')} 
+              <Button
+                variant="outlined"
+                onClick={() => handleSave('IN_PROGRESS')}
                 disabled={saving}
-                style={{ padding: '10px 20px', borderRadius: 8, fontWeight: 600, fontSize: 14 }}
+                sx={{ px: 2.5, fontWeight: 600, fontSize: 14 }}
               >
                 {saving ? '⏳...' : '💾 บันทึกร่าง'}
-              </button>
-              <button 
-                type="button" 
-                className="pmr-btn pmr-btn-success" 
-                onClick={() => handleSave('COMPLETED')} 
+              </Button>
+              <Button
+                variant="contained" color="success"
+                onClick={() => handleSave('COMPLETED')}
                 disabled={saving}
-                style={{ padding: '10px 24px', borderRadius: 8, fontWeight: 600, fontSize: 14, boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.2)' }}
+                sx={{ px: 3, fontWeight: 600, fontSize: 14 }}
               >
                 {saving ? '⏳ กำลังบันทึก...' : '✅ บันทึกผล PM'}
-              </button>
+              </Button>
             </>
           )}
-        </div>
-      </div>
+        </Box>
+      </Box>
     </Modal>
   );
 };
