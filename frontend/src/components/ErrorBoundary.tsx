@@ -21,7 +21,7 @@ export default class ErrorBoundary extends Component<Props, State> {
       return (
         <Box sx={{ p: 4, maxWidth: 600, mx: 'auto', mt: 8 }}>
           <Typography variant="h4" color="error" gutterBottom>เกิดข้อผิดพลาด</Typography>
-          <Box sx={{ p: 2, bgcolor: '#fff', borderRadius: 2, border: '1px solid #ef4444', mb: 2 }}>
+          <Box sx={{ p: 2, bgcolor: 'background.paper', borderRadius: 2, border: '1px solid', borderColor: 'error.main', mb: 2 }}>
             <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '0.8rem' }}>
               {this.state.error?.message}
             </Typography>
