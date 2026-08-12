@@ -19,6 +19,16 @@ function getGitCommit(): string {
 
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf-8'));
 
+// The API's CORS allowlist is pinned to the deployed origins plus :5173, so a
+// dev server on any other port (e.g. a second one for design review) gets
+// rejected. Present the canonical dev origin to the API instead of widening
+// the server's allowlist for a local-only concern. Dev proxy only — `vite
+// preview`, which is what production serves, has no proxy and is unaffected.
+const DEV_ORIGIN = 'http://localhost:5173';
+const devProxyOrigin = (proxy: { on: (e: string, cb: (r: { setHeader: (k: string, v: string) => void }) => void) => void }) => {
+  proxy.on('proxyReq', (proxyReq) => proxyReq.setHeader('origin', DEV_ORIGIN));
+};
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, projectRoot, '');
   const proxyTarget = env.VITE_API_PROXY_TARGET || 'http://localhost:3000';
@@ -40,10 +50,12 @@ export default defineConfig(({ mode }) => {
         '/api': {
           target: proxyTarget,
           changeOrigin: true,
+          configure: devProxyOrigin,
         },
         '/uploads': {
           target: proxyTarget,
           changeOrigin: true,
+          configure: devProxyOrigin,
         },
       },
     },
