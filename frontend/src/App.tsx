@@ -58,6 +58,8 @@ const MasterDataManagementPage = lazy(() => import('./pages/admin/MasterDataMana
 const AssetHistoryPage = lazy(() => import('./pages/assets/AssetHistoryPage'));
 const ContractsPage = lazy(() => import('./pages/contracts/ContractsPage'));
 const LicensesPage = lazy(() => import('./pages/licenses/LicensesPage'));
+const DeliveryPage = lazy(() => import('./pages/delivery/DeliveryPage'));
+const DeliveryConfirmPage = lazy(() => import('./pages/delivery/DeliveryConfirmPage'));
 
 // System Settings
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
@@ -80,6 +82,8 @@ export default function App() {
     <Suspense fallback={null}>
       <Routes>
         <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <LoginPage />} />
+        {/* Public — no login required, resolved by a one-click token link emailed to the recipient */}
+        <Route path="/delivery-confirm/:token" element={<DeliveryConfirmPage />} />
         <Route path="/" element={<ProtectedRoute><ErrorBoundary><Layout /></ErrorBoundary></ProtectedRoute>}>
           <Route index element={<Navigate to="/dashboard" />} />
           <Route path="dashboard" element={<DashboardPage />} />
@@ -94,6 +98,7 @@ export default function App() {
           <Route path="assets/statuses" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><AssetStatusesPage /></ProtectedRoute>} />
           <Route path="assets/import-export" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><ImportExportPage /></ProtectedRoute>} />
           <Route path="assets/print-qr" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><PrintQRPage /></ProtectedRoute>} />
+          <Route path="delivery" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><DeliveryPage /></ProtectedRoute>} />
           <Route path="inventory" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><InventoryPage /></ProtectedRoute>} />
           <Route path="categories" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><CategoryPage /></ProtectedRoute>} />
           {/* Borrow - User */}

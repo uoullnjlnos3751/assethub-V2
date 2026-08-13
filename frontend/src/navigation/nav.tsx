@@ -40,6 +40,7 @@ import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import GavelIcon from '@mui/icons-material/Gavel';
 import KeyIcon from '@mui/icons-material/Key';
+import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 
 export interface NavItem {
   label: string;
@@ -90,6 +91,12 @@ export const adminNav: NavEntry[] = [
       { label: 'นำเข้า/ส่งออก ข้อมูล', path: '/assets/import-export', icon: <ImportExportIcon fontSize="small" />, roles: ['SUPERADMIN', 'IT_ADMIN'] },
       { label: 'พิมพ์ QR สติ๊กเกอร์', path: '/assets/print-qr', icon: <PrintIcon fontSize="small" />, roles: ['SUPERADMIN', 'IT_ADMIN'] },
     ],
+  },
+  {
+    label: 'เครื่องใหม่ & ส่งมอบ',
+    path: '/delivery',
+    icon: <LocalShippingIcon fontSize="small" />,
+    roles: ['SUPERADMIN', 'IT_ADMIN'],
   },
   {
     label: 'คลังวัสดุ',

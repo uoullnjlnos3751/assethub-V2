@@ -224,6 +224,22 @@ export const pmAPI = {
   adhocCreate: (data: { assetId: number; templateId: number }) => api.post('/pm/runs/adhoc', data),
 };
 
+// New Devices & Delivery
+export const deliveryAPI = {
+  list: (params?: any) => api.get('/delivery/requests', { params }),
+  summary: () => api.get('/delivery/requests/summary'),
+  get: (id: number) => api.get(`/delivery/requests/${id}`),
+  create: (data: any) => api.post('/delivery/requests', data),
+  update: (id: number, data: any) => api.put(`/delivery/requests/${id}`, data),
+  togglePeripheral: (id: number, itemId: number, data: { prepared?: boolean; delivered?: boolean }) =>
+    api.patch(`/delivery/requests/${id}/peripherals/${itemId}`, data),
+  markReady: (id: number) => api.patch(`/delivery/requests/${id}/ready`),
+  deliver: (id: number) => api.post(`/delivery/requests/${id}/deliver`),
+  // Public — no auth, used by the recipient-facing confirmation page
+  getConfirm: (token: string) => api.get(`/delivery/confirm/${token}`),
+  confirm: (token: string) => api.post(`/delivery/confirm/${token}`),
+};
+
 export const floorPlanAPI = {
   getAll: () => api.get('/floorplans'),
   getById: (id: number) => api.get(`/floorplans/${id}`),

@@ -386,6 +386,7 @@ export default function SettingsPage() {
                   { key: 'extension_pending', icon: '⏰', label: 'ขอขยายวัน' },
                   { key: 'extension_approved', icon: '✅', label: 'อนุมัติขยาย' },
                   { key: 'extension_rejected', icon: '❌', label: 'ปฏิเสธขยาย' },
+                  { key: 'delivery_confirm_request', icon: '📦', label: 'ขอยืนยันรับเครื่องใหม่' },
                 ].map(ev => {
                   const keys = settings?.enabledEventKeys ? settings.enabledEventKeys.split(',').map((s: string) => s.trim()) : [];
                   const en = keys.includes(ev.key);

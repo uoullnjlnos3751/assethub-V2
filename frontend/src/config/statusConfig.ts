@@ -55,6 +55,15 @@ export const STATUS_CONFIG: Record<string, StatusConfigEntry> = {
   DRAFT:       { label: 'ร่าง',             labelEn: 'Draft',       icon: FileText, colorKey: 'neutral' },
   IN_PROGRESS: { label: 'กำลังดำเนินการ',    labelEn: 'In Progress', icon: RefreshCw, colorKey: 'warning' },
   COMPLETED:   { label: 'เสร็จสิ้น',         labelEn: 'Completed',   icon: CircleCheck, colorKey: 'success' },
+
+  // ── Delivery request statuses (เครื่องใหม่ & ส่งมอบ) ─────────────────────
+  SETUP_IN_PROGRESS: { label: 'กำลังเตรียมเครื่อง', labelEn: 'Setup In Progress', icon: RefreshCw,   colorKey: 'warning' },
+  SETUP_DONE:         { label: 'เตรียมเครื่องเสร็จ', labelEn: 'Setup Done',        icon: CheckCircle, colorKey: 'info' },
+  PENDING_DELIVERY:   { label: 'รอส่งมอบ',           labelEn: 'Pending Delivery',  icon: Clock,       colorKey: 'warning' },
+  DELIVERED:          { label: 'ส่งมอบแล้ว',         labelEn: 'Delivered',         icon: ShoppingCart, colorKey: 'info' },
+  CONFIRMED:          { label: 'ยืนยันรับแล้ว',       labelEn: 'Confirmed',         icon: CheckCircle2, colorKey: 'success' },
+  RETURN_REQUESTED:   { label: 'รอเรียกคืน',          labelEn: 'Return Requested',  icon: RotateCcw,   colorKey: 'warning' },
+  RETURNED:           { label: 'คืนแล้ว',             labelEn: 'Returned',          icon: Archive,     colorKey: 'neutral' },
 };
 
 /** Fallback used when a status string is not in the map. */

@@ -11,12 +11,14 @@ const EVENT_LABELS: Record<string, string> = {
   borrow_request_pending: 'มีคำขอยืมใหม่', borrow_approved: 'อนุมัติคำขอยืม', borrow_rejected: 'ปฏิเสธคำขอยืม',
   checkout_completed: 'ส่งมอบอุปกรณ์', return_recorded: 'คืนอุปกรณ์', overdue_borrow: 'แจ้งเตือนเกินกำหนด',
   extension_pending: 'ขอขยายวันยืม', extension_approved: 'อนุมัติขยายวัน', extension_rejected: 'ปฏิเสธขยายวัน',
+  delivery_confirm_request: 'ขอยืนยันรับเครื่องใหม่',
 };
 
 const EVENT_ICONS: Record<string, string> = {
   borrow_request_pending: '📋', borrow_approved: '✅', borrow_rejected: '❌',
   checkout_completed: '💻', return_recorded: '🔄', overdue_borrow: '⚠️',
   extension_pending: '⏰', extension_approved: '✅', extension_rejected: '❌',
+  delivery_confirm_request: '📦',
 };
 
 const TEMPLATE_GROUPS = [
@@ -24,6 +26,7 @@ const TEMPLATE_GROUPS = [
   { title: 'ส่งมอบ / คืน', color: '#2563eb', keys: ['checkout_completed', 'return_recorded'] },
   { title: 'ขยายวันยืม', color: '#7c3aed', keys: ['extension_pending', 'extension_approved', 'extension_rejected'] },
   { title: 'แจ้งเตือน', color: '#f59e0b', keys: ['overdue_borrow'] },
+  { title: 'เครื่องใหม่ & ส่งมอบ', color: '#059669', keys: ['delivery_confirm_request'] },
 ];
 
 const PLACEHOLDER_GROUPS = [
