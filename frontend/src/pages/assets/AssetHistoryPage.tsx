@@ -14,6 +14,8 @@ import {
   Typography,
   TextField,
   MenuItem,
+  alpha,
+  useTheme,
 } from '@mui/material';
 import { Timeline, TimelineItem, TimelineSeparator, TimelineConnector, TimelineContent, TimelineOppositeContent, TimelineDot } from '@mui/lab';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -64,6 +66,7 @@ interface HistoryRecord {
 }
 
 export default function AssetHistoryPage() {
+  const theme = useTheme();
   const { id } = useParams();
   const [history, setHistory] = useState<HistoryRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -135,11 +138,11 @@ export default function AssetHistoryPage() {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
       <Card sx={{
-        background: 'rgba(255, 255, 255, 0.65)',
-        border: '1px solid rgba(255, 255, 255, 0.85)',
+        background: alpha(theme.palette.background.paper, 0.65),
+        border: `1px solid ${alpha(theme.palette.background.paper, 0.85)}`,
         backdropFilter: 'blur(20px)',
         borderRadius: '14px',
-        boxShadow: '0 4px 24px rgba(99, 102, 241, 0.07), 0 1px 3px rgba(0, 0, 0, 0.04)',
+        boxShadow: `0 4px 24px ${alpha(theme.palette.secondary.main, 0.07)}, 0 1px 3px rgba(0, 0, 0, 0.04)`,
       }}>
         <CardContent sx={{ pb: 0 }}>
           <Box sx={{ display: 'flex', gap: 2, mb: 2, alignItems: 'center' }}>
@@ -205,8 +208,8 @@ export default function AssetHistoryPage() {
                       </TimelineSeparator>
                       <TimelineContent sx={{ pb: 2 }}>
                         <Card sx={{
-                          bgcolor: 'rgba(248, 247, 255, 0.5)',
-                          border: '1px solid rgba(99, 102, 241, 0.08)',
+                          bgcolor: alpha(theme.palette.secondary.main, 0.04),
+                          border: `1px solid ${alpha(theme.palette.secondary.main, 0.08)}`,
                           borderRadius: '8px',
                         }}>
                           <CardContent sx={{ p: 1.5 }}>

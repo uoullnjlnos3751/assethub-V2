@@ -319,7 +319,7 @@ export default function UsersPage() {
           <Card sx={{ borderLeft: '2px solid', borderLeftColor: 'primary.main', bgcolor: alpha(theme.palette.primary.main, 0.02) }}>
             <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(79,70,229,0.06)', display: 'flex' }}>
+                <Box sx={{ p: 1, borderRadius: 2, bgcolor: alpha(theme.palette.primary.main, 0.06), display: 'flex' }}>
                   <PeopleIcon sx={{ color: 'primary.main', fontSize: 20 }} />
                 </Box>
                 <Box>
@@ -336,7 +336,7 @@ export default function UsersPage() {
           <Card sx={{ borderLeft: '2px solid', borderLeftColor: 'success.main', bgcolor: alpha(theme.palette.success.main, 0.02) }}>
             <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(22,163,74,0.06)', display: 'flex' }}>
+                <Box sx={{ p: 1, borderRadius: 2, bgcolor: alpha(theme.palette.success.main, 0.06), display: 'flex' }}>
                   <ShieldIcon sx={{ color: 'success.main', fontSize: 20 }} />
                 </Box>
                 <Box>
@@ -353,7 +353,7 @@ export default function UsersPage() {
           <Card sx={{ borderLeft: '2px solid', borderLeftColor: 'warning.main', bgcolor: alpha(theme.palette.warning.main, 0.02) }}>
             <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(245,158,11,0.06)', display: 'flex' }}>
+                <Box sx={{ p: 1, borderRadius: 2, bgcolor: alpha(theme.palette.warning.main, 0.06), display: 'flex' }}>
                   <AdminIcon sx={{ color: 'warning.main', fontSize: 20 }} />
                 </Box>
                 <Box>
@@ -370,7 +370,7 @@ export default function UsersPage() {
           <Card sx={{ borderLeft: '2px solid', borderLeftColor: 'error.main', bgcolor: alpha(theme.palette.error.main, 0.02) }}>
             <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(239,68,68,0.06)', display: 'flex' }}>
+                <Box sx={{ p: 1, borderRadius: 2, bgcolor: alpha(theme.palette.error.main, 0.06), display: 'flex' }}>
                   <BlockIcon sx={{ color: 'error.main', fontSize: 20 }} />
                 </Box>
                 <Box>
