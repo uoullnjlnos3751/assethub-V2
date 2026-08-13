@@ -415,9 +415,6 @@ export default function AssetFormPage() {
   /* ─── Submit ─── */
   const validateForm = (): string => {
     // Required fields validation
-    if (!id && !form.assetCode?.trim()) {
-      return 'เลขครุภัณฑ์ ต้องไม่ว่างเปล่า (สำหรับการสร้างใหม่)';
-    }
     if (!form.serialNo?.trim()) {
       return 'Serial Number ต้องไม่ว่างเปล่า';
     }
@@ -539,16 +536,16 @@ export default function AssetFormPage() {
             {id ? 'แก้ไขข้อมูลทรัพย์สิน' : 'ลงทะเบียนทรัพย์สินใหม่'}
           </Typography>
           <Typography variant="body2" color="text.secondary" fontWeight={500}>
-            {id ? `เลขครุภัณฑ์: ${form.assetCode || form.serialNo}` : 'กรอกข้อมูลพื้นฐานและรายละเอียดเพื่อนำอุปกรณ์เข้าสู่ระบบ'}
+            {id ? `เลขทรัพย์สิน: ${form.assetName || form.assetCode || form.serialNo}` : 'กรอกข้อมูลพื้นฐานและรายละเอียดเพื่อนำอุปกรณ์เข้าสู่ระบบ'}
           </Typography>
         </Box>
         <Breadcrumbs separator={<NavigateNextIcon fontSize="small" sx={{ color: 'text.disabled' }} />} aria-label="breadcrumb" sx={{ mb: 2 }}>
           <Link component="button" onClick={() => navigate('/assets')} sx={{ textDecoration: 'none', color: 'primary.main', fontWeight: 600, border: 'none', bg: 'none', p: 0, cursor: 'pointer', outline: 'none' }}>
             ทรัพย์สิน IT
           </Link>
-          {id && form.assetCode && (
+          {id && (form.assetName || form.assetCode) && (
             <Link component="button" onClick={() => navigate(`/assets/${id}`)} sx={{ textDecoration: 'none', color: 'primary.main', fontWeight: 600, border: 'none', bg: 'none', p: 0, cursor: 'pointer', outline: 'none' }}>
-              {form.assetCode}
+              {form.assetName || form.assetCode}
             </Link>
           )}
           <Typography variant="body2" color="text.disabled">
@@ -583,8 +580,8 @@ export default function AssetFormPage() {
                 {id ? 'แก้ไขข้อมูลทรัพย์สิน' : 'เพิ่มทรัพย์สินใหม่'}
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mt: 0.5 }}>
-                {form.assetCode && (
-                  <Chip label={form.assetCode} size="small" sx={{ fontFamily: 'monospace', fontWeight: 700, height: 20, bgcolor: alpha(theme.palette.primary.main, .09), color: 'primary.dark' }} />
+                {(form.assetName || form.assetCode) && (
+                  <Chip label={form.assetName || form.assetCode} size="small" sx={{ fontFamily: 'monospace', fontWeight: 700, height: 20, bgcolor: alpha(theme.palette.primary.main, .09), color: 'primary.dark' }} />
                 )}
                 {(form.brand || form.model) && (
                   <Typography variant="caption" color="text.secondary">
@@ -597,7 +594,7 @@ export default function AssetFormPage() {
               {id && (
                 <Box sx={{ textAlign: 'right', display: { xs: 'none', sm: 'block' } }}>
                   <Typography variant="caption" color="text.disabled" display="block">กำลังแก้ไข</Typography>
-                  <Typography variant="body2" fontWeight={600} color="text.secondary">{form.assetCode}</Typography>
+                  <Typography variant="body2" fontWeight={600} color="text.secondary">{form.assetName || form.assetCode}</Typography>
                 </Box>
               )}
               <Button
@@ -674,35 +671,22 @@ export default function AssetFormPage() {
             <Grid container spacing={2}>
               <Grid item xs={12} sm={6}>
                 <TextField
-                  label="เลขครุภัณฑ์ (Asset Code) *"
-                  value={form.assetCode}
-                  onChange={e => setFormField('assetCode', 'เลขครุภัณฑ์ (Asset Code)', e.target.value)}
-                  placeholder="เช่น HQ-PS-N001"
-                  fullWidth
-                  size="small"
-                  required={!id}
-                  error={!!duplicates.assetCode || (submitAttempted && !id && !form.assetCode?.trim())}
-                  helperText={duplicates.assetCode ? '⚠️ เลขครุภัณฑ์นี้มีอยู่ในระบบแล้ว' : (submitAttempted && !id && !form.assetCode?.trim() ? 'กรุณาระบุเลขครุภัณฑ์' : '')}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
                   label="เลขครุภัณฑ์ (ฝ่ายบัญชี) — ถ้ามี"
-                  value={form.accountingCode}
-                  onChange={e => setFormField('accountingCode', 'เลขครุภัณฑ์ (ฝ่ายบัญชี)', e.target.value)}
+                  value={form.assetCode}
+                  onChange={e => setFormField('assetCode', 'เลขครุภัณฑ์ (ฝ่ายบัญชี)', e.target.value)}
                   placeholder="กรอกเมื่อทราบเลขครุภัณฑ์จริงจากฝ่ายบัญชี ไม่ทราบเว้นว่างไว้ได้"
                   fullWidth
                   size="small"
-                  error={!!duplicates.accountingCode}
-                  helperText={duplicates.accountingCode ? '⚠️ เลขครุภัณฑ์นี้มีอยู่ในระบบแล้ว' : ''}
+                  error={!!duplicates.assetCode}
+                  helperText={duplicates.assetCode ? '⚠️ เลขครุภัณฑ์นี้มีอยู่ในระบบแล้ว' : ''}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField
-                  label="ชื่อทรัพย์สิน / รหัสทรัพย์สิน"
+                  label="ชื่อทรัพย์สิน / รหัสทรัพย์สิน (IT) *"
                   value={form.assetName}
                   onChange={e => setFormField('assetName', 'ชื่อทรัพย์สิน / รหัสทรัพย์สิน', e.target.value)}
-                  placeholder="ชื่อสำหรับเรียกทรัพย์สิน หรือ รหัสพัสดุภายในองค์กร"
+                  placeholder="เลขที่ทางไอทีต้องมี เช่น HQ-PS-N001"
                   fullWidth
                   size="small"
                   required
