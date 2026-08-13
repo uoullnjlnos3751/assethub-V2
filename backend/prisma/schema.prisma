@@ -153,6 +153,7 @@ model Asset {
   @@index([departmentRefId])
   @@index([vendorRefId])
   @@index([locationRefId])
+  @@index([categoryId])
   @@map("assets")
 }
 
@@ -728,6 +729,7 @@ model PMPlan {
   template           PMTemplate @relation(fields: [templateId], references: [id])
   runs               PMRun[]
 
+  @@index([year])
   @@map("pm_plans")
 }
 
@@ -753,6 +755,7 @@ model PMRun {
   @@index([planId, status])
   @@index([assetId, year])
   @@index([status, performedAt])
+  @@index([year, status])
   @@map("pm_runs")
 }
 

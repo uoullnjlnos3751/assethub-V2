@@ -179,27 +179,24 @@ router.get('/borrow-trend', authenticate, authorize('IT_ADMIN', 'SUPERADMIN', 'V
 router.get('/pm-summary', authenticate, authorize('IT_ADMIN', 'SUPERADMIN', 'VIEWER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const currentYear = parseInt(req.query.year as string) || new Date().getFullYear();
-    const runs = await prisma.pMRun.findMany({
-      where: { year: currentYear },
-      include: { plan: true },
-    });
+    const [runs, plans] = await Promise.all([
+      prisma.pMRun.findMany({
+        where: { year: currentYear },
+        include: {
+          plan: true,
+          asset: { select: { category: { select: { id: true, name: true, icon: true } }, departmentId: true } },
+        },
+      }),
+      prisma.pMPlan.findMany({ where: { year: currentYear } }),
+    ]);
     const completed = runs.filter(r => r.status === 'COMPLETED').length;
     const total = runs.length;
     const overdue = runs.filter(r => r.status !== 'COMPLETED' && r.plan.endDate && new Date(r.plan.endDate) < new Date()).length;
-    const plans = await prisma.pMPlan.findMany({ where: { year: currentYear } });
     const plannedTotal = plans.reduce((s, p) => s + p.plannedDeviceCount, 0);
-    // Category & department breakdown via PMRun → asset
-    const pmRuns = await prisma.pMRun.findMany({
-      where: { year: currentYear },
-      select: {
-        planId: true, status: true,
-        plan: { select: { plannedDeviceCount: true } },
-        asset: { select: { category: { select: { id: true, name: true, icon: true } }, departmentId: true } },
-      },
-    });
+    // Category & department breakdown via PMRun → asset (reuses `runs` above, no second query)
     const catBreakdown: Record<string, { name: string; icon: string; total: number; completed: number }> = {};
     const deptBreakdown: Record<string, { name: string; total: number; completed: number }> = {};
-    for (const run of pmRuns) {
+    for (const run of runs) {
       const cat = run.asset?.category;
       const catKey = cat?.name || 'อื่นๆ';
       if (!catBreakdown[catKey]) catBreakdown[catKey] = { name: catKey, icon: cat?.icon || '📦', total: 0, completed: 0 };
