@@ -40,6 +40,7 @@ model AppUser {
   deliveryRequested  DeliveryRequest[]   @relation("DeliveryRequestedBy")
   deliveryInstalled  DeliveryRequest[]   @relation("DeliveryInstalledBy")
   deliveryDelivered  DeliveryRequest[]   @relation("DeliveryDeliveredBy")
+  checklistRunsPerformed DeliveryChecklistRun[] @relation("DeliveryChecklistPerformedBy")
 
   @@index([role, isActive])
   @@index([department])
@@ -542,7 +543,60 @@ model ChecklistSet {
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 
+  items                  ChecklistItem[]
+  checklistRuns          DeliveryChecklistRun[]
+
   @@map("checklist_sets")
+}
+
+model ChecklistItem {
+  id          Int          @id @default(autoincrement())
+  setId       Int
+  set         ChecklistSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+  category    String
+  refCode     String
+  itemText    String
+  answerType  String       @default("PASS_FAIL_NA")
+  sortOrder   Int          @default(0)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  answers     DeliveryChecklistAnswer[]
+
+  @@index([setId, sortOrder])
+  @@map("checklist_items")
+}
+
+model DeliveryChecklistRun {
+  id             Int                       @id @default(autoincrement())
+  requestId      Int
+  request        DeliveryRequest           @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  checklistSetId Int
+  checklistSet   ChecklistSet              @relation(fields: [checklistSetId], references: [id])
+  status         String                    @default("DRAFT")
+  performedBy    Int?
+  performer      AppUser?                  @relation("DeliveryChecklistPerformedBy", fields: [performedBy], references: [id])
+  performedAt    DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+  answers        DeliveryChecklistAnswer[]
+
+  @@index([requestId])
+  @@map("delivery_checklist_runs")
+}
+
+model DeliveryChecklistAnswer {
+  id     Int                  @id @default(autoincrement())
+  runId  Int
+  run    DeliveryChecklistRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  itemId Int
+  item   ChecklistItem        @relation(fields: [itemId], references: [id])
+  value  String?
+  note   String?
+
+  @@unique([runId, itemId])
+  @@map("delivery_checklist_answers")
 }
 
 model AssetHistory {
@@ -815,6 +869,7 @@ model DeliveryRequest {
   confirmMethod    String?
   notes            String?
   peripherals      DeliveryPeripheralItem[]
+  checklistRuns    DeliveryChecklistRun[]
   createdAt        DateTime                 @default(now())
   updatedAt        DateTime                 @updatedAt
 
