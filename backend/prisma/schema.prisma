@@ -512,6 +512,38 @@ model AssetStatusMaster {
   @@map("asset_status_masters")
 }
 
+model Printer {
+  id          Int      @id @default(autoincrement())
+  floorArea   String
+  brandModel  String
+  serialNo    String?
+  ipAddress   String?
+  driver      String?
+  pinNote     String?
+  status      String   @default("active")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("printers")
+}
+
+model ChecklistSet {
+  id                     Int      @id @default(autoincrement())
+  docCode                String   @unique
+  name                   String
+  appliesToCategories    String?
+  itemCount              Int      @default(0)
+  categoryCount          Int      @default(0)
+  avgTimeLabel           String?
+  revision               Int      @default(1)
+  isActive               Boolean  @default(true)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@map("checklist_sets")
+}
+
 model AssetHistory {
   id          Int      @id @default(autoincrement())
   assetId     Int

@@ -356,4 +356,138 @@ router.delete('/asset-statuses/:statusId', authenticate, authorize('IT_ADMIN', '
   }
 });
 
+// ── Printers (Settings tab 3: เครื่องพิมพ์ตามพื้นที่) ──
+router.get('/printers', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const printers = await prisma.printer.findMany({ orderBy: { floorArea: 'asc' } });
+    res.json(printers);
+  } catch (err) { next(err); }
+});
+
+router.post('/printers', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const floorArea = String(req.body.floorArea || '').trim();
+    const brandModel = String(req.body.brandModel || '').trim();
+    if (!floorArea) throw new AppError('กรุณาระบุชั้น/พื้นที่');
+    if (!brandModel) throw new AppError('กรุณาระบุยี่ห้อ/รุ่น');
+    const created = await prisma.printer.create({
+      data: {
+        floorArea, brandModel,
+        serialNo: req.body.serialNo ? String(req.body.serialNo).trim() : null,
+        ipAddress: req.body.ipAddress ? String(req.body.ipAddress).trim() : null,
+        driver: req.body.driver ? String(req.body.driver).trim() : null,
+        pinNote: req.body.pinNote ? String(req.body.pinNote).trim() : null,
+        status: req.body.status || 'active',
+        isActive: req.body.isActive ?? true,
+      },
+    });
+    res.status(201).json(created);
+  } catch (err) { next(err); }
+});
+
+router.put('/printers/:printerId', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.printerId);
+    const floorArea = String(req.body.floorArea || '').trim();
+    const brandModel = String(req.body.brandModel || '').trim();
+    if (!floorArea) throw new AppError('กรุณาระบุชั้น/พื้นที่');
+    if (!brandModel) throw new AppError('กรุณาระบุยี่ห้อ/รุ่น');
+    const updated = await prisma.printer.update({
+      where: { id },
+      data: {
+        floorArea, brandModel,
+        serialNo: req.body.serialNo ? String(req.body.serialNo).trim() : null,
+        ipAddress: req.body.ipAddress ? String(req.body.ipAddress).trim() : null,
+        driver: req.body.driver ? String(req.body.driver).trim() : null,
+        pinNote: req.body.pinNote ? String(req.body.pinNote).trim() : null,
+        status: req.body.status || 'active',
+        isActive: req.body.isActive ?? true,
+      },
+    });
+    res.json(updated);
+  } catch (err: any) {
+    if (err?.code === 'P2025') return next(new AppError('ไม่พบเครื่องพิมพ์', 404));
+    next(err);
+  }
+});
+
+router.delete('/printers/:printerId', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await prisma.printer.delete({ where: { id: parseInt(req.params.printerId) } });
+    res.json({ message: 'ลบเครื่องพิมพ์เรียบร้อย' });
+  } catch (err: any) {
+    if (err?.code === 'P2025') return next(new AppError('ไม่พบเครื่องพิมพ์', 404));
+    next(err);
+  }
+});
+
+// ── Checklist sets (Settings tab 3: ชุด Checklist ติดตั้ง) ──
+router.get('/checklist-sets', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const sets = await prisma.checklistSet.findMany({ orderBy: { docCode: 'asc' } });
+    res.json(sets);
+  } catch (err) { next(err); }
+});
+
+router.post('/checklist-sets', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const docCode = String(req.body.docCode || '').trim();
+    const name = String(req.body.name || '').trim();
+    if (!docCode) throw new AppError('กรุณาระบุรหัสเอกสาร');
+    if (!name) throw new AppError('กรุณาระบุชื่อชุด');
+    const created = await prisma.checklistSet.create({
+      data: {
+        docCode, name,
+        appliesToCategories: req.body.appliesToCategories ? String(req.body.appliesToCategories).trim() : null,
+        itemCount: Number(req.body.itemCount) || 0,
+        categoryCount: Number(req.body.categoryCount) || 0,
+        avgTimeLabel: req.body.avgTimeLabel ? String(req.body.avgTimeLabel).trim() : null,
+        revision: Number(req.body.revision) || 1,
+        isActive: req.body.isActive ?? true,
+      },
+    });
+    res.status(201).json(created);
+  } catch (err: any) {
+    if (err?.code === 'P2002') return next(new AppError('รหัสเอกสารนี้มีอยู่แล้ว'));
+    next(err);
+  }
+});
+
+router.put('/checklist-sets/:setId', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.setId);
+    const docCode = String(req.body.docCode || '').trim();
+    const name = String(req.body.name || '').trim();
+    if (!docCode) throw new AppError('กรุณาระบุรหัสเอกสาร');
+    if (!name) throw new AppError('กรุณาระบุชื่อชุด');
+    const updated = await prisma.checklistSet.update({
+      where: { id },
+      data: {
+        docCode, name,
+        appliesToCategories: req.body.appliesToCategories ? String(req.body.appliesToCategories).trim() : null,
+        itemCount: Number(req.body.itemCount) || 0,
+        categoryCount: Number(req.body.categoryCount) || 0,
+        avgTimeLabel: req.body.avgTimeLabel ? String(req.body.avgTimeLabel).trim() : null,
+        revision: Number(req.body.revision) || 1,
+        isActive: req.body.isActive ?? true,
+      },
+    });
+    res.json(updated);
+  } catch (err: any) {
+    if (err?.code === 'P2002') return next(new AppError('รหัสเอกสารนี้มีอยู่แล้ว'));
+    if (err?.code === 'P2025') return next(new AppError('ไม่พบชุด Checklist', 404));
+    next(err);
+  }
+});
+
+router.delete('/checklist-sets/:setId', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await prisma.checklistSet.delete({ where: { id: parseInt(req.params.setId) } });
+    res.json({ message: 'ลบชุด Checklist เรียบร้อย' });
+  } catch (err: any) {
+    if (err?.code === 'P2025') return next(new AppError('ไม่พบชุด Checklist', 404));
+    next(err);
+  }
+});
+
 export default router;

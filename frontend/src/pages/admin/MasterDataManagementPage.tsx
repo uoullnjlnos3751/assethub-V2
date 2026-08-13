@@ -4,6 +4,8 @@ import {
 } from '@mui/material';
 import MasterDataPage from '../assets/MasterDataPage';
 import CompaniesPage from './CompaniesPage';
+import PrinterMasterPage from './master-data/PrinterMasterPage';
+import ChecklistSetMasterPage from './master-data/ChecklistSetMasterPage';
 import { assetAPI, departmentAPI } from '../../services/api';
 
 interface TabPanelProps { children: React.ReactNode; value: number; index: number }
@@ -18,6 +20,8 @@ const TABS = [
   { label: 'สถานะอุปกรณ์', icon: '✅', color: '#10b981' },
   { label: 'บริษัท', icon: '🏢', color: '#ef4444' },
   { label: 'แผนก', icon: '🏛️', color: '#ec4899' },
+  { label: 'เครื่องพิมพ์', icon: '🖨️', color: '#0891b2' },
+  { label: 'ชุด Checklist ติดตั้ง', icon: '📋', color: '#7c3aed' },
 ];
 
 export default function MasterDataManagementPage() {
@@ -134,6 +138,14 @@ export default function MasterDataManagementPage() {
               deleteItem={(id: number) => departmentAPI.delete(id)}
               showCodeField
             />
+          </TabPanel>
+
+          <TabPanel value={tab} index={6}>
+            <PrinterMasterPage />
+          </TabPanel>
+
+          <TabPanel value={tab} index={7}>
+            <ChecklistSetMasterPage />
           </TabPanel>
         </Box>
       </Paper>
