@@ -60,7 +60,7 @@ interface HistoryRecord {
   createdAt: string;
   actor?: {
     id: number;
-    name: string;
+    displayName: string;
     email: string;
   };
 }
@@ -88,8 +88,8 @@ export default function AssetHistoryPage() {
         limit: rowsPerPage,
         offset: page * rowsPerPage,
       });
-      setHistory(res.data || []);
-      setTotal(res.pagination?.total || 0);
+      setHistory(res.data.data || []);
+      setTotal(res.data.pagination?.total || 0);
     } catch (err) {
       console.error('Failed to fetch history:', err);
     } finally {
