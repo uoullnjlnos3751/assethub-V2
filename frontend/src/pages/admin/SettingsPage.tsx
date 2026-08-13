@@ -17,6 +17,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { StatBox, StatusRow } from './settings/SharedComponents';
 import SystemSettingsTab from './SystemSettingsTab';
 import UsersPermissionsTab from './settings/UsersPermissionsTab';
+import CompanyOrgTab from './settings/CompanyOrgTab';
 import EmailTemplateEditor from './settings/EmailTemplateEditor';
 import { SectionCard } from '../../components/SectionCard';
 import type { SystemSettings, NotificationTemplate, HealthCheckResult, NotificationLog } from './settings/types';
@@ -54,6 +55,7 @@ const TAB_GROUPS = [
     label: 'ผู้ใช้และองค์กร', icon: <Users size={20} />,
     items: [
       { index: 8, label: 'ผู้ใช้ & สิทธิ์', icon: <Users size={16} /> },
+      { index: 9, label: 'บริษัท & หน่วยงาน', icon: <Building2 size={16} /> },
     ]
   },
 ];
@@ -613,6 +615,10 @@ export default function SettingsPage() {
 
       {tab === 8 && (
         <UsersPermissionsTab />
+      )}
+
+      {tab === 9 && (
+        <CompanyOrgTab />
       )}
 
       {/* Dialogs */}
