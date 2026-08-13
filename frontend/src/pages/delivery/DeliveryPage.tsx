@@ -12,6 +12,7 @@ import { useToast } from '../../contexts/ToastContext';
 import StatusChip from '../../components/StatusChip';
 import { SectionCard } from '../../components/SectionCard';
 import { KpiCard } from '../dashboard/components/KpiCard';
+import SetupChecklistTab from './SetupChecklistTab';
 
 const DELIVERY_TYPE_LABELS: Record<string, string> = {
   NEW_PURCHASE: 'เครื่องใหม่',
@@ -230,7 +231,7 @@ export default function DeliveryPage() {
         </SectionCard>
       )}
 
-      {tab === 1 && <ComingSoon label="Setup Checklist" />}
+      {tab === 1 && <SetupChecklistTab requests={requests} loading={loading} onRefresh={load} />}
 
       {tab === 2 && (
         <SectionCard title="ส่งมอบ & แจ้งเมล" icon={Truck}>

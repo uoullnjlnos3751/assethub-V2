@@ -6,6 +6,7 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import { useToast } from '../../../contexts/ToastContext';
 import { assetAPI } from '../../../services/api';
+import ChecklistItemsDialog from './ChecklistItemsDialog';
 
 interface ChecklistSet {
   id: number;
@@ -33,6 +34,7 @@ export default function ChecklistSetMasterPage() {
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<ChecklistSet | null>(null);
+  const [itemsDialogSet, setItemsDialogSet] = useState<ChecklistSet | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -107,7 +109,7 @@ export default function ChecklistSetMasterPage() {
           <Box>
             <Typography sx={{ fontSize: 16, fontWeight: 700, color: theme.palette.text.primary, lineHeight: 1.2 }}>ชุด Checklist ติดตั้ง</Typography>
             <Typography sx={{ fontSize: 11, color: theme.palette.text.disabled, mt: 0.25 }}>
-              รายการหัวข้อ/หมวดย่อยของแต่ละชุดยังไม่รองรับการแก้ไขในหน้านี้ — จัดการได้แค่ระดับชุดเอกสาร
+              จัดการระดับชุดเอกสารที่นี่ — กด "หัวข้อ" ที่แต่ละแถวเพื่อจัดการรายการตรวจสอบ
             </Typography>
           </Box>
         </Box>
@@ -133,7 +135,7 @@ export default function ChecklistSetMasterPage() {
                 <TableCell>เวลาเฉลี่ย</TableCell>
                 <TableCell>Rev.</TableCell>
                 <TableCell>สถานะ</TableCell>
-                <TableCell align="center" sx={{ width: 110 }}>จัดการ</TableCell>
+                <TableCell align="center" sx={{ width: 170 }}>จัดการ</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -157,7 +159,8 @@ export default function ChecklistSetMasterPage() {
                   </TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
-                      <Button size="small" onClick={() => openEdit(item)} sx={{ minWidth: 0, px: 1, fontSize: 10, fontWeight: 600, bgcolor: alpha(theme.palette.info.main, 0.08), color: theme.palette.info.dark, border: `1px solid ${alpha(theme.palette.info.main, 0.3)}`, '&:hover': { bgcolor: alpha(theme.palette.info.main, 0.15) } }}>✏️ แก้ไข</Button>
+                      <Button size="small" onClick={() => setItemsDialogSet(item)} sx={{ minWidth: 0, px: 1, fontSize: 10, fontWeight: 600, bgcolor: alpha(theme.palette.secondary.main, 0.08), color: theme.palette.secondary.dark, border: `1px solid ${alpha(theme.palette.secondary.main, 0.3)}`, '&:hover': { bgcolor: alpha(theme.palette.secondary.main, 0.15) } }}>📋 หัวข้อ</Button>
+                      <Button size="small" onClick={() => openEdit(item)} sx={{ minWidth: 0, px: 1, fontSize: 10, fontWeight: 600, bgcolor: alpha(theme.palette.info.main, 0.08), color: theme.palette.info.dark, border: `1px solid ${alpha(theme.palette.info.main, 0.3)}`, '&:hover': { bgcolor: alpha(theme.palette.info.main, 0.15) } }}>✏️</Button>
                       <Button size="small" onClick={() => setDeleteConfirm(item)} sx={{ minWidth: 0, px: 1, fontSize: 10, fontWeight: 600, bgcolor: alpha(theme.palette.error.main, 0.06), color: theme.palette.error.main, border: `1px solid ${alpha(theme.palette.error.main, 0.3)}`, '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.12) } }}>🗑</Button>
                     </Box>
                   </TableCell>
@@ -220,6 +223,15 @@ export default function ChecklistSetMasterPage() {
           <Button variant="contained" color="error" onClick={() => handleDelete(deleteConfirm!)}>🗑 ลบเลย</Button>
         </DialogActions>
       </Dialog>
+
+      {itemsDialogSet && (
+        <ChecklistItemsDialog
+          setId={itemsDialogSet.id}
+          setName={itemsDialogSet.name}
+          open={Boolean(itemsDialogSet)}
+          onClose={() => { setItemsDialogSet(null); load(); }}
+        />
+      )}
     </Box>
   );
 }
