@@ -164,6 +164,15 @@ export default function DashboardPage() {
   const borrowActive = borrowSummary?.activeItems || 0;
   const borrowPending = borrowSummary?.pendingApproval || 0;
   const borrowOverdue = borrowSummary?.overdue || 0;
+  const pmOverdue = pmSummary?.overdue || 0;
+
+  // Monitoring Wall summary numbers
+  const openWork = borrowPending + maintenance;
+  const overSla = borrowOverdue + pmOverdue;
+  const todayStr = new Date().toDateString();
+  const closedToday = (activityData?.recentReturns || []).filter(
+    (r: any) => r.returnedAt && new Date(r.returnedAt).toDateString() === todayStr
+  ).length;
 
   // Alerts list (from real proactive-alerts data)
   const alerts: { icon: LucideIcon; text: string; sub: string; colorKey: string }[] = [];
@@ -239,6 +248,8 @@ export default function DashboardPage() {
           borrowActive={borrowActive} borrowPending={borrowPending}
           pmDone={pmDone} pmTotal={pmTotal} pmPct={pmPct}
           lowStockCount={inventoryLowStock?.lowStockCount || 0}
+          assetsTotal={total} openWork={openWork} overSla={overSla} closedToday={closedToday}
+          onNavigateReports={() => navigate('/reports')}
         />
         <CategoryDonutCard byCategory={byCategory} total={total} onNavigate={() => navigate('/assets')} />
       </Box>

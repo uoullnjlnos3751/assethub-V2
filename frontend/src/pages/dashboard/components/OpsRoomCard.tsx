@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Typography, Avatar, alpha, useTheme } from '@mui/material';
 import { ShoppingCart, Wrench, PackageSearch, Users, type LucideIcon } from 'lucide-react';
 import { SectionCard } from './SectionCard';
+import { MonitoringWallPanel } from './MonitoringWallPanel';
 
 interface OnlinePerson {
   userId: number;
@@ -77,11 +78,16 @@ function DeskBay({ desk, people, accent }: { desk: Desk; people: OnlinePerson[];
   );
 }
 
-export function OpsRoomCard({ onlineNow, borrowActive, borrowPending, pmDone, pmTotal, pmPct, lowStockCount }: {
+export function OpsRoomCard({
+  onlineNow, borrowActive, borrowPending, pmDone, pmTotal, pmPct, lowStockCount,
+  assetsTotal, openWork, overSla, closedToday, onNavigateReports,
+}: {
   onlineNow: OnlinePerson[];
   borrowActive: number; borrowPending: number;
   pmDone: number; pmTotal: number; pmPct: number;
   lowStockCount: number;
+  assetsTotal: number; openWork: number; overSla: number; closedToday: number;
+  onNavigateReports: () => void;
 }) {
   const theme = useTheme();
 
@@ -106,7 +112,15 @@ export function OpsRoomCard({ onlineNow, borrowActive, borrowPending, pmDone, pm
       },
     }}>
       <SectionCard title="ห้องปฏิบัติการ IT (สด)" icon={Users}>
-        <Box sx={{ height: 480, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+        <Box sx={{ minHeight: 480, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+
+          <MonitoringWallPanel
+            assetsTotal={assetsTotal}
+            openWork={openWork}
+            overSla={overSla}
+            closedToday={closedToday}
+            onNavigate={onNavigateReports}
+          />
 
           {/* Center reception — total online headcount */}
           <Box sx={{
