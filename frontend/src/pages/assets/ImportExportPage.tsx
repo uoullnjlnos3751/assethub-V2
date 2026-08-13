@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Box, Typography, Button, Select, MenuItem, alpha, useTheme } from '@mui/material';
 import * as XLSX from 'xlsx';
 import ImportAssetsButton from '../../components/ImportAssetsButton';
 import { assetAPI } from '../../services/api';
@@ -78,7 +79,7 @@ const buildRows = (assets: any[], dateFormat: 'iso' | 'thai' = 'iso') => assets.
   const row: Record<string, any> = {};
   exportColumns.forEach(([field, label]) => {
     let value = asset[field] ?? '';
-    
+
     // Handle special field mappings
     if (field === 'categoryId') {
       value = asset.category?.name || '';
@@ -87,7 +88,7 @@ const buildRows = (assets: any[], dateFormat: 'iso' | 'thai' = 'iso') => assets.
     } else if (field === 'createdAt' || field === 'updatedAt') {
       value = formatDate(value, dateFormat);
     }
-    
+
     row[label] = value;
   });
   return row;
@@ -121,74 +122,64 @@ function ActionCard({
   icon: string; color: string; title: string; desc: string;
   children: React.ReactNode; badge?: string;
 }) {
+  const theme = useTheme();
   return (
-    <div style={{
-      background: '#fff', border: '1px solid #e2e8f0', borderRadius: '14px',
+    <Box sx={{
+      bgcolor: theme.palette.background.paper, border: `1px solid ${theme.palette.divider}`, borderRadius: '14px',
       overflow: 'hidden', display: 'flex', flexDirection: 'column',
     }}>
       {/* Card header stripe */}
-      <div style={{ height: '4px', background: color }} />
-      <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      <Box sx={{ height: '4px', bgcolor: color }} />
+      <Box sx={{ p: 2.5, flex: 1, display: 'flex', flexDirection: 'column', gap: 1.75 }}>
         {/* Icon + title */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-          <div style={{
-            width: '42px', height: '42px', borderRadius: '10px',
-            background: `${color}18`, border: `1.5px solid ${color}30`,
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+          <Box sx={{
+            width: 42, height: 42, borderRadius: '10px',
+            bgcolor: alpha(color, 0.1), border: `1.5px solid ${alpha(color, 0.3)}`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '20px', flexShrink: 0,
-          }}>{icon}</div>
-          <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>{title}</span>
+            fontSize: 20, flexShrink: 0,
+          }}>{icon}</Box>
+          <Box sx={{ flex: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography sx={{ fontSize: 14, fontWeight: 700, color: theme.palette.text.primary }}>{title}</Typography>
               {badge && (
-                <span style={{
-                  fontSize: '9px', fontWeight: 700, padding: '2px 7px',
-                  borderRadius: '99px', background: `${color}18`, color,
-                }}>{badge}</span>
+                <Box component="span" sx={{
+                  fontSize: 9, fontWeight: 700, px: '7px', py: '2px',
+                  borderRadius: '99px', bgcolor: alpha(color, 0.1), color,
+                }}>{badge}</Box>
               )}
-            </div>
-            <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px', lineHeight: 1.5 }}>{desc}</div>
-          </div>
-        </div>
+            </Box>
+            <Typography sx={{ fontSize: 11, color: theme.palette.text.secondary, mt: 0.5, lineHeight: 1.5 }}>{desc}</Typography>
+          </Box>
+        </Box>
         {/* Actions */}
-        <div style={{ marginTop: 'auto' }}>{children}</div>
-      </div>
-    </div>
+        <Box sx={{ mt: 'auto' }}>{children}</Box>
+      </Box>
+    </Box>
   );
 }
 
 function ActionBtn({
-  icon, label, onClick, disabled, variant = 'outline', color = '#0ea5e9',
+  icon, label, onClick, disabled, variant = 'outline', color = '#0891b2',
 }: {
   icon: string; label: string; onClick: () => void;
   disabled?: boolean; variant?: 'solid' | 'outline'; color?: string;
 }) {
   return (
-    <button
+    <Button
       onClick={onClick}
       disabled={disabled}
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: '6px',
-        padding: '8px 14px', borderRadius: '8px', cursor: disabled ? 'not-allowed' : 'pointer',
-        fontFamily: 'Sarabun, sans-serif', fontSize: '12px', fontWeight: 600,
-        opacity: disabled ? 0.55 : 1, transition: 'all .15s',
-        ...(variant === 'solid'
-          ? { background: color, border: `1px solid ${color}`, color: '#fff' }
-          : { background: '#fff', border: `1px solid #e2e8f0`, color: '#475569' }),
-      }}
-      onMouseEnter={e => {
-        if (!disabled) {
-          if (variant === 'solid') { (e.currentTarget as HTMLButtonElement).style.filter = 'brightness(1.08)'; }
-          else { (e.currentTarget as HTMLButtonElement).style.borderColor = color; (e.currentTarget as HTMLButtonElement).style.color = color; }
-        }
-      }}
-      onMouseLeave={e => {
-        if (variant === 'solid') { (e.currentTarget as HTMLButtonElement).style.filter = ''; }
-        else { (e.currentTarget as HTMLButtonElement).style.borderColor = '#e2e8f0'; (e.currentTarget as HTMLButtonElement).style.color = '#475569'; }
+      variant={variant === 'solid' ? 'contained' : 'outlined'}
+      size="small"
+      startIcon={<span>{icon}</span>}
+      sx={variant === 'solid' ? {
+        bgcolor: color, borderColor: color, '&:hover': { bgcolor: color, filter: 'brightness(1.08)' },
+      } : {
+        color, borderColor: alpha(color, 0.4), '&:hover': { borderColor: color, bgcolor: alpha(color, 0.06) },
       }}
     >
-      <span>{icon}</span> {label}
-    </button>
+      {label}
+    </Button>
   );
 }
 
@@ -196,6 +187,7 @@ function ActionBtn({
    Main
 ───────────────────────────────────────────────────────────────── */
 export default function ImportExportPage() {
+  const theme = useTheme();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
@@ -215,7 +207,7 @@ export default function ImportExportPage() {
       const assets = await fetchAllAssets();
       setProgress(`กำลัง build ${assets.length} รายการ...`);
       const rows = buildRows(assets, dateFormat);
-      
+
       const sheetsData: Record<string, Record<string, any>[]> = {};
       rows.forEach((row, index) => {
         const type = assets[index].type || 'Other';
@@ -265,7 +257,7 @@ export default function ImportExportPage() {
       const res = await assetAPI.deviceTypes();
       const types = res.data.map((t: any) => t.name);
       if (types.length === 0) types.push('Computer', 'Monitor');
-      
+
       // Create sample row with realistic data
       const sampleRow = Object.fromEntries(exportColumns.map(([field, label]) => {
         const sampleData: Record<string, string> = {
@@ -321,7 +313,7 @@ export default function ImportExportPage() {
         };
         return [label, sampleData[label] || ''];
       }));
-      
+
       const emptyRow = Object.fromEntries(exportColumns.map(([, label]) => [label, '']));
       const sheetsData: Record<string, Record<string, any>[]> = {};
       types.forEach((type: string) => {
@@ -343,180 +335,171 @@ export default function ImportExportPage() {
   const totalCols = exportColumns.length;
 
   return (
-    <>
-      <style>{`
-        .iep-root { font-family: 'Sarabun', sans-serif; }
-        .iep-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-          background: #0f172a; color: #fff; padding: 10px 20px; border-radius: 8px;
-          font-size: 12px; font-family: 'Sarabun', sans-serif; z-index: 9999;
-          box-shadow: 0 8px 24px rgba(0,0,0,.2); pointer-events: none;
-          animation: iepFadeUp .2s ease; }
-        @keyframes iepFadeUp { from { opacity: 0; transform: translateX(-50%) translateY(8px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
-        .iep-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
-        .iep-col-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
-          background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 5px;
-          font-size: 10px; color: #475569; font-family: monospace; }
-      `}</style>
+    <Box>
+      {/* ── Page header ── */}
+      <Box sx={{ mb: 2.5 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
+          <Box sx={{
+            width: 40, height: 40, borderRadius: '10px',
+            bgcolor: alpha(theme.palette.primary.main, 0.08), border: `1.5px solid ${alpha(theme.palette.primary.main, 0.25)}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
+          }}>📊</Box>
+          <Box>
+            <Typography sx={{ fontSize: 16, fontWeight: 700, color: theme.palette.text.primary }}>นำเข้า / ส่งออก (Import / Export)</Typography>
+            <Typography sx={{ fontSize: 11, color: theme.palette.text.disabled }}>ศูนย์รวมการนำเข้าและส่งออกข้อมูลทะเบียนทรัพย์สินทั้งหมด</Typography>
+          </Box>
+        </Box>
+      </Box>
 
-      <div className="iep-root">
-        {/* ── Page header ── */}
-        <div style={{ marginBottom: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
-            <div style={{
-              width: '40px', height: '40px', borderRadius: '10px',
-              background: '#f0f9ff', border: '1.5px solid #bae6fd',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px',
-            }}>📊</div>
-            <div>
-              <div style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>นำเข้า / ส่งออก (Import / Export)</div>
-              <div style={{ fontSize: '11px', color: '#94a3b8' }}>ศูนย์รวมการนำเข้าและส่งออกข้อมูลทะเบียนทรัพย์สินทั้งหมด</div>
-            </div>
-          </div>
-        </div>
+      {/* ── Error banner ── */}
+      {error && (
+        <Box sx={{
+          bgcolor: alpha(theme.palette.error.main, 0.06), border: `1px solid ${alpha(theme.palette.error.main, 0.25)}`, borderRadius: '10px',
+          px: 1.75, py: 1.25, fontSize: 12, color: theme.palette.error.main, mb: 2,
+          display: 'flex', alignItems: 'center', gap: 1,
+        }}>
+          ⚠️ {error}
+          <Box component="button" onClick={() => setError('')} sx={{ ml: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: theme.palette.error.main, fontSize: 13 }}>✕</Box>
+        </Box>
+      )}
 
-        {/* ── Error banner ── */}
-        {error && (
-          <div style={{
-            background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px',
-            padding: '10px 14px', fontSize: '12px', color: '#dc2626', marginBottom: '16px',
-            display: 'flex', alignItems: 'center', gap: '8px',
-          }}>
-            ⚠️ {error}
-            <button onClick={() => setError('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '13px' }}>✕</button>
-          </div>
-        )}
+      {/* ── Progress ── */}
+      {progress && (
+        <Box sx={{
+          bgcolor: alpha(theme.palette.info.main, 0.06), border: `1px solid ${alpha(theme.palette.info.main, 0.25)}`, borderRadius: '10px',
+          px: 1.75, py: 1.25, fontSize: 12, color: theme.palette.info.dark, mb: 2,
+          display: 'flex', alignItems: 'center', gap: 1,
+        }}>
+          <Box component="span" sx={{ display: 'inline-block' }}>⏳</Box> {progress}
+        </Box>
+      )}
 
-        {/* ── Progress ── */}
-        {progress && (
-          <div style={{
-            background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '10px',
-            padding: '10px 14px', fontSize: '12px', color: '#0369a1', marginBottom: '16px',
-            display: 'flex', alignItems: 'center', gap: '8px',
-          }}>
-            <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⏳</span> {progress}
-          </div>
-        )}
+      {/* ── 3-column action cards ── */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 2, mb: 3 }}>
 
-        {/* ── 3-column action cards ── */}
-        <div className="iep-grid" style={{ marginBottom: '24px' }}>
+        {/* Import */}
+        <ActionCard
+          icon="📥" color={theme.palette.primary.main}
+          title="นำเข้าทรัพย์สิน"
+          badge="IMPORT"
+          desc="รองรับไฟล์ Excel (.xlsx) และ CSV เพื่อนำเข้าข้อมูลทรัพย์สินหลายรายการพร้อมกัน"
+        >
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <ImportAssetsButton />
+            <Box sx={{ fontSize: 10, color: theme.palette.text.disabled, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              💡 ใช้ Template ด้านขวาเพื่อเตรียมข้อมูลให้ถูกต้อง
+            </Box>
+          </Box>
+        </ActionCard>
 
-          {/* Import */}
-          <ActionCard
-            icon="📥" color="#0ea5e9"
-            title="นำเข้าทรัพย์สิน"
-            badge="IMPORT"
-            desc="รองรับไฟล์ Excel (.xlsx) และ CSV เพื่อนำเข้าข้อมูลทรัพย์สินหลายรายการพร้อมกัน"
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <ImportAssetsButton />
-              <div style={{ fontSize: '10px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                💡 ใช้ Template ด้านขวาเพื่อเตรียมข้อมูลให้ถูกต้อง
-              </div>
-            </div>
-          </ActionCard>
-
-          {/* Export */}
-          <ActionCard
-            icon="📤" color="#10b981"
-            title="ส่งออกข้อมูลทั้งหมด"
-            badge="EXPORT"
-            desc={`ส่งออกข้อมูลทรัพย์สินครบ ${totalCols} ฟิลด์ แยก Sheet ตามประเภทอุปกรณ์ สำหรับรายงานหรือสำรองข้อมูล`}
-          >
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <ActionBtn
-                icon="📊" label="Excel (.xlsx)"
-                variant="solid" color="#10b981"
-                onClick={exportExcel} disabled={loading}
-              />
-              <ActionBtn
-                icon="📄" label="CSV"
-                onClick={exportCsv} disabled={loading}
-              />
-            </div>
-          </ActionCard>
-
-          {/* Template */}
-          <ActionCard
-            icon="📋" color="#8b5cf6"
-            title="Template นำเข้า"
-            badge="TEMPLATE"
-            desc="ดาวน์โหลดแบบฟอร์มคอลัมน์มาตรฐานพร้อม Sheet แยกตามประเภทอุปกรณ์ที่มีในระบบ"
-          >
+        {/* Export */}
+        <ActionCard
+          icon="📤" color={theme.palette.success.main}
+          title="ส่งออกข้อมูลทั้งหมด"
+          badge="EXPORT"
+          desc={`ส่งออกข้อมูลทรัพย์สินครบ ${totalCols} ฟิลด์ แยก Sheet ตามประเภทอุปกรณ์ สำหรับรายงานหรือสำรองข้อมูล`}
+        >
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
             <ActionBtn
-              icon="⬇️" label="ดาวน์โหลด Template"
-              variant="solid" color="#8b5cf6"
-              onClick={downloadTemplate} disabled={loading}
+              icon="📊" label="Excel (.xlsx)"
+              variant="solid" color={theme.palette.success.main}
+              onClick={exportExcel} disabled={loading}
             />
-          </ActionCard>
-        </div>
+            <ActionBtn
+              icon="📄" label="CSV"
+              onClick={exportCsv} disabled={loading}
+            />
+          </Box>
+        </ActionCard>
 
-        {/* ── Export Options ── */}
-        <div style={{
-          background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px',
-          padding: '12px 14px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap'
-        }}>
-          <span style={{ fontSize: '12px', fontWeight: 600, color: '#0f172a' }}>⚙️ ตัวเลือกการส่งออก:</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <label style={{ fontSize: '11px', color: '#475569' }}>รูปแบบวันที่:</label>
-            <select 
-              value={dateFormat} 
-              onChange={(e) => setDateFormat(e.target.value as 'iso' | 'thai')}
-              disabled={loading}
-              style={{
-                padding: '4px 8px', borderRadius: '6px', border: '1px solid #cbd5e1',
-                fontSize: '11px', fontFamily: 'Sarabun, sans-serif', cursor: 'pointer',
-                background: '#fff'
-              }}
-            >
-              <option value="iso">ISO (YYYY-MM-DD)</option>
-              <option value="thai">วันไทย (DD/MM/YYYY ค.ศ.)</option>
-            </select>
-          </div>
-        </div>
+        {/* Template */}
+        <ActionCard
+          icon="📋" color={theme.palette.secondary.main}
+          title="Template นำเข้า"
+          badge="TEMPLATE"
+          desc="ดาวน์โหลดแบบฟอร์มคอลัมน์มาตรฐานพร้อม Sheet แยกตามประเภทอุปกรณ์ที่มีในระบบ"
+        >
+          <ActionBtn
+            icon="⬇️" label="ดาวน์โหลด Template"
+            variant="solid" color={theme.palette.secondary.main}
+            onClick={downloadTemplate} disabled={loading}
+          />
+        </ActionCard>
+      </Box>
 
-        {/* ── 3-column action cards ── */}
-        <div style={{
-          background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden',
+      {/* ── Export Options ── */}
+      <Box sx={{
+        bgcolor: theme.palette.background.default, border: `1px solid ${theme.palette.divider}`, borderRadius: '10px',
+        px: 1.75, py: 1.5, mb: 2.5, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap',
+      }}>
+        <Typography sx={{ fontSize: 12, fontWeight: 600, color: theme.palette.text.primary }}>⚙️ ตัวเลือกการส่งออก:</Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography component="label" sx={{ fontSize: 11, color: theme.palette.text.secondary }}>รูปแบบวันที่:</Typography>
+          <Select
+            value={dateFormat}
+            onChange={(e) => setDateFormat(e.target.value as 'iso' | 'thai')}
+            disabled={loading}
+            size="small"
+            sx={{ fontSize: 11, '& .MuiSelect-select': { py: 0.5 } }}
+          >
+            <MenuItem value="iso">ISO (YYYY-MM-DD)</MenuItem>
+            <MenuItem value="thai">วันไทย (DD/MM/YYYY ค.ศ.)</MenuItem>
+          </Select>
+        </Box>
+      </Box>
+
+      {/* ── Supported columns ── */}
+      <Box sx={{ bgcolor: theme.palette.background.paper, border: `1px solid ${theme.palette.divider}`, borderRadius: '12px', overflow: 'hidden' }}>
+        <Box sx={{
+          bgcolor: theme.palette.background.default, borderBottom: `1px solid ${theme.palette.divider}`,
+          px: 2, py: 1.5, display: 'flex', alignItems: 'center', gap: 1.25,
         }}>
-          <div style={{
-            background: '#f8fafc', borderBottom: '1px solid #e2e8f0',
-            padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px',
-          }}>
-            <span style={{ fontSize: '14px' }}>📑</span>
-            <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>คอลัมน์ที่รองรับในการนำเข้า/ส่งออก</span>
-            <span style={{
-              marginLeft: 'auto', fontSize: '10px', fontWeight: 700, padding: '2px 9px',
-              borderRadius: '99px', background: '#f0f9ff', color: '#0369a1', border: '1px solid #bae6fd',
-            }}>{totalCols} คอลัมน์</span>
-          </div>
-          <div style={{ padding: '14px 16px' }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-              {exportColumns.map(([field, label]) => (
-                <div key={field} className="iep-col-tag" title={`field: ${field}`}>
-                  <span style={{ color: '#94a3b8' }}>{field}</span>
-                  <span style={{ color: '#cbd5e1' }}>→</span>
-                  <span style={{ color: '#334155', fontFamily: 'Sarabun, sans-serif' }}>{label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div style={{
-            background: '#fefce8', borderTop: '1px solid #fde68a',
-            padding: '10px 16px', fontSize: '11px', color: '#92400e',
-            display: 'flex', alignItems: 'flex-start', gap: '6px',
-          }}>
-            <span>⚠️</span>
-            <div>
-              <strong>หมายเหตุ:</strong> ไฟล์ที่นำเข้าต้องมีคอลัมน์ <code style={{ background: '#fef9c3', padding: '1px 5px', borderRadius: '4px' }}>รหัสทรัพย์สิน</code> เสมอ
-              · ข้อมูลที่มีรหัสซ้ำจะถูก<strong>อัปเดต</strong> ข้อมูลที่ไม่มีรหัสจะถูก<strong>สร้างใหม่</strong>
-              · วันที่ให้ใช้รูปแบบ YYYY-MM-DD
-            </div>
-          </div>
-        </div>
-      </div>
+          <Box component="span" sx={{ fontSize: 14 }}>📑</Box>
+          <Typography sx={{ fontSize: 13, fontWeight: 700, color: theme.palette.text.primary }}>คอลัมน์ที่รองรับในการนำเข้า/ส่งออก</Typography>
+          <Box component="span" sx={{
+            ml: 'auto', fontSize: 10, fontWeight: 700, px: '9px', py: '2px',
+            borderRadius: '99px', bgcolor: alpha(theme.palette.info.main, 0.08), color: theme.palette.info.dark, border: `1px solid ${alpha(theme.palette.info.main, 0.3)}`,
+          }}>{totalCols} คอลัมน์</Box>
+        </Box>
+        <Box sx={{ p: '14px 16px' }}>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+            {exportColumns.map(([field, label]) => (
+              <Box key={field} title={`field: ${field}`} sx={{
+                display: 'inline-flex', alignItems: 'center', gap: 0.5, px: 1, py: '2px',
+                bgcolor: theme.palette.background.default, border: `1px solid ${theme.palette.divider}`, borderRadius: '5px',
+                fontSize: 10, fontFamily: 'monospace',
+              }}>
+                <Box component="span" sx={{ color: theme.palette.text.disabled }}>{field}</Box>
+                <Box component="span" sx={{ color: theme.palette.text.disabled }}>→</Box>
+                <Box component="span" sx={{ color: theme.palette.text.secondary, fontFamily: 'Sarabun, sans-serif' }}>{label}</Box>
+              </Box>
+            ))}
+          </Box>
+        </Box>
+        <Box sx={{
+          bgcolor: alpha(theme.palette.warning.main, 0.08), borderTop: `1px solid ${alpha(theme.palette.warning.main, 0.25)}`,
+          px: 2, py: 1.25, fontSize: 11, color: theme.palette.warning.dark,
+          display: 'flex', alignItems: 'flex-start', gap: 0.75,
+        }}>
+          <Box component="span">⚠️</Box>
+          <Box component="span">
+            <strong>หมายเหตุ:</strong> ไฟล์ที่นำเข้าต้องมีคอลัมน์ <Box component="code" sx={{ bgcolor: alpha(theme.palette.warning.main, 0.15), px: '5px', py: '1px', borderRadius: '4px' }}>รหัสทรัพย์สิน</Box> เสมอ
+            · ข้อมูลที่มีรหัสซ้ำจะถูก<strong>อัปเดต</strong> ข้อมูลที่ไม่มีรหัสจะถูก<strong>สร้างใหม่</strong>
+            · วันที่ให้ใช้รูปแบบ YYYY-MM-DD
+          </Box>
+        </Box>
+      </Box>
 
       {/* Toast */}
-      {toast && <div className="iep-toast">{toast}</div>}
-    </>
+      {toast && (
+        <Box sx={{
+          position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+          bgcolor: theme.palette.text.primary, color: theme.palette.background.paper, px: 2.5, py: 1.25, borderRadius: '8px',
+          fontSize: 12, zIndex: 9999, boxShadow: '0 8px 24px rgba(0,0,0,.2)', pointerEvents: 'none',
+        }}>
+          {toast}
+        </Box>
+      )}
+    </Box>
   );
 }

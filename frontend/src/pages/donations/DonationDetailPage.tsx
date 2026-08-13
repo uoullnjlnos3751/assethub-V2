@@ -47,7 +47,7 @@ interface InfoCardProps {
   children: React.ReactNode;
   color?: string;
 }
-function InfoCard({ icon, label, children, color = '#6366F1' }: InfoCardProps) {
+function InfoCard({ icon, label, children, color = '#7c3aed' }: InfoCardProps) {
   return (
     <Card sx={{ height: '100%' }}>
       <CardContent>
@@ -364,8 +364,8 @@ export default function DonationDetailPage() {
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Box sx={{
                 width: 32, height: 32, borderRadius: 1.5,
-                bgcolor: alpha('#8B5CF6', 0.1), display: 'flex',
-                alignItems: 'center', justifyContent: 'center', color: '#8B5CF6',
+                bgcolor: alpha(theme.palette.secondary.main, 0.1), display: 'flex',
+                alignItems: 'center', justifyContent: 'center', color: theme.palette.secondary.main,
               }}>
                 <PhotoLibraryIcon sx={{ fontSize: 18 }} />
               </Box>
@@ -382,7 +382,7 @@ export default function DonationDetailPage() {
               startIcon={<AddPhotoAlternateIcon />}
               onClick={() => batchFileRef.current?.click()}
               disabled={uploading}
-              sx={{ borderColor: alpha('#8B5CF6', 0.3), color: '#8B5CF6', '&:hover': { borderColor: '#8B5CF6', bgcolor: alpha('#8B5CF6', 0.04) } }}
+              sx={{ borderColor: alpha(theme.palette.secondary.main, 0.3), color: theme.palette.secondary.main, '&:hover': { borderColor: theme.palette.secondary.main, bgcolor: alpha(theme.palette.secondary.main, 0.04) } }}
             >
               {uploading ? 'กำลังอัพโหลด...' : 'เพิ่มรูป'}
             </Button>
@@ -399,14 +399,14 @@ export default function DonationDetailPage() {
           {batchImages.length === 0 ? (
             <Box sx={{
               py: 5, display: 'flex', flexDirection: 'column', alignItems: 'center',
-              border: '2px dashed', borderColor: alpha('#8B5CF6', 0.2), borderRadius: 2,
-              bgcolor: alpha('#8B5CF6', 0.02), cursor: 'pointer',
+              border: '2px dashed', borderColor: alpha(theme.palette.secondary.main, 0.2), borderRadius: 2,
+              bgcolor: alpha(theme.palette.secondary.main, 0.02), cursor: 'pointer',
               transition: 'all 0.2s',
-              '&:hover': { borderColor: alpha('#8B5CF6', 0.4), bgcolor: alpha('#8B5CF6', 0.04) },
+              '&:hover': { borderColor: alpha(theme.palette.secondary.main, 0.4), bgcolor: alpha(theme.palette.secondary.main, 0.04) },
             }}
               onClick={() => batchFileRef.current?.click()}
             >
-              <AddPhotoAlternateIcon sx={{ fontSize: 40, color: alpha('#8B5CF6', 0.3), mb: 1 }} />
+              <AddPhotoAlternateIcon sx={{ fontSize: 40, color: alpha(theme.palette.secondary.main, 0.3), mb: 1 }} />
               <Typography variant="body2" color="text.secondary">
                 คลิกหรือลากไฟล์เพื่อเพิ่มรูปหลักฐาน
               </Typography>
@@ -468,13 +468,13 @@ export default function DonationDetailPage() {
                 onClick={() => batchFileRef.current?.click()}
                 sx={{
                   width: 120, height: 120, borderRadius: 2,
-                  border: '2px dashed', borderColor: alpha('#8B5CF6', 0.25),
+                  border: '2px dashed', borderColor: alpha(theme.palette.secondary.main, 0.25),
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                   cursor: 'pointer', transition: 'all 0.2s',
-                  '&:hover': { borderColor: '#8B5CF6', bgcolor: alpha('#8B5CF6', 0.04) },
+                  '&:hover': { borderColor: theme.palette.secondary.main, bgcolor: alpha(theme.palette.secondary.main, 0.04) },
                 }}
               >
-                <AddPhotoAlternateIcon sx={{ fontSize: 24, color: alpha('#8B5CF6', 0.4), mb: 0.5 }} />
+                <AddPhotoAlternateIcon sx={{ fontSize: 24, color: alpha(theme.palette.secondary.main, 0.4), mb: 0.5 }} />
                 <Typography variant="caption" color="text.disabled">เพิ่มรูป</Typography>
               </Box>
             </Box>
@@ -578,7 +578,7 @@ export default function DonationDetailPage() {
                             <IconButton
                               size="small"
                               onClick={() => itemFileRefs.current[item.id]?.click()}
-                              sx={{ color: 'text.disabled', '&:hover': { color: '#8B5CF6' } }}
+                              sx={{ color: 'text.disabled', '&:hover': { color: theme.palette.secondary.main } }}
                             >
                               <PhotoCameraIcon sx={{ fontSize: 16 }} />
                             </IconButton>

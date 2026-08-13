@@ -313,7 +313,7 @@ export default function MaintenanceTab({ assetId, onUpdate }: MaintenanceTabProp
                       <Typography variant="body2" fontWeight={600} gutterBottom>รายการอะไหล่ที่เปลี่ยน:</Typography>
                       <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: '8px' }}>
                         <Table size="small">
-                          <TableHead sx={{ bgcolor: '#f8fafc' }}>
+                          <TableHead sx={{ bgcolor: 'action.hover' }}>
                             <TableRow>
                               <TableCell>ชื่ออะไหล่</TableCell>
                               <TableCell align="right">จำนวน</TableCell>

@@ -162,6 +162,18 @@ export const assetAPI = {
   createAssetStatus: (data: any) => api.post('/assets/asset-statuses', data),
   updateAssetStatus: (id: number, data: any) => api.put(`/assets/asset-statuses/${id}`, data),
   deleteAssetStatus: (id: number) => api.delete(`/assets/asset-statuses/${id}`),
+  printers: () => api.get('/assets/printers'),
+  createPrinter: (data: any) => api.post('/assets/printers', data),
+  updatePrinter: (id: number, data: any) => api.put(`/assets/printers/${id}`, data),
+  deletePrinter: (id: number) => api.delete(`/assets/printers/${id}`),
+  checklistSets: () => api.get('/assets/checklist-sets'),
+  createChecklistSet: (data: any) => api.post('/assets/checklist-sets', data),
+  updateChecklistSet: (id: number, data: any) => api.put(`/assets/checklist-sets/${id}`, data),
+  deleteChecklistSet: (id: number) => api.delete(`/assets/checklist-sets/${id}`),
+  checklistItems: (setId: number) => api.get(`/assets/checklist-sets/${setId}/items`),
+  createChecklistItem: (setId: number, data: any) => api.post(`/assets/checklist-sets/${setId}/items`, data),
+  updateChecklistItem: (setId: number, itemId: number, data: any) => api.put(`/assets/checklist-sets/${setId}/items/${itemId}`, data),
+  deleteChecklistItem: (setId: number, itemId: number) => api.delete(`/assets/checklist-sets/${setId}/items/${itemId}`),
   stats: (typeGroup: string) => api.get('/assets/stats', { params: { typeGroup } }),
   checkDuplicate: (params: { assetCode?: string; accountingCode?: string; serialNo?: string; assetName?: string; excludeId?: number }) => api.get('/assets/check-duplicate', { params }),
 };
@@ -222,6 +234,25 @@ export const pmAPI = {
   adhocSearch: (q: string) => api.get('/pm/runs/adhoc-search', { params: { q } }),
   adhocCheck: (assetId: number) => api.get(`/pm/runs/adhoc-check/${assetId}`),
   adhocCreate: (data: { assetId: number; templateId: number }) => api.post('/pm/runs/adhoc', data),
+};
+
+// New Devices & Delivery
+export const deliveryAPI = {
+  list: (params?: any) => api.get('/delivery/requests', { params }),
+  summary: () => api.get('/delivery/requests/summary'),
+  get: (id: number) => api.get(`/delivery/requests/${id}`),
+  create: (data: any) => api.post('/delivery/requests', data),
+  update: (id: number, data: any) => api.put(`/delivery/requests/${id}`, data),
+  togglePeripheral: (id: number, itemId: number, data: { prepared?: boolean; delivered?: boolean }) =>
+    api.patch(`/delivery/requests/${id}/peripherals/${itemId}`, data),
+  markReady: (id: number) => api.patch(`/delivery/requests/${id}/ready`),
+  deliver: (id: number) => api.post(`/delivery/requests/${id}/deliver`),
+  getChecklistRun: (id: number) => api.get(`/delivery/requests/${id}/checklist-run`),
+  performChecklistRun: (id: number, data: { answers: { itemId: number; value: string; note?: string }[]; status?: 'DRAFT' | 'DONE' }) =>
+    api.post(`/delivery/requests/${id}/checklist-run/perform`, data),
+  // Public — no auth, used by the recipient-facing confirmation page
+  getConfirm: (token: string) => api.get(`/delivery/confirm/${token}`),
+  confirm: (token: string) => api.post(`/delivery/confirm/${token}`),
 };
 
 export const floorPlanAPI = {
@@ -307,6 +338,9 @@ export const dashboardAPI = {
   recentActivity: () => api.get('/dashboard/recent-activity'),
   proactiveAlerts: () => api.get('/dashboard/proactive-alerts'),
   warrantyExpiring: (days?: number) => api.get('/dashboard/warranty-expiring', { params: { days } }),
+  moduleStatus: () => api.get('/dashboard/module-status'),
+  categoryUtilization: () => api.get('/dashboard/category-utilization'),
+  inventoryLowStock: () => api.get('/dashboard/inventory-low-stock'),
 };
 
 // Inventory

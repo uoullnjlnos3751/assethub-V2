@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import {
+  Box, Typography, Button, TextField, Select, MenuItem, FormControl, alpha, useTheme,
+} from '@mui/material';
 import { pmAPI } from '../../../services/api';
 import { Modal } from './Modal';
 import { PMDeviceArrayInput } from './PMDeviceArrayInput';
@@ -14,6 +17,7 @@ interface PMBulkModalProps {
 }
 
 export const PMBulkModal: React.FC<PMBulkModalProps> = ({ open, onClose, selectedRunIds, runs, onSuccess }) => {
+  const theme = useTheme();
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [saving, setSaving] = useState(false);
 
@@ -90,6 +94,13 @@ export const PMBulkModal: React.FC<PMBulkModalProps> = ({ open, onClose, selecte
     }
   };
 
+  const BOOLEAN_OPTS: { val: string; lbl: string }[] = [
+    { val: 'yes', lbl: '✓ ใช่' },
+    { val: 'no', lbl: '✗ ไม่' },
+    { val: 'na', lbl: '— N/A' },
+  ];
+  const boolColor = (val: string) => val === 'yes' ? theme.palette.success.main : val === 'no' ? theme.palette.error.main : theme.palette.text.secondary;
+
   return (
     <Modal
       open={open}
@@ -97,164 +108,191 @@ export const PMBulkModal: React.FC<PMBulkModalProps> = ({ open, onClose, selecte
       maxWidth={760}
       title={`🔧 บันทึก PM แบบกลุ่ม (${selectedRunIds.length} รายการ)`}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '80vh' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '80vh' }}>
         {/* Alert banner */}
-        <div style={{ background: '#fff9e6', borderBottom: '1px solid rgba(255,149,0,0.2)', padding: '12px 24px', fontSize: 12, color: '#d97706', fontWeight: 500, display: 'flex', gap: 8, alignItems: 'center' }}>
+        <Box sx={{
+          bgcolor: alpha(theme.palette.warning.main, 0.08),
+          borderBottom: `1px solid ${alpha(theme.palette.warning.main, 0.2)}`,
+          px: 3, py: 1.5, fontSize: 12, color: theme.palette.warning.dark, fontWeight: 500,
+          display: 'flex', gap: 1, alignItems: 'center',
+        }}>
           ⚠️ ข้อความนี้จะถูกบันทึกไปยังรายการอุปกรณ์ที่เลือก {selectedRunIds.length} รายการ
           และสถานะจะเป็น 'เสร็จแล้ว (COMPLETED)' โดยอัตโนมัติ
-        </div>
+        </Box>
 
         {/* Quick Actions */}
-        <div style={{ padding: '14px 24px', borderBottom: '1px solid #e5e5ea', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexShrink: 0, gap: 12, background: '#f5f5f7' }}>
-          <button type="button" className="pmr-btn pmr-btn-outline" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => setAll('yes')}>✓ ทำทั้งหมด (Yes)</button>
-          <button type="button" className="pmr-btn pmr-btn-outline" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => setAnswers({})}>↺ ล้างข้อมูล</button>
-        </div>
+        <Box sx={{
+          px: 3, py: 1.75, borderBottom: `1px solid ${theme.palette.divider}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexShrink: 0, gap: 1.5,
+          bgcolor: theme.palette.background.default,
+        }}>
+          <Button size="small" variant="outlined" onClick={() => setAll('yes')}>✓ ทำทั้งหมด (Yes)</Button>
+          <Button size="small" variant="outlined" onClick={() => setAnswers({})}>↺ ล้างข้อมูล</Button>
+        </Box>
 
         {/* Checklist Scrollable Body */}
-        <div style={{ padding: '24px', overflowY: 'auto', flex: 1, background: '#f5f5f7' }}>
-          <div className="checklist-card">
+        <Box sx={{ p: 3, overflowY: 'auto', flex: 1, bgcolor: theme.palette.background.default }}>
+          <Box sx={{ bgcolor: theme.palette.background.paper, borderRadius: '12px', border: `1px solid ${theme.palette.divider}`, p: 2 }}>
             {groups.map((group: any) => {
               const groupItems = items.filter((i: any) => i.group === group);
               const gi = GROUP_INFO[group] || { label: group, icon: '📌' };
               return (
-                <div key={group}>
-                  <div className="check-group-title">{gi.icon} {gi.label}</div>
+                <Box key={group} sx={{ mb: 2 }}>
+                  <Typography sx={{ fontSize: 13, fontWeight: 700, color: theme.palette.text.primary, mb: 1 }}>{gi.icon} {gi.label}</Typography>
                   {groupItems.map((item: any) => (
-                    <div key={item.key} className="check-item">
-                      <div className="check-no">{items.indexOf(item) + 1}</div>
-                      <div style={{ flex: 1, minWidth: 220 }}>
-                        <div style={{ fontSize: 13, color: '#1d1d1f', fontWeight: 500 }}>{item.label}</div>
+                    <Box key={item.key} sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 1.5, py: 1, borderTop: `1px solid ${theme.palette.divider}` }}>
+                      <Box sx={{
+                        width: 22, height: 22, borderRadius: '50%', flexShrink: 0, mt: 0.25,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 11, fontWeight: 700, color: theme.palette.text.secondary, bgcolor: theme.palette.action.hover,
+                      }}>
+                        {items.indexOf(item) + 1}
+                      </Box>
+                      <Box sx={{ flex: 1, minWidth: 220 }}>
+                        <Typography sx={{ fontSize: 13, color: theme.palette.text.primary, fontWeight: 500 }}>{item.label}</Typography>
                         {item.type?.toLowerCase() === 'text' && (
-                          <textarea
-                            style={{ width: '100%', border: '1px solid #d2d2d7', borderRadius: 8, padding: '10px 14px', fontSize: 12, fontFamily: 'inherit', minHeight: 70, marginTop: 8, resize: 'vertical', outline: 'none' }}
+                          <TextField
+                            fullWidth multiline minRows={3} size="small" sx={{ mt: 1 }}
                             placeholder={item.key === 'issue_note' ? 'ระบุข้อเสนอแนะหรือปัญหาที่พบ...' : 'ระบุรายละเอียด...'}
                             value={answers[item.key] || ''}
                             onChange={(e) => setAnswers((p) => ({ ...p, [item.key]: e.target.value }))}
                           />
                         )}
                         {item.type?.toLowerCase() === 'rating' && (
-                          <div style={{ marginTop: 8 }}>
+                          <Box sx={{ mt: 1 }}>
                             <StarRating value={parseInt(answers[item.key] || '0')} onChange={(v) => setAnswers((p) => ({ ...p, [item.key]: String(v) }))} />
-                          </div>
+                          </Box>
                         )}
-                        {['select', 'select_physical', 'select_speed', 'select_result'].includes(item.type?.toLowerCase()) && (
-                          <div style={{ marginTop: 8 }}>
-                            <select
-                              style={{
-                                width: '100%',
-                                border: (['select_physical', 'select_result'].includes(item.type?.toLowerCase()) && (answers[item.key] === 'ชำรุดรอซ่อม' || answers[item.key] === 'ไม่ผ่านเกณฑ์')) ? '2px solid #ff3b30' : '1px solid #d2d2d7',
-                                borderRadius: 8, padding: '10px 14px', fontSize: 12, fontFamily: 'inherit', outline: 'none',
-                                background: (['select_physical', 'select_result'].includes(item.type?.toLowerCase()) && (answers[item.key] === 'ชำรุดรอซ่อม' || answers[item.key] === 'ไม่ผ่านเกณฑ์')) ? '#fff0f0' : '#fff',
-                                appearance: 'none',
-                                backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%2386868b\' stroke-width=\'2\'%3E%3Cpolyline points=\'6 9 12 15 18 9\'/%3E%3C/svg%3E")',
-                                backgroundRepeat: 'no-repeat', backgroundPosition: 'right 14px center',
-                              }}
-                              value={answers[item.key] || ''}
-                              onChange={(e) => setAnswers((p) => ({ ...p, [item.key]: e.target.value }))}
-                            >
-                              <option value="">-- กรุณาเลือก --</option>
-                              {item.type?.toLowerCase() === 'select_physical' && ['สภาพปกติ', 'ชำรุดเล็กน้อย', 'ชำรุดรอซ่อม', 'หมดสภาพ'].map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                              {item.type?.toLowerCase() === 'select_speed' && ['เร็วปกติ', 'เริ่มหน่วงหนืด', 'ช้ามาก'].map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                              {item.type?.toLowerCase() === 'select_result' && ['ผ่านเกณฑ์', 'แก้ไขเรียบร้อย', 'ไม่ผ่านเกณฑ์'].map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                              {item.type?.toLowerCase() === 'select' && item.options?.split(',').map((opt: string) => opt.trim()).filter(Boolean).map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
-                            </select>
-                          </div>
-                        )}
+                        {['select', 'select_physical', 'select_speed', 'select_result'].includes(item.type?.toLowerCase()) && (() => {
+                          const isDefect = ['select_physical', 'select_result'].includes(item.type?.toLowerCase()) && (answers[item.key] === 'ชำรุดรอซ่อม' || answers[item.key] === 'ไม่ผ่านเกณฑ์');
+                          return (
+                            <FormControl fullWidth size="small" sx={{ mt: 1 }}>
+                              <Select
+                                displayEmpty
+                                value={answers[item.key] || ''}
+                                onChange={(e) => setAnswers((p) => ({ ...p, [item.key]: e.target.value }))}
+                                sx={isDefect ? {
+                                  '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.error.main, borderWidth: '2px' },
+                                  bgcolor: alpha(theme.palette.error.main, 0.06),
+                                } : undefined}
+                              >
+                                <MenuItem value=""><em>-- กรุณาเลือก --</em></MenuItem>
+                                {item.type?.toLowerCase() === 'select_physical' && ['สภาพปกติ', 'ชำรุดเล็กน้อย', 'ชำรุดรอซ่อม', 'หมดสภาพ'].map(opt => <MenuItem key={opt} value={opt}>{opt}</MenuItem>)}
+                                {item.type?.toLowerCase() === 'select_speed' && ['เร็วปกติ', 'เริ่มหน่วงหนืด', 'ช้ามาก'].map(opt => <MenuItem key={opt} value={opt}>{opt}</MenuItem>)}
+                                {item.type?.toLowerCase() === 'select_result' && ['ผ่านเกณฑ์', 'แก้ไขเรียบร้อย', 'ไม่ผ่านเกณฑ์'].map(opt => <MenuItem key={opt} value={opt}>{opt}</MenuItem>)}
+                                {item.type?.toLowerCase() === 'select' && item.options?.split(',').map((opt: string) => opt.trim()).filter(Boolean).map((opt: string) => <MenuItem key={opt} value={opt}>{opt}</MenuItem>)}
+                              </Select>
+                            </FormControl>
+                          );
+                        })()}
                         {item.type?.toLowerCase() === 'monitor_array' && (
-                          <div style={{ marginTop: 8 }}>
+                          <Box sx={{ mt: 1 }}>
                             <PMDeviceArrayInput
                               type="monitor"
                               value={answers[item.key] || ''}
                               onChange={(v) => setAnswers((p) => ({ ...p, [item.key]: v }))}
                               parentAsset={firstRun?.asset}
                             />
-                          </div>
+                          </Box>
                         )}
                         {item.type?.toLowerCase() === 'printer_array' && (
-                          <div style={{ marginTop: 8 }}>
+                          <Box sx={{ mt: 1 }}>
                             <PMDeviceArrayInput
                               type="printer"
                               value={answers[item.key] || ''}
                               onChange={(v) => setAnswers((p) => ({ ...p, [item.key]: v }))}
                               parentAsset={firstRun?.asset}
                             />
-                          </div>
+                          </Box>
                         )}
-                      </div>
+                      </Box>
                       {item.type?.toLowerCase() === 'boolean' && (
-                        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                          {[
-                            { val: 'yes', lbl: '✓ ใช่' },
-                            { val: 'no', lbl: '✗ ไม่' },
-                            { val: 'na', lbl: '— N/A' },
-                          ].map((opt) => (
-                            <button
-                              key={opt.val}
-                              type="button"
-                              className={`pmr-radio ${answers[item.key] === opt.val ? `sel-${opt.val}` : ''}`}
-                              onClick={() => setAnswers((p) => ({ ...p, [item.key]: opt.val }))}
-                            >
-                              {opt.lbl}
-                            </button>
-                          ))}
-                        </div>
+                        <Box sx={{ display: 'flex', gap: 0.75, flexShrink: 0 }}>
+                          {BOOLEAN_OPTS.map((opt) => {
+                            const selected = answers[item.key] === opt.val;
+                            const c = boolColor(opt.val);
+                            return (
+                              <Button
+                                key={opt.val}
+                                size="small"
+                                variant={selected ? 'contained' : 'outlined'}
+                                onClick={() => setAnswers((p) => ({ ...p, [item.key]: opt.val }))}
+                                sx={selected ? { bgcolor: c, '&:hover': { bgcolor: c } } : { color: c, borderColor: alpha(c, 0.4) }}
+                              >
+                                {opt.lbl}
+                              </Button>
+                            );
+                          })}
+                        </Box>
                       )}
 
                       {/* Inline Note for No/NA */}
                       {item.type?.toLowerCase() === 'boolean' && (answers[item.key] === 'no' || answers[item.key] === 'na') && (
-                        <div style={{ width: '100%', paddingLeft: 38, marginTop: 6 }}>
-                          <input
-                            type="text"
-                            style={{ width: '100%', border: '1px solid #ff9500', borderRadius: 6, padding: '8px 12px', fontSize: 12, background: '#fffbeb', outline: 'none', fontFamily: 'inherit' }}
+                        <Box sx={{ width: '100%', pl: '38px', mt: 0.5 }}>
+                          <TextField
+                            fullWidth size="small"
                             placeholder="ระบุสาเหตุประกอบการเลือกไม่ใช่หรือไม่ระบุ..."
                             value={answers[`${item.key}_note`] || ''}
                             onChange={(e) => setAnswers((p) => ({ ...p, [`${item.key}_note`]: e.target.value }))}
+                            sx={{
+                              '& .MuiOutlinedInput-root': { bgcolor: alpha(theme.palette.warning.main, 0.06) },
+                              '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.warning.main },
+                            }}
                           />
-                        </div>
+                        </Box>
                       )}
-                      
+
                       {/* Green Box for IP Phone (Yes) */}
                       {item.type?.toLowerCase() === 'boolean' && item.key === 'ip_phone' && answers[item.key] === 'yes' && (
-                        <div style={{ width: '100%', paddingLeft: 38, marginTop: 6 }}>
-                          <div style={{ background: '#eaf6ed', border: '1px solid rgba(52, 199, 89, 0.4)', borderRadius: 8, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                            <label style={{ fontSize: 10, color: '#1c873b', fontWeight: 600 }}>📞 ระบุหมายเลขโทรศัพท์ภายใน (Extension Number)</label>
-                            <input
-                              type="text"
-                              style={{ width: '100%', border: '1px solid #34c759', borderRadius: 6, padding: '6px 10px', fontSize: 12, background: '#fff', outline: 'none', fontFamily: 'inherit', color: '#1d1d1f' }}
+                        <Box sx={{ width: '100%', pl: '38px', mt: 0.5 }}>
+                          <Box sx={{
+                            bgcolor: alpha(theme.palette.success.main, 0.08), border: `1px solid ${alpha(theme.palette.success.main, 0.4)}`,
+                            borderRadius: '8px', p: '10px 14px', display: 'flex', flexDirection: 'column', gap: 0.75,
+                          }}>
+                            <Typography sx={{ fontSize: 10, color: theme.palette.success.dark, fontWeight: 600 }}>📞 ระบุหมายเลขโทรศัพท์ภายใน (Extension Number)</Typography>
+                            <TextField
+                              fullWidth size="small"
                               placeholder="ตัวอย่าง: 1035, 1036..."
                               value={answers[`${item.key}_note`] || ''}
                               onChange={(e) => setAnswers((p) => ({ ...p, [`${item.key}_note`]: e.target.value }))}
+                              sx={{ '& .MuiOutlinedInput-root': { bgcolor: theme.palette.background.paper } }}
                             />
-                          </div>
-                        </div>
+                          </Box>
+                        </Box>
                       )}
                       {['select_physical', 'select_result'].includes(item.type?.toLowerCase()) && (answers[item.key] === 'ชำรุดรอซ่อม' || answers[item.key] === 'ไม่ผ่านเกณฑ์') && (
-                        <div style={{ width: '100%', paddingLeft: 38, marginTop: 6 }}>
-                          <input
-                            type="text"
-                            style={{ width: '100%', border: '1px solid #ff9500', borderRadius: 6, padding: '8px 12px', fontSize: 12, background: '#fffbeb', outline: 'none', fontFamily: 'inherit' }}
-                            placeholder={item.type?.toLowerCase() === 'select_physical' ? "ระบุสาเหตุที่ชำรุด / อาการ..." : "ระบุเหตุผลที่ไม่ผ่านเกณฑ์..."}
+                        <Box sx={{ width: '100%', pl: '38px', mt: 0.5 }}>
+                          <TextField
+                            fullWidth size="small"
+                            placeholder={item.type?.toLowerCase() === 'select_physical' ? 'ระบุสาเหตุที่ชำรุด / อาการ...' : 'ระบุเหตุผลที่ไม่ผ่านเกณฑ์...'}
                             value={answers[`${item.key}_note`] || ''}
                             onChange={(e) => setAnswers((p) => ({ ...p, [`${item.key}_note`]: e.target.value }))}
+                            sx={{
+                              '& .MuiOutlinedInput-root': { bgcolor: alpha(theme.palette.warning.main, 0.06) },
+                              '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.warning.main },
+                            }}
                           />
-                        </div>
+                        </Box>
                       )}
-                    </div>
+                    </Box>
                   ))}
-                </div>
+                </Box>
               );
             })}
-          </div>
-        </div>
+          </Box>
+        </Box>
 
         {/* Footer Actions */}
-        <div style={{ padding: '16px 24px', borderTop: '1px solid #e5e5ea', display: 'flex', justifyContent: 'flex-end', gap: 10, background: '#fff', flexShrink: 0 }}>
-          <button type="button" className="pmr-btn pmr-btn-outline" onClick={onClose}>ปิด</button>
-          <button type="button" className="pmr-btn pmr-btn-primary" onClick={handleBulkSave} disabled={saving}>
+        <Box sx={{
+          px: 3, py: 2, borderTop: `1px solid ${theme.palette.divider}`,
+          display: 'flex', justifyContent: 'flex-end', gap: 1.25, flexShrink: 0, bgcolor: theme.palette.background.paper,
+        }}>
+          <Button variant="outlined" onClick={onClose}>ปิด</Button>
+          <Button variant="contained" onClick={handleBulkSave} disabled={saving}>
             {saving ? '⏳ กำลังบันทึก...' : '✅ บันทึกผล PM ทั้งหมด'}
-          </button>
-        </div>
-      </div>
+          </Button>
+        </Box>
+      </Box>
     </Modal>
   );
 };

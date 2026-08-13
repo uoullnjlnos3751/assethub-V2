@@ -13,7 +13,7 @@ export default function LocationsPage() {
               subtitle="จัดการสถานที่ตั้งหรือไซต์สำหรับทรัพย์สิน"
               itemLabel="สถานที่ตั้ง"
               icon="📍"
-              accentColor="#8b5cf6"
+              accentColor="#7c3aed"
               showCompanyField
               fetchItems={assetAPI.locations}
               createItem={assetAPI.createLocation}

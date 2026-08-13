@@ -11,7 +11,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { dashboardAPI, contractAPI, licenseAPI, presenceAPI } from '../services/api';
 import LoadingSkeleton from '../components/LoadingSkeleton';
 import { KpiCard } from './dashboard/components/KpiCard';
-import { OnlineTeamCard } from './dashboard/components/OnlineTeamCard';
+import { OpsRoomCard } from './dashboard/components/OpsRoomCard';
 import { ProactiveAlertsBar } from './dashboard/components/ProactiveAlertsBar';
 import { CategoryDonutCard } from './dashboard/components/CategoryDonutCard';
 import { BorrowTrendCard } from './dashboard/components/BorrowTrendCard';
@@ -24,6 +24,8 @@ import { PMSummaryCard } from './dashboard/components/PMSummaryCard';
 import { DataHealthCard } from './dashboard/components/DataHealthCard';
 import { WarrantyAlertsCard } from './dashboard/components/WarrantyAlertsCard';
 import { ContractLicenseSummary } from './dashboard/components/ContractLicenseSummary';
+import { ModuleStatusCard } from './dashboard/components/ModuleStatusCard';
+import { CategoryUtilizationCard } from './dashboard/components/CategoryUtilizationCard';
 import { now, pct } from './dashboard/dashboardHelpers';
 
 // ── Main Dashboard ──────────────────────────────────────────────────────────
@@ -42,6 +44,9 @@ export default function DashboardPage() {
   const [contractList, setContractList] = useState<any[]>([]);
   const [licenseList, setLicenseList] = useState<any[]>([]);
   const [onlineNow, setOnlineNow] = useState<any[]>([]);
+  const [moduleStatus, setModuleStatus] = useState<any>(null);
+  const [categoryUtilization, setCategoryUtilization] = useState<any[]>([]);
+  const [inventoryLowStock, setInventoryLowStock] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -55,8 +60,11 @@ export default function DashboardPage() {
         dashboardAPI.dataHealth(),
         dashboardAPI.borrowTrend(year),
         dashboardAPI.recentActivity(),
+        dashboardAPI.moduleStatus(),
+        dashboardAPI.categoryUtilization(),
+        dashboardAPI.inventoryLowStock(),
       ])
-        .then(([a, b, p, pa, dh, tr, ra]) => {
+        .then(([a, b, p, pa, dh, tr, ra, ms, cu, ls]) => {
           setAssetSummary(a.data);
           setBorrowSummary(b.data);
           setPmSummary(p.data);
@@ -64,6 +72,9 @@ export default function DashboardPage() {
           setDataHealth(dh.data);
           setTrendData(tr.data);
           setActivityData(ra.data);
+          setModuleStatus(ms.data);
+          setCategoryUtilization(cu.data || []);
+          setInventoryLowStock(ls.data);
         })
         .finally(() => setLoading(false));
 
@@ -153,6 +164,15 @@ export default function DashboardPage() {
   const borrowActive = borrowSummary?.activeItems || 0;
   const borrowPending = borrowSummary?.pendingApproval || 0;
   const borrowOverdue = borrowSummary?.overdue || 0;
+  const pmOverdue = pmSummary?.overdue || 0;
+
+  // Monitoring Wall summary numbers
+  const openWork = borrowPending + maintenance;
+  const overSla = borrowOverdue + pmOverdue;
+  const todayStr = new Date().toDateString();
+  const closedToday = (activityData?.recentReturns || []).filter(
+    (r: any) => r.returnedAt && new Date(r.returnedAt).toDateString() === todayStr
+  ).length;
 
   // Alerts list (from real proactive-alerts data)
   const alerts: { icon: LucideIcon; text: string; sub: string; colorKey: string }[] = [];
@@ -221,24 +241,31 @@ export default function DashboardPage() {
         />
       </Box>
 
-      {/* ── ทีมงานออนไลน์ตอนนี้ ────────────────────────────────────── */}
-      <Box sx={{ mb: 2 }}>
-        <OnlineTeamCard onlineNow={onlineNow} />
+      {/* ── Row 2: IT Operations Room (live) + Donut ─────────────── */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '7fr 5fr' }, gap: 1.5, mb: 2 }}>
+        <OpsRoomCard
+          onlineNow={onlineNow}
+          borrowActive={borrowActive} borrowPending={borrowPending}
+          pmDone={pmDone} pmTotal={pmTotal} pmPct={pmPct}
+          lowStockCount={inventoryLowStock?.lowStockCount || 0}
+          assetsTotal={total} openWork={openWork} overSla={overSla} closedToday={closedToday}
+          onNavigateReports={() => navigate('/reports')}
+        />
+        <CategoryDonutCard byCategory={byCategory} total={total} onNavigate={() => navigate('/assets')} />
       </Box>
 
-      {/* ── Row 2: Donut + Trend bar chart ───────────────────────── */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '5fr 7fr' }, gap: 1.5, mb: 2 }}>
-        <CategoryDonutCard byCategory={byCategory} total={total} onNavigate={() => navigate('/assets')} />
+      {/* ── Row 3: Trend bar chart ───────────────────────────────── */}
+      <Box sx={{ mb: 2 }}>
         <BorrowTrendCard trendData={trendData} onNavigate={() => navigate('/reports/borrow')} />
       </Box>
 
-      {/* ── Row 3: Recent activity + Quick actions ───────────────── */}
+      {/* ── Row 4: Recent activity + Quick actions ───────────────── */}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '8fr 4fr' }, gap: 1.5, mb: 2 }}>
         <RecentActivityCard activityData={activityData} onNavigate={() => navigate('/borrow/history')} />
         <QuickActionsPanel onNavigate={navigate} />
       </Box>
 
-      {/* ── Row 4: Status breakdown + Location + Borrow + PM ─────── */}
+      {/* ── Row 5: Status breakdown + Location + Borrow + PM ─────── */}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 1.5, mb: 2 }}>
         <AssetStatusBreakdownCard byStatus={byStatus} total={total} onNavigate={() => navigate('/assets')} />
         <LocationBreakdownCard byLocation={byLocation} total={total} onNavigate={() => navigate('/assets')} />
@@ -246,13 +273,19 @@ export default function DashboardPage() {
         <PMSummaryCard pmTotal={pmTotal} pmDone={pmDone} pmPct={pmPct} onNavigate={() => navigate('/pm')} />
       </Box>
 
-      {/* ── Row 5: Data Health + Warranty ────────────────────────── */}
+      {/* ── Row 6: Module status + Category utilization ─────────── */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 1.5, mb: 2 }}>
+        <ModuleStatusCard moduleStatus={moduleStatus} />
+        <CategoryUtilizationCard categories={categoryUtilization} onNavigate={() => navigate('/assets')} />
+      </Box>
+
+      {/* ── Row 7: Data Health + Warranty ────────────────────────── */}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 1.5, mb: 2 }}>
         <DataHealthCard dataHealth={dataHealth} navigate={navigate} />
         <WarrantyAlertsCard warrantyData={warrantyData} navigate={navigate} />
       </Box>
 
-      {/* ── Row 6: Executive Summary — Contract & License ─────── */}
+      {/* ── Row 8: Executive Summary — Contract & License ─────── */}
       <ContractLicenseSummary contractList={contractList} licenseList={licenseList} navigate={navigate} />
 
     </Box>

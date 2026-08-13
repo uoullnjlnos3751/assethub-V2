@@ -190,7 +190,7 @@ export default function FlowchartsPage() {
               width: 56, height: 56, borderRadius: '14px',
               background: `linear-gradient(150deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 8px 20px rgba(14,165,233,0.3)', fontSize: 26
+              boxShadow: `0 8px 20px ${alpha(theme.palette.primary.main, 0.3)}`, fontSize: 26
             }}>📊</Box>
             <Box>
               <Typography variant="h5" fontWeight={800} sx={{

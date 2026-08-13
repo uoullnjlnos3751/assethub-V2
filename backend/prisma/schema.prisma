@@ -37,6 +37,10 @@ model AppUser {
   notifications      AppNotification[]
   assignedAssets     Asset[]             @relation("AssetAssignedTo")
   disposalsCreated   AssetDisposal[]     @relation("DisposalCreatedBy")
+  deliveryRequested  DeliveryRequest[]   @relation("DeliveryRequestedBy")
+  deliveryInstalled  DeliveryRequest[]   @relation("DeliveryInstalledBy")
+  deliveryDelivered  DeliveryRequest[]   @relation("DeliveryDeliveredBy")
+  checklistRunsPerformed DeliveryChecklistRun[] @relation("DeliveryChecklistPerformedBy")
 
   @@index([role, isActive])
   @@index([department])
@@ -141,6 +145,7 @@ model Asset {
   linkedParent        AssetLink[]          @relation("LinkChild")
   linkedChildren      AssetLink[]          @relation("LinkParent")
   contractAssets      ContractAsset[]
+  deliveryRequests    DeliveryRequest[]
 
   @@index([status, departmentId, location])
   @@index([type, brand])
@@ -149,6 +154,7 @@ model Asset {
   @@index([departmentRefId])
   @@index([vendorRefId])
   @@index([locationRefId])
+  @@index([categoryId])
   @@map("assets")
 }
 
@@ -508,6 +514,91 @@ model AssetStatusMaster {
   @@map("asset_status_masters")
 }
 
+model Printer {
+  id          Int      @id @default(autoincrement())
+  floorArea   String
+  brandModel  String
+  serialNo    String?
+  ipAddress   String?
+  driver      String?
+  pinNote     String?
+  status      String   @default("active")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("printers")
+}
+
+model ChecklistSet {
+  id                     Int      @id @default(autoincrement())
+  docCode                String   @unique
+  name                   String
+  appliesToCategories    String?
+  itemCount              Int      @default(0)
+  categoryCount          Int      @default(0)
+  avgTimeLabel           String?
+  revision               Int      @default(1)
+  isActive               Boolean  @default(true)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  items                  ChecklistItem[]
+  checklistRuns          DeliveryChecklistRun[]
+
+  @@map("checklist_sets")
+}
+
+model ChecklistItem {
+  id          Int          @id @default(autoincrement())
+  setId       Int
+  set         ChecklistSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+  category    String
+  refCode     String
+  itemText    String
+  answerType  String       @default("PASS_FAIL_NA")
+  sortOrder   Int          @default(0)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  answers     DeliveryChecklistAnswer[]
+
+  @@index([setId, sortOrder])
+  @@map("checklist_items")
+}
+
+model DeliveryChecklistRun {
+  id             Int                       @id @default(autoincrement())
+  requestId      Int
+  request        DeliveryRequest           @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  checklistSetId Int
+  checklistSet   ChecklistSet              @relation(fields: [checklistSetId], references: [id])
+  status         String                    @default("DRAFT")
+  performedBy    Int?
+  performer      AppUser?                  @relation("DeliveryChecklistPerformedBy", fields: [performedBy], references: [id])
+  performedAt    DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+  answers        DeliveryChecklistAnswer[]
+
+  @@index([requestId])
+  @@map("delivery_checklist_runs")
+}
+
+model DeliveryChecklistAnswer {
+  id     Int                  @id @default(autoincrement())
+  runId  Int
+  run    DeliveryChecklistRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  itemId Int
+  item   ChecklistItem        @relation(fields: [itemId], references: [id])
+  value  String?
+  note   String?
+
+  @@unique([runId, itemId])
+  @@map("delivery_checklist_answers")
+}
+
 model AssetHistory {
   id          Int      @id @default(autoincrement())
   assetId     Int
@@ -692,6 +783,7 @@ model PMPlan {
   template           PMTemplate @relation(fields: [templateId], references: [id])
   runs               PMRun[]
 
+  @@index([year])
   @@map("pm_plans")
 }
 
@@ -717,6 +809,7 @@ model PMRun {
   @@index([planId, status])
   @@index([assetId, year])
   @@index([status, performedAt])
+  @@index([year, status])
   @@map("pm_runs")
 }
 
@@ -729,6 +822,74 @@ model PMRunAnswer {
   run    PMRun          @relation(fields: [runId], references: [id])
 
   @@map("pm_run_answers")
+}
+
+// ── New Devices & Delivery (เครื่องใหม่ & ส่งมอบ) ───────────────────────────
+// Phase A: register device + peripherals, deliver with a self-generated
+// email-confirmation link (no Power Automate / MS Forms dependency — the
+// confirmToken is resolved by a public, unauthenticated route+page).
+enum DeliveryType {
+  NEW_PURCHASE
+  RECYCLED
+  TEMP_REPLACEMENT
+}
+
+enum DeliveryStatus {
+  DRAFT
+  SETUP_IN_PROGRESS
+  SETUP_DONE
+  PENDING_DELIVERY
+  DELIVERED
+  CONFIRMED
+  RETURN_REQUESTED
+  RETURNED
+}
+
+model DeliveryRequest {
+  id               Int                      @id @default(autoincrement())
+  deliveryType     DeliveryType             @default(NEW_PURCHASE)
+  status           DeliveryStatus           @default(DRAFT)
+  assetId          Int?
+  asset            Asset?                   @relation(fields: [assetId], references: [id])
+  recipientName    String
+  recipientEmail   String?
+  recipientDept    String?
+  recipientCompany String?
+  source           String?
+  requestedBy      Int
+  requester        AppUser                  @relation("DeliveryRequestedBy", fields: [requestedBy], references: [id])
+  installerId      Int?
+  installer        AppUser?                 @relation("DeliveryInstalledBy", fields: [installerId], references: [id])
+  installedAt      DateTime?
+  deliveredById    Int?
+  deliveredBy      AppUser?                 @relation("DeliveryDeliveredBy", fields: [deliveredById], references: [id])
+  deliveredAt      DateTime?
+  confirmToken     String?                  @unique
+  confirmedAt      DateTime?
+  confirmMethod    String?
+  notes            String?
+  peripherals      DeliveryPeripheralItem[]
+  checklistRuns    DeliveryChecklistRun[]
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  @@index([status])
+  @@map("delivery_requests")
+}
+
+model DeliveryPeripheralItem {
+  id        Int             @id @default(autoincrement())
+  requestId Int
+  request   DeliveryRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  category  String
+  itemName  String
+  serialNo  String?
+  qty       Int             @default(1)
+  remark    String?
+  prepared  Boolean         @default(false)
+  delivered Boolean         @default(false)
+
+  @@map("delivery_peripheral_items")
 }
 
 model NotificationTemplate {

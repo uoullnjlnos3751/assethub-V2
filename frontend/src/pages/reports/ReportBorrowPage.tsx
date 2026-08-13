@@ -261,25 +261,25 @@ export default function ReportBorrowPage() {
           <Grid item xs={6} md={3}>
             <Card 
               onClick={() => setStatusFilter('')}
-              sx={{ 
-                borderLeft: '4px solid #7c3aed', 
-                bgcolor: statusFilter === '' ? 'rgba(124,58,237,0.06)' : 'rgba(124,58,237,0.01)',
+              sx={{
+                borderLeft: `4px solid ${theme.palette.secondary.main}`,
+                bgcolor: statusFilter === '' ? alpha(theme.palette.secondary.main, 0.06) : alpha(theme.palette.secondary.main, 0.01),
                 cursor: 'pointer',
                 transition: 'all 0.2s',
                 opacity: (statusFilter === '' || statusFilter === 'Pending' || statusFilter === 'CheckedOut' || statusFilter === 'Overdue') ? 1 : 0.45,
                 transform: statusFilter === '' ? 'scale(1.02)' : 'scale(1)',
-                boxShadow: statusFilter === '' ? '0 8px 20px rgba(124,58,237,0.15)' : 'none',
-                '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 6px 15px rgba(124,58,237,0.1)' }
+                boxShadow: statusFilter === '' ? `0 8px 20px ${alpha(theme.palette.secondary.main, 0.15)}` : 'none',
+                '&:hover': { transform: 'translateY(-2px)', boxShadow: `0 6px 15px ${alpha(theme.palette.secondary.main, 0.1)}` }
               }}
             >
               <CardContent sx={{ p: 2.5 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
-                  <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(139,92,246,0.1)', color: '#7c3aed', display: 'flex' }}>
+                  <Box sx={{ p: 1, borderRadius: 2, bgcolor: alpha(theme.palette.secondary.main, 0.1), color: theme.palette.secondary.main, display: 'flex' }}>
                     <History size={20} />
                   </Box>
                   <Typography variant="body2" color="text.secondary" fontWeight={700}>คำขอทั้งหมด</Typography>
                 </Box>
-                <Typography variant="h4" fontWeight={800} color="#7c3aed">{history.length}</Typography>
+                <Typography variant="h4" fontWeight={800} sx={{ color: theme.palette.secondary.main }}>{history.length}</Typography>
               </CardContent>
             </Card>
           </Grid>

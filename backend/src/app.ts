@@ -26,6 +26,7 @@ import uploadsRoutes from './routes/uploads';
 import aiRoutes from './routes/ai';
 import presenceRoutes from './routes/presence';
 import floorplanRoutes from './routes/floorplan';
+import deliveryRoutes from './routes/delivery';
 import { errorHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
 import { apiLimiter, authLimiter } from './middleware/rateLimiter';
@@ -153,6 +154,7 @@ export function createApp() {
   app.use('/api/ai', aiRoutes);
   app.use('/api/presence', presenceRoutes);
   app.use('/api/floorplans', floorplanRoutes);
+  app.use('/api/delivery', deliveryRoutes);
 
   app.get('/api/health', (_req, res) => {
     res.json({

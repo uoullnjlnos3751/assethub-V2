@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent, Grid, Typography, TextField, Button, CircularProgress, Box, Alert, IconButton, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, useTheme } from '@mui/material';
+import { Grid, Typography, TextField, Button, CircularProgress, Box, Alert, IconButton, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, useTheme } from '@mui/material';
 import { Settings, Save, Plus, Trash2 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
+import { SectionCard } from '../../components/SectionCard';
 
 type PrefixConfig = {
   company: string;
@@ -118,15 +119,10 @@ export default function SystemSettingsTab() {
   }
 
   return (
-    <Grid container spacing={3}>
+    <Grid container spacing={2}>
       <Grid item xs={12}>
-        <Card>
-          <CardContent>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <Settings size={24} color={theme.palette.primary.main} />
-                <Typography variant="h6" fontWeight={700}>ตั้งค่ารหัสทรัพย์สินอัตโนมัติ (Asset Generation)</Typography>
-              </Box>
+        <SectionCard title="ตั้งค่ารหัสทรัพย์สินอัตโนมัติ (Asset Generation)" icon={Settings}>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
               <Button
                 variant="contained"
                 color="primary"
@@ -236,9 +232,7 @@ export default function SystemSettingsTab() {
                 </Typography>
               </Grid>
             </Grid>
-            
-          </CardContent>
-        </Card>
+        </SectionCard>
       </Grid>
     </Grid>
   );

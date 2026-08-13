@@ -1,4 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import {
+  Box, Typography, Button, TextField, Select, MenuItem, Switch, Dialog, DialogTitle, DialogContent, DialogActions,
+  IconButton, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip, alpha, useTheme,
+} from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 import { useToast } from '../../contexts/ToastContext';
 
 /* ─────────────────────────────────────────────────────────────────
@@ -35,76 +40,15 @@ type MasterDataPageProps = {
 const emptyForm = { code: '', name: '', company: '', description: '', isActive: true };
 
 /* ─────────────────────────────────────────────────────────────────
-   Inline Modal
-───────────────────────────────────────────────────────────────── */
-function Modal({
-  open, onClose, title, children,
-}: { open: boolean; onClose: () => void; title: string; children: React.ReactNode }) {
-  if (!open) return null;
-  return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)',
-        zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
-      }}
-    >
-      <div
-        onClick={e => e.stopPropagation()}
-        style={{
-          background: '#fff', borderRadius: '14px', width: '100%', maxWidth: '460px',
-          boxShadow: '0 20px 60px rgba(0,0,0,.18)', overflow: 'hidden',
-        }}
-      >
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '16px 20px', borderBottom: '1px solid #f1f5f9',
-        }}>
-          <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>{title}</span>
-          <button onClick={onClose} style={{
-            background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer',
-            color: '#94a3b8', lineHeight: 1, padding: '2px 6px',
-          }}>✕</button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────
-   Toggle Switch
-───────────────────────────────────────────────────────────────── */
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <div
-      onClick={() => onChange(!checked)}
-      style={{
-        width: '38px', height: '22px', borderRadius: '11px',
-        background: checked ? '#0ea5e9' : '#e2e8f0',
-        position: 'relative', cursor: 'pointer', transition: 'background .2s', flexShrink: 0,
-      }}
-    >
-      <div style={{
-        position: 'absolute', top: '3px',
-        left: checked ? '19px' : '3px',
-        width: '16px', height: '16px', borderRadius: '50%',
-        background: '#fff', transition: 'left .2s',
-        boxShadow: '0 1px 3px rgba(0,0,0,.18)',
-      }} />
-    </div>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────
    Main Component
 ───────────────────────────────────────────────────────────────── */
 export default function MasterDataPage({
-  title, subtitle, itemLabel, icon = '📋', accentColor = '#0ea5e9',
+  title, subtitle, itemLabel, icon = '📋', accentColor,
   fetchItems, createItem, updateItem, deleteItem,
   importItems, statusOptions, showCompanyField, showCodeField,
 }: MasterDataPageProps) {
-
+  const theme = useTheme();
+  const accent = accentColor || theme.palette.primary.main;
   const toast = useToast();
   const [items, setItems] = useState<MasterDataItem[]>([]);
   const [filtered, setFiltered] = useState<MasterDataItem[]>([]);
@@ -223,329 +167,275 @@ export default function MasterDataPage({
   const inactiveCount = items.length - activeCount;
 
   return (
-    <>
-      <style>{`
-        .mdp-root { font-family: 'Sarabun', sans-serif; }
-        .mdp-header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
-        .mdp-title-wrap { display: flex; align-items: center; gap: 12px; }
-        .mdp-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
-        .mdp-title { font-size: 16px; font-weight: 700; color: #0f172a; line-height: 1.2; }
-        .mdp-sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
-
-        /* Stats row */
-        .mdp-stats { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
-        .mdp-stat { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; flex: 1; min-width: 100px; }
-        .mdp-stat-val { font-size: 20px; font-weight: 800; color: #0f172a; }
-        .mdp-stat-lbl { font-size: 10px; color: #94a3b8; line-height: 1.2; }
-
-        /* Toolbar */
-        .mdp-toolbar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
-        .mdp-search { flex: 1; min-width: 180px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 7px 12px 7px 34px; font-size: 12px; font-family: 'Sarabun', sans-serif; outline: none; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E") no-repeat 10px center; }
-        .mdp-search:focus { border-color: #0ea5e9; }
-        .mdp-btn { display: inline-flex; align-items: center; gap: 5px; padding: 7px 13px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'Sarabun', sans-serif; transition: all .15s; white-space: nowrap; }
-        .mdp-btn-primary { background: #0ea5e9; border: 1px solid #0284c7; color: #fff; }
-        .mdp-btn-primary:hover { background: #0284c7; }
-        .mdp-btn-outline { background: #fff; border: 1px solid #e2e8f0; color: #475569; }
-        .mdp-btn-outline:hover { border-color: #0ea5e9; color: #0ea5e9; background: #f0f9ff; }
-        .mdp-btn:disabled { opacity: .5; cursor: not-allowed; }
-
-        /* Table */
-        .mdp-table-wrap { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
-        .mdp-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-        .mdp-table thead th { background: #f8fafc; padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
-        .mdp-table tbody tr { border-bottom: 1px solid #f1f5f9; transition: background .1s; }
-        .mdp-table tbody tr:last-child { border-bottom: none; }
-        .mdp-table tbody tr:hover { background: #f8fafc; }
-        .mdp-table td { padding: 10px 14px; color: #334155; vertical-align: middle; }
-        .mdp-code { font-family: monospace; font-size: 11px; font-weight: 700; color: #0369a1; background: #f0f9ff; padding: 2px 7px; border-radius: 5px; }
-        .mdp-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 99px; font-size: 10px; font-weight: 700; }
-        .mdp-badge-on { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
-        .mdp-badge-off { background: #f8fafc; color: #94a3b8; border: 1px solid #e2e8f0; }
-        .mdp-count { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; color: #475569; }
-        .mdp-dot { width: 6px; height: 6px; border-radius: 50%; background: #0ea5e9; display: inline-block; }
-        .mdp-desc { color: #64748b; font-size: 11px; max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .mdp-action-btn { padding: 4px 8px; border: 1px solid; border-radius: 6px; font-size: 10px; font-weight: 600; cursor: pointer; font-family: 'Sarabun', sans-serif; transition: all .12s; }
-        .mdp-edit { background: #f0f9ff; border-color: #bae6fd; color: #0369a1; }
-        .mdp-edit:hover { background: #e0f2fe; }
-        .mdp-del { background: #fff5f5; border-color: #fecaca; color: #dc2626; }
-        .mdp-del:hover { background: #fee2e2; }
-        .mdp-empty { padding: 40px; text-align: center; color: #94a3b8; font-size: 13px; }
-        .mdp-loading { padding: 40px; text-align: center; color: #0ea5e9; }
-
-        /* Form */
-        .mdp-form-body { padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; }
-        .mdp-form-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid #f1f5f9; }
-        .mdp-label { font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 4px; }
-        .mdp-input { width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; font-size: 12px; font-family: 'Sarabun', sans-serif; outline: none; box-sizing: border-box; color: #334155; }
-        .mdp-input:focus { border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,.1); }
-        .mdp-select { width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; font-size: 12px; font-family: 'Sarabun', sans-serif; outline: none; background: #fff; color: #334155; }
-        .mdp-textarea { width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; font-size: 12px; font-family: 'Sarabun', sans-serif; outline: none; box-sizing: border-box; resize: vertical; min-height: 72px; color: #334155; }
-        .mdp-textarea:focus, .mdp-select:focus { border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,.1); }
-        .mdp-error { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 8px 12px; font-size: 11px; color: #dc2626; }
-        .mdp-toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; }
-        .mdp-toggle-lbl { font-size: 12px; color: #334155; font-weight: 500; }
-
-        /* Delete confirm */
-        .mdp-confirm { padding: 18px 20px; }
-        .mdp-confirm-msg { font-size: 13px; color: #334155; margin-bottom: 6px; }
-        .mdp-confirm-sub { font-size: 11px; color: #94a3b8; }
-        .mdp-confirm-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid #f1f5f9; }
-      `}</style>
-
-      <div className="mdp-root">
-        {/* ── Header ── */}
-        <div className="mdp-header">
-          <div className="mdp-title-wrap">
-            <div className="mdp-icon" style={{ background: `${accentColor}15`, border: `1.5px solid ${accentColor}30` }}>
-              {icon}
-            </div>
-            <div>
-              <div className="mdp-title">{title}</div>
-              <div className="mdp-sub">{subtitle}</div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            {importItems && (
-              <button className="mdp-btn mdp-btn-outline" onClick={handleImport} disabled={importing}>
-                {importing ? '⏳' : '🔄'} นำเข้าจากทรัพย์สิน
-              </button>
-            )}
-            <button className="mdp-btn mdp-btn-primary" onClick={openCreate}>
-              ＋ เพิ่ม{itemLabel}
-            </button>
-          </div>
-        </div>
-
-        {/* ── Stats ── */}
-        <div className="mdp-stats">
-          <div className="mdp-stat">
-            <div style={{ fontSize: '22px' }}>📦</div>
-            <div>
-              <div className="mdp-stat-val" style={{ color: accentColor }}>{items.length}</div>
-              <div className="mdp-stat-lbl">ทั้งหมด</div>
-            </div>
-          </div>
-          <div className="mdp-stat">
-            <div style={{ fontSize: '22px' }}>✅</div>
-            <div>
-              <div className="mdp-stat-val" style={{ color: '#16a34a' }}>{activeCount}</div>
-              <div className="mdp-stat-lbl">ใช้งาน</div>
-            </div>
-          </div>
-          {inactiveCount > 0 && (
-            <div className="mdp-stat">
-              <div style={{ fontSize: '22px' }}>🔒</div>
-              <div>
-                <div className="mdp-stat-val" style={{ color: '#94a3b8' }}>{inactiveCount}</div>
-                <div className="mdp-stat-lbl">ปิดใช้งาน</div>
-              </div>
-            </div>
+    <Box>
+      {/* ── Header ── */}
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5, mb: 2.25 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box sx={{
+            width: 40, height: 40, borderRadius: '10px',
+            bgcolor: alpha(accent, 0.08), border: `1.5px solid ${alpha(accent, 0.3)}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0,
+          }}>{icon}</Box>
+          <Box>
+            <Typography sx={{ fontSize: 16, fontWeight: 700, color: theme.palette.text.primary, lineHeight: 1.2 }}>{title}</Typography>
+            <Typography sx={{ fontSize: 11, color: theme.palette.text.disabled, mt: 0.25 }}>{subtitle}</Typography>
+          </Box>
+        </Box>
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          {importItems && (
+            <Button variant="outlined" size="small" onClick={handleImport} disabled={importing}>
+              {importing ? '⏳' : '🔄'} นำเข้าจากทรัพย์สิน
+            </Button>
           )}
-        </div>
+          <Button variant="contained" size="small" onClick={openCreate} sx={{ bgcolor: accent, '&:hover': { bgcolor: accent, filter: 'brightness(1.08)' } }}>
+            ＋ เพิ่ม{itemLabel}
+          </Button>
+        </Box>
+      </Box>
 
-        {/* ── Toolbar ── */}
-        <div className="mdp-toolbar">
-          <input
-            className="mdp-search"
-            placeholder={`ค้นหา${itemLabel}...`}
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          <span style={{ fontSize: '11px', color: '#94a3b8' }}>
-            แสดง {filtered.length}/{items.length}
-          </span>
-        </div>
-
-        {/* ── Table ── */}
-        <div className="mdp-table-wrap">
-          {loading ? (
-            <div className="mdp-loading">⏳ กำลังโหลด...</div>
-          ) : filtered.length === 0 ? (
-            <div className="mdp-empty">
-              {search ? `ไม่พบ "${search}"` : `ยังไม่มี${itemLabel}`}<br />
-              <span style={{ fontSize: '11px' }}>กดปุ่ม "+ เพิ่ม" เพื่อเพิ่มรายการใหม่</span>
-            </div>
-          ) : (
-            <table className="mdp-table">
-              <thead>
-                <tr>
-                  <th style={{ width: '40px' }}>#</th>
-                  {(isStatusPage || showCodeField) && <th>รหัส</th>}
-                  <th>{itemLabel}</th>
-                  {showCompanyField && <th>Company</th>}
-                  <th>รายละเอียด</th>
-                  <th>ทรัพย์สิน</th>
-                  <th>สถานะ</th>
-                  <th style={{ width: '110px', textAlign: 'center' }}>จัดการ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((item, idx) => (
-                  <tr key={item.id}>
-                    <td style={{ color: '#cbd5e1', fontSize: '11px' }}>{idx + 1}</td>
-                    {(isStatusPage || showCodeField) && (
-                      <td><span className="mdp-code">{item.code || '—'}</span></td>
-                    )}
-                    <td>
-                      <span style={{ fontWeight: 600, color: '#0f172a' }}>{item.name}</span>
-                    </td>
-                    {showCompanyField && (
-                      <td><span style={{ fontSize: '11px', color: '#64748b' }}>{item.company || '—'}</span></td>
-                    )}
-                    <td><span className="mdp-desc">{item.description || <span style={{ color: '#d1d5db' }}>—</span>}</span></td>
-                    <td>
-                      {item.assetCount != null ? (
-                        <span className="mdp-count">
-                          <span className="mdp-dot" />
-                          {item.assetCount} รายการ
-                        </span>
-                      ) : <span style={{ color: '#d1d5db' }}>—</span>}
-                    </td>
-                    <td>
-                      <span className={`mdp-badge ${item.isActive !== false ? 'mdp-badge-on' : 'mdp-badge-off'}`}>
-                        {item.isActive !== false ? '● ใช้งาน' : '○ ปิด'}
-                      </span>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '5px', justifyContent: 'center' }}>
-                        <button className="mdp-action-btn mdp-edit" onClick={() => openEdit(item)}>✏️ แก้ไข</button>
-                        <button className="mdp-action-btn mdp-del" onClick={() => setDeleteConfirm(item)}>🗑</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        {/* ── Pagination hint ── */}
-        {items.length > 0 && (
-          <div style={{ fontSize: '10px', color: '#cbd5e1', marginTop: '8px', textAlign: 'right' }}>
-            {filtered.length} รายการ {search && `(กรอง "${search}")`}
-          </div>
+      {/* ── Stats ── */}
+      <Box sx={{ display: 'flex', gap: 1.25, mb: 2, flexWrap: 'wrap' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.75, py: 1.25, bgcolor: theme.palette.background.paper, border: `1px solid ${theme.palette.divider}`, borderRadius: '10px', flex: 1, minWidth: 100 }}>
+          <Typography sx={{ fontSize: 22 }}>📦</Typography>
+          <Box>
+            <Typography sx={{ fontSize: 20, fontWeight: 800, color: accent, lineHeight: 1.2 }}>{items.length}</Typography>
+            <Typography sx={{ fontSize: 10, color: theme.palette.text.disabled }}>ทั้งหมด</Typography>
+          </Box>
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.75, py: 1.25, bgcolor: theme.palette.background.paper, border: `1px solid ${theme.palette.divider}`, borderRadius: '10px', flex: 1, minWidth: 100 }}>
+          <Typography sx={{ fontSize: 22 }}>✅</Typography>
+          <Box>
+            <Typography sx={{ fontSize: 20, fontWeight: 800, color: theme.palette.success.main, lineHeight: 1.2 }}>{activeCount}</Typography>
+            <Typography sx={{ fontSize: 10, color: theme.palette.text.disabled }}>ใช้งาน</Typography>
+          </Box>
+        </Box>
+        {inactiveCount > 0 && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.75, py: 1.25, bgcolor: theme.palette.background.paper, border: `1px solid ${theme.palette.divider}`, borderRadius: '10px', flex: 1, minWidth: 100 }}>
+            <Typography sx={{ fontSize: 22 }}>🔒</Typography>
+            <Box>
+              <Typography sx={{ fontSize: 20, fontWeight: 800, color: theme.palette.text.disabled, lineHeight: 1.2 }}>{inactiveCount}</Typography>
+              <Typography sx={{ fontSize: 10, color: theme.palette.text.disabled }}>ปิดใช้งาน</Typography>
+            </Box>
+          </Box>
         )}
-      </div>
+      </Box>
+
+      {/* ── Toolbar ── */}
+      <Box sx={{ display: 'flex', gap: 1, mb: 1.75, flexWrap: 'wrap', alignItems: 'center' }}>
+        <TextField
+          size="small" sx={{ flex: 1, minWidth: 180 }}
+          placeholder={`ค้นหา${itemLabel}...`}
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+        <Typography sx={{ fontSize: 11, color: theme.palette.text.disabled }}>
+          แสดง {filtered.length}/{items.length}
+        </Typography>
+      </Box>
+
+      {/* ── Table ── */}
+      <TableContainer sx={{ bgcolor: theme.palette.background.paper, border: `1px solid ${theme.palette.divider}`, borderRadius: '12px' }}>
+        {loading ? (
+          <Box sx={{ py: 5, textAlign: 'center', color: accent, fontSize: 13 }}>⏳ กำลังโหลด...</Box>
+        ) : filtered.length === 0 ? (
+          <Box sx={{ py: 5, textAlign: 'center', color: theme.palette.text.disabled, fontSize: 13 }}>
+            {search ? `ไม่พบ "${search}"` : `ยังไม่มี${itemLabel}`}<br />
+            <Box component="span" sx={{ fontSize: 11 }}>กดปุ่ม "+ เพิ่ม" เพื่อเพิ่มรายการใหม่</Box>
+          </Box>
+        ) : (
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ width: 40 }}>#</TableCell>
+                {(isStatusPage || showCodeField) && <TableCell>รหัส</TableCell>}
+                <TableCell>{itemLabel}</TableCell>
+                {showCompanyField && <TableCell>Company</TableCell>}
+                <TableCell>รายละเอียด</TableCell>
+                <TableCell>ทรัพย์สิน</TableCell>
+                <TableCell>สถานะ</TableCell>
+                <TableCell align="center" sx={{ width: 110 }}>จัดการ</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {filtered.map((item, idx) => (
+                <TableRow key={item.id} hover>
+                  <TableCell sx={{ color: theme.palette.text.disabled, fontSize: 11 }}>{idx + 1}</TableCell>
+                  {(isStatusPage || showCodeField) && (
+                    <TableCell>
+                      <Box component="span" sx={{
+                        fontFamily: 'monospace', fontSize: 11, fontWeight: 700, color: theme.palette.info.dark,
+                        bgcolor: alpha(theme.palette.info.main, 0.08), px: '7px', py: '2px', borderRadius: '5px',
+                      }}>{item.code || '—'}</Box>
+                    </TableCell>
+                  )}
+                  <TableCell>
+                    <Typography sx={{ fontWeight: 600, color: theme.palette.text.primary, fontSize: '0.8rem' }}>{item.name}</Typography>
+                  </TableCell>
+                  {showCompanyField && (
+                    <TableCell><Typography sx={{ fontSize: 11, color: theme.palette.text.secondary }}>{item.company || '—'}</Typography></TableCell>
+                  )}
+                  <TableCell sx={{ maxWidth: 280 }}>
+                    <Box component="span" sx={{ display: 'block', fontSize: 11, color: theme.palette.text.secondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {item.description || <Box component="span" sx={{ color: theme.palette.text.disabled }}>—</Box>}
+                    </Box>
+                  </TableCell>
+                  <TableCell>
+                    {item.assetCount != null ? (
+                      <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, fontSize: 11, fontWeight: 600, color: theme.palette.text.secondary }}>
+                        <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: accent, display: 'inline-block' }} />
+                        {item.assetCount} รายการ
+                      </Box>
+                    ) : <Box component="span" sx={{ color: theme.palette.text.disabled }}>—</Box>}
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      size="small"
+                      label={item.isActive !== false ? '● ใช้งาน' : '○ ปิด'}
+                      sx={item.isActive !== false ? {
+                        bgcolor: alpha(theme.palette.success.main, 0.1), color: theme.palette.success.dark, border: `1px solid ${alpha(theme.palette.success.main, 0.3)}`,
+                      } : {
+                        bgcolor: theme.palette.background.default, color: theme.palette.text.disabled, border: `1px solid ${theme.palette.divider}`,
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
+                      <Button
+                        size="small" onClick={() => openEdit(item)}
+                        sx={{
+                          minWidth: 0, px: 1, fontSize: 10, fontWeight: 600,
+                          bgcolor: alpha(theme.palette.info.main, 0.08), color: theme.palette.info.dark,
+                          border: `1px solid ${alpha(theme.palette.info.main, 0.3)}`,
+                          '&:hover': { bgcolor: alpha(theme.palette.info.main, 0.15) },
+                        }}
+                      >✏️ แก้ไข</Button>
+                      <Button
+                        size="small" onClick={() => setDeleteConfirm(item)}
+                        sx={{
+                          minWidth: 0, px: 1, fontSize: 10, fontWeight: 600,
+                          bgcolor: alpha(theme.palette.error.main, 0.06), color: theme.palette.error.main,
+                          border: `1px solid ${alpha(theme.palette.error.main, 0.3)}`,
+                          '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.12) },
+                        }}
+                      >🗑</Button>
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </TableContainer>
+
+      {/* ── Pagination hint ── */}
+      {items.length > 0 && (
+        <Typography sx={{ fontSize: 10, color: theme.palette.text.disabled, mt: 1, textAlign: 'right' }}>
+          {filtered.length} รายการ {search && `(กรอง "${search}")`}
+        </Typography>
+      )}
 
       {/* ── Create / Edit Modal ── */}
-      <Modal
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        title={editingItem ? `✏️ แก้ไข${itemLabel}` : `➕ เพิ่ม${itemLabel}`}
-      >
-        <div className="mdp-form-body">
-          {error && <div className="mdp-error">⚠️ {error}</div>}
+      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Typography sx={{ fontSize: 14, fontWeight: 700 }}>{editingItem ? `✏️ แก้ไข${itemLabel}` : `➕ เพิ่ม${itemLabel}`}</Typography>
+          <IconButton size="small" onClick={() => setDialogOpen(false)}><CloseIcon fontSize="small" /></IconButton>
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, pt: 0.5 }}>
+            {error && (
+              <Box sx={{ bgcolor: alpha(theme.palette.error.main, 0.06), border: `1px solid ${alpha(theme.palette.error.main, 0.25)}`, borderRadius: '8px', px: 1.5, py: 1, fontSize: 11, color: theme.palette.error.main }}>
+                ⚠️ {error}
+              </Box>
+            )}
 
-          {isStatusPage && (
-            <div>
-              <div className="mdp-label">รหัสสถานะ *</div>
-              <select
-                className="mdp-select"
+            {isStatusPage && (
+              <Select
+                fullWidth size="small"
                 value={form.code}
                 onChange={e => {
-                  const nextCode = e.target.value;
+                  const nextCode = e.target.value as string;
                   const opt = statusOptions?.find(s => s.code === nextCode);
                   setForm(p => ({ ...p, code: nextCode, name: p.name || opt?.name || '' }));
                 }}
               >
                 {statusOptions?.map(s => (
-                  <option key={s.code} value={s.code}>{s.code} — {s.name}</option>
+                  <MenuItem key={s.code} value={s.code}>{s.code} — {s.name}</MenuItem>
                 ))}
-              </select>
-            </div>
-          )}
+              </Select>
+            )}
 
-          {showCodeField && !isStatusPage && (
-            <div>
-              <div className="mdp-label">รหัส</div>
-              <input
-                className="mdp-input"
+            {showCodeField && !isStatusPage && (
+              <TextField
+                fullWidth size="small" label="รหัส"
                 placeholder="รหัสแผนก (ไม่บังคับ)"
                 value={form.code}
                 onChange={e => setForm(p => ({ ...p, code: e.target.value }))}
               />
-            </div>
-          )}
+            )}
 
-          <div>
-            <div className="mdp-label">{itemLabel} *</div>
-            <input
+            <TextField
               autoFocus={!isStatusPage}
-              className="mdp-input"
+              fullWidth size="small"
+              label={`${itemLabel} *`}
               placeholder={`ระบุ${itemLabel}`}
               value={form.name}
               onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
               onKeyDown={e => e.key === 'Enter' && !isStatusPage && handleSave()}
             />
-          </div>
 
-          {showCompanyField && (
-            <div>
-              <div className="mdp-label">Company</div>
-              <input
-                className="mdp-input"
+            {showCompanyField && (
+              <TextField
+                fullWidth size="small" label="Company"
                 placeholder="ชื่อบริษัท"
                 value={form.company}
                 onChange={e => setForm(p => ({ ...p, company: e.target.value }))}
               />
-            </div>
-          )}
+            )}
 
-          <div>
-            <div className="mdp-label">รายละเอียด</div>
-            <textarea
-              className="mdp-textarea"
+            <TextField
+              fullWidth multiline minRows={3} size="small"
+              label="รายละเอียด"
               placeholder="รายละเอียดเพิ่มเติม (ไม่บังคับ)"
               value={form.description}
               onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
             />
-          </div>
 
-          <div className="mdp-toggle-row">
-            <span className="mdp-toggle-lbl">เปิดใช้งาน</span>
-            <Toggle checked={form.isActive} onChange={v => setForm(p => ({ ...p, isActive: v }))} />
-          </div>
-        </div>
-
-        <div className="mdp-form-footer">
-          <button className="mdp-btn mdp-btn-outline" onClick={() => setDialogOpen(false)}>ยกเลิก</button>
-          <button
-            className="mdp-btn mdp-btn-primary"
-            onClick={handleSave}
-            disabled={saving}
-            style={{ minWidth: '80px' }}
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 0.5 }}>
+              <Typography sx={{ fontSize: 12, color: theme.palette.text.primary, fontWeight: 500 }}>เปิดใช้งาน</Typography>
+              <Switch checked={form.isActive} onChange={e => setForm(p => ({ ...p, isActive: e.target.checked }))} />
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDialogOpen(false)}>ยกเลิก</Button>
+          <Button
+            variant="contained" onClick={handleSave} disabled={saving}
+            sx={{ minWidth: 80, bgcolor: accent, '&:hover': { bgcolor: accent, filter: 'brightness(1.08)' } }}
           >
             {saving ? '⏳ กำลังบันทึก...' : '💾 บันทึก'}
-          </button>
-        </div>
-      </Modal>
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* ── Delete Confirm Modal ── */}
-      <Modal
-        open={Boolean(deleteConfirm)}
-        onClose={() => setDeleteConfirm(null)}
-        title="🗑 ยืนยันการลบ"
-      >
-        <div className="mdp-confirm">
-          <div className="mdp-confirm-msg">
+      <Dialog open={Boolean(deleteConfirm)} onClose={() => setDeleteConfirm(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Typography sx={{ fontSize: 14, fontWeight: 700 }}>🗑 ยืนยันการลบ</Typography>
+          <IconButton size="small" onClick={() => setDeleteConfirm(null)}><CloseIcon fontSize="small" /></IconButton>
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontSize: 13, color: theme.palette.text.primary, mb: 0.75 }}>
             ต้องการลบ <strong>"{deleteConfirm?.name}"</strong> ใช่หรือไม่?
-          </div>
-          <div className="mdp-confirm-sub">
+          </Typography>
+          <Typography sx={{ fontSize: 11, color: theme.palette.text.disabled }}>
             การลบไม่สามารถย้อนกลับได้ และอาจกระทบข้อมูลทรัพย์สินที่เชื่อมอยู่
-          </div>
-        </div>
-        <div className="mdp-confirm-footer">
-          <button className="mdp-btn mdp-btn-outline" onClick={() => setDeleteConfirm(null)}>ยกเลิก</button>
-          <button
-            className="mdp-btn"
-            style={{ background: '#ef4444', border: '1px solid #dc2626', color: '#fff' }}
-            onClick={() => handleDelete(deleteConfirm)}
-          >
-            🗑 ลบเลย
-          </button>
-        </div>
-      </Modal>
-
-    </>
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteConfirm(null)}>ยกเลิก</Button>
+          <Button variant="contained" color="error" onClick={() => handleDelete(deleteConfirm)}>🗑 ลบเลย</Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 }

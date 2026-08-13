@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { Box, Typography, TextField, Button, IconButton, Avatar, Chip, InputAdornment, alpha, useTheme } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI, borrowAPI } from '../services/api';
 import { Eye, EyeOff, Lock, User, Mail, Building2, Building, Shield, CheckCircle2, AlertCircle, Clock, Calendar, Briefcase, History } from 'lucide-react';
+import { SectionCard } from '../components/SectionCard';
 
 export default function ProfilePage() {
+  const theme = useTheme();
   const { user } = useAuth();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -31,12 +34,13 @@ export default function ProfilePage() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  const roleLabel: Record<string, { label: string; color: string; bg: string }> = {
-    SUPERADMIN: { label: 'Super Admin', color: '#7c3aed', bg: '#f3e8ff' },
-    IT_ADMIN:   { label: 'IT Admin',    color: '#0369a1', bg: '#e0f2fe' },
-    USER:       { label: 'ผู้ใช้งาน',  color: '#065f46', bg: '#d1fae5' },
+  const roleLabel: Record<string, { label: string; colorKey: 'secondary' | 'info' | 'success' }> = {
+    SUPERADMIN: { label: 'Super Admin', colorKey: 'secondary' },
+    IT_ADMIN:   { label: 'IT Admin',    colorKey: 'info' },
+    USER:       { label: 'ผู้ใช้งาน',  colorKey: 'success' },
   };
   const roleInfo = roleLabel[user?.role || 'USER'];
+  const roleColor = theme.palette[roleInfo.colorKey].main;
   const authTypeLabel = (user as any)?.authType === 'LOCAL' ? 'Local Account' : 'Active Directory (AD)';
   const isLocal = (user as any)?.authType === 'LOCAL';
 
@@ -64,223 +68,207 @@ export default function ProfilePage() {
     }
   };
 
+  const infoItems = [
+    { icon: <User size={16} />, label: 'ชื่อผู้ใช้', value: user?.adUsername || '-' },
+    { icon: <User size={16} />, label: 'ชื่อ-สกุล (TH)', value: (user as any)?.thaiName || '-' },
+    { icon: <Mail size={16} />, label: 'อีเมล', value: user?.email || '-' },
+    { icon: <Building size={16} />, label: 'บริษัท', value: (user as any)?.companyThai || (user as any)?.company || '-' },
+    { icon: <Building2 size={16} />, label: 'แผนก', value: user?.department || '-' },
+    { icon: <Shield size={16} />, label: 'สิทธิ์การใช้งาน', value: roleInfo.label },
+    { icon: <Clock size={16} />, label: 'เข้าสู่ระบบล่าสุด', value: (user as any)?.lastLoginAt ? new Date((user as any).lastLoginAt).toLocaleString('th-TH') : '-' },
+    { icon: <Calendar size={16} />, label: 'วันที่สร้างบัญชี', value: (user as any)?.createdAt ? new Date((user as any).createdAt).toLocaleDateString('th-TH') : '-' },
+  ];
+
   return (
-    <div style={{ maxWidth: 700, margin: '0 auto', padding: '0 8px 80px' }}>
+    <Box sx={{ maxWidth: 700, margin: '0 auto', padding: '0 8px 80px' }}>
 
       {/* Toast */}
       {toast && (
-        <div style={{
+        <Box sx={{
           position: 'fixed', top: 24, right: 24, zIndex: 9999,
-          background: toast.type === 'ok' ? '#0f172a' : '#dc2626',
-          color: '#fff', padding: '12px 20px', borderRadius: 12,
+          bgcolor: toast.type === 'ok' ? theme.palette.text.primary : theme.palette.error.main,
+          color: '#fff', padding: '12px 20px', borderRadius: '12px',
           fontWeight: 600, boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-          fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: 10
+          fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '10px',
         }}>
           {toast.type === 'ok' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
           {toast.msg}
-        </div>
+        </Box>
       )}
 
       {/* Header */}
-      <div style={{ marginBottom: 28 }}>
-        <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: '#0f172a' }}>
+      <Box sx={{ mb: 3.5 }}>
+        <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: theme.palette.text.primary }}>
           โปรไฟล์ของฉัน
-        </h2>
-        <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '0.875rem' }}>
+        </Typography>
+        <Typography sx={{ mt: 0.5, color: theme.palette.text.secondary, fontSize: '0.875rem' }}>
           ข้อมูลบัญชีผู้ใช้และการตั้งค่า
-        </p>
-      </div>
+        </Typography>
+      </Box>
 
       {/* Profile Card */}
-      <div style={{
-        background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0',
-        padding: '28px 28px 24px', boxShadow: '0 2px 12px rgba(0,0,0,0.05)', marginBottom: 20
-      }}>
-        {/* Avatar + Name */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 24 }}>
-          <div style={{
-            width: 72, height: 72, borderRadius: '50%',
-            background: 'linear-gradient(135deg, #0ea5e9, #6366f1)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '2rem', fontWeight: 800, color: '#fff', flexShrink: 0,
-            boxShadow: '0 4px 16px rgba(14,165,233,0.3)',
-            overflow: 'hidden'
-          }}>
-            {((user as any)?.avatarUrl && !imgError) ? (
-              <img 
-                src={(user as any).avatarUrl} 
-                alt="Profile" 
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                onError={() => setImgError(true)}
-              />
-            ) : (
-              (user?.displayName || user?.adUsername || 'U')[0].toUpperCase()
-            )}
-          </div>
-          <div>
-            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>
-              {user?.displayName || user?.adUsername}
-            </div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-              <span style={{
-                background: roleInfo.bg, color: roleInfo.color,
-                borderRadius: 20, padding: '3px 12px', fontSize: '0.78rem', fontWeight: 700
-              }}>{roleInfo.label}</span>
-              <span style={{
-                background: isLocal ? '#fff7ed' : '#f0f9ff',
-                color: isLocal ? '#c2410c' : '#0369a1',
-                borderRadius: 20, padding: '3px 12px', fontSize: '0.78rem', fontWeight: 600,
-                border: `1px solid ${isLocal ? '#fed7aa' : '#bae6fd'}`
-              }}>🔑 {authTypeLabel}</span>
-            </div>
-          </div>
-        </div>
+      <Box sx={{ mb: 2.5 }}>
+        <SectionCard title="ข้อมูลบัญชี" icon={User}>
+          {/* Avatar + Name */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5, mb: 3 }}>
+            <Avatar
+              src={(user as any)?.avatarUrl && !imgError ? (user as any).avatarUrl : undefined}
+              onError={() => setImgError(true)}
+              sx={{
+                width: 72, height: 72,
+                background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                fontSize: '2rem', fontWeight: 800,
+                boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.3)}`,
+              }}
+            >
+              {(user?.displayName || user?.adUsername || 'U')[0].toUpperCase()}
+            </Avatar>
+            <Box>
+              <Typography sx={{ fontSize: '1.3rem', fontWeight: 800, color: theme.palette.text.primary, mb: 0.5 }}>
+                {user?.displayName || user?.adUsername}
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+                <Chip label={roleInfo.label} size="small" sx={{ bgcolor: alpha(roleColor, 0.12), color: roleColor, fontWeight: 700 }} />
+                <Chip
+                  label={`🔑 ${authTypeLabel}`}
+                  size="small"
+                  variant="outlined"
+                  sx={{
+                    bgcolor: isLocal ? alpha(theme.palette.warning.main, 0.06) : alpha(theme.palette.info.main, 0.06),
+                    color: isLocal ? theme.palette.warning.dark : theme.palette.info.dark,
+                    borderColor: isLocal ? alpha(theme.palette.warning.main, 0.3) : alpha(theme.palette.info.main, 0.3),
+                    fontWeight: 600,
+                  }}
+                />
+              </Box>
+            </Box>
+          </Box>
 
-        {/* Info Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 14 }}>
-          {[
-            { icon: <User size={16} />, label: 'ชื่อผู้ใช้', value: user?.adUsername || '-' },
-            { icon: <User size={16} />, label: 'ชื่อ-สกุล (TH)', value: (user as any)?.thaiName || '-' },
-            { icon: <Mail size={16} />, label: 'อีเมล', value: user?.email || '-' },
-            { icon: <Building size={16} />, label: 'บริษัท', value: (user as any)?.companyThai || (user as any)?.company || '-' },
-            { icon: <Building2 size={16} />, label: 'แผนก', value: user?.department || '-' },
-            { icon: <Shield size={16} />, label: 'สิทธิ์การใช้งาน', value: roleInfo.label },
-            { icon: <Clock size={16} />, label: 'เข้าสู่ระบบล่าสุด', value: (user as any)?.lastLoginAt ? new Date((user as any).lastLoginAt).toLocaleString('th-TH') : '-' },
-            { icon: <Calendar size={16} />, label: 'วันที่สร้างบัญชี', value: (user as any)?.createdAt ? new Date((user as any).createdAt).toLocaleDateString('th-TH') : '-' },
-          ].map((item, i) => (
-            <div key={i} style={{
-              background: '#f8fafc', borderRadius: 10, padding: '12px 14px',
-              border: '1px solid #f1f5f9'
+          {/* Info Grid */}
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 1.75 }}>
+            {infoItems.map((item, i) => (
+              <Box key={i} sx={{ bgcolor: theme.palette.background.default, borderRadius: '10px', p: '12px 14px', border: `1px solid ${theme.palette.divider}` }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, color: theme.palette.text.secondary, mb: 0.5, fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>
+                  {item.icon} {item.label}
+                </Box>
+                <Typography sx={{ fontWeight: 700, color: theme.palette.text.primary, fontSize: '0.9rem', wordBreak: 'break-all' }}>
+                  {item.value}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+
+          {/* Sync Info Note */}
+          {!isLocal && (
+            <Box sx={{
+              mt: 2.5, p: '12px 16px', bgcolor: theme.palette.background.default,
+              borderRadius: '10px', border: `1px dashed ${theme.palette.divider}`,
+              display: 'flex', gap: 1.25, alignItems: 'flex-start',
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#64748b', marginBottom: 4, fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>
-                {item.icon} {item.label}
-              </div>
-              <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.9rem', wordBreak: 'break-all' }}>
-                {item.value}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Sync Info Note */}
-        {!isLocal && (
-          <div style={{
-            marginTop: 20, padding: '12px 16px', background: '#f8fafc',
-            borderRadius: 10, border: '1px dashed #cbd5e1',
-            display: 'flex', gap: 10, alignItems: 'flex-start'
-          }}>
-            <span style={{ fontSize: '1.2rem' }}>ℹ️</span>
-            <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: 2 }}>การซิงค์ข้อมูลจาก AD</div>
-              <div style={{ fontSize: '0.75rem', color: '#64748b', lineHeight: 1.5 }}>
-                ข้อมูลบัญชีของคุณจะถูกอัปเดตและดึงมาจากระบบ Active Directory ของบริษัทโดยอัตโนมัติ 
-                (ดึงข้อมูลล่าสุด: {(user as any)?.lastLoginAt ? new Date((user as any).lastLoginAt).toLocaleString('th-TH') : '-'})
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+              <Box component="span" sx={{ fontSize: '1.2rem' }}>ℹ️</Box>
+              <Box>
+                <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: theme.palette.text.primary, mb: 0.25 }}>การซิงค์ข้อมูลจาก AD</Typography>
+                <Typography sx={{ fontSize: '0.75rem', color: theme.palette.text.secondary, lineHeight: 1.5 }}>
+                  ข้อมูลบัญชีของคุณจะถูกอัปเดตและดึงมาจากระบบ Active Directory ของบริษัทโดยอัตโนมัติ
+                  (ดึงข้อมูลล่าสุด: {(user as any)?.lastLoginAt ? new Date((user as any).lastLoginAt).toLocaleString('th-TH') : '-'})
+                </Typography>
+              </Box>
+            </Box>
+          )}
+        </SectionCard>
+      </Box>
 
       {/* Stats Grid */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(2, 1fr)',
-        gap: 16,
-        marginBottom: 20
-      }}>
-        <div style={{
-          background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0',
-          padding: 16, boxShadow: '0 2px 12px rgba(0,0,0,0.03)',
-          display: 'flex', alignItems: 'center', gap: 14
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2, mb: 2.5 }}>
+        <Box sx={{
+          bgcolor: theme.palette.background.paper, borderRadius: '16px', border: `1px solid ${theme.palette.divider}`,
+          p: 2, boxShadow: theme.palette.mode === 'dark' ? '0 6px 18px rgba(0,0,0,0.35)' : '0 6px 18px rgba(16,24,40,.06)',
+          display: 'flex', alignItems: 'center', gap: 1.75,
         }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: 12,
-            background: '#f0f9ff', color: '#0284c7', border: '1px solid #bae6fd',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+          <Box sx={{
+            width: 40, height: 40, borderRadius: '12px',
+            bgcolor: alpha(theme.palette.info.main, 0.1), color: theme.palette.info.main, border: `1px solid ${alpha(theme.palette.info.main, 0.3)}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
           }}>
             <Briefcase size={20} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>กำลังยืมอยู่</div>
-            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', marginTop: 2 }}>{stats.active} รายการ</div>
-          </div>
-        </div>
+          </Box>
+          <Box>
+            <Typography sx={{ fontSize: '0.68rem', fontWeight: 800, color: theme.palette.text.disabled, textTransform: 'uppercase', letterSpacing: '0.05em' }}>กำลังยืมอยู่</Typography>
+            <Typography sx={{ fontSize: '1.25rem', fontWeight: 800, color: theme.palette.text.primary, mt: 0.25 }}>{stats.active} รายการ</Typography>
+          </Box>
+        </Box>
 
-        <div style={{
-          background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0',
-          padding: 16, boxShadow: '0 2px 12px rgba(0,0,0,0.03)',
-          display: 'flex', alignItems: 'center', gap: 14
+        <Box sx={{
+          bgcolor: theme.palette.background.paper, borderRadius: '16px', border: `1px solid ${theme.palette.divider}`,
+          p: 2, boxShadow: theme.palette.mode === 'dark' ? '0 6px 18px rgba(0,0,0,0.35)' : '0 6px 18px rgba(16,24,40,.06)',
+          display: 'flex', alignItems: 'center', gap: 1.75,
         }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: 12,
-            background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+          <Box sx={{
+            width: 40, height: 40, borderRadius: '12px',
+            bgcolor: alpha(theme.palette.success.main, 0.1), color: theme.palette.success.main, border: `1px solid ${alpha(theme.palette.success.main, 0.3)}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
           }}>
             <History size={20} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>ยืมทั้งหมด</div>
-            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', marginTop: 2 }}>{stats.total} รายการ</div>
-          </div>
-        </div>
-      </div>
+          </Box>
+          <Box>
+            <Typography sx={{ fontSize: '0.68rem', fontWeight: 800, color: theme.palette.text.disabled, textTransform: 'uppercase', letterSpacing: '0.05em' }}>ยืมทั้งหมด</Typography>
+            <Typography sx={{ fontSize: '1.25rem', fontWeight: 800, color: theme.palette.text.primary, mt: 0.25 }}>{stats.total} รายการ</Typography>
+          </Box>
+        </Box>
+      </Box>
 
       {/* Change Password Card */}
-      <div style={{
-        background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0',
-        padding: '24px 28px', boxShadow: '0 2px 12px rgba(0,0,0,0.05)'
-      }}>
-        <h3 style={{ margin: '0 0 6px', fontSize: '1rem', fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Lock size={18} style={{ color: '#0ea5e9' }} /> เปลี่ยนรหัสผ่าน
-        </h3>
-        <p style={{ margin: '0 0 20px', fontSize: '0.8rem', color: '#64748b' }}>
+      <SectionCard title="เปลี่ยนรหัสผ่าน" icon={Lock}>
+        <Typography sx={{ mb: 2.5, fontSize: '0.8rem', color: theme.palette.text.secondary }}>
           {isLocal
             ? 'เปลี่ยนรหัสผ่านสำหรับบัญชีนี้'
             : '⚠️ บัญชีของคุณเชื่อมต่อกับ Active Directory (AD) กรุณาเปลี่ยนรหัสผ่านผ่านระบบ AD ของบริษัทแทน'}
-        </p>
+        </Typography>
 
         {isLocal ? (
-          <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {/* Current Password */}
-            <div>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#374151', marginBottom: 6 }}>
-                รหัสผ่านปัจจุบัน
-              </label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type={showCurrent ? 'text' : 'password'}
-                  value={currentPassword}
-                  onChange={e => setCurrentPassword(e.target.value)}
-                  required
-                  placeholder="กรอกรหัสผ่านปัจจุบัน"
-                  style={{ width: '100%', padding: '10px 40px 10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: '0.9rem', boxSizing: 'border-box' }}
-                />
-                <button type="button" onClick={() => setShowCurrent(!showCurrent)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
-                  {showCurrent ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-            </div>
+          <Box component="form" onSubmit={handleChangePassword} sx={{ display: 'flex', flexDirection: 'column', gap: 1.75 }}>
+            <TextField
+              label="รหัสผ่านปัจจุบัน"
+              type={showCurrent ? 'text' : 'password'}
+              value={currentPassword}
+              onChange={e => setCurrentPassword(e.target.value)}
+              required
+              fullWidth
+              size="small"
+              placeholder="กรอกรหัสผ่านปัจจุบัน"
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => setShowCurrent(!showCurrent)} edge="end">
+                      {showCurrent ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+            />
 
-            {/* New Password */}
-            <div>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#374151', marginBottom: 6 }}>
-                รหัสผ่านใหม่
-              </label>
-              <div style={{ position: 'relative', marginBottom: 6 }}>
-                <input
-                  type={showNew ? 'text' : 'password'}
-                  value={newPassword}
-                  onChange={e => setNewPassword(e.target.value)}
-                  required
-                  minLength={8}
-                  placeholder="กรอกรหัสผ่านใหม่ (อย่างน้อย 8 ตัว)"
-                  style={{ width: '100%', padding: '10px 40px 10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: '0.9rem', boxSizing: 'border-box' }}
-                />
-                <button type="button" onClick={() => setShowNew(!showNew)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
-                  {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-              
+            <Box>
+              <TextField
+                label="รหัสผ่านใหม่"
+                type={showNew ? 'text' : 'password'}
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                required
+                inputProps={{ minLength: 8 }}
+                fullWidth
+                size="small"
+                placeholder="กรอกรหัสผ่านใหม่ (อย่างน้อย 8 ตัว)"
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton size="small" onClick={() => setShowNew(!showNew)} edge="end">
+                        {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+
               {/* Password Strength Meter */}
               {newPassword.length > 0 && (() => {
                 let score = 0;
@@ -288,86 +276,80 @@ export default function ProfilePage() {
                 if (newPassword.length >= 8) score++;
                 if (/[A-Z]/.test(newPassword) && /[a-z]/.test(newPassword)) score++;
                 if (/[0-9]/.test(newPassword) && /[^A-Za-z0-9]/.test(newPassword)) score++;
-                
-                const colors = ['#e2e8f0', '#ef4444', '#f59e0b', '#3b82f6', '#22c55e'];
+
+                const colors = [theme.palette.divider, theme.palette.error.main, theme.palette.warning.main, theme.palette.info.main, theme.palette.success.main];
                 const labels = ['อ่อนแอมาก', 'อ่อนแอ', 'ปานกลาง', 'ดี', 'แข็งแกร่ง'];
                 const color = colors[score];
                 const label = labels[score];
 
                 return (
-                  <div style={{ marginTop: 6 }}>
-                    <div style={{ display: 'flex', gap: 4, height: 4, marginBottom: 4 }}>
+                  <Box sx={{ mt: 0.75 }}>
+                    <Box sx={{ display: 'flex', gap: 0.5, height: 4, mb: 0.5 }}>
                       {[1, 2, 3, 4].map((level) => (
-                        <div key={level} style={{ flex: 1, borderRadius: 2, background: level <= score ? color : '#e2e8f0', transition: 'background 0.3s' }} />
+                        <Box key={level} sx={{ flex: 1, borderRadius: '2px', bgcolor: level <= score ? color : theme.palette.divider, transition: 'background 0.3s' }} />
                       ))}
-                    </div>
-                    <div style={{ fontSize: '0.7rem', color: color, fontWeight: 600, textAlign: 'right' }}>
+                    </Box>
+                    <Typography sx={{ fontSize: '0.7rem', color, fontWeight: 600, textAlign: 'right' }}>
                       ความปลอดภัย: {label}
-                    </div>
-                  </div>
+                    </Typography>
+                  </Box>
                 );
               })()}
-            </div>
+            </Box>
 
-            {/* Confirm Password */}
-            <div>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#374151', marginBottom: 6 }}>
-                ยืนยันรหัสผ่านใหม่
-              </label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type={showConfirm ? 'text' : 'password'}
-                  value={confirmPassword}
-                  onChange={e => setConfirmPassword(e.target.value)}
-                  required
-                  placeholder="กรอกรหัสผ่านใหม่อีกครั้ง"
-                  style={{
-                    width: '100%', padding: '10px 40px 10px 12px', borderRadius: 8,
-                    border: `1px solid ${confirmPassword && confirmPassword !== newPassword ? '#ef4444' : '#e2e8f0'}`,
-                    fontSize: '0.9rem', boxSizing: 'border-box'
-                  }}
-                />
-                <button type="button" onClick={() => setShowConfirm(!showConfirm)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
-                  {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
+            <Box>
+              <TextField
+                label="ยืนยันรหัสผ่านใหม่"
+                type={showConfirm ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                required
+                fullWidth
+                size="small"
+                placeholder="กรอกรหัสผ่านใหม่อีกครั้ง"
+                error={!!confirmPassword && confirmPassword !== newPassword}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton size="small" onClick={() => setShowConfirm(!showConfirm)} edge="end">
+                        {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+              />
               {confirmPassword && confirmPassword !== newPassword && (
-                <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#ef4444' }}>รหัสผ่านไม่ตรงกัน</p>
+                <Typography sx={{ mt: 0.5, fontSize: '0.75rem', color: theme.palette.error.main }}>รหัสผ่านไม่ตรงกัน</Typography>
               )}
-            </div>
+            </Box>
 
-            <button
+            <Button
               type="submit"
+              variant="contained"
+              color="primary"
               disabled={loading || !currentPassword || !newPassword || newPassword !== confirmPassword}
-              style={{
-                padding: '12px', borderRadius: 10, border: 'none',
-                background: loading || !currentPassword || !newPassword || newPassword !== confirmPassword
-                  ? '#e2e8f0' : 'linear-gradient(135deg, #0ea5e9, #6366f1)',
-                color: loading || !currentPassword || !newPassword || newPassword !== confirmPassword ? '#94a3b8' : '#fff',
-                fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer', transition: 'all 0.2s',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
-              }}
+              sx={{ py: 1.5, fontWeight: 700, fontSize: '0.95rem' }}
             >
               {loading ? '⏳ กำลังบันทึก...' : '🔒 เปลี่ยนรหัสผ่าน'}
-            </button>
-          </form>
+            </Button>
+          </Box>
         ) : (
-          <div style={{
-            background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 10,
-            padding: '16px', display: 'flex', gap: 12, alignItems: 'flex-start'
+          <Box sx={{
+            bgcolor: alpha(theme.palette.info.main, 0.06), border: `1px solid ${alpha(theme.palette.info.main, 0.3)}`, borderRadius: '10px',
+            p: 2, display: 'flex', gap: 1.5, alignItems: 'flex-start',
           }}>
-            <span style={{ fontSize: '1.5rem' }}>🏢</span>
-            <div>
-              <div style={{ fontWeight: 700, color: '#0369a1', fontSize: '0.9rem', marginBottom: 4 }}>
+            <Box component="span" sx={{ fontSize: '1.5rem' }}>🏢</Box>
+            <Box>
+              <Typography sx={{ fontWeight: 700, color: theme.palette.info.dark, fontSize: '0.9rem', mb: 0.5 }}>
                 บัญชี Active Directory (AD)
-              </div>
-              <div style={{ fontSize: '0.8rem', color: '#0c4a6e', lineHeight: 1.5 }}>
+              </Typography>
+              <Typography sx={{ fontSize: '0.8rem', color: theme.palette.text.secondary, lineHeight: 1.5 }}>
                 รหัสผ่านของบัญชีนี้ถูกจัดการโดย Active Directory ของบริษัท หากต้องการเปลี่ยนรหัสผ่าน กรุณาติดต่อทีม IT หรือเปลี่ยนผ่านระบบ Windows ของบริษัท
-              </div>
-            </div>
-          </div>
+              </Typography>
+            </Box>
+          </Box>
         )}
-      </div>
-    </div>
+      </SectionCard>
+    </Box>
   );
 }

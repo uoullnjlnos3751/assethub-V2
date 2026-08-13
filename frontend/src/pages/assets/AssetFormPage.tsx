@@ -415,9 +415,6 @@ export default function AssetFormPage() {
   /* ─── Submit ─── */
   const validateForm = (): string => {
     // Required fields validation
-    if (!id && !form.assetCode?.trim()) {
-      return 'เลขครุภัณฑ์ ต้องไม่ว่างเปล่า (สำหรับการสร้างใหม่)';
-    }
     if (!form.serialNo?.trim()) {
       return 'Serial Number ต้องไม่ว่างเปล่า';
     }
@@ -539,16 +536,16 @@ export default function AssetFormPage() {
             {id ? 'แก้ไขข้อมูลทรัพย์สิน' : 'ลงทะเบียนทรัพย์สินใหม่'}
           </Typography>
           <Typography variant="body2" color="text.secondary" fontWeight={500}>
-            {id ? `เลขครุภัณฑ์: ${form.assetCode || form.serialNo}` : 'กรอกข้อมูลพื้นฐานและรายละเอียดเพื่อนำอุปกรณ์เข้าสู่ระบบ'}
+            {id ? `เลขทรัพย์สิน: ${form.assetName || form.assetCode || form.serialNo}` : 'กรอกข้อมูลพื้นฐานและรายละเอียดเพื่อนำอุปกรณ์เข้าสู่ระบบ'}
           </Typography>
         </Box>
         <Breadcrumbs separator={<NavigateNextIcon fontSize="small" sx={{ color: 'text.disabled' }} />} aria-label="breadcrumb" sx={{ mb: 2 }}>
           <Link component="button" onClick={() => navigate('/assets')} sx={{ textDecoration: 'none', color: 'primary.main', fontWeight: 600, border: 'none', bg: 'none', p: 0, cursor: 'pointer', outline: 'none' }}>
             ทรัพย์สิน IT
           </Link>
-          {id && form.assetCode && (
+          {id && (form.assetName || form.assetCode) && (
             <Link component="button" onClick={() => navigate(`/assets/${id}`)} sx={{ textDecoration: 'none', color: 'primary.main', fontWeight: 600, border: 'none', bg: 'none', p: 0, cursor: 'pointer', outline: 'none' }}>
-              {form.assetCode}
+              {form.assetName || form.assetCode}
             </Link>
           )}
           <Typography variant="body2" color="text.disabled">
@@ -583,8 +580,8 @@ export default function AssetFormPage() {
                 {id ? 'แก้ไขข้อมูลทรัพย์สิน' : 'เพิ่มทรัพย์สินใหม่'}
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mt: 0.5 }}>
-                {form.assetCode && (
-                  <Chip label={form.assetCode} size="small" sx={{ fontFamily: 'monospace', fontWeight: 700, height: 20, bgcolor: alpha(theme.palette.primary.main, .09), color: 'primary.dark' }} />
+                {(form.assetName || form.assetCode) && (
+                  <Chip label={form.assetName || form.assetCode} size="small" sx={{ fontFamily: 'monospace', fontWeight: 700, height: 20, bgcolor: alpha(theme.palette.primary.main, .09), color: 'primary.dark' }} />
                 )}
                 {(form.brand || form.model) && (
                   <Typography variant="caption" color="text.secondary">
@@ -597,7 +594,7 @@ export default function AssetFormPage() {
               {id && (
                 <Box sx={{ textAlign: 'right', display: { xs: 'none', sm: 'block' } }}>
                   <Typography variant="caption" color="text.disabled" display="block">กำลังแก้ไข</Typography>
-                  <Typography variant="body2" fontWeight={600} color="text.secondary">{form.assetCode}</Typography>
+                  <Typography variant="body2" fontWeight={600} color="text.secondary">{form.assetName || form.assetCode}</Typography>
                 </Box>
               )}
               <Button
@@ -629,8 +626,8 @@ export default function AssetFormPage() {
           <Card sx={{
             mb: 2.5,
             border: '1px solid',
-            borderColor: alpha('#f59e0b', 0.3),
-            bgcolor: 'rgba(254, 252, 232, 0.5)',
+            borderColor: alpha(theme.palette.warning.main, 0.3),
+            bgcolor: alpha(theme.palette.warning.main, 0.06),
             borderRadius: '10px',
             boxShadow: 'none'
           }}>
@@ -640,7 +637,7 @@ export default function AssetFormPage() {
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                 {Object.entries(changes).map(([field, c], i) => (
-                  <Box key={field} sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5, py: 0.5, borderBottom: i < changeCount - 1 ? '1px dashed rgba(245,158,11,.1)' : 'none' }}>
+                  <Box key={field} sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5, py: 0.5, borderBottom: i < changeCount - 1 ? `1px dashed ${alpha(theme.palette.warning.main, 0.15)}` : 'none' }}>
                     <Typography variant="caption" sx={{ minWidth: 120, fontWeight: 600, color: 'text.secondary' }}>
                       {c.label}
                     </Typography>
@@ -674,35 +671,22 @@ export default function AssetFormPage() {
             <Grid container spacing={2}>
               <Grid item xs={12} sm={6}>
                 <TextField
-                  label="เลขครุภัณฑ์ (Asset Code) *"
-                  value={form.assetCode}
-                  onChange={e => setFormField('assetCode', 'เลขครุภัณฑ์ (Asset Code)', e.target.value)}
-                  placeholder="เช่น HQ-PS-N001"
-                  fullWidth
-                  size="small"
-                  required={!id}
-                  error={!!duplicates.assetCode || (submitAttempted && !id && !form.assetCode?.trim())}
-                  helperText={duplicates.assetCode ? '⚠️ เลขครุภัณฑ์นี้มีอยู่ในระบบแล้ว' : (submitAttempted && !id && !form.assetCode?.trim() ? 'กรุณาระบุเลขครุภัณฑ์' : '')}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
                   label="เลขครุภัณฑ์ (ฝ่ายบัญชี) — ถ้ามี"
-                  value={form.accountingCode}
-                  onChange={e => setFormField('accountingCode', 'เลขครุภัณฑ์ (ฝ่ายบัญชี)', e.target.value)}
+                  value={form.assetCode}
+                  onChange={e => setFormField('assetCode', 'เลขครุภัณฑ์ (ฝ่ายบัญชี)', e.target.value)}
                   placeholder="กรอกเมื่อทราบเลขครุภัณฑ์จริงจากฝ่ายบัญชี ไม่ทราบเว้นว่างไว้ได้"
                   fullWidth
                   size="small"
-                  error={!!duplicates.accountingCode}
-                  helperText={duplicates.accountingCode ? '⚠️ เลขครุภัณฑ์นี้มีอยู่ในระบบแล้ว' : ''}
+                  error={!!duplicates.assetCode}
+                  helperText={duplicates.assetCode ? '⚠️ เลขครุภัณฑ์นี้มีอยู่ในระบบแล้ว' : ''}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField
-                  label="ชื่อทรัพย์สิน / รหัสทรัพย์สิน"
+                  label="ชื่อทรัพย์สิน / รหัสทรัพย์สิน (IT) *"
                   value={form.assetName}
                   onChange={e => setFormField('assetName', 'ชื่อทรัพย์สิน / รหัสทรัพย์สิน', e.target.value)}
-                  placeholder="ชื่อสำหรับเรียกทรัพย์สิน หรือ รหัสพัสดุภายในองค์กร"
+                  placeholder="เลขที่ทางไอทีต้องมี เช่น HQ-PS-N001"
                   fullWidth
                   size="small"
                   required
@@ -926,7 +910,7 @@ export default function AssetFormPage() {
           </SectionCard>
 
           {/* ② ข้อมูลการครอบครองและตำแหน่งพิกัด */}
-          <SectionCard title="ข้อมูลการครอบครองและตำแหน่งพิกัด" sub="Ownership & Location" barColor="linear-gradient(180deg,#8b5cf6,#a855f7)">
+          <SectionCard title="ข้อมูลการครอบครองและตำแหน่งพิกัด" sub="Ownership & Location" barColor={`linear-gradient(180deg, ${theme.palette.secondary.main}, ${alpha(theme.palette.secondary.main, 0.55)})`}>
             <Grid container spacing={2}>
 
               {/* — Sub-group: ผู้ใช้งาน / บริษัท / แผนก — */}
@@ -1041,7 +1025,7 @@ export default function AssetFormPage() {
 
               {/* — Divider — */}
               <Grid item xs={12}>
-                <Box sx={{ borderTop: '1px dashed rgba(139,92,246,0.15)', pt: 1.5, mt: 0.5 }}>
+                <Box sx={{ borderTop: `1px dashed ${alpha(theme.palette.secondary.main, 0.2)}`, pt: 1.5, mt: 0.5 }}>
                   <Typography variant="caption" fontWeight={700} color="text.disabled" sx={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: '0.7rem' }}>
                     📍 ตำแหน่งที่ตั้ง
                   </Typography>
@@ -1141,15 +1125,15 @@ export default function AssetFormPage() {
 
           {/* ③-B Memory Specification (Computer only) */}
           {isComputer && !isMonitor && (
-            <SectionCard title="Memory Specification" barColor="linear-gradient(180deg,#7c3aed,#a78bfa)">
+            <SectionCard title="Memory Specification" barColor={`linear-gradient(180deg, ${theme.palette.secondary.main}, ${alpha(theme.palette.secondary.main, 0.55)})`}>
               <Grid container spacing={2}>
                 {/* Memory Type Selector */}
                 <Grid item xs={12}>
                   <Box sx={{
                     display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap',
                     p: 1.5, borderRadius: 2,
-                    background: 'linear-gradient(135deg, rgba(124,58,237,0.06) 0%, rgba(167,139,250,0.04) 100%)',
-                    border: '1px solid rgba(124,58,237,0.15)',
+                    background: `linear-gradient(135deg, ${alpha(theme.palette.secondary.main, 0.06)} 0%, ${alpha(theme.palette.secondary.main, 0.04)} 100%)`,
+                    border: `1px solid ${alpha(theme.palette.secondary.main, 0.15)}`,
                   }}>
                     <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ minWidth: 'max-content' }}>
                       Memory Type:
@@ -1165,17 +1149,17 @@ export default function AssetFormPage() {
                         sx={{
                           flex: '1 1 140px', cursor: 'pointer', borderRadius: 2,
                           border: form.memoryType === opt.value
-                            ? '2px solid #7c3aed'
+                            ? `2px solid ${theme.palette.secondary.main}`
                             : '2px solid transparent',
                           background: form.memoryType === opt.value
-                            ? 'linear-gradient(135deg, rgba(124,58,237,0.12), rgba(167,139,250,0.08))'
-                            : 'rgba(0,0,0,0.03)',
+                            ? `linear-gradient(135deg, ${alpha(theme.palette.secondary.main, 0.12)}, ${alpha(theme.palette.secondary.main, 0.08)})`
+                            : alpha(theme.palette.text.primary, 0.03),
                           p: 1.2, textAlign: 'center', transition: 'all .2s',
-                          '&:hover': { borderColor: '#a78bfa', background: 'rgba(124,58,237,0.06)' },
-                          boxShadow: form.memoryType === opt.value ? '0 0 0 3px rgba(124,58,237,0.15)' : 'none',
+                          '&:hover': { borderColor: alpha(theme.palette.secondary.main, 0.6), background: alpha(theme.palette.secondary.main, 0.06) },
+                          boxShadow: form.memoryType === opt.value ? `0 0 0 3px ${alpha(theme.palette.secondary.main, 0.15)}` : 'none',
                         }}
                       >
-                        <Typography variant="body2" fontWeight={600} sx={{ mb: 0.3, color: form.memoryType === opt.value ? '#7c3aed' : 'text.primary' }}>
+                        <Typography variant="body2" fontWeight={600} sx={{ mb: 0.3, color: form.memoryType === opt.value ? theme.palette.secondary.main : 'text.primary' }}>
                           {opt.label}
                         </Typography>
                         <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.3, display: 'block' }}>
@@ -1264,8 +1248,8 @@ export default function AssetFormPage() {
                       readOnly: true,
                       startAdornment: <Box sx={{ mr: 1, fontSize: '1rem', lineHeight: 1 }}>💾</Box>,
                       sx: {
-                        bgcolor: 'rgba(124,58,237,0.06)',
-                        '& .MuiInputBase-input': { fontWeight: 600, color: '#7c3aed' }
+                        bgcolor: alpha(theme.palette.secondary.main, 0.06),
+                        '& .MuiInputBase-input': { fontWeight: 600, color: theme.palette.secondary.main }
                       }
                     }}
                     helperText="คำนวณจากฟิลด์ด้านบนอัตโนมัติ"
@@ -1478,7 +1462,7 @@ export default function AssetFormPage() {
 
           {/* Monitor detail */}
           {isMonitor && (
-            <SectionCard title="ข้อมูลจอภาพ" barColor="linear-gradient(180deg,#7c3aed,#a855f7)">
+            <SectionCard title="ข้อมูลจอภาพ" barColor={`linear-gradient(180deg, ${theme.palette.secondary.main}, ${alpha(theme.palette.secondary.main, 0.55)})`}>
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={4}>
                   <TextField
@@ -1561,7 +1545,7 @@ export default function AssetFormPage() {
 
           {/* Phone detail */}
           {isPhone && (
-            <SectionCard title="ข้อมูลอุปกรณ์สื่อสาร" barColor="linear-gradient(180deg,#7c3aed,#a855f7)">
+            <SectionCard title="ข้อมูลอุปกรณ์สื่อสาร" barColor={`linear-gradient(180deg, ${theme.palette.secondary.main}, ${alpha(theme.palette.secondary.main, 0.55)})`}>
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={4}>
                   <TextField
@@ -2184,7 +2168,7 @@ export default function AssetFormPage() {
               <Grid item xs={12}>
                 <Box sx={{ mb: 1 }}>
                   <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                    สถานะการใช้งาน <Box component="span" sx={{ fontSize: '10px', color: 'error.main', bgcolor: alpha('#e11d48', 0.08), px: 1, py: 0.2, borderRadius: 3, ml: 1 }}>คลิกเพื่อเปลี่ยน</Box>
+                    สถานะการใช้งาน <Box component="span" sx={{ fontSize: '10px', color: 'error.main', bgcolor: alpha(theme.palette.error.main, 0.08), px: 1, py: 0.2, borderRadius: 3, ml: 1 }}>คลิกเพื่อเปลี่ยน</Box>
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
@@ -2196,20 +2180,20 @@ export default function AssetFormPage() {
                     
                     if (opt.cls === 's-available') {
                       activeColor = 'success.main';
-                      borderColor = isSelected ? 'success.main' : 'rgba(16, 185, 129, 0.3)';
-                      activeBg = alpha('#10b981', 0.12);
+                      borderColor = isSelected ? 'success.main' : alpha(theme.palette.success.main, 0.3);
+                      activeBg = alpha(theme.palette.success.main, 0.12);
                     } else if (opt.cls === 's-reserved') {
                       activeColor = 'secondary.main';
-                      borderColor = isSelected ? 'secondary.main' : 'rgba(99, 102, 241, 0.25)';
-                      activeBg = alpha('#6366f1', 0.1);
+                      borderColor = isSelected ? 'secondary.main' : alpha(theme.palette.secondary.main, 0.25);
+                      activeBg = alpha(theme.palette.secondary.main, 0.1);
                     } else if (opt.cls === 's-maintenance') {
                       activeColor = 'error.main';
-                      borderColor = isSelected ? 'error.main' : 'rgba(239, 68, 68, 0.25)';
-                      activeBg = alpha('#ef4444', 0.08);
+                      borderColor = isSelected ? 'error.main' : alpha(theme.palette.error.main, 0.25);
+                      activeBg = alpha(theme.palette.error.main, 0.08);
                     } else if (opt.cls === 's-retired') {
                       activeColor = 'text.secondary';
-                      borderColor = isSelected ? 'text.secondary' : 'rgba(107, 114, 128, 0.2)';
-                      activeBg = alpha('#6b7280', 0.08);
+                      borderColor = isSelected ? 'text.secondary' : alpha(theme.palette.text.secondary, 0.2);
+                      activeBg = alpha(theme.palette.text.secondary, 0.08);
                     }
 
                     return (
@@ -2267,7 +2251,7 @@ export default function AssetFormPage() {
           </SectionCard>
 
           {/* ⑥ รูปภาพ */}
-          <SectionCard title="รูปภาพทะเบียนทรัพย์สิน" barColor="linear-gradient(180deg,#6366f1,#8b5cf6)">
+          <SectionCard title="รูปภาพทะเบียนทรัพย์สิน" barColor={`linear-gradient(180deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`}>
             {imageError && (
               <Alert severity="error" sx={{ mb: 2, borderRadius: '10px' }}>
                 {imageError}
@@ -2284,8 +2268,8 @@ export default function AssetFormPage() {
                     aspectRatio: '4/3',
                     borderRadius: '12px',
                     border: '2px dashed',
-                    borderColor: alpha('#6366f1', 0.2),
-                    bgcolor: 'rgba(248, 247, 255, 0.5)',
+                    borderColor: alpha(theme.palette.primary.main, 0.2),
+                    bgcolor: alpha(theme.palette.primary.main, 0.04),
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -2295,7 +2279,7 @@ export default function AssetFormPage() {
                     transition: 'all 0.15s',
                     '&:hover': {
                       borderColor: 'primary.main',
-                      bgcolor: 'rgba(99, 102, 241, 0.03)'
+                      bgcolor: alpha(theme.palette.primary.main, 0.03)
                     }
                   }}
                 >
@@ -2303,10 +2287,10 @@ export default function AssetFormPage() {
                     <>
                       <Box component="img" src={imagePreview} alt="Asset" sx={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                       <Box sx={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 0.5 }} onClick={e => e.stopPropagation()}>
-                        <IconButton size="small" onClick={() => fileInputRef.current?.click()} sx={{ bgcolor: 'rgba(255,255,255,0.9)', '&:hover': { bgcolor: '#fff' } }}>
+                        <IconButton size="small" onClick={() => fileInputRef.current?.click()} sx={{ bgcolor: alpha(theme.palette.background.paper, 0.9), '&:hover': { bgcolor: theme.palette.background.paper } }}>
                           <PhotoCameraIcon sx={{ fontSize: 16 }} />
                         </IconButton>
-                        <IconButton size="small" onClick={handleImageDelete} sx={{ bgcolor: 'rgba(255,255,255,0.9)', color: 'error.main', '&:hover': { bgcolor: '#fff' } }}>
+                        <IconButton size="small" onClick={handleImageDelete} sx={{ bgcolor: alpha(theme.palette.background.paper, 0.9), color: 'error.main', '&:hover': { bgcolor: theme.palette.background.paper } }}>
                           <DeleteIcon sx={{ fontSize: 16 }} />
                         </IconButton>
                       </Box>
@@ -2337,8 +2321,8 @@ export default function AssetFormPage() {
                   <Box sx={{
                     p: 2,
                     borderRadius: 2.5,
-                    bgcolor: 'rgba(248, 247, 255, 0.6)',
-                    border: '1px solid rgba(99, 102, 241, 0.09)',
+                    bgcolor: alpha(theme.palette.primary.main, 0.04),
+                    border: `1px solid ${alpha(theme.palette.primary.main, 0.15)}`,
                   }}>
                     <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
                       💡 คำแนะนำ
@@ -2366,9 +2350,9 @@ export default function AssetFormPage() {
           left: 0,
           right: 0,
           zIndex: 1100,
-          bgcolor: 'rgba(255, 255, 255, 0.9)',
+          bgcolor: alpha(theme.palette.background.paper, 0.9),
           backdropFilter: 'blur(20px)',
-          borderTop: '1px solid rgba(99, 102, 241, 0.1)',
+          borderTop: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
           py: 1.5,
           px: 3,
           display: 'flex',
@@ -2390,7 +2374,7 @@ export default function AssetFormPage() {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {hasChanges && (
             <Typography variant="caption" color="text.secondary">
-              เปลี่ยนแปลง <strong style={{ color: '#b45309' }}>{changeCount}</strong> รายการ
+              เปลี่ยนแปลง <strong style={{ color: theme.palette.warning.dark }}>{changeCount}</strong> รายการ
             </Typography>
           )}
           <Button
