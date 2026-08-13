@@ -170,6 +170,10 @@ export const assetAPI = {
   createChecklistSet: (data: any) => api.post('/assets/checklist-sets', data),
   updateChecklistSet: (id: number, data: any) => api.put(`/assets/checklist-sets/${id}`, data),
   deleteChecklistSet: (id: number) => api.delete(`/assets/checklist-sets/${id}`),
+  checklistItems: (setId: number) => api.get(`/assets/checklist-sets/${setId}/items`),
+  createChecklistItem: (setId: number, data: any) => api.post(`/assets/checklist-sets/${setId}/items`, data),
+  updateChecklistItem: (setId: number, itemId: number, data: any) => api.put(`/assets/checklist-sets/${setId}/items/${itemId}`, data),
+  deleteChecklistItem: (setId: number, itemId: number) => api.delete(`/assets/checklist-sets/${setId}/items/${itemId}`),
   stats: (typeGroup: string) => api.get('/assets/stats', { params: { typeGroup } }),
   checkDuplicate: (params: { assetCode?: string; accountingCode?: string; serialNo?: string; assetName?: string; excludeId?: number }) => api.get('/assets/check-duplicate', { params }),
 };
@@ -243,6 +247,9 @@ export const deliveryAPI = {
     api.patch(`/delivery/requests/${id}/peripherals/${itemId}`, data),
   markReady: (id: number) => api.patch(`/delivery/requests/${id}/ready`),
   deliver: (id: number) => api.post(`/delivery/requests/${id}/deliver`),
+  getChecklistRun: (id: number) => api.get(`/delivery/requests/${id}/checklist-run`),
+  performChecklistRun: (id: number, data: { answers: { itemId: number; value: string; note?: string }[]; status?: 'DRAFT' | 'DONE' }) =>
+    api.post(`/delivery/requests/${id}/checklist-run/perform`, data),
   // Public — no auth, used by the recipient-facing confirmation page
   getConfirm: (token: string) => api.get(`/delivery/confirm/${token}`),
   confirm: (token: string) => api.post(`/delivery/confirm/${token}`),

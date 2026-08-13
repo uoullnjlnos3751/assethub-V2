@@ -257,4 +257,95 @@ router.post('/confirm/:token', async (req: Request, res: Response, next: NextFun
   } catch (err) { next(err); }
 });
 
+// ── Setup Checklist (Phase B) ───────────────────────────────────────────────
+const CHECKLIST_RUN_INCLUDE = {
+  checklistSet: {
+    include: { items: { orderBy: { sortOrder: 'asc' as const } } },
+  },
+  performer: { select: { id: true, displayName: true, adUsername: true } },
+  answers: true,
+} as const;
+
+// Fetch the in-progress run for a request, auto-creating a DRAFT run
+// against IT-WI-001 (the only checklist set with real items today) on
+// first access — mirrors pm.ts's plan->template->items->run shape.
+router.get('/requests/:id/checklist-run', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const requestId = Number(req.params.id);
+    const request = await prisma.deliveryRequest.findUnique({ where: { id: requestId } });
+    if (!request) throw new AppError('ไม่พบรายการส่งมอบ', 404);
+
+    let run = await prisma.deliveryChecklistRun.findFirst({
+      where: { requestId },
+      orderBy: { id: 'desc' },
+      include: CHECKLIST_RUN_INCLUDE,
+    });
+
+    if (!run) {
+      const defaultSet = await prisma.checklistSet.findUnique({ where: { docCode: 'IT-WI-001' } });
+      if (!defaultSet) throw new AppError('ยังไม่มีชุด Checklist ในระบบ', 404);
+      run = await prisma.deliveryChecklistRun.create({
+        data: { requestId, checklistSetId: defaultSet.id, status: 'DRAFT' },
+        include: CHECKLIST_RUN_INCLUDE,
+      });
+    }
+
+    res.json(run);
+  } catch (err) { next(err); }
+});
+
+// Save answers (delete-all-then-recreate, matching pm.ts's POST /runs/:id/perform
+// pattern) and, when status:'DONE' is requested, auto-transition the parent
+// DeliveryRequest — this is the automatic handoff the PATCH /:id/ready
+// comment above calls out as Phase B's replacement for the manual bridge.
+router.post('/requests/:id/checklist-run/perform', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const requestId = Number(req.params.id);
+    const { answers, status } = req.body as { answers: { itemId: number; value: string; note?: string }[]; status?: 'DRAFT' | 'DONE' };
+
+    const run = await prisma.deliveryChecklistRun.findFirst({ where: { requestId }, orderBy: { id: 'desc' } });
+    if (!run) throw new AppError('ไม่พบ Checklist run', 404);
+
+    const validItemIds = new Set(
+      (await prisma.checklistItem.findMany({ where: { setId: run.checklistSetId }, select: { id: true } })).map((i) => i.id)
+    );
+    const cleanAnswers = (answers || []).filter((a) => validItemIds.has(a.itemId));
+
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.deliveryChecklistAnswer.deleteMany({ where: { runId: run.id } });
+      if (cleanAnswers.length > 0) {
+        await tx.deliveryChecklistAnswer.createMany({
+          data: cleanAnswers.map((a) => ({ runId: run.id, itemId: a.itemId, value: a.value, note: a.note || null })),
+        });
+      }
+
+      const isDone = status === 'DONE';
+      const savedRun = await tx.deliveryChecklistRun.update({
+        where: { id: run.id },
+        data: {
+          status: isDone ? 'DONE' : 'DRAFT',
+          performedBy: req.user!.userId,
+          performedAt: new Date(),
+          completedAt: isDone ? new Date() : null,
+        },
+        include: CHECKLIST_RUN_INCLUDE,
+      });
+
+      if (isDone) {
+        const deliveryRequest = await tx.deliveryRequest.findUnique({ where: { id: requestId } });
+        if (deliveryRequest && ['DRAFT', 'SETUP_IN_PROGRESS'].includes(deliveryRequest.status)) {
+          await tx.deliveryRequest.update({
+            where: { id: requestId },
+            data: { status: 'SETUP_DONE', installerId: req.user!.userId, installedAt: new Date() },
+          });
+        }
+      }
+
+      return savedRun;
+    });
+
+    res.json(updated);
+  } catch (err) { next(err); }
+});
+
 export default router;

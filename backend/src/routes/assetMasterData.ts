@@ -424,9 +424,83 @@ router.delete('/printers/:printerId', authenticate, authorize('IT_ADMIN', 'SUPER
 // ── Checklist sets (Settings tab 3: ชุด Checklist ติดตั้ง) ──
 router.get('/checklist-sets', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const sets = await prisma.checklistSet.findMany({ orderBy: { docCode: 'asc' } });
-    res.json(sets);
+    const sets = await prisma.checklistSet.findMany({
+      orderBy: { docCode: 'asc' },
+      include: { items: { select: { id: true, category: true } } },
+    });
+    // Once a set has real items, its item/category counts are derived live
+    // instead of trusting the hand-typed itemCount/categoryCount columns
+    // (those stay as manual fallback fields for sets with no items yet).
+    res.json(sets.map(({ items, ...set }) => ({
+      ...set,
+      itemCount: items.length > 0 ? items.length : set.itemCount,
+      categoryCount: items.length > 0 ? new Set(items.map((i) => i.category)).size : set.categoryCount,
+    })));
   } catch (err) { next(err); }
+});
+
+router.get('/checklist-sets/:setId/items', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const items = await prisma.checklistItem.findMany({
+      where: { setId: parseInt(req.params.setId) },
+      orderBy: { sortOrder: 'asc' },
+    });
+    res.json(items);
+  } catch (err) { next(err); }
+});
+
+router.post('/checklist-sets/:setId/items', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const setId = parseInt(req.params.setId);
+    const category = String(req.body.category || '').trim();
+    const itemText = String(req.body.itemText || '').trim();
+    if (!category) throw new AppError('กรุณาระบุหมวด');
+    if (!itemText) throw new AppError('กรุณาระบุรายการตรวจสอบ');
+    const maxOrder = await prisma.checklistItem.aggregate({ where: { setId }, _max: { sortOrder: true } });
+    const created = await prisma.checklistItem.create({
+      data: {
+        setId, category, itemText,
+        refCode: req.body.refCode ? String(req.body.refCode).trim() : '',
+        answerType: req.body.answerType || 'PASS_FAIL_NA',
+        sortOrder: (maxOrder._max.sortOrder ?? -1) + 1,
+      },
+    });
+    res.status(201).json(created);
+  } catch (err: any) {
+    if (err?.code === 'P2003') return next(new AppError('ไม่พบชุด Checklist', 404));
+    next(err);
+  }
+});
+
+router.put('/checklist-sets/:setId/items/:itemId', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const category = String(req.body.category || '').trim();
+    const itemText = String(req.body.itemText || '').trim();
+    if (!category) throw new AppError('กรุณาระบุหมวด');
+    if (!itemText) throw new AppError('กรุณาระบุรายการตรวจสอบ');
+    const updated = await prisma.checklistItem.update({
+      where: { id: parseInt(req.params.itemId) },
+      data: {
+        category, itemText,
+        refCode: req.body.refCode ? String(req.body.refCode).trim() : '',
+        answerType: req.body.answerType || 'PASS_FAIL_NA',
+      },
+    });
+    res.json(updated);
+  } catch (err: any) {
+    if (err?.code === 'P2025') return next(new AppError('ไม่พบรายการ', 404));
+    next(err);
+  }
+});
+
+router.delete('/checklist-sets/:setId/items/:itemId', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await prisma.checklistItem.delete({ where: { id: parseInt(req.params.itemId) } });
+    res.json({ message: 'ลบรายการเรียบร้อย' });
+  } catch (err: any) {
+    if (err?.code === 'P2025') return next(new AppError('ไม่พบรายการ', 404));
+    next(err);
+  }
 });
 
 router.post('/checklist-sets', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
