@@ -9,13 +9,14 @@ import {
 import {
   Settings, Globe, Clock, Database, Shield, Server, Smartphone, Mail, Save,
   Bell, Download, Upload, Trash2, Search, RefreshCw, Building2, Image,
-  MessageSquare, AlertTriangle
+  MessageSquare, AlertTriangle, Users,
 } from 'lucide-react';
 import { adminAPI, assetAPI } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { StatBox, StatusRow } from './settings/SharedComponents';
 import SystemSettingsTab from './SystemSettingsTab';
+import UsersPermissionsTab from './settings/UsersPermissionsTab';
 import EmailTemplateEditor from './settings/EmailTemplateEditor';
 import { SectionCard } from '../../components/SectionCard';
 import type { SystemSettings, NotificationTemplate, HealthCheckResult, NotificationLog } from './settings/types';
@@ -48,7 +49,13 @@ const TAB_GROUPS = [
     items: [
       { index: 7, label: 'การสร้างรหัสทรัพย์สิน', icon: <Building2 size={16} /> },
     ]
-  }
+  },
+  {
+    label: 'ผู้ใช้และองค์กร', icon: <Users size={20} />,
+    items: [
+      { index: 8, label: 'ผู้ใช้ & สิทธิ์', icon: <Users size={16} /> },
+    ]
+  },
 ];
 
 export default function SettingsPage() {
@@ -602,6 +609,10 @@ export default function SettingsPage() {
 
       {tab === 7 && (
         <SystemSettingsTab />
+      )}
+
+      {tab === 8 && (
+        <UsersPermissionsTab />
       )}
 
       {/* Dialogs */}
