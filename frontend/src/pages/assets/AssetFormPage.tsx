@@ -629,8 +629,8 @@ export default function AssetFormPage() {
           <Card sx={{
             mb: 2.5,
             border: '1px solid',
-            borderColor: alpha('#f59e0b', 0.3),
-            bgcolor: 'rgba(254, 252, 232, 0.5)',
+            borderColor: alpha(theme.palette.warning.main, 0.3),
+            bgcolor: alpha(theme.palette.warning.main, 0.06),
             borderRadius: '10px',
             boxShadow: 'none'
           }}>
@@ -640,7 +640,7 @@ export default function AssetFormPage() {
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                 {Object.entries(changes).map(([field, c], i) => (
-                  <Box key={field} sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5, py: 0.5, borderBottom: i < changeCount - 1 ? '1px dashed rgba(245,158,11,.1)' : 'none' }}>
+                  <Box key={field} sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5, py: 0.5, borderBottom: i < changeCount - 1 ? `1px dashed ${alpha(theme.palette.warning.main, 0.15)}` : 'none' }}>
                     <Typography variant="caption" sx={{ minWidth: 120, fontWeight: 600, color: 'text.secondary' }}>
                       {c.label}
                     </Typography>
@@ -1041,7 +1041,7 @@ export default function AssetFormPage() {
 
               {/* — Divider — */}
               <Grid item xs={12}>
-                <Box sx={{ borderTop: '1px dashed rgba(139,92,246,0.15)', pt: 1.5, mt: 0.5 }}>
+                <Box sx={{ borderTop: `1px dashed ${alpha(theme.palette.secondary.main, 0.2)}`, pt: 1.5, mt: 0.5 }}>
                   <Typography variant="caption" fontWeight={700} color="text.disabled" sx={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: '0.7rem' }}>
                     📍 ตำแหน่งที่ตั้ง
                   </Typography>
@@ -1148,8 +1148,8 @@ export default function AssetFormPage() {
                   <Box sx={{
                     display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap',
                     p: 1.5, borderRadius: 2,
-                    background: 'linear-gradient(135deg, rgba(124,58,237,0.06) 0%, rgba(167,139,250,0.04) 100%)',
-                    border: '1px solid rgba(124,58,237,0.15)',
+                    background: `linear-gradient(135deg, ${alpha(theme.palette.secondary.main, 0.06)} 0%, ${alpha(theme.palette.secondary.main, 0.04)} 100%)`,
+                    border: `1px solid ${alpha(theme.palette.secondary.main, 0.15)}`,
                   }}>
                     <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ minWidth: 'max-content' }}>
                       Memory Type:
@@ -2184,7 +2184,7 @@ export default function AssetFormPage() {
               <Grid item xs={12}>
                 <Box sx={{ mb: 1 }}>
                   <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                    สถานะการใช้งาน <Box component="span" sx={{ fontSize: '10px', color: 'error.main', bgcolor: alpha('#e11d48', 0.08), px: 1, py: 0.2, borderRadius: 3, ml: 1 }}>คลิกเพื่อเปลี่ยน</Box>
+                    สถานะการใช้งาน <Box component="span" sx={{ fontSize: '10px', color: 'error.main', bgcolor: alpha(theme.palette.error.main, 0.08), px: 1, py: 0.2, borderRadius: 3, ml: 1 }}>คลิกเพื่อเปลี่ยน</Box>
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
@@ -2295,7 +2295,7 @@ export default function AssetFormPage() {
                     transition: 'all 0.15s',
                     '&:hover': {
                       borderColor: 'primary.main',
-                      bgcolor: 'rgba(99, 102, 241, 0.03)'
+                      bgcolor: alpha(theme.palette.primary.main, 0.03)
                     }
                   }}
                 >
@@ -2303,10 +2303,10 @@ export default function AssetFormPage() {
                     <>
                       <Box component="img" src={imagePreview} alt="Asset" sx={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                       <Box sx={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 0.5 }} onClick={e => e.stopPropagation()}>
-                        <IconButton size="small" onClick={() => fileInputRef.current?.click()} sx={{ bgcolor: 'rgba(255,255,255,0.9)', '&:hover': { bgcolor: '#fff' } }}>
+                        <IconButton size="small" onClick={() => fileInputRef.current?.click()} sx={{ bgcolor: alpha(theme.palette.background.paper, 0.9), '&:hover': { bgcolor: theme.palette.background.paper } }}>
                           <PhotoCameraIcon sx={{ fontSize: 16 }} />
                         </IconButton>
-                        <IconButton size="small" onClick={handleImageDelete} sx={{ bgcolor: 'rgba(255,255,255,0.9)', color: 'error.main', '&:hover': { bgcolor: '#fff' } }}>
+                        <IconButton size="small" onClick={handleImageDelete} sx={{ bgcolor: alpha(theme.palette.background.paper, 0.9), color: 'error.main', '&:hover': { bgcolor: theme.palette.background.paper } }}>
                           <DeleteIcon sx={{ fontSize: 16 }} />
                         </IconButton>
                       </Box>
@@ -2337,8 +2337,8 @@ export default function AssetFormPage() {
                   <Box sx={{
                     p: 2,
                     borderRadius: 2.5,
-                    bgcolor: 'rgba(248, 247, 255, 0.6)',
-                    border: '1px solid rgba(99, 102, 241, 0.09)',
+                    bgcolor: alpha(theme.palette.primary.main, 0.04),
+                    border: `1px solid ${alpha(theme.palette.primary.main, 0.15)}`,
                   }}>
                     <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
                       💡 คำแนะนำ
@@ -2366,9 +2366,9 @@ export default function AssetFormPage() {
           left: 0,
           right: 0,
           zIndex: 1100,
-          bgcolor: 'rgba(255, 255, 255, 0.9)',
+          bgcolor: alpha(theme.palette.background.paper, 0.9),
           backdropFilter: 'blur(20px)',
-          borderTop: '1px solid rgba(99, 102, 241, 0.1)',
+          borderTop: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
           py: 1.5,
           px: 3,
           display: 'flex',
@@ -2390,7 +2390,7 @@ export default function AssetFormPage() {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {hasChanges && (
             <Typography variant="caption" color="text.secondary">
-              เปลี่ยนแปลง <strong style={{ color: '#b45309' }}>{changeCount}</strong> รายการ
+              เปลี่ยนแปลง <strong style={{ color: theme.palette.warning.dark }}>{changeCount}</strong> รายการ
             </Typography>
           )}
           <Button
