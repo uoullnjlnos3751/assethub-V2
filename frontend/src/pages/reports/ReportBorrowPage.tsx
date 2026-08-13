@@ -268,8 +268,8 @@ export default function ReportBorrowPage() {
                 transition: 'all 0.2s',
                 opacity: (statusFilter === '' || statusFilter === 'Pending' || statusFilter === 'CheckedOut' || statusFilter === 'Overdue') ? 1 : 0.45,
                 transform: statusFilter === '' ? 'scale(1.02)' : 'scale(1)',
-                boxShadow: statusFilter === '' ? '0 8px 20px rgba(124,58,237,0.15)' : 'none',
-                '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 6px 15px rgba(124,58,237,0.1)' }
+                boxShadow: statusFilter === '' ? `0 8px 20px ${alpha(theme.palette.secondary.main, 0.15)}` : 'none',
+                '&:hover': { transform: 'translateY(-2px)', boxShadow: `0 6px 15px ${alpha(theme.palette.secondary.main, 0.1)}` }
               }}
             >
               <CardContent sx={{ p: 2.5 }}>

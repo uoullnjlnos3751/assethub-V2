@@ -442,7 +442,7 @@ export default function ReportMaintenancePage() {
 
                       <Divider sx={{ my: 2 }} />
 
-                      <Box sx={{ bgcolor: 'rgba(239,68,68,0.05)', p: 1.5, borderRadius: 2, border: '1px dashed rgba(239,68,68,0.3)' }}>
+                      <Box sx={{ bgcolor: alpha(theme.palette.error.main, 0.05), p: 1.5, borderRadius: 2, border: `1px dashed ${alpha(theme.palette.error.main, 0.3)}` }}>
                         <Typography variant="caption" color="error">ค่าใช้จ่ายรวม (บาท)</Typography>
                         <Typography variant="h5" fontWeight={800} color="error" sx={{ mt: 0.5 }}>
                           ฿{Number(selectedRecord.totalCost || 0).toLocaleString()}
