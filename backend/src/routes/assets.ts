@@ -191,6 +191,12 @@ const normalizeAssetPayload = (data: any, isCreate = false) => {
   if (filtered.assetCode === '-' || filtered.assetCode === '' || filtered.assetCode === null) {
     filtered.assetCode = null;
   }
+  // accountingCode is @unique like assetCode — an unset '' here would collide
+  // with any other asset that also has no accounting code on file, since '' is
+  // a real, comparable value to Postgres (unlike NULL, which never collides).
+  if (filtered.accountingCode === '-' || filtered.accountingCode === '') {
+    filtered.accountingCode = null;
+  }
 
   return {
     ...filtered,
@@ -700,7 +706,81 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
     }
 
     const [assets, total] = await Promise.all([
-      prisma.asset.findMany({ where, skip, take: limitNum, orderBy: { createdAt: 'desc' }, include: { category: { select: { id: true, name: true, icon: true } }, consumableDetail: { select: { stockQuantity: true, minimumStock: true } } } }),
+      prisma.asset.findMany({
+        where, skip, take: limitNum, orderBy: { createdAt: 'desc' },
+        // Explicit select excluding `image`: it stores the full base64 upload
+        // directly in the row (up to ~10MB each), and an unfiltered
+        // findMany() was round-tripping that for every row on every page
+        // load — newest-first sort makes this worst-case by default, since
+        // recent uploads are disproportionately the ones with a photo. The
+        // list/grid view already falls back to a placeholder icon when no
+        // image is present, so dropping it here is a safe no-UI-break change;
+        // the full photo still loads on the single-asset detail page.
+        select: {
+          id: true,
+          assetCode: true,
+          assetName: true,
+          accountingCode: true,
+          serialNo: true,
+          type: true,
+          categoryId: true,
+          brand: true,
+          model: true,
+          cpu: true,
+          ram: true,
+          osVersion: true,
+          windowsLicense: true,
+          officeLicense: true,
+          antivirusStatus: true,
+          vendor: true,
+          poNumber: true,
+          prNumber: true,
+          purchaseDate: true,
+          purchasePrice: true,
+          warrantyEndDate: true,
+          age: true,
+          ownerName: true,
+          departmentId: true,
+          location: true,
+          status: true,
+          remark: true,
+          createdAt: true,
+          updatedAt: true,
+          company: true,
+          oldAssetCode: true,
+          cpuGeneration: true,
+          domainName: true,
+          floor: true,
+          poDate: true,
+          ramDetail: true,
+          gpu: true,
+          osType: true,
+          budget: true,
+          ramSlot1: true,
+          ramSlot2: true,
+          memoryType: true,
+          ramOnboard: true,
+          ramType: true,
+          ramSpeed: true,
+          ramMaxSupported: true,
+          ramAvailableSlots: true,
+          ramUpgradeable: true,
+          snComputer: true,
+          storage1: true,
+          storage2: true,
+          assignedToUserId: true,
+          departmentRefId: true,
+          vendorRefId: true,
+          locationRefId: true,
+          usefulLifeYears: true,
+          salvageValue: true,
+          requesterName: true,
+          budgetCode: true,
+          receivedDate: true,
+          category: { select: { id: true, name: true, icon: true } },
+          consumableDetail: { select: { stockQuantity: true, minimumStock: true } },
+        },
+      }),
       prisma.asset.count({ where }),
     ]);
 
