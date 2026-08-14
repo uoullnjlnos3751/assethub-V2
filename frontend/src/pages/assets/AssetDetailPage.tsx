@@ -1,19 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   CircularProgress,
-  Card,
-  CardContent,
-  Chip,
   Typography,
   alpha,
   useTheme,
   Box,
-  Grid,
   Button,
   Tabs,
   Tab,
-  Avatar,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -21,7 +16,6 @@ import {
   Snackbar,
   Alert,
 } from '@mui/material';
-import EditIcon from '@mui/icons-material/Edit';
 import StarIcon from '@mui/icons-material/Star';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
 import QrCodeIcon from '@mui/icons-material/QrCode';
@@ -33,19 +27,21 @@ import HistoryIcon from '@mui/icons-material/History';
 import BuildIcon from '@mui/icons-material/Build';
 import HandymanIcon from '@mui/icons-material/Handyman';
 import LinkIcon from '@mui/icons-material/Link';
-import PersonIcon from '@mui/icons-material/Person';
 import QRCode from 'react-qr-code';
-import { assetAPI } from '../../services/api';
+import { assetAPI, maintenanceAPI } from '../../services/api';
 import StatusChip from '../../components/StatusChip';
 import MaintenanceTab from './MaintenanceTab';
 import LinkedAssetsTab from './tabs/LinkedAssetsTab';
-import { getTypeIconComponent } from './components/assetTypeIcon';
-import { WarrantyBar } from './components/WarrantyBar';
 import { LifecycleStepper } from './components/LifecycleStepper';
 import { SpecTab } from './tabs/SpecTab';
 import { HistoryTab } from './tabs/HistoryTab';
 import { PMTab } from './tabs/PMTab';
 import { DocumentsTab } from './tabs/DocumentsTab';
+import { AssetOverviewCard } from './components/AssetOverviewCard';
+import { AssetFinanceCard } from './components/AssetFinanceCard';
+import { AssetTimeline } from './components/AssetTimeline';
+import { AssetActionsPanel } from './components/AssetActionsPanel';
+import { AssetInsightTiles } from './components/AssetInsightTiles';
 
 /* ─── Main Page ───────────────────────────────────────────────── */
 export default function AssetDetailPage() {
@@ -58,6 +54,7 @@ export default function AssetDetailPage() {
   const [showQR, setShowQR] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [similarAssets, setSimilarAssets] = useState<any[]>([]);
+  const [maintenance, setMaintenance] = useState<any[]>([]);
 
   const [glpiSpec, setGlpiSpec] = useState<any>(null);
   const [loadingGLPI, setLoadingGLPI] = useState(false);
@@ -76,6 +73,16 @@ export default function AssetDetailPage() {
         .then((res) => setAsset(res.data))
         .finally(() => setLoading(false));
     }
+  }, [id]);
+
+  // Maintenance records power the timeline and the repair-cost tiles, which
+  // both live outside the ประวัติการซ่อม tab — so fetch them at page level
+  // rather than leaving them owned by MaintenanceTab.
+  useEffect(() => {
+    if (!id) return;
+    maintenanceAPI.getByAsset(parseInt(id))
+      .then((res) => setMaintenance(Array.isArray(res.data) ? res.data : (res.data?.data || [])))
+      .catch(() => setMaintenance([]));
   }, [id]);
 
   useEffect(() => {
@@ -159,24 +166,12 @@ export default function AssetDetailPage() {
       .catch(() => {});
   }, [asset]);
 
-  /* Warranty calculation */
-  const warrantyDaysLeft = useMemo(() => {
-    if (!asset?.warrantyEndDate) return null;
-    return Math.max(0, Math.round((new Date(asset.warrantyEndDate).getTime() - Date.now()) / 86400000));
-  }, [asset]);
-
-  const totalBorrows = asset?.pmRuns?.length ?? 0;
-  const completedPMs = asset?.pmRuns?.filter((r: any) => r.status === 'COMPLETED').length ?? 0;
-
   if (loading) return (
     <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
       <CircularProgress size={32} />
     </Box>
   );
   if (!asset) return <Box sx={{ p: 4, textAlign: 'center' }}><Typography color="text.secondary">ไม่พบทรัพย์สิน</Typography></Box>;
-
-  const TypeIcon = getTypeIconComponent(asset.type);
-  const historyCount = asset.assetHistory?.length ?? 0;
 
   const toggleFavorite = () => {
     try {
@@ -192,274 +187,179 @@ export default function AssetDetailPage() {
     } catch { /* ignore */ }
   };
 
+  const reloadAsset = () => assetAPI.get(parseInt(id!)).then(res => setAsset(res.data));
+
   return (
     <Box sx={{ pb: 5 }}>
-      {/* Hero card */}
-      <Card sx={{ mb: 2 }}>
-        <CardContent sx={{ p: '20px 24px !important' }}>
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={9}>
-              <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', flexWrap: { xs: 'wrap', sm: 'nowrap' } }}>
-                <Avatar sx={{
-                  width: 52,
-                  height: 52,
-                  borderRadius: '14px',
-                  bgcolor: 'primary.main',
-                  color: 'primary.contrastText',
-                  flexShrink: 0
-                }}>
-                  <TypeIcon sx={{ fontSize: 26 }} />
-                </Avatar>
-                <Box sx={{ minWidth: 0 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap', mb: 0.5 }}>
-                    <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ lineHeight: 1.2 }}>
-                      {asset.brand} {asset.model}
-                    </Typography>
-                    <StatusChip status={asset.status} />
-                  </Box>
-
-                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap', mb: 1 }}>
-                    <Chip label={asset.assetCode} size="small" variant="outlined" color="primary" sx={{ height: 20, fontFamily: 'monospace', fontWeight: 700 }} />
-                    {asset.assetName && (
-                      <Chip label={asset.assetName} size="small" sx={{ height: 20, bgcolor: (t) => alpha(t.palette.primary.main, 0.1), color: 'primary.dark', fontWeight: 600 }} />
-                    )}
-                    {asset.type && (
-                      <Typography variant="caption" color="text.secondary">{asset.type}</Typography>
-                    )}
-                    {asset.location && (
-                      <Typography variant="caption" color="text.secondary">
-                        · {asset.location}{asset.floor ? ` ชั้น ${asset.floor}` : ''}
-                      </Typography>
-                    )}
-                    {asset.departmentId && (
-                      <Typography variant="caption" color="text.secondary">
-                        · แผนก {asset.departmentId}
-                      </Typography>
-                    )}
-                  </Box>
-
-                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
-                    {asset.age != null && (
-                      <Chip label={`อายุ ${asset.age} ปี`} size="small" sx={{ height: 18, bgcolor: (t) => alpha(t.palette.warning.main, 0.12), color: 'warning.dark', fontWeight: 600, fontSize: '10px' }} />
-                    )}
-                    {asset.serialNo && (
-                      <Typography variant="caption" color="text.disabled">S/N: {asset.serialNo}</Typography>
-                    )}
-                    {asset.ownerName && (
-                      <Typography variant="caption" color="primary.main" sx={{ ml: 1, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <PersonIcon sx={{ fontSize: 14 }} /> {asset.ownerName}
-                      </Typography>
-                    )}
-                  </Box>
-                </Box>
-              </Box>
-            </Grid>
-            <Grid item xs={12} md={3} sx={{ textAlign: { xs: 'left', md: 'right' }, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              {asset.purchasePrice != null && (
-                <Box>
-                  <Typography variant="h5" fontWeight={800} color="primary.main">
-                    ฿{Number(asset.purchasePrice).toLocaleString('th-TH')}
-                  </Typography>
-                  <Typography variant="caption" color="text.disabled" display="block">ราคาซื้อ</Typography>
-                </Box>
-              )}
-            </Grid>
-          </Grid>
-
-          {/* Action buttons */}
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 3, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
-            <Button variant="outlined" startIcon={<EditIcon sx={{ fontSize: 16 }} />} onClick={() => navigate(`/assets/${id}/edit`)} size="small" sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600 }}>
-              แก้ไข
-            </Button>
-            <Button
-              variant={isFavorite ? 'contained' : 'outlined'}
-              startIcon={isFavorite ? <StarIcon sx={{ fontSize: 16 }} /> : <StarBorderIcon sx={{ fontSize: 16 }} />}
-              onClick={toggleFavorite}
-              size="small"
-              sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600 }}
-            >
-              ดาวโปรด
-            </Button>
-            <Button variant="outlined" color="warning" startIcon={<QrCodeIcon sx={{ fontSize: 16 }} />} onClick={() => setShowQR(true)} size="small" sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600 }}>
-              QR Code
-            </Button>
-            <Button variant="outlined" startIcon={<PrintIcon sx={{ fontSize: 16 }} />} onClick={() => navigate(`/assets/print-qr?ids=${id}`)} size="small" sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600 }}>
-              พิมพ์สติ๊กเกอร์
-            </Button>
-            <Button variant="outlined" color="inherit" startIcon={<ArrowBackIcon sx={{ fontSize: 16 }} />} onClick={() => navigate('/assets')} size="small" sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600, ml: { sm: 'auto' } }}>
-              กลับรายการ
-            </Button>
-          </Box>
-        </CardContent>
-      </Card>
-
-      <LifecycleStepper asset={asset} />
-
-      {/* Quick stats strip */}
-      <Grid container spacing={1.5} sx={{ mb: 2 }}>
-        <Grid item xs={6} sm={3}>
-          <Card sx={{ textAlign: 'center', p: 1 }}>
-            <CardContent sx={{ py: '12px !important' }}>
-              <Typography variant="h6" fontWeight={800} color="text.primary" sx={{ lineHeight: 1 }}>
-                {historyCount}
-              </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '10px', mt: 0.5, display: 'block' }}>
-                ประวัติการเปลี่ยนแปลง
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={6} sm={3}>
-          <Card sx={{ textAlign: 'center', p: 1 }}>
-            <CardContent sx={{ py: '12px !important' }}>
-              <Typography variant="h6" fontWeight={800} color="secondary.main" sx={{ lineHeight: 1 }}>
-                {totalBorrows}
-              </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '10px', mt: 0.5, display: 'block' }}>
-                บันทึก PM
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={6} sm={3}>
-          <Card sx={{ textAlign: 'center', p: 1 }}>
-            <CardContent sx={{ py: '12px !important' }}>
-              <Typography variant="h6" fontWeight={800} color="success.main" sx={{ lineHeight: 1 }}>
-                {completedPMs}
-              </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '10px', mt: 0.5, display: 'block' }}>
-                PM เสร็จแล้ว
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={6} sm={3}>
-          <Card sx={{ textAlign: 'center', p: 1 }}>
-            <CardContent sx={{ py: '12px !important' }}>
-              <Typography
-                variant="h6"
-                fontWeight={800}
-                sx={{
-                  lineHeight: 1,
-                  color: warrantyDaysLeft === 0 ? 'error.main' : warrantyDaysLeft != null && warrantyDaysLeft < 180 ? 'warning.main' : 'primary.main'
-                }}
-              >
-                {warrantyDaysLeft != null ? warrantyDaysLeft.toLocaleString('th-TH') : '—'}
-              </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '10px', mt: 0.5, display: 'block' }}>
-                วันหมดประกัน
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* Warranty bar */}
-      <WarrantyBar purchaseDate={asset.purchaseDate} warrantyEndDate={asset.warrantyEndDate} />
-
-      {/* Tabs navigation */}
-      <Tabs
-        value={activeTab}
-        onChange={(_, val) => setActiveTab(val)}
-        variant="scrollable"
-        scrollButtons="auto"
-        sx={{
-          mb: 2,
-          borderBottom: 1,
-          borderColor: 'divider',
-          '& .MuiTab-root': {
-            fontWeight: 700,
-            fontSize: '0.8125rem',
-            minHeight: 44,
-          }
-        }}
-      >
-        <Tab value="spec" icon={<InfoOutlinedIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="สเปก" />
-        <Tab value="history" icon={<HistoryIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="ประวัติ" />
-        <Tab value="pm" icon={<BuildIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="PM" />
-        <Tab value="documents" icon={<InsertDriveFileIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="เอกสาร" />
-        <Tab value="repairs" icon={<HandymanIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="ประวัติการซ่อม" />
-        <Tab value="linked" icon={<LinkIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="อุปกรณ์ที่เชื่อมโยง" />
-      </Tabs>
-
-      {/* Tab panels */}
-      {activeTab === 'spec' && (
-        <SpecTab
-          asset={asset}
-          glpiSpec={glpiSpec}
-          loadingGLPI={loadingGLPI}
-          syncingGLPI={syncingGLPI}
-          onSync={handleGLPISync}
-        />
-      )}
-      {activeTab === 'history' && <HistoryTab asset={asset} />}
-      {activeTab === 'pm' && <PMTab asset={asset} />}
-      {activeTab === 'documents' && (
-        <DocumentsTab
-          asset={asset}
-          onReload={() => {
-            assetAPI.get(parseInt(id!)).then(res => setAsset(res.data));
-          }}
-        />
-      )}
-      {activeTab === 'repairs' && (
-        <MaintenanceTab
-          assetId={asset.id}
-          onUpdate={() => {
-            assetAPI.get(parseInt(id!)).then(res => setAsset(res.data));
-          }}
-        />
-      )}
-      {activeTab === 'linked' && <LinkedAssetsTab asset={asset} />}
-
-      {/* Similar assets */}
-      {similarAssets.length > 0 && (
-        <Box sx={{ mt: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-            <Box sx={{ width: 3, height: 14, borderRadius: '2px', bgcolor: 'primary.main' }} />
-            <Typography variant="subtitle2" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '.06em' }}>
-              ทรัพย์สินใกล้เคียงในหมวดหมู่เดียวกัน
-            </Typography>
-          </Box>
-          <Grid container spacing={1}>
-            {similarAssets.slice(0, 4).map((a: any) => (
-              <Grid item xs={12} key={a.id}>
-                <Box
-                  onClick={() => navigate(`/assets/${a.id}`)}
-                  sx={{
-                    cursor: 'pointer',
-                    p: 1.5,
-                    borderRadius: 2,
-                    bgcolor: (t) => alpha(t.palette.primary.main, 0.03),
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 2,
-                    transition: 'all 0.2s',
-                    '&:hover': {
-                      bgcolor: (t) => alpha(t.palette.primary.main, 0.06),
-                      borderColor: 'primary.main',
-                      transform: 'translateY(-2px)',
-                    }
-                  }}
-                >
-                  <Box>
-                    <Typography variant="body2" fontWeight={700} color="text.primary">
-                      {a.assetCode}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {a.brand} {a.model} · {a.serialNo}
-                    </Typography>
-                  </Box>
-                  <StatusChip status={a.status} />
-                </Box>
-              </Grid>
-            ))}
-          </Grid>
+      {/* Page header */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2, flexWrap: 'wrap' }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography sx={{ fontSize: '0.75rem', color: theme.palette.text.disabled }}>
+            รายการทรัพย์สิน / {asset.assetCode || asset.assetName}
+          </Typography>
+          <Typography sx={{ fontSize: '1.4rem', fontWeight: 800, color: theme.palette.text.primary, lineHeight: 1.25 }}>
+            {[asset.brand, asset.model].filter(Boolean).join(' ') || asset.assetName || asset.assetCode}
+          </Typography>
         </Box>
-      )}
+        <Button
+          variant={isFavorite ? 'contained' : 'outlined'}
+          startIcon={isFavorite ? <StarIcon sx={{ fontSize: 16 }} /> : <StarBorderIcon sx={{ fontSize: 16 }} />}
+          onClick={toggleFavorite}
+          size="small"
+          sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600 }}
+        >
+          ดาวโปรด
+        </Button>
+        <Button variant="outlined" color="warning" startIcon={<QrCodeIcon sx={{ fontSize: 16 }} />} onClick={() => setShowQR(true)} size="small" sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600 }}>
+          QR Code
+        </Button>
+        <Button variant="outlined" startIcon={<PrintIcon sx={{ fontSize: 16 }} />} onClick={() => navigate(`/assets/print-qr?ids=${id}`)} size="small" sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600 }}>
+          พิมพ์สติ๊กเกอร์
+        </Button>
+        <Button variant="outlined" color="inherit" startIcon={<ArrowBackIcon sx={{ fontSize: 16 }} />} onClick={() => navigate('/assets')} size="small" sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600 }}>
+          กลับรายการ
+        </Button>
+      </Box>
+
+      {/* Two-column shell — main content beside a sticky context rail */}
+      <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', flexDirection: { xs: 'column', lg: 'row' } }}>
+        {/* ── Main column ─────────────────────────────────── */}
+        <Box sx={{ flex: 1, minWidth: 0, width: '100%', display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <AssetOverviewCard asset={asset} />
+
+          <AssetInsightTiles asset={asset} maintenance={maintenance} />
+
+          <AssetFinanceCard asset={asset} />
+
+          <LifecycleStepper asset={asset} />
+
+          {/* Tabs navigation */}
+          <Box>
+            <Tabs
+              value={activeTab}
+              onChange={(_, val) => setActiveTab(val)}
+              variant="scrollable"
+              scrollButtons="auto"
+              sx={{
+                mb: 2,
+                borderBottom: 1,
+                borderColor: 'divider',
+                '& .MuiTab-root': {
+                  fontWeight: 700,
+                  fontSize: '0.8125rem',
+                  minHeight: 44,
+                }
+              }}
+            >
+              <Tab value="spec" icon={<InfoOutlinedIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="สเปก" />
+              <Tab value="history" icon={<HistoryIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="ประวัติ" />
+              <Tab value="pm" icon={<BuildIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="PM" />
+              <Tab value="documents" icon={<InsertDriveFileIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="เอกสาร" />
+              <Tab value="repairs" icon={<HandymanIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="ประวัติการซ่อม" />
+              <Tab value="linked" icon={<LinkIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="อุปกรณ์ที่เชื่อมโยง" />
+            </Tabs>
+
+            {/* Tab panels */}
+            {activeTab === 'spec' && (
+              <SpecTab
+                asset={asset}
+                glpiSpec={glpiSpec}
+                loadingGLPI={loadingGLPI}
+                syncingGLPI={syncingGLPI}
+                onSync={handleGLPISync}
+              />
+            )}
+            {activeTab === 'history' && <HistoryTab asset={asset} />}
+            {activeTab === 'pm' && <PMTab asset={asset} />}
+            {activeTab === 'documents' && <DocumentsTab asset={asset} onReload={reloadAsset} />}
+            {activeTab === 'repairs' && (
+              <MaintenanceTab
+                assetId={asset.id}
+                onUpdate={() => {
+                  reloadAsset();
+                  maintenanceAPI.getByAsset(asset.id)
+                    .then((res) => setMaintenance(Array.isArray(res.data) ? res.data : (res.data?.data || [])))
+                    .catch(() => {});
+                }}
+              />
+            )}
+            {activeTab === 'linked' && <LinkedAssetsTab asset={asset} />}
+          </Box>
+        </Box>
+
+        {/* ── Context rail ────────────────────────────────── */}
+        <Box sx={{
+          width: { xs: '100%', lg: 340 },
+          flex: 'none',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2,
+          position: { lg: 'sticky' },
+          top: { lg: 16 },
+        }}>
+          <AssetTimeline asset={asset} maintenance={maintenance} />
+
+          <AssetActionsPanel
+            onEdit={() => navigate(`/assets/${id}/edit`)}
+            onTransfer={() => navigate(`/assets/${id}/edit`)}
+            onReportRepair={() => {
+              setActiveTab('repairs');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onBorrow={() => navigate('/borrow/new')}
+            onReportDamage={() => navigate(`/assets/${id}/edit`)}
+            onProposeDisposal={() => navigate('/disposals')}
+          />
+
+          {/* Similar assets */}
+          {similarAssets.length > 0 && (
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                <Box sx={{ width: 3, height: 14, borderRadius: '2px', bgcolor: 'primary.main' }} />
+                <Typography variant="subtitle2" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '.06em', fontSize: '0.7rem' }}>
+                  ทรัพย์สินใกล้เคียงในหมวดหมู่เดียวกัน
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {similarAssets.slice(0, 4).map((a: any) => (
+                  <Box
+                    key={a.id}
+                    onClick={() => navigate(`/assets/${a.id}`)}
+                    sx={{
+                      cursor: 'pointer',
+                      p: 1.5,
+                      borderRadius: 2,
+                      bgcolor: (t) => alpha(t.palette.primary.main, 0.03),
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 1,
+                      transition: 'all 0.2s',
+                      '&:hover': {
+                        bgcolor: (t) => alpha(t.palette.primary.main, 0.06),
+                        borderColor: 'primary.main',
+                        transform: 'translateY(-2px)',
+                      }
+                    }}
+                  >
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography noWrap variant="body2" fontWeight={700} color="text.primary">
+                        {a.assetCode}
+                      </Typography>
+                      <Typography noWrap variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                        {a.brand} {a.model}
+                      </Typography>
+                    </Box>
+                    <StatusChip status={a.status} />
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+          )}
+        </Box>
+      </Box>
 
       {/* QR Modal */}
       <Dialog open={showQR} onClose={() => setShowQR(false)} maxWidth="xs" fullWidth sx={{ '& .MuiDialog-paper': { p: 1 } }}>
