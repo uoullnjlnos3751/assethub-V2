@@ -616,7 +616,11 @@ async function processDeviceAnswers(tx: any, run: any, answers: any[], oldAnswer
                         accountingCode,
                         serialNo: sNo,
                         assetName: deviceLabel,
-                        type: isPrinter ? 'Printer' : 'Monitor',
+                        // 'Monitor มาตรฐาน' (not bare 'Monitor') so the value lands on
+                        // one of the actual category_types options for จอภาพ — a bare
+                        // 'Monitor' matches no option, so the ประเภทอุปกรณ์ dropdown on
+                        // the edit page renders blank even though the field is set.
+                        type: isPrinter ? 'Printer' : 'Monitor มาตรฐาน',
                         categoryId: getCategoryIdByAssetType(isPrinter ? 'Printer' : 'Monitor') ?? undefined,
                         company: dev.company || run.asset?.company,
                         brand: dev.brand || '',
