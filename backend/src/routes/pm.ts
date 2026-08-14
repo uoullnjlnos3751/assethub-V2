@@ -615,7 +615,14 @@ async function processDeviceAnswers(tx: any, run: any, answers: any[], oldAnswer
                         assetCode: finalCode,
                         accountingCode,
                         serialNo: sNo,
-                        assetName: deviceLabel,
+                        // ชื่อทรัพย์สิน / รหัสทรัพย์สิน (IT) is the mandatory canonical
+                        // identifier (see AssetFormPage.tsx) — defaults to the
+                        // system-generated code itself, same as every manually
+                        // created asset with no distinct display name. brand/model
+                        // still get their own columns and still appear in
+                        // deviceLabel below for the per-row "which device was
+                        // found" text — just not duplicated into assetName.
+                        assetName: finalCode,
                         // 'Monitor มาตรฐาน' (not bare 'Monitor') so the value lands on
                         // one of the actual category_types options for จอภาพ — a bare
                         // 'Monitor' matches no option, so the ประเภทอุปกรณ์ dropdown on
