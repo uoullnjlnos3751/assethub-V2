@@ -1677,7 +1677,7 @@ function getAssetDetail(prisma: any, assetId: number, type?: string | null) {
     }
   });
 
-  function getCategoryIdByAssetType(type: string): number | null {
+  export function getCategoryIdByAssetType(type: string): number | null {
     const t = (type || '').toLowerCase().trim();
     if (!t) return null;
     if (t.includes('notebook') || t.includes('computer') || t.includes('macbook') || t === 'pc' || t.includes('laptop') || t.includes('workstation') || t.includes('mini pc')) {

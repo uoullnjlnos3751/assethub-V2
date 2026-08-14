@@ -4,6 +4,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { createNotification } from '../services/notification';
 import { fetchGLPISpecBySerial } from '../services/glpi';
+import { getCategoryIdByAssetType } from './assets';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -616,6 +617,7 @@ async function processDeviceAnswers(tx: any, run: any, answers: any[], oldAnswer
                         serialNo: sNo,
                         assetName: deviceLabel,
                         type: isPrinter ? 'Printer' : 'Monitor',
+                        categoryId: getCategoryIdByAssetType(isPrinter ? 'Printer' : 'Monitor') ?? undefined,
                         company: dev.company || run.asset?.company,
                         brand: dev.brand || '',
                         model: dev.model || '',
