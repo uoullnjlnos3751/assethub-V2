@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   Box, Typography, Card, CardContent, Grid, TextField, Switch, FormControlLabel,
-  Button, Alert, CircularProgress, Divider, Stack, Chip, Paper, Tabs, Tab,
+  Button, Alert, CircularProgress, Divider, Stack, Chip, Paper,
   Select, MenuItem, InputLabel, FormControl, useTheme, alpha,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Checkbox,
   Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
@@ -24,41 +24,40 @@ import EmailTemplateEditor from './settings/EmailTemplateEditor';
 import { SectionCard } from '../../components/SectionCard';
 import type { SystemSettings, NotificationTemplate, HealthCheckResult, NotificationLog } from './settings/types';
 
+// Grouped left-nav for the settings page. The `index` values are the
+// tab ids the content blocks below switch on — they intentionally do NOT
+// run in visual order, so groups can be rearranged without touching any
+// of the `{tab === N && ...}` render blocks.
 const TAB_GROUPS = [
   {
-    label: 'ระบบและทั่วไป', icon: <Globe size={20} />,
+    label: 'ทั่วไป', icon: <Globe size={15} />,
     items: [
-      { index: 0, label: 'ทั่วไป', icon: <Globe size={16} /> },
+      { index: 0, label: 'ข้อมูลระบบ', icon: <Globe size={16} /> },
       { index: 1, label: 'กฎการยืม', icon: <Clock size={16} /> },
+      { index: 7, label: 'การสร้างรหัสทรัพย์สิน', icon: <Building2 size={16} /> },
     ]
   },
   {
-    label: 'การติดต่อสื่อสาร', icon: <Bell size={20} />,
+    label: 'ผู้ใช้ & สิทธิ์', icon: <Users size={15} />,
+    items: [
+      { index: 8, label: 'ผู้ใช้งาน', icon: <Users size={16} /> },
+      { index: 10, label: 'ตารางสิทธิ์รายเมนู', icon: <Shield size={16} /> },
+      { index: 9, label: 'บริษัท & หน่วยงาน', icon: <Building2 size={16} /> },
+    ]
+  },
+  {
+    label: 'การแจ้งเตือน', icon: <Bell size={15} />,
     items: [
       { index: 2, label: 'LINE แจ้งเตือน', icon: <Smartphone size={16} /> },
       { index: 3, label: 'Templates อีเมล', icon: <Mail size={16} /> },
     ]
   },
   {
-    label: 'ความปลอดภัยและระบบ', icon: <Shield size={20} />,
+    label: 'ความปลอดภัย & ระบบ', icon: <Shield size={15} />,
     items: [
       { index: 4, label: 'ความปลอดภัย', icon: <Shield size={16} /> },
       { index: 5, label: 'ระบบ / Health', icon: <Server size={16} /> },
       { index: 6, label: 'จัดการข้อมูล', icon: <Database size={16} /> },
-    ]
-  },
-  {
-    label: 'ตั้งค่าการทำงาน (PM)', icon: <Settings size={20} />,
-    items: [
-      { index: 7, label: 'การสร้างรหัสทรัพย์สิน', icon: <Building2 size={16} /> },
-    ]
-  },
-  {
-    label: 'ผู้ใช้และองค์กร', icon: <Users size={20} />,
-    items: [
-      { index: 8, label: 'ผู้ใช้ & สิทธิ์', icon: <Users size={16} /> },
-      { index: 9, label: 'บริษัท & หน่วยงาน', icon: <Building2 size={16} /> },
-      { index: 10, label: 'ตารางสิทธิ์รายเมนู', icon: <Shield size={16} /> },
       { index: 11, label: 'เชื่อมต่อระบบภายนอก', icon: <Server size={16} /> },
     ]
   },
@@ -197,22 +196,59 @@ export default function SettingsPage() {
         </Box>
       </Box>
 
-      {/* Tab Navigation */}
-      <Paper elevation={0} sx={{ borderRadius: 2.5, border: `0.5px solid ${theme.palette.divider}`, mb: 3, p: 1 }}>
-        <Tabs
-          value={tab}
-          onChange={(_, v) => setTab(v)}
-          variant="scrollable"
-          scrollButtons="auto"
-          sx={{ minHeight: 40, '& .MuiTab-root': { minHeight: 40, textTransform: 'none', fontWeight: 600, fontSize: '0.85rem' } }}
-        >
-          {TAB_GROUPS.flatMap(g => g.items).map(item => (
-            <Tab key={item.index} icon={item.icon} label={item.label} iconPosition="start" />
-          ))}
-        </Tabs>
-      </Paper>
+      <Box sx={{ display: 'flex', gap: 2.5, alignItems: 'flex-start', flexDirection: { xs: 'column', md: 'row' } }}>
 
-      {/* ── Tab Content ── */}
+        {/* ── Grouped left nav ── */}
+        <Paper
+          elevation={0}
+          sx={{
+            width: { xs: '100%', md: 244 },
+            flexShrink: 0,
+            borderRadius: 2.5,
+            border: `0.5px solid ${theme.palette.divider}`,
+            p: 1,
+            position: { md: 'sticky' },
+            top: { md: 16 },
+          }}
+        >
+          {TAB_GROUPS.map((group, gi) => (
+            <Box key={group.label} sx={{ mt: gi === 0 ? 0 : 1.25 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 1.25, py: 0.75 }}>
+                <Box sx={{ display: 'flex', color: theme.palette.text.disabled }}>{group.icon}</Box>
+                <Typography sx={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '.05em', color: theme.palette.text.disabled }}>
+                  {group.label}
+                </Typography>
+              </Box>
+              {group.items.map(item => {
+                const active = tab === item.index;
+                return (
+                  <Box
+                    key={item.index}
+                    onClick={() => setTab(item.index)}
+                    sx={{
+                      display: 'flex', alignItems: 'center', gap: 1,
+                      px: 1.25, py: 0.85, borderRadius: '8px', cursor: 'pointer',
+                      bgcolor: active ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
+                      color: active ? theme.palette.primary.main : theme.palette.text.secondary,
+                      transition: 'background-color .15s, color .15s',
+                      '&:hover': {
+                        bgcolor: active ? alpha(theme.palette.primary.main, 0.14) : theme.palette.action.hover,
+                      },
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', flexShrink: 0 }}>{item.icon}</Box>
+                    <Typography sx={{ fontSize: '0.8rem', fontWeight: active ? 700 : 500, color: 'inherit' }}>
+                      {item.label}
+                    </Typography>
+                  </Box>
+                );
+              })}
+            </Box>
+          ))}
+        </Paper>
+
+        {/* ── Tab Content ── */}
+        <Box sx={{ flex: 1, minWidth: 0, width: '100%' }}>
       {tab === 0 && (
         <Box sx={{ maxWidth: 720, display: 'flex', flexDirection: 'column', gap: 2 }}>
           <SectionCard title="ข้อมูลระบบ" icon={Building2}>
@@ -632,6 +668,8 @@ export default function SettingsPage() {
       {tab === 11 && (
         <IntegrationsTab />
       )}
+        </Box>
+      </Box>
 
       {/* Dialogs */}
       <Dialog open={bulkDialog} onClose={() => setBulkDialog(false)}>
