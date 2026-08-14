@@ -689,6 +689,12 @@ export default function PMRunPage() {
           .filter((m: any) => !m.serial || !existingSerials.has(String(m.serial).trim().toLowerCase()))
           .map((m: any) => ({
             _assetId: m._assetId || undefined,
+            // Only trust GLPI's assetCode when it's the real code of an
+            // already-registered asset (_assetId set) — for a genuinely new
+            // monitor GLPI has no ITAM code yet and sends its own device name
+            // in this field instead, which must NOT overwrite the auto-
+            // generated running-number preview shown for new devices.
+            assetCode: m._assetId ? (m.assetCode || '') : undefined,
             hasMonitor: true,
             company: m.company || pmModal.run.asset?.company || 'TRR HQ',
             brand: m.brand || '',
