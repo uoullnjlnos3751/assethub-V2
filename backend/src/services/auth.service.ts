@@ -116,6 +116,7 @@ export class AuthService {
         displayName: user.displayName,
         email: user.email,
         department: user.department,
+        avatarUrl: user.avatarUrl,
       });
     } catch (err) {
       console.error('Token generation failed during login:', err);
