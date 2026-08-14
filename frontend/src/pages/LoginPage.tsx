@@ -4,7 +4,7 @@ import { Lock, Eye, EyeOff, Package, AlertCircle, Loader, Calendar, Clock, Lapto
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/api';
 import { extractApiError } from '../utils/errorHandler';
-import { APP_VERSION, GIT_COMMIT, BUILD_TIME, formatBuildTime } from '../utils/buildInfo';
+import { APP_VERSION, GIT_COMMIT, BUILD_NUMBER, BUILD_TIME, formatBuildTime } from '../utils/buildInfo';
 import './LoginPage.css';
 
 export default function LoginPage() {
@@ -327,8 +327,8 @@ export default function LoginPage() {
 
           </div>
 
-          <div className="version-footer" title={BUILD_TIME ? `Built ${formatBuildTime(BUILD_TIME)}` : undefined}>
-            {systemSettings?.systemName || 'AssetHub'} v{APP_VERSION} · {GIT_COMMIT}
+          <div className="version-footer" title={BUILD_TIME ? `อัปเดตครั้งที่ ${BUILD_NUMBER} · Built ${formatBuildTime(BUILD_TIME)}` : undefined}>
+            {systemSettings?.systemName || 'AssetHub'} v{APP_VERSION} · อัปเดตครั้งที่ {BUILD_NUMBER} · {GIT_COMMIT}
           </div>
         </div>
       </main>

@@ -17,6 +17,18 @@ function getGitCommit(): string {
   }
 }
 
+// Total commit count on the current branch — a running "build number" that
+// climbs by 1 on every deploy, unlike package.json's version (bumped by hand,
+// rarely) or the commit hash (unique but not orderable at a glance). Answers
+// "how many updates so far" directly. Falls back to '0' outside a git checkout.
+function getGitCommitCount(): string {
+  try {
+    return execSync('git rev-list --count HEAD', { cwd: projectRoot }).toString().trim();
+  } catch {
+    return '0';
+  }
+}
+
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf-8'));
 
 // The API's CORS allowlist is pinned to the deployed origins plus :5173, so a
@@ -41,6 +53,7 @@ export default defineConfig(({ mode }) => {
     define: {
       __APP_VERSION__: JSON.stringify(pkg.version),
       __GIT_COMMIT__: JSON.stringify(getGitCommit()),
+      __BUILD_NUMBER__: JSON.stringify(getGitCommitCount()),
       __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
     },
     server: {

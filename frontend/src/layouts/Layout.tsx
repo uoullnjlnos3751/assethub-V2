@@ -29,7 +29,7 @@ import PageTransition from '../components/PageTransition';
 import QRScannerModal from '../components/QRScannerModal';
 import { notificationAPI, assetAPI, presenceAPI, dashboardAPI } from '../services/api';
 import { adminNav, NavGroup, NavItem, userNavItems } from '../navigation/nav';
-import { APP_VERSION, GIT_COMMIT, BUILD_TIME, formatBuildTime } from '../utils/buildInfo';
+import { APP_VERSION, GIT_COMMIT, BUILD_NUMBER, BUILD_TIME, formatBuildTime } from '../utils/buildInfo';
 
 // ── Sidebar width matching ITSM HTML (210px) ───────────────────────────────
 const drawerWidth = 220;
@@ -541,7 +541,7 @@ export default function Layout() {
 
       {/* Build/version footer — so it's always visible which build is live */}
       {!collapsed && (
-        <Tooltip title={BUILD_TIME ? `Built ${formatBuildTime(BUILD_TIME)}` : ''} placement="top">
+        <Tooltip title={`อัปเดตครั้งที่ ${BUILD_NUMBER}${BUILD_TIME ? ` · Built ${formatBuildTime(BUILD_TIME)}` : ''}`} placement="top">
           <Typography noWrap sx={{
             fontSize: '9px',
             fontFamily: 'monospace',
@@ -551,7 +551,7 @@ export default function Layout() {
             py: '4px',
             flexShrink: 0,
           }}>
-            v{APP_VERSION} · {GIT_COMMIT}
+            v{APP_VERSION} · #{BUILD_NUMBER} · {GIT_COMMIT}
           </Typography>
         </Tooltip>
       )}
