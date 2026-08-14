@@ -60,10 +60,11 @@ export function AssetFinanceCard({ asset }: { asset: any }) {
     }
   }
 
-  // Nothing to draw at all — let the caller's grid collapse instead of
-  // rendering an empty shell.
-  if (!hasWarranty && !dep) return null;
-
+  // Always rendered, even with neither meter available: the handoff keeps this
+  // card beside the spec card at all times, and today only 8 of ~785 assets
+  // carry a warranty date and none carry a useful-life, so returning null here
+  // meant the layout almost never matched the design. Each half states plainly
+  // what's missing instead.
   return (
     <SectionCard title="ประกัน · ค่าเสื่อมราคา" icon={ShieldCheck}>
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.25 }}>

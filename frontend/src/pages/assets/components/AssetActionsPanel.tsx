@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Typography, alpha, useTheme } from '@mui/material';
-import { Zap, UserCog, Wrench, PackageCheck, Pencil, AlertTriangle, Recycle, type LucideIcon } from 'lucide-react';
+import { Zap, UserCog, Wrench, PackageCheck, Pencil, AlertTriangle, Recycle, QrCode, type LucideIcon } from 'lucide-react';
 import { SectionCard } from '../../../components/SectionCard';
 
 interface Action {
@@ -45,11 +45,14 @@ function ActionRow({ action }: { action: Action }) {
   );
 }
 
-export function AssetActionsPanel({ onEdit, onTransfer, onReportRepair, onBorrow, onReportDamage, onProposeDisposal }: {
+export function AssetActionsPanel({ onEdit, onTransfer, onReportRepair, onBorrow, onShowQR, onReportDamage, onProposeDisposal }: {
   onEdit: () => void;
   onTransfer: () => void;
   onReportRepair: () => void;
   onBorrow: () => void;
+  /** QR lives here rather than the header — the handoff's header carries only
+   *  back / print-label / transfer, and print-label already covers the sticker. */
+  onShowQR: () => void;
   onReportDamage: () => void;
   onProposeDisposal: () => void;
 }) {
@@ -58,6 +61,7 @@ export function AssetActionsPanel({ onEdit, onTransfer, onReportRepair, onBorrow
     { label: 'แจ้งซ่อม', icon: Wrench, onClick: onReportRepair },
     { label: 'บันทึกยืมออกนอกสถานที่', icon: PackageCheck, onClick: onBorrow },
     { label: 'แก้ไขข้อมูล', icon: Pencil, onClick: onEdit },
+    { label: 'แสดง QR Code', icon: QrCode, onClick: onShowQR },
     { label: 'แจ้งชำรุด / สูญหาย', icon: AlertTriangle, onClick: onReportDamage, tone: 'danger' },
     { label: 'เสนอตัดจำหน่าย', icon: Recycle, onClick: onProposeDisposal, tone: 'danger' },
   ];

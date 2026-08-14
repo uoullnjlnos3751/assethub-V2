@@ -168,17 +168,16 @@ export function SpecTab({ asset, glpiSpec, loadingGLPI, syncingGLPI, onSync }: {
         {/* General */}
         <Accordion defaultExpanded disableGutters elevation={0} sx={{ bgcolor: 'transparent', '&:before': { display: 'none' }, mb: 1 }}>
           <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ fontSize: 18 }} />} sx={{ minHeight: 0, py: 0.5, px: 0, '& .MuiAccordionSummary-content': { m: 0 } }}>
-            <SectionHeader title="ข้อมูลพื้นฐานทรัพย์สิน" />
+            <SectionHeader title="รหัสและการระบุตัวตน" />
           </AccordionSummary>
           <AccordionDetails sx={{ pt: 1.5, pb: 0.5, px: 0 }}>
+            {/* Only the identifiers the overview card at the top of the page
+                does not already show. Asset code, type, brand, model, serial
+                and company all live in the hero now, so repeating them here
+                was pure duplication. */}
             <Grid container spacing={1}>
-              <SpecItem label="เลขครุภัณฑ์" value={asset.assetCode} mono />
-              <SpecItem label="ชื่อทรัพย์สิน" value={asset.assetName} />
-              <SpecItem label="ประเภท" value={asset.type} />
-              <SpecItem label="ยี่ห้อ" value={asset.brand} />
-              <SpecItem label="รุ่น" value={asset.model} />
-              <SpecItem label="Serial No." value={asset.serialNo} mono />
-              <SpecItem label="Company" value={asset.company} />
+              <SpecItem label="ชื่อทรัพย์สิน / รหัสทรัพย์สิน (IT)" value={asset.assetName} mono />
+              <SpecItem label="เลขครุภัณฑ์ (ฝ่ายบัญชี)" value={asset.accountingCode} mono />
               <SpecItem label="รหัสทรัพย์สินเดิม" value={asset.oldAssetCode} mono />
               <SpecItem label="Domain Name" value={asset.domainName} />
             </Grid>

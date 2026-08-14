@@ -77,10 +77,13 @@ function buildEntries(asset: any, maintenance: any[]): Entry[] {
     const at = new Date(when).getTime();
     if (Number.isNaN(at)) continue;
     const total = run.answers?.length ?? 0;
-    const passed = (run.answers || []).filter((a: any) => String(a.value || '').toLowerCase().startsWith('yes') || a.value === 'PASS').length;
+    // Count answered items, matching AssetServiceHistoryCard — the two used to
+    // disagree (passed-count here vs answered-count there) while both read
+    // "ตรวจ X/Y ข้อ", so the same run showed two different numbers.
+    const answered = (run.answers || []).filter((a: any) => a.value !== null && a.value !== '').length;
     out.push({
       at,
-      title: `PM ${run.plan?.year || ''} — ${total > 0 ? `ตรวจ ${passed}/${total} ข้อ` : 'บันทึกผลแล้ว'}`.trim(),
+      title: `PM ${run.plan?.year || ''} — ${total > 0 ? `ตรวจ ${answered}/${total} ข้อ` : 'บันทึกผลแล้ว'}`.trim(),
       sub: [fmt(new Date(at)), run.performer?.displayName].filter(Boolean).join(' · '),
       tone: 'success',
     });
