@@ -32,6 +32,7 @@ import { AssetInsightTiles } from './components/AssetInsightTiles';
 import { AssetSpecMiniCard } from './components/AssetSpecMiniCard';
 import { AssetServiceHistoryCard } from './components/AssetServiceHistoryCard';
 import { AssetDocumentsRail } from './components/AssetDocumentsRail';
+import { PillTabBar } from '../../components/PillTabBar';
 
 const TABS = [
   { value: 'overview', label: 'ภาพรวม' },
@@ -211,42 +212,7 @@ export default function AssetDetailPage() {
         </Button>
       </Box>
 
-      {/* Pill tab bar */}
-      <Box sx={{
-        display: 'flex', gap: 0.75, flexWrap: 'wrap', mb: 2,
-        p: 0.75, borderRadius: '14px',
-        bgcolor: theme.palette.background.paper,
-        border: `1px solid ${theme.palette.divider}`,
-      }}>
-        {TABS.map(t => {
-          const active = activeTab === t.value;
-          return (
-            <Box
-              key={t.value}
-              onClick={() => setActiveTab(t.value)}
-              role="tab"
-              tabIndex={0}
-              aria-selected={active}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveTab(t.value); } }}
-              sx={{
-                px: 2, py: 1.05, borderRadius: '10px', cursor: 'pointer',
-                fontSize: '0.83rem', fontWeight: active ? 700 : 500,
-                color: active ? theme.palette.primary.main : theme.palette.text.secondary,
-                bgcolor: active ? alpha(theme.palette.primary.main, 0.12) : 'transparent',
-                border: `1px solid ${active ? alpha(theme.palette.primary.main, 0.35) : 'transparent'}`,
-                transition: 'all .18s',
-                '&:hover': active ? {} : {
-                  color: theme.palette.text.primary,
-                  bgcolor: alpha(theme.palette.text.primary, 0.05),
-                },
-                '&:focus-visible': { outline: `2px solid ${theme.palette.primary.main}`, outlineOffset: 2 },
-              }}
-            >
-              {t.label}
-            </Box>
-          );
-        })}
-      </Box>
+      <PillTabBar tabs={TABS} value={activeTab} onChange={setActiveTab} />
 
       {activeTab === 'overview' ? (
         /* Two-column shell — main content beside the context rail */
