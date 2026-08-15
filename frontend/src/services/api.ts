@@ -193,6 +193,18 @@ export const borrowAPI = {
   approve: (id: number, data: any) => api.post(`/borrow/requests/${id}/approve`, data),
   checkout: (id: number, data: any) => api.post(`/borrow/requests/${id}/checkout`, data),
   returnItem: (itemId: number, data: any) => api.post(`/borrow/items/${itemId}/return`, data),
+  uploadCheckoutImage: (checkoutId: number, file: File, description?: string) => {
+    const fd = new FormData();
+    fd.append('image', file);
+    if (description) fd.append('description', description);
+    return api.post(`/borrow/checkouts/${checkoutId}/images`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
+  uploadReturnImage: (returnId: number, file: File, description?: string) => {
+    const fd = new FormData();
+    fd.append('image', file);
+    if (description) fd.append('description', description);
+    return api.post(`/borrow/returns/${returnId}/images`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
   sendReminder: (itemId: number, data: any) => api.post(`/borrow/items/${itemId}/reminder`, data),
   history: (params?: any) => api.get('/borrow/history', { params }),
   createExtension: (data: any) => api.post('/borrow/extensions', data),

@@ -17,13 +17,16 @@ import { borrowAPI } from '../../services/api';
 import StatusChip from '../../components/StatusChip';
 import { useToast } from '../../contexts/ToastContext';
 import { formatDate } from '../../utils/dateUtils';
-
+import QRScannerModal from '../../components/QRScannerModal';
+import { SignaturePad } from '../../components/SignaturePad';
+import { EvidencePhotoPicker, type PendingPhoto } from '../../components/EvidencePhotoPicker';
 
 const conditions = [
   { value: 'Normal', label: 'ปกติ' },
   { value: 'Damaged', label: 'เสียหาย' },
   { value: 'Repairing', label: 'ส่งซ่อม' },
   { value: 'AccessoryIncomplete', label: 'อุปกรณ์เสริมไม่ครบ' },
+  { value: 'Lost', label: 'สูญหาย' },
 ];
 
 interface BorrowItem {
@@ -274,6 +277,9 @@ export default function ReturnPage() {
   const [quickReturnMode, setQuickReturnMode] = useState(false);
   const [quickSearch, setQuickSearch] = useState('');
   const [quickResults, setQuickResults] = useState<FlatItem[]>([]);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [signatureData, setSignatureData] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<PendingPhoto[]>([]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -412,6 +418,8 @@ export default function ReturnPage() {
     setDamageNote('');
     setAccessoriesNote('');
     setReceiverName('');
+    setSignatureData(null);
+    setPhotos([]);
   };
 
   const handleReturnSubmit = async () => {
@@ -420,12 +428,24 @@ export default function ReturnPage() {
     setProcessing(true);
     try {
       for (const item of dialog.items) {
-        await borrowAPI.returnItem(item.id, { condition, damageNote, accessoriesNote, receiverName });
+        const res = await borrowAPI.returnItem(item.id, { condition, damageNote, accessoriesNote, receiverName, signatureData });
+        const returnId = res.data?.returnId;
+        if (returnId && photos.length > 0) {
+          // Best-effort: the return itself already succeeded, so a photo
+          // upload failure shouldn't roll back or block the flow — just
+          // surface it and move on.
+          for (const p of photos) {
+            try { await borrowAPI.uploadReturnImage(returnId, p.file); }
+            catch { toast.error('อัปโหลดรูปภาพบางรายการไม่สำเร็จ'); }
+          }
+        }
       }
       toast.success(`คืนทรัพย์สิน ${dialog.items.length} รายการสำเร็จ`);
       setDialog({ open: false, items: [] });
       setQuickSearch('');
       setQuickResults([]);
+      setSignatureData(null);
+      setPhotos([]);
       fetchData();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'เกิดข้อผิดพลาด');
@@ -510,6 +530,9 @@ export default function ReturnPage() {
               sx={{ minWidth: 160 }}
             >
               {quickReturnMode ? 'ปิดโหมดคืนด่วน' : 'คืนด่วน'}
+            </Button>
+            <Button variant="outlined" startIcon={<QrCodeScannerIcon />} onClick={() => setScannerOpen(true)}>
+              สแกน QR รับคืน
             </Button>
           </Box>
 
@@ -650,9 +673,23 @@ export default function ReturnPage() {
           {(condition === 'Damaged' || condition === 'Repairing') && (
             <TextField label="รายละเอียดความเสียหาย" fullWidth multiline rows={2} value={damageNote} onChange={(e) => setDamageNote(e.target.value)} placeholder="บรรยายสภาพเสียหาย" sx={{ mb: 2 }} />
           )}
-          {condition === 'AccessoryIncomplete' && (
-            <TextField label="อุปกรณ์เสริมที่ไม่ครบ" fullWidth multiline rows={2} value={accessoriesNote} onChange={(e) => setAccessoriesNote(e.target.value)} placeholder="ระบุอุปกรณ์ที่ไม่มา" />
+          {condition === 'Lost' && (
+            <TextField label="รายละเอียดการสูญหาย" fullWidth multiline rows={2} value={damageNote} onChange={(e) => setDamageNote(e.target.value)} placeholder="สถานการณ์ที่ทราบว่าสูญหาย" sx={{ mb: 2 }} />
           )}
+          {condition === 'AccessoryIncomplete' && (
+            <TextField label="อุปกรณ์เสริมที่ไม่ครบ" fullWidth multiline rows={2} value={accessoriesNote} onChange={(e) => setAccessoriesNote(e.target.value)} placeholder="ระบุอุปกรณ์ที่ไม่มา" sx={{ mb: 2 }} />
+          )}
+
+          <Box sx={{ mb: 2 }}>
+            <EvidencePhotoPicker photos={photos} onChange={setPhotos} label="แนบภาพถ่ายสภาพตอนรับคืน" />
+          </Box>
+
+          <Box>
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.75 }}>
+              ลายเซ็นผู้รับคืน
+            </Typography>
+            <SignaturePad onChange={setSignatureData} />
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialog({ open: false, items: [] })}>ยกเลิก</Button>
@@ -661,6 +698,21 @@ export default function ReturnPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <QRScannerModal
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onScan={(decoded) => {
+          const match = flatItems.find(i => i.assetCode === decoded || i.serialNo === decoded);
+          if (match) {
+            handleQuickReturn(match);
+          } else {
+            setQuickReturnMode(true);
+            setQuickSearch(decoded);
+            toast.error(`ไม่พบทรัพย์สินที่กำลังยืมอยู่ตรงกับรหัส "${decoded}"`);
+          }
+        }}
+      />
     </Box>
   );
 }

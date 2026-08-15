@@ -7,9 +7,13 @@ import { useNavigate } from 'react-router-dom';
 interface Props {
   open: boolean;
   onClose: () => void;
+  /** When provided, a successful scan calls this instead of navigating to
+   *  the asset search page — used by pages (checkout/return) that want to
+   *  act on the scanned code themselves rather than leaving the page. */
+  onScan?: (decodedText: string) => void;
 }
 
-export default function QRScannerModal({ open, onClose }: Props) {
+export default function QRScannerModal({ open, onClose, onScan }: Props) {
   const navigate = useNavigate();
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
 
@@ -32,9 +36,13 @@ export default function QRScannerModal({ open, onClose }: Props) {
                 scannerRef.current = null;
               }
               onClose();
-              
-              // Assume decodedText is the Asset Code
-              navigate(`/assets?search=${encodeURIComponent(decodedText)}`);
+
+              if (onScan) {
+                onScan(decodedText);
+              } else {
+                // Assume decodedText is the Asset Code
+                navigate(`/assets?search=${encodeURIComponent(decodedText)}`);
+              }
             },
             (error) => {
               // Ignore typical scan errors
@@ -55,7 +63,7 @@ export default function QRScannerModal({ open, onClose }: Props) {
         scannerRef.current = null;
       }
     };
-  }, [open, onClose, navigate]);
+  }, [open, onClose, navigate, onScan]);
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">

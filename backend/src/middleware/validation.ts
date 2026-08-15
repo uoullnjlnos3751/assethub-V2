@@ -31,15 +31,17 @@ export const approveSchema = z.object({
 export const checkoutSchema = z.object({
   receivedBy: z.string().optional(),
   handoverNote: z.string().optional(),
+  signatureData: z.string().optional(),
 });
 
 export const returnSchema = z.object({
-  condition: z.enum(['Normal', 'Damaged', 'Repairing', 'AccessoryIncomplete'], {
+  condition: z.enum(['Normal', 'Damaged', 'Repairing', 'AccessoryIncomplete', 'Lost'], {
     errorMap: () => ({ message: 'กรุณาเลือกสภาพเครื่อง' }),
   }),
   damageNote: z.string().optional(),
   accessoriesNote: z.string().optional(),
   receiverName: z.string().optional(),
+  signatureData: z.string().optional(),
 });
 
 export const extensionSchema = z.object({

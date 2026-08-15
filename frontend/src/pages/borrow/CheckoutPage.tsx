@@ -9,9 +9,13 @@ import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
 import HandymanIcon from '@mui/icons-material/Handyman';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import { borrowAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatDate } from '../../utils/dateUtils';
+import QRScannerModal from '../../components/QRScannerModal';
+import { SignaturePad } from '../../components/SignaturePad';
+import { EvidencePhotoPicker, type PendingPhoto } from '../../components/EvidencePhotoPicker';
 
 
 interface Request {
@@ -55,6 +59,9 @@ export default function CheckoutPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [signatureData, setSignatureData] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<PendingPhoto[]>([]);
 
   const fetchData = () => {
     setLoading(true);
@@ -96,11 +103,22 @@ export default function CheckoutPage() {
     setProcessing(true);
     setError('');
     try {
-      await borrowAPI.checkout(dialog.request.id, { receivedBy, handoverNote });
+      const res = await borrowAPI.checkout(dialog.request.id, { receivedBy, handoverNote, signatureData });
+      const checkoutId = res.data?.checkoutId;
+      if (checkoutId && photos.length > 0) {
+        // Best-effort, same reasoning as ReturnPage: the handover already
+        // succeeded, a photo failing to attach shouldn't undo it.
+        for (const p of photos) {
+          try { await borrowAPI.uploadCheckoutImage(checkoutId, p.file); }
+          catch { setError('ส่งมอบสำเร็จ แต่อัปโหลดรูปภาพบางรายการไม่สำเร็จ'); }
+        }
+      }
       setSuccess('ส่งมอบทรัพย์สินสำเร็จ');
       setDialog({ open: false, request: null });
       setReceivedBy('');
       setHandoverNote('');
+      setSignatureData(null);
+      setPhotos([]);
       fetchData();
     } catch (err: any) {
       setError(err.response?.data?.error || 'เกิดข้อผิดพลาด');
@@ -159,7 +177,7 @@ export default function CheckoutPage() {
       )}
 
       {/* Search */}
-      <Box sx={{ mb: 2 }}>
+      <Box sx={{ mb: 2, display: 'flex', gap: 1.5 }}>
         <TextField
           label="ค้นหา"
           fullWidth
@@ -183,7 +201,16 @@ export default function CheckoutPage() {
           }}
           placeholder="ค้นหาด้วยเลขที่, ผู้ขอ, หรือวัตถุประสงค์"
         />
+        <Button variant="outlined" startIcon={<QrCodeScannerIcon />} onClick={() => setScannerOpen(true)} sx={{ flexShrink: 0 }}>
+          สแกน QR
+        </Button>
       </Box>
+
+      <QRScannerModal
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onScan={(decoded) => setSearchTerm(decoded)}
+      />
 
       {/* Requests Table */}
       <Card>
@@ -496,7 +523,19 @@ export default function CheckoutPage() {
                 value={handoverNote}
                 onChange={(e) => setHandoverNote(e.target.value)}
                 placeholder="เช่น ส่งมอบเรียบร้อย, สภาพปกติ"
+                sx={{ mb: 2 }}
               />
+
+              <Box sx={{ mb: 2 }}>
+                <EvidencePhotoPicker photos={photos} onChange={setPhotos} label="แนบภาพถ่ายสภาพก่อนส่งมอบ" />
+              </Box>
+
+              <Box>
+                <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.75 }}>
+                  ลายเซ็นผู้รับมอบ
+                </Typography>
+                <SignaturePad onChange={setSignatureData} />
+              </Box>
             </Box>
           )}
         </DialogContent>

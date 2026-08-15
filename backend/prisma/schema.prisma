@@ -683,16 +683,33 @@ model BorrowApproval {
 }
 
 model Checkout {
-  id           Int           @id @default(autoincrement())
-  requestId    Int
-  checkoutBy   Int
-  receivedBy   String?
-  checkoutAt   DateTime      @default(now())
-  handoverNote String?
-  checker      AppUser       @relation(fields: [checkoutBy], references: [id])
-  request      BorrowRequest @relation(fields: [requestId], references: [id])
+  id            Int             @id @default(autoincrement())
+  requestId     Int
+  checkoutBy    Int
+  receivedBy    String?
+  checkoutAt    DateTime        @default(now())
+  handoverNote  String?
+  // Base64 PNG data URL from the on-screen signature pad — small enough
+  // (a few KB) that storing it as text alongside the row is reasonable,
+  // unlike the photo evidence below which goes to disk like every other
+  // evidence-photo model in this schema (see MaintenanceImage).
+  signatureData String?
+  checker       AppUser         @relation(fields: [checkoutBy], references: [id])
+  request       BorrowRequest   @relation(fields: [requestId], references: [id])
+  images        CheckoutImage[]
 
   @@map("checkouts")
+}
+
+model CheckoutImage {
+  id          Int      @id @default(autoincrement())
+  checkoutId  Int
+  checkout    Checkout @relation(fields: [checkoutId], references: [id], onDelete: Cascade)
+  imageUrl    String
+  description String?
+  createdAt   DateTime @default(now())
+
+  @@map("checkout_images")
 }
 
 model Return {
@@ -704,10 +721,23 @@ model Return {
   damageNote      String?
   accessoriesNote String?
   receiverName    String?
+  signatureData   String?
   requestItem     BorrowRequestItem @relation(fields: [requestItemId], references: [id])
   returner        AppUser           @relation(fields: [returnBy], references: [id])
+  images          ReturnImage[]
 
   @@map("returns")
+}
+
+model ReturnImage {
+  id          Int      @id @default(autoincrement())
+  returnId    Int
+  return      Return   @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  imageUrl    String
+  description String?
+  createdAt   DateTime @default(now())
+
+  @@map("return_images")
 }
 
 model BorrowExtension {
@@ -1237,6 +1267,7 @@ enum ReturnCondition {
   Damaged
   Repairing
   AccessoryIncomplete
+  Lost
 }
 
 enum NotificationChannel {

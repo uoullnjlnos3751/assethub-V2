@@ -1,4 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import multer from 'multer';
+import path from 'path';
+import crypto from 'crypto';
+import fs from 'fs';
 import { prisma } from '../lib/prisma';
 import { authenticate, authorize } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
@@ -6,6 +10,19 @@ import { createNotification } from '../services/notification';
 import { validate, borrowRequestSchema, approveSchema, checkoutSchema, returnSchema, extensionSchema, reminderSchema } from '../middleware/validation';
 
 const router = Router();
+
+// Evidence photos for checkout/return — same disk-storage + UUID-filename
+// pattern as maintenance.ts's upload, one shared folder since both are
+// short-lived evidence shots of the same borrow-request lifecycle.
+const EVIDENCE_UPLOAD_DIR = path.join(__dirname, '..', '..', 'uploads', 'borrow');
+fs.mkdirSync(EVIDENCE_UPLOAD_DIR, { recursive: true });
+const uploadEvidence = multer({
+  storage: multer.diskStorage({
+    destination: (_req: any, _file: any, cb: any) => cb(null, EVIDENCE_UPLOAD_DIR),
+    filename: (_req: any, file: any, cb: any) => cb(null, `${crypto.randomUUID()}${path.extname(file.originalname)}`),
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+});
 
 async function getBorrowDays(): Promise<number> {
   const settings = await prisma.notificationSetting.findFirst();
@@ -438,11 +455,11 @@ router.post('/requests/:id/approve', authenticate, authorize('IT_ADMIN', 'SUPERA
 router.post('/requests/:id/checkout', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), validate(checkoutSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
-    const { receivedBy, handoverNote } = req.body;
+    const { receivedBy, handoverNote, signatureData } = req.body;
 
     const request = await prisma.borrowRequest.findUnique({
       where: { id },
-      include: { 
+      include: {
         items: { include: { asset: { include: { category: true } }, inventoryItem: true } },
         requester: true
       },
@@ -450,6 +467,7 @@ router.post('/requests/:id/checkout', authenticate, authorize('IT_ADMIN', 'SUPER
     if (!request) throw new AppError('ไม่พบคำขอ', 404);
     if (request.status !== 'Approved') throw new AppError('คำขอยังไม่ได้รับการอนุมัติ');
 
+    let checkoutId = 0;
     await prisma.$transaction(async (tx) => {
       for (const item of request.items) {
         if (item.isQuantityBased && item.inventoryItem) {
@@ -471,9 +489,10 @@ router.post('/requests/:id/checkout', authenticate, authorize('IT_ADMIN', 'SUPER
         }
       }
 
-      await tx.checkout.create({
-        data: { requestId: id, checkoutBy: req.user!.userId, receivedBy, handoverNote },
+      const checkout = await tx.checkout.create({
+        data: { requestId: id, checkoutBy: req.user!.userId, receivedBy, handoverNote, signatureData },
       });
+      checkoutId = checkout.id;
 
       await tx.borrowRequest.update({
         where: { id },
@@ -539,7 +558,26 @@ router.post('/requests/:id/checkout', authenticate, authorize('IT_ADMIN', 'SUPER
       await createNotification('checkout_completed', 'LINE', 'broadcast', payload);
     }
 
-    res.json({ message: 'Check-out สำเร็จ' });
+    res.json({ message: 'Check-out สำเร็จ', checkoutId });
+  } catch (err) { next(err); }
+});
+
+// ── IT Admin: Upload evidence photo for a checkout ──
+router.post('/checkouts/:checkoutId/images', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), uploadEvidence.single('image'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const checkoutId = parseInt(req.params.checkoutId);
+    if (!req.file) throw new AppError('ไม่พบไฟล์รูปภาพ', 400);
+    const checkout = await prisma.checkout.findUnique({ where: { id: checkoutId } });
+    if (!checkout) throw new AppError('ไม่พบรายการส่งมอบ', 404);
+
+    const image = await prisma.checkoutImage.create({
+      data: {
+        checkoutId,
+        imageUrl: `/uploads/borrow/${req.file.filename}`,
+        description: req.body.description,
+      },
+    });
+    res.status(201).json(image);
   } catch (err) { next(err); }
 });
 
@@ -547,7 +585,7 @@ router.post('/requests/:id/checkout', authenticate, authorize('IT_ADMIN', 'SUPER
 router.post('/items/:itemId/return', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), validate(returnSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const itemId = parseInt(req.params.itemId);
-    const { condition, damageNote, accessoriesNote, receiverName } = req.body;
+    const { condition, damageNote, accessoriesNote, receiverName, signatureData } = req.body;
 
     const item = await prisma.borrowRequestItem.findUnique({
       where: { id: itemId },
@@ -558,8 +596,9 @@ router.post('/items/:itemId/return', authenticate, authorize('IT_ADMIN', 'SUPERA
       throw new AppError('รายการนี้ไม่สามารถคืนได้');
     }
 
+    let returnId = 0;
     await prisma.$transaction(async (tx) => {
-      await tx.return.create({
+      const ret = await tx.return.create({
         data: {
           requestItemId: itemId,
           returnBy: req.user!.userId,
@@ -567,8 +606,10 @@ router.post('/items/:itemId/return', authenticate, authorize('IT_ADMIN', 'SUPERA
           damageNote: damageNote || null,
           accessoriesNote: accessoriesNote || null,
           receiverName: receiverName || null,
+          signatureData: signatureData || null,
         },
       });
+      returnId = ret.id;
 
       await tx.borrowRequestItem.update({
         where: { id: itemId },
@@ -576,23 +617,30 @@ router.post('/items/:itemId/return', authenticate, authorize('IT_ADMIN', 'SUPERA
       });
 
       if (item.isQuantityBased && item.inventoryItem) {
-        // Inventory item: increment stock
-        await tx.inventoryItem.update({
-          where: { id: item.inventoryItemId! },
-          data: { availableQuantity: { increment: item.quantity } },
-        });
+        // Inventory item: increment stock — unless it was lost, in which case
+        // it never actually came back and shouldn't re-enter available stock.
+        if (condition !== 'Lost') {
+          await tx.inventoryItem.update({
+            where: { id: item.inventoryItemId! },
+            data: { availableQuantity: { increment: item.quantity } },
+          });
+        }
       } else if (item.asset) {
-        // Serialized asset: update status
+        // Serialized asset: a lost item did not physically come back, so it
+        // can't go to 'Available' like every other condition here does today
+        // (that Damaged/Repairing also land on 'Available' is pre-existing
+        // behavior, unrelated to adding Lost, and left alone here).
+        const newStatus = condition === 'Lost' ? 'Lost' : 'Available';
         await tx.asset.update({
           where: { id: item.assetId! },
-          data: { status: 'Available' },
+          data: { status: newStatus },
         });
         await tx.assetHistory.create({
           data: {
             assetId: item.assetId!,
             actionType: 'RETURN',
             fromStatus: 'Borrowed',
-            toStatus: 'Available',
+            toStatus: newStatus,
             actorUserId: req.user!.userId,
             note: `Return - ${condition}${damageNote ? ': ' + damageNote : ''}`,
           },
@@ -617,7 +665,7 @@ router.post('/items/:itemId/return', authenticate, authorize('IT_ADMIN', 'SUPERA
     });
 
     if (item.request.requester) {
-      const conditionLabel = condition === 'Normal' ? 'ปกติ' : condition === 'Damaged' ? 'ชำรุด' : condition === 'Repairing' ? 'ต้องซ่อม' : 'อุปกรณ์ไม่ครบ';
+      const conditionLabel = condition === 'Normal' ? 'ปกติ' : condition === 'Damaged' ? 'ชำรุด' : condition === 'Repairing' ? 'ต้องซ่อม' : condition === 'Lost' ? 'สูญหาย' : 'อุปกรณ์ไม่ครบ';
       const returnDateStr = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
       const payload = {
         requestNo: item.request.requestNo,
@@ -642,7 +690,26 @@ router.post('/items/:itemId/return', authenticate, authorize('IT_ADMIN', 'SUPERA
       await createNotification('return_recorded', 'LINE', 'broadcast', payload);
     }
 
-    res.json({ message: 'คืนทรัพย์สินเรียบร้อย' });
+    res.json({ message: 'คืนทรัพย์สินเรียบร้อย', returnId });
+  } catch (err) { next(err); }
+});
+
+// ── IT Admin: Upload evidence photo for a return ──
+router.post('/returns/:returnId/images', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), uploadEvidence.single('image'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const returnId = parseInt(req.params.returnId);
+    if (!req.file) throw new AppError('ไม่พบไฟล์รูปภาพ', 400);
+    const ret = await prisma.return.findUnique({ where: { id: returnId } });
+    if (!ret) throw new AppError('ไม่พบรายการรับคืน', 404);
+
+    const image = await prisma.returnImage.create({
+      data: {
+        returnId,
+        imageUrl: `/uploads/borrow/${req.file.filename}`,
+        description: req.body.description,
+      },
+    });
+    res.status(201).json(image);
   } catch (err) { next(err); }
 });
 
