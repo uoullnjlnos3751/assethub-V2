@@ -12,7 +12,14 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import ExtensionIcon from '@mui/icons-material/Extension';
 import { borrowAPI } from '../../services/api';
 import { formatDate } from '../../utils/dateUtils';
+import { BorrowTrackingRulesPanel } from './components/BorrowTrackingRulesPanel';
 
+interface ExtStats {
+  extensionsPending: number;
+  extensionsApprovedThisMonth: number;
+  extensionsRejectedThisMonth: number;
+  avgPendingExtraDays: number | null;
+}
 
 interface Extension {
   id: number;
@@ -50,6 +57,9 @@ export default function ExtensionQueuePage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [stats, setStats] = useState<ExtStats | null>(null);
+
+  const fetchStats = () => borrowAPI.stats().then(res => setStats(res.data)).catch(() => setStats(null));
 
   const fetchData = async () => {
     setLoading(true);
@@ -88,6 +98,7 @@ export default function ExtensionQueuePage() {
 
   useEffect(() => {
     fetchData();
+    fetchStats();
   }, []);
 
   useEffect(() => {
@@ -119,6 +130,7 @@ export default function ExtensionQueuePage() {
       setDialog({ open: false, extension: null, action: null });
       setNote('');
       fetchData();
+      fetchStats();
     } catch (err: any) {
       setError(err.response?.data?.error || 'เกิดข้อผิดพลาด');
     } finally {
@@ -158,22 +170,48 @@ export default function ExtensionQueuePage() {
       )}
 
       {/* Statistics */}
-      {extensions.length > 0 && (
-        <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid item xs={12} sm={6} md={3}>
+      {stats && (
+        <Grid container spacing={2} sx={{ mb: 2 }}>
+          <Grid item xs={6} sm={3}>
             <Card>
               <CardContent>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  รอการอนุมัติ
-                </Typography>
+                <Typography variant="body2" color="text.secondary" gutterBottom noWrap>รอการอนุมัติ</Typography>
+                <Typography variant="h5" fontWeight={700}>{stats.extensionsPending}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={6} sm={3}>
+            <Card>
+              <CardContent>
+                <Typography variant="body2" color="text.secondary" gutterBottom noWrap>อนุมัติเดือนนี้</Typography>
+                <Typography variant="h5" fontWeight={700} color="success.main">{stats.extensionsApprovedThisMonth}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={6} sm={3}>
+            <Card>
+              <CardContent>
+                <Typography variant="body2" color="text.secondary" gutterBottom noWrap>ปฏิเสธเดือนนี้</Typography>
+                <Typography variant="h5" fontWeight={700} color="error.main">{stats.extensionsRejectedThisMonth}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={6} sm={3}>
+            <Card>
+              <CardContent>
+                <Typography variant="body2" color="text.secondary" gutterBottom noWrap>ขอเพิ่มเฉลี่ย</Typography>
                 <Typography variant="h5" fontWeight={700}>
-                  {extensions.length}
+                  {stats.avgPendingExtraDays != null ? `${stats.avgPendingExtraDays} วัน` : '—'}
                 </Typography>
               </CardContent>
             </Card>
           </Grid>
         </Grid>
       )}
+
+      <Box sx={{ mb: 3 }}>
+        <BorrowTrackingRulesPanel />
+      </Box>
 
       {/* Search */}
       <Box sx={{ mb: 2 }}>

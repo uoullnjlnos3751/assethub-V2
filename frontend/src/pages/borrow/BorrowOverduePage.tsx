@@ -12,7 +12,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import SendIcon from '@mui/icons-material/Send';
 import { borrowAPI } from '../../services/api';
 import { formatDate } from '../../utils/dateUtils';
-
+import { BorrowTrackingRulesPanel } from './components/BorrowTrackingRulesPanel';
 
 interface OverdueItem {
   id: number;
@@ -152,6 +152,10 @@ export default function BorrowOverduePage() {
           </Grid>
         </Grid>
       )}
+
+      <Box sx={{ mb: 3 }}>
+        <BorrowTrackingRulesPanel />
+      </Box>
 
       {/* Search */}
       <Box sx={{ mb: 2 }}>

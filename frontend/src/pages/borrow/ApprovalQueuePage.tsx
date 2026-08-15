@@ -30,7 +30,7 @@ const APPROVAL_RULES = [
 interface Request {
   id: number;
   requestNo: string;
-  requester: { displayName: string; adUsername: string; department?: string; company?: string };
+  requester: { id: number; displayName: string; adUsername: string; department?: string; company?: string };
   department: string;
   departmentId?: string;
   purpose: string;
@@ -41,6 +41,69 @@ interface Request {
     quantity?: number;
   }>;
   createdAt: string;
+  status?: string;
+}
+
+interface RequesterHistory {
+  totalBorrows: number;
+  totalReturns: number;
+  onTimeCount: number;
+  onTimePct: number | null;
+  lateCount: number;
+  damagedCount: number;
+  currentlySuspended: boolean;
+}
+
+/** The 3 steps this app actually tracks per request (create → approve → done),
+ *  matching BUSINESS-RULES.md's single-tier IT Admin approval — the mockup's
+ *  5-step version includes a "แจ้งหัวหน้า" cc-email step and separate
+ *  checkout/return steps that this same detail dialog already covers
+ *  elsewhere, so folding them in here would just duplicate that UI. */
+function ApprovalStepper({ request }: { request: Request }) {
+  const theme = useTheme();
+  const status = request.status || 'Pending';
+  const steps = [
+    { label: 'ผู้ยื่นคำขอ', done: true, sub: `${formatDate(request.createdAt)} · ${request.requester?.displayName || request.requester?.adUsername}` },
+    { label: 'IT Admin พิจารณา', done: status !== 'Pending', sub: status === 'Pending' ? 'รอดำเนินการ' : (status === 'Rejected' ? 'ปฏิเสธแล้ว' : 'อนุมัติแล้ว') },
+    { label: 'จ่ายของ & รับคืน', done: ['Returned', 'PartiallyReturned'].includes(status), sub: status === 'CheckedOut' ? 'ส่งมอบแล้ว รอรับคืน' : (['Returned', 'PartiallyReturned'].includes(status) ? 'ดำเนินการแล้ว' : 'ยังไม่ถึงขั้นตอน') },
+  ];
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+      {steps.map((s, i) => (
+        <Box key={s.label} sx={{ display: 'flex', gap: 1.25 }}>
+          <Box sx={{
+            width: 22, height: 22, borderRadius: '50%', flex: 'none', fontSize: '0.7rem', fontWeight: 700,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            bgcolor: s.done ? theme.palette.success.main : alpha(theme.palette.text.disabled, 0.15),
+            color: s.done ? '#fff' : theme.palette.text.disabled,
+          }}>
+            {s.done ? '✓' : i + 1}
+          </Box>
+          <Box>
+            <Typography variant="body2" fontWeight={700}>{s.label}</Typography>
+            <Typography variant="caption" color="text.secondary">{s.sub}</Typography>
+          </Box>
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
+function RequesterHistoryPanel({ userId }: { userId: number }) {
+  const [hist, setHist] = useState<RequesterHistory | null>(null);
+  useEffect(() => {
+    borrowAPI.requesterHistory(userId).then(res => setHist(res.data)).catch(() => setHist(null));
+  }, [userId]);
+  if (!hist) return null;
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.6 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}><Typography variant="body2" color="text.secondary">ยืมทั้งหมด</Typography><Typography variant="body2" fontWeight={700}>{hist.totalBorrows} ครั้ง</Typography></Box>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}><Typography variant="body2" color="text.secondary">คืนตรงเวลา</Typography><Typography variant="body2" fontWeight={700}>{hist.onTimeCount} ครั้ง{hist.onTimePct != null ? ` (${hist.onTimePct}%)` : ''}</Typography></Box>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}><Typography variant="body2" color="text.secondary">คืนล่าช้า</Typography><Typography variant="body2" fontWeight={700} color={hist.lateCount > 0 ? 'warning.main' : 'text.primary'}>{hist.lateCount} ครั้ง</Typography></Box>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}><Typography variant="body2" color="text.secondary">ความเสียหาย</Typography><Typography variant="body2" fontWeight={700} color={hist.damagedCount > 0 ? 'error.main' : 'text.primary'}>{hist.damagedCount > 0 ? `${hist.damagedCount} ครั้ง` : 'ไม่มี'}</Typography></Box>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}><Typography variant="body2" color="text.secondary">สถานะสิทธิ์</Typography><Typography variant="body2" fontWeight={700} color={hist.currentlySuspended ? 'error.main' : 'success.main'}>{hist.currentlySuspended ? 'ถูกระงับชั่วคราว' : 'ปกติ · ไม่ถูกระงับ'}</Typography></Box>
+    </Box>
+  );
 }
 
 export default function ApprovalQueuePage() {
@@ -411,6 +474,13 @@ export default function ApprovalQueuePage() {
                 <Typography fontWeight={600}>{detailDialog.request.requestNo}</Typography>
               </Box>
 
+              <Box sx={{ mb: 2.5, p: 1.5, borderRadius: 2, bgcolor: alpha(theme.palette.text.primary, theme.palette.mode === 'dark' ? 0.03 : 0.02) }}>
+                <Typography variant="caption" fontWeight={700} color="text.secondary" display="block" sx={{ mb: 1 }}>
+                  ขั้นตอนของคำขอนี้
+                </Typography>
+                <ApprovalStepper request={detailDialog.request} />
+              </Box>
+
               <Box sx={{ mb: 2 }}>
                 <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                   ผู้ขอ
@@ -439,6 +509,15 @@ export default function ApprovalQueuePage() {
                 </Typography>
                 <Typography>{detailDialog.request.purpose}</Typography>
               </Box>
+
+              {detailDialog.request.requester?.id && (
+                <Box sx={{ mb: 2, p: 1.5, borderRadius: 2, border: `1px solid ${theme.palette.divider}` }}>
+                  <Typography variant="caption" fontWeight={700} color="text.secondary" display="block" sx={{ mb: 1 }}>
+                    ประวัติการยืมของผู้ขอ
+                  </Typography>
+                  <RequesterHistoryPanel userId={detailDialog.request.requester.id} />
+                </Box>
+              )}
 
               <Divider sx={{ my: 2 }} />
 

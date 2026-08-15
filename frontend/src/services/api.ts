@@ -189,6 +189,7 @@ export const borrowAPI = {
   allRequests: (params?: any) => api.get('/borrow/all-requests', { params }),
   stats: () => api.get('/borrow/stats'),
   historyStats: () => api.get('/borrow/history-stats'),
+  requesterHistory: (userId: number) => api.get(`/borrow/requester-history/${userId}`),
   overdue: () => api.get('/borrow/overdue'),
   approve: (id: number, data: any) => api.post(`/borrow/requests/${id}/approve`, data),
   checkout: (id: number, data: any) => api.post(`/borrow/requests/${id}/checkout`, data),

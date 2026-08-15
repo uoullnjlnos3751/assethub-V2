@@ -1054,6 +1054,7 @@ router.get('/stats', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_
       pending, pendingOverDay, approvedToday, rejectedThisMonth,
       recentApprovals, activeItems, activeRequesterRows,
       overdueItems, dueTodayItems, returnsThisMonth,
+      extensionsPending, extensionsApprovedThisMonth, extensionsRejectedThisMonth, pendingExtensionExtraDays,
     ] = await Promise.all([
       prisma.borrowRequest.count({ where: { status: 'Pending' } }),
       prisma.borrowRequest.count({ where: { status: 'Pending', createdAt: { lt: oneDayAgo } } }),
@@ -1079,6 +1080,13 @@ router.get('/stats', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_
         where: { returnedAt: { gte: startOfMonth } },
         select: { returnedAt: true, requestItem: { select: { dueDate: true } } },
       }),
+      prisma.borrowExtension.count({ where: { status: 'Pending' } }),
+      prisma.borrowExtension.count({ where: { status: 'Approved', decidedAt: { gte: startOfMonth } } }),
+      prisma.borrowExtension.count({ where: { status: 'Rejected', decidedAt: { gte: startOfMonth } } }),
+      prisma.borrowExtensionItem.findMany({
+        where: { extension: { status: 'Pending' } },
+        select: { extraDays: true },
+      }),
     ]);
 
     const avgApprovalHours = recentApprovals.length > 0
@@ -1094,6 +1102,10 @@ router.get('/stats', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_
 
     const onTimeThisMonth = returnsThisMonth.filter(r => !r.requestItem.dueDate || r.returnedAt <= r.requestItem.dueDate).length;
 
+    const avgPendingExtraDays = pendingExtensionExtraDays.length > 0
+      ? Math.round(pendingExtensionExtraDays.reduce((sum, e) => sum + e.extraDays, 0) / pendingExtensionExtraDays.length)
+      : null;
+
     res.json({
       pending, pendingOverDay, approvedToday, rejectedThisMonth,
       avgApprovalHours: avgApprovalHours != null ? Math.round(avgApprovalHours * 10) / 10 : null,
@@ -1103,6 +1115,49 @@ router.get('/stats', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_
       dueTodayItems,
       returnedThisMonth: returnsThisMonth.length,
       returnedOnTimePct: returnsThisMonth.length > 0 ? Math.round((onTimeThisMonth / returnsThisMonth.length) * 100) : null,
+      extensionsPending, extensionsApprovedThisMonth, extensionsRejectedThisMonth, avgPendingExtraDays,
+    });
+  } catch (err) { next(err); }
+});
+
+// ── IT Admin: A requester's borrow track record — real aggregation over
+// their own Return/BorrowRequestItem history, used by the approval-queue
+// detail dialog (mirrors the mockup's "ประวัติการยืมของผู้ขอ" panel). No
+// suspension flag exists anywhere in the schema, so "currently suspended" is
+// derived here (a return >7 days late per BUSINESS-RULES.md §... within the
+// last 30 days) rather than read from a stored field — informational only,
+// nothing reads this to actually block a new request.
+router.get('/requester-history/:userId', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    const returns = await prisma.return.findMany({
+      where: { requestItem: { request: { requesterUserId: userId } } },
+      select: { returnedAt: true, condition: true, requestItem: { select: { dueDate: true } } },
+      orderBy: { returnedAt: 'desc' },
+    });
+
+    const totalReturns = returns.length;
+    const lateReturns = returns.filter(r => r.requestItem.dueDate && r.returnedAt > r.requestItem.dueDate);
+    const onTimeCount = totalReturns - lateReturns.length;
+    const damagedCount = returns.filter(r => r.condition === 'Damaged' || r.condition === 'Lost').length;
+
+    const now = Date.now();
+    const recentSevereLate = lateReturns.find(r => {
+      const daysLate = (r.returnedAt.getTime() - r.requestItem.dueDate!.getTime()) / 86400000;
+      const daysSinceReturn = (now - r.returnedAt.getTime()) / 86400000;
+      return daysLate > 7 && daysSinceReturn < 30;
+    });
+
+    const totalBorrows = await prisma.borrowRequestItem.count({ where: { request: { requesterUserId: userId } } });
+
+    res.json({
+      totalBorrows,
+      totalReturns,
+      onTimeCount,
+      onTimePct: totalReturns > 0 ? Math.round((onTimeCount / totalReturns) * 100) : null,
+      lateCount: lateReturns.length,
+      damagedCount,
+      currentlySuspended: !!recentSevereLate,
     });
   } catch (err) { next(err); }
 });

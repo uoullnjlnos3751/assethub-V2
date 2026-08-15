@@ -141,6 +141,11 @@ export default function BorrowRequestPage() {
   // Derived filter lists
   const allTypes = [...new Set(assets.map((a: any) => a.deviceType || a.category?.name || '').filter(Boolean))].sort();
   const allLocations = [...new Set(assets.map((a: any) => a.location || '').filter(Boolean))].sort();
+  const typeCounts = assets.reduce((acc: Record<string, number>, a: any) => {
+    const t = a.deviceType || a.category?.name || '';
+    if (t) acc[t] = (acc[t] || 0) + 1;
+    return acc;
+  }, {});
 
   const filteredAssets = assets.filter(a =>
     (assetSearch === '' ||
@@ -352,7 +357,7 @@ export default function BorrowRequestPage() {
                     {allTypes.map(t => (
                       <Chip
                         key={t}
-                        label={t}
+                        label={`${t} (${typeCounts[t] || 0})`}
                         onClick={() => setFilterType(t)}
                         color={filterType === t ? 'primary' : 'default'}
                         variant={filterType === t ? 'filled' : 'outlined'}
