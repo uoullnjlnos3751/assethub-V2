@@ -108,6 +108,10 @@ export default function ApprovalQueuePage() {
       setDialog({ open: false, request: null, action: null });
       setNote('');
       fetchData();
+      // The 4 stat cards (pending-over-1-day, approved today, etc.) come from
+      // a separate endpoint fetched once on mount — without this they kept
+      // showing pre-action numbers after every approve/reject.
+      borrowAPI.stats().then(res => setStats(res.data)).catch(() => {});
     } catch (err: any) {
       setError(err.response?.data?.error || 'เกิดข้อผิดพลาด');
     } finally {
