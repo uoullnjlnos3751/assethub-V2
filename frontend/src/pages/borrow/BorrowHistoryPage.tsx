@@ -11,6 +11,12 @@ import DownloadIcon from '@mui/icons-material/Download';
 import { borrowAPI } from '../../services/api';
 import { formatDate } from '../../utils/dateUtils';
 
+interface HistoryStats {
+  totalReturns: number;
+  onTimePct: number | null;
+  damagedPct: number | null;
+  topAssets: { assetId: number; assetCode: string; label: string; count: number }[];
+}
 
 interface HistoryRecord {
   id: number;
@@ -62,9 +68,11 @@ export default function BorrowHistoryPage() {
   const [selectedRecord, setSelectedRecord] = useState<HistoryRecord | null>(null);
   const [detailDialog, setDetailDialog] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [historyStats, setHistoryStats] = useState<HistoryStats | null>(null);
 
   useEffect(() => {
     fetchHistory();
+    borrowAPI.historyStats().then(res => setHistoryStats(res.data)).catch(() => setHistoryStats(null));
   }, []);
 
   const fetchHistory = async () => {
@@ -187,6 +195,55 @@ export default function BorrowHistoryPage() {
               </Card>
             </Grid>
           ))}
+        </Grid>
+      )}
+
+      {/* Analytics — computed from real Return/BorrowRequestItem records, not
+          shown until there's at least one completed return to base it on. */}
+      {historyStats && historyStats.totalReturns > 0 && (
+        <Grid container spacing={2} sx={{ mb: 3 }}>
+          <Grid item xs={12} sm={6} md={3}>
+            <Card>
+              <CardContent>
+                <Typography variant="body2" color="text.secondary" gutterBottom>คืนตรงกำหนด</Typography>
+                <Typography variant="h5" fontWeight={700} color={historyStats.onTimePct != null && historyStats.onTimePct < 80 ? 'warning.main' : 'success.main'}>
+                  {historyStats.onTimePct != null ? `${historyStats.onTimePct}%` : '—'}
+                </Typography>
+                <Typography variant="caption" color="text.disabled">จากการคืนทั้งหมด {historyStats.totalReturns} ครั้ง</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <Card>
+              <CardContent>
+                <Typography variant="body2" color="text.secondary" gutterBottom>คืนแล้วชำรุด</Typography>
+                <Typography variant="h5" fontWeight={700} color={historyStats.damagedPct != null && historyStats.damagedPct > 10 ? 'error.main' : 'text.primary'}>
+                  {historyStats.damagedPct != null ? `${historyStats.damagedPct}%` : '—'}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={12} md={6}>
+            <Card>
+              <CardContent>
+                <Typography variant="body2" color="text.secondary" gutterBottom>ทรัพย์สินยืมบ่อยสุด</Typography>
+                {historyStats.topAssets.length === 0 ? (
+                  <Typography variant="body2" color="text.disabled">ยังไม่มีข้อมูล</Typography>
+                ) : (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    {historyStats.topAssets.map((a, i) => (
+                      <Box key={a.assetId} sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+                        <Typography variant="body2" noWrap>
+                          {i + 1}. {a.assetCode} {a.label ? `— ${a.label}` : ''}
+                        </Typography>
+                        <Typography variant="body2" fontWeight={700} color="primary.main">{a.count}×</Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
         </Grid>
       )}
 

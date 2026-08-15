@@ -113,6 +113,7 @@ export const adminNav: NavEntry[] = [
     section: 'Service Desk',
     children: [
       { label: 'ของพร้อมยืม', path: '/assets?status=Available', icon: <CheckCircleOutlineIcon fontSize="small" /> },
+      { label: 'คำขอทั้งหมด', path: '/borrow/all-requests', icon: <ListAltIcon fontSize="small" /> },
       { label: 'รออนุมัติ', path: '/borrow/approval-queue', icon: <CheckCircleIcon fontSize="small" /> },
       { label: 'ส่งมอบ (Check-out)', path: '/borrow/checkout', icon: <HandymanIcon fontSize="small" /> },
       { label: 'รับคืน (Return)', path: '/borrow/return', icon: <AssignmentReturnIcon fontSize="small" /> },

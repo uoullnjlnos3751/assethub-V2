@@ -9,9 +9,23 @@ import ClearIcon from '@mui/icons-material/Clear';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { borrowAPI } from '../../services/api';
 import { formatDate } from '../../utils/dateUtils';
 
+interface QueueStats {
+  pending: number; pendingOverDay: number;
+  approvedToday: number; rejectedThisMonth: number;
+  avgApprovalHours: number | null;
+}
+
+// Real policy text from BUSINESS-RULES.md §2 — not decorative copy.
+const APPROVAL_RULES = [
+  'อนุมัติขั้นเดียวโดย IT Admin — ไม่มีขั้นตามมูลค่าและไม่มีสายบังคับบัญชา',
+  'ต้องอนุมัติภายใน 1 วันทำการ เกินแล้วระบบเตือน IT Admin ทุกเช้า 09:00',
+  'ปฏิเสธคำขอต้องระบุเหตุผลเสมอ ระบบแจ้งผู้ขอทันที',
+  'หัวหน้าผู้ขอได้รับสำเนาอีเมลเพื่อรับทราบ ไม่ต้องกดอนุมัติ',
+];
 
 interface Request {
   id: number;
@@ -44,6 +58,7 @@ export default function ApprovalQueuePage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [stats, setStats] = useState<QueueStats | null>(null);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -63,6 +78,7 @@ export default function ApprovalQueuePage() {
 
   useEffect(() => {
     fetchData();
+    borrowAPI.stats().then(res => setStats(res.data)).catch(() => setStats(null));
   }, []);
 
   useEffect(() => {
@@ -131,22 +147,64 @@ export default function ApprovalQueuePage() {
       )}
 
       {/* Statistics */}
-      {requests.length > 0 && (
-        <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid item xs={12} sm={6} md={3}>
+      {stats && (
+        <Grid container spacing={2} sx={{ mb: 2 }}>
+          <Grid item xs={6} sm={4} md={2.4}>
             <Card>
               <CardContent>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  รอการอนุมัติ
+                <Typography variant="body2" color="text.secondary" gutterBottom noWrap>รอการอนุมัติ</Typography>
+                <Typography variant="h5" fontWeight={700} color={stats.pendingOverDay > 0 ? 'warning.main' : 'text.primary'}>
+                  {stats.pending}
                 </Typography>
+                {stats.pendingOverDay > 0 && (
+                  <Typography variant="caption" color="warning.main" display="block">เกิน 1 วันทำการ {stats.pendingOverDay} คำขอ</Typography>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={6} sm={4} md={2.4}>
+            <Card>
+              <CardContent>
+                <Typography variant="body2" color="text.secondary" gutterBottom noWrap>อนุมัติวันนี้</Typography>
+                <Typography variant="h5" fontWeight={700} color="success.main">{stats.approvedToday}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={6} sm={4} md={2.4}>
+            <Card>
+              <CardContent>
+                <Typography variant="body2" color="text.secondary" gutterBottom noWrap>ปฏิเสธเดือนนี้</Typography>
+                <Typography variant="h5" fontWeight={700} color="error.main">{stats.rejectedThisMonth}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={6} sm={4} md={2.4}>
+            <Card>
+              <CardContent>
+                <Typography variant="body2" color="text.secondary" gutterBottom noWrap>เวลาเฉลี่ยดำเนินการ</Typography>
                 <Typography variant="h5" fontWeight={700}>
-                  {requests.length}
+                  {stats.avgApprovalHours != null ? `${stats.avgApprovalHours} ชม.` : '—'}
                 </Typography>
               </CardContent>
             </Card>
           </Grid>
         </Grid>
       )}
+
+      {/* Approval rules — real policy from BUSINESS-RULES.md, informational only */}
+      <Card sx={{ mb: 3, bgcolor: alpha(theme.palette.info.main, 0.06), border: `1px solid ${alpha(theme.palette.info.main, 0.2)}` }}>
+        <CardContent sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
+          <InfoOutlinedIcon color="info" fontSize="small" sx={{ mt: 0.25 }} />
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="subtitle2" fontWeight={700} gutterBottom>กฎที่ระบบบังคับใช้</Typography>
+            <Box component="ul" sx={{ m: 0, pl: 2.5, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+              {APPROVAL_RULES.map((rule) => (
+                <Typography component="li" key={rule} variant="body2" color="text.secondary">{rule}</Typography>
+              ))}
+            </Box>
+          </Box>
+        </CardContent>
+      </Card>
 
       {/* Search */}
       <Box sx={{ mb: 2 }}>

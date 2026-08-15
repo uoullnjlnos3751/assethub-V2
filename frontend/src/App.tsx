@@ -15,6 +15,7 @@ const MyRequestsPage = lazy(() => import('./pages/borrow/MyRequestsPage'));
 const MyItemsPage = lazy(() => import('./pages/borrow/MyItemsPage'));
 const MyHistoryPage = lazy(() => import('./pages/borrow/MyHistoryPage'));
 const MyExtensionsPage = lazy(() => import('./pages/borrow/MyExtensionsPage'));
+const AllRequestsPage = lazy(() => import('./pages/borrow/AllRequestsPage'));
 const ApprovalQueuePage = lazy(() => import('./pages/borrow/ApprovalQueuePage'));
 const CheckoutPage = lazy(() => import('./pages/borrow/CheckoutPage'));
 const ReturnPage = lazy(() => import('./pages/borrow/ReturnPage'));
@@ -108,6 +109,7 @@ export default function App() {
           <Route path="borrow/my-history" element={<MyHistoryPage />} />
           <Route path="borrow/my-extensions" element={<MyExtensionsPage />} />
           {/* Borrow - IT Admin */}
+          <Route path="borrow/all-requests" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><AllRequestsPage /></ProtectedRoute>} />
           <Route path="borrow/approval-queue" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><ApprovalQueuePage /></ProtectedRoute>} />
           <Route path="borrow/overdue" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><BorrowOverduePage /></ProtectedRoute>} />
           <Route path="borrow/checkout" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><CheckoutPage /></ProtectedRoute>} />

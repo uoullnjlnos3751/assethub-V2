@@ -969,4 +969,118 @@ router.get('/history', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async 
   } catch (err) { next(err); }
 });
 
+// ── IT Admin: Operational stat tiles for the all-requests / approval-queue
+// screens. One shared endpoint rather than duplicating the same counts in two
+// places — the approval queue's extra cards (pending-over-1-day, approved
+// today, etc.) are just a subset of what the all-requests dashboard needs.
+router.get('/stats', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endOfToday = new Date(startOfToday.getTime() + 86400000);
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    // "1 วันทำการ" per BUSINESS-RULES.md is approximated as 24h — the system
+    // has no holiday/weekend calendar to compute true business days against.
+    const oneDayAgo = new Date(now.getTime() - 86400000);
+
+    const [
+      pending, pendingOverDay, approvedToday, rejectedThisMonth,
+      recentApprovals, activeItems, activeRequesterRows,
+      overdueItems, dueTodayItems, returnsThisMonth,
+    ] = await Promise.all([
+      prisma.borrowRequest.count({ where: { status: 'Pending' } }),
+      prisma.borrowRequest.count({ where: { status: 'Pending', createdAt: { lt: oneDayAgo } } }),
+      prisma.borrowApproval.count({ where: { action: 'Approved', actedAt: { gte: startOfToday, lt: endOfToday } } }),
+      prisma.borrowApproval.count({ where: { action: 'Rejected', actedAt: { gte: startOfMonth } } }),
+      prisma.borrowApproval.findMany({
+        where: { actedAt: { gte: startOfMonth } },
+        select: { actedAt: true, request: { select: { createdAt: true } } },
+      }),
+      prisma.borrowRequestItem.count({ where: { itemStatus: 'CheckedOut' } }),
+      prisma.borrowRequestItem.findMany({
+        where: { itemStatus: 'CheckedOut' },
+        select: { request: { select: { requesterUserId: true } } },
+      }),
+      prisma.borrowRequestItem.findMany({
+        where: { itemStatus: { in: ['CheckedOut', 'PartiallyReturned'] }, dueDate: { lt: now } },
+        select: { dueDate: true },
+      }),
+      prisma.borrowRequestItem.count({
+        where: { itemStatus: { in: ['CheckedOut', 'PartiallyReturned'] }, dueDate: { gte: startOfToday, lt: endOfToday } },
+      }),
+      prisma.return.findMany({
+        where: { returnedAt: { gte: startOfMonth } },
+        select: { returnedAt: true, requestItem: { select: { dueDate: true } } },
+      }),
+    ]);
+
+    const avgApprovalHours = recentApprovals.length > 0
+      ? recentApprovals.reduce((sum, a) => sum + (a.actedAt.getTime() - a.request.createdAt.getTime()), 0)
+        / recentApprovals.length / 3600000
+      : null;
+
+    const activeBorrowers = new Set(activeRequesterRows.map(r => r.request.requesterUserId)).size;
+
+    const overdueAvgDays = overdueItems.length > 0
+      ? overdueItems.reduce((sum, i) => sum + (now.getTime() - i.dueDate!.getTime()), 0) / overdueItems.length / 86400000
+      : 0;
+
+    const onTimeThisMonth = returnsThisMonth.filter(r => !r.requestItem.dueDate || r.returnedAt <= r.requestItem.dueDate).length;
+
+    res.json({
+      pending, pendingOverDay, approvedToday, rejectedThisMonth,
+      avgApprovalHours: avgApprovalHours != null ? Math.round(avgApprovalHours * 10) / 10 : null,
+      activeItems, activeBorrowers,
+      overdueItems: overdueItems.length,
+      overdueAvgDays: Math.round(overdueAvgDays * 10) / 10,
+      dueTodayItems,
+      returnedThisMonth: returnsThisMonth.length,
+      returnedOnTimePct: returnsThisMonth.length > 0 ? Math.round((onTimeThisMonth / returnsThisMonth.length) * 100) : null,
+    });
+  } catch (err) { next(err); }
+});
+
+// ── IT Admin: All-time analytics for the history screen (on-time rate,
+// damage rate, most-borrowed assets) — kept separate from /stats above since
+// it scans the full returns table rather than a recent/current window, and
+// the history page loads far less often than the operational dashboards.
+router.get('/history-stats', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const [returns, topAssetRows] = await Promise.all([
+      prisma.return.findMany({ select: { returnedAt: true, condition: true, requestItem: { select: { dueDate: true } } } }),
+      prisma.borrowRequestItem.groupBy({
+        by: ['assetId'],
+        where: { assetId: { not: null } },
+        _count: { assetId: true },
+        orderBy: { _count: { assetId: 'desc' } },
+        take: 5,
+      }),
+    ]);
+
+    const assets = await prisma.asset.findMany({
+      where: { id: { in: topAssetRows.map(r => r.assetId!) } },
+      select: { id: true, assetCode: true, assetName: true, brand: true, model: true },
+    });
+    const assetById = new Map(assets.map(a => [a.id, a]));
+
+    const onTime = returns.filter(r => !r.requestItem.dueDate || r.returnedAt <= r.requestItem.dueDate).length;
+    const damaged = returns.filter(r => r.condition !== 'Normal').length;
+
+    res.json({
+      totalReturns: returns.length,
+      onTimePct: returns.length > 0 ? Math.round((onTime / returns.length) * 100) : null,
+      damagedPct: returns.length > 0 ? Math.round((damaged / returns.length) * 100) : null,
+      topAssets: topAssetRows.map(r => {
+        const a = assetById.get(r.assetId!);
+        return {
+          assetId: r.assetId,
+          assetCode: a?.assetCode || '',
+          label: a ? [a.brand, a.model].filter(Boolean).join(' ') || a.assetName : '',
+          count: r._count.assetId,
+        };
+      }),
+    });
+  } catch (err) { next(err); }
+});
+
 export default router;
