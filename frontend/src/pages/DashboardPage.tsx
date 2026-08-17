@@ -25,6 +25,7 @@ import { DataHealthCard } from './dashboard/components/DataHealthCard';
 import { WarrantyAlertsCard } from './dashboard/components/WarrantyAlertsCard';
 import { ContractLicenseSummary } from './dashboard/components/ContractLicenseSummary';
 import { ModuleStatusCard } from './dashboard/components/ModuleStatusCard';
+import { ExternalAgentsSummaryCard } from './dashboard/components/ExternalAgentsSummaryCard';
 import { CategoryUtilizationCard } from './dashboard/components/CategoryUtilizationCard';
 import { now, pct } from './dashboard/dashboardHelpers';
 
@@ -44,6 +45,7 @@ export default function DashboardPage() {
   const [contractList, setContractList] = useState<any[]>([]);
   const [licenseList, setLicenseList] = useState<any[]>([]);
   const [onlineNow, setOnlineNow] = useState<any[]>([]);
+  const [externalAgentsSummary, setExternalAgentsSummary] = useState<any>(null);
   const [moduleStatus, setModuleStatus] = useState<any>(null);
   const [categoryUtilization, setCategoryUtilization] = useState<any[]>([]);
   const [inventoryLowStock, setInventoryLowStock] = useState<any>(null);
@@ -86,6 +88,12 @@ export default function DashboardPage() {
       // Contract & License summary (Phase 3) — non-blocking, fail silently
       contractAPI.list({}).then(r => setContractList(r.data || [])).catch(() => {});
       licenseAPI.list({}).then(r => setLicenseList(r.data || [])).catch(() => {});
+
+      // External agent summary — separate service, non-blocking so a slow/
+      // unreachable agent server never delays the rest of the dashboard.
+      dashboardAPI.externalAgentsSummary()
+        .then(r => setExternalAgentsSummary(r.data?.available ? r.data.data : null))
+        .catch(() => setExternalAgentsSummary(null));
     } else {
       setLoading(false);
     }
@@ -273,10 +281,11 @@ export default function DashboardPage() {
         <PMSummaryCard pmTotal={pmTotal} pmDone={pmDone} pmPct={pmPct} onNavigate={() => navigate('/pm')} />
       </Box>
 
-      {/* ── Row 6: Module status + Category utilization ─────────── */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 1.5, mb: 2 }}>
+      {/* ── Row 6: Module status + Category utilization + External agents ── */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', lg: externalAgentsSummary ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)' }, gap: 1.5, mb: 2 }}>
         <ModuleStatusCard moduleStatus={moduleStatus} />
         <CategoryUtilizationCard categories={categoryUtilization} onNavigate={() => navigate('/assets')} />
+        <ExternalAgentsSummaryCard summary={externalAgentsSummary} />
       </Box>
 
       {/* ── Row 7: Data Health + Warranty ────────────────────────── */}

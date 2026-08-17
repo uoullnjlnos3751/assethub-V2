@@ -359,6 +359,7 @@ export const dashboardAPI = {
   moduleStatus: () => api.get('/dashboard/module-status'),
   categoryUtilization: () => api.get('/dashboard/category-utilization'),
   inventoryLowStock: () => api.get('/dashboard/inventory-low-stock'),
+  externalAgentsSummary: () => api.get('/dashboard/external-agents-summary'),
 };
 
 // Inventory

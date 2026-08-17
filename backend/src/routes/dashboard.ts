@@ -216,6 +216,31 @@ router.get('/pm-summary', authenticate, authorize('IT_ADMIN', 'SUPERADMIN', 'VIE
   } catch (err) { next(err); }
 });
 
+// Aggregate counts only (no per-device detail), so this gets the same
+// visibility as the rest of the dashboard rather than the IT_ADMIN/SUPERADMIN
+// gate on the per-asset external-agent pull in assets.ts.
+router.get('/external-agents-summary', authenticate, authorize('IT_ADMIN', 'SUPERADMIN', 'VIEWER'), async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const baseUrl = process.env.EXTERNAL_ASSET_API_URL;
+    const apiKey = process.env.EXTERNAL_ASSET_API_KEY;
+    if (!baseUrl || !apiKey) return res.json({ available: false });
+
+    let response: globalThis.Response;
+    try {
+      response = await fetch(`${baseUrl}/api/external/summary`, {
+        headers: { 'x-api-key': apiKey },
+        signal: AbortSignal.timeout(5000),
+      });
+    } catch {
+      return res.json({ available: false });
+    }
+    if (!response.ok) return res.json({ available: false });
+
+    const data = await response.json();
+    res.json({ available: true, data });
+  } catch (err) { next(err); }
+});
+
 router.get('/recent-activity', authenticate, authorize('IT_ADMIN', 'SUPERADMIN', 'VIEWER'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const [recentRequests, recentReturns] = await Promise.all([
