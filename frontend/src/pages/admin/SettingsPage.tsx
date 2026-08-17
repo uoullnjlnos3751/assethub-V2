@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Box, Typography, Card, CardContent, Grid, TextField, Switch, FormControlLabel,
   Button, Alert, CircularProgress, Divider, Stack, Chip, Paper,
   Select, MenuItem, InputLabel, FormControl, useTheme, alpha,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Checkbox,
-  Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
+  Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, IconButton,
 } from '@mui/material';
 import {
   Settings, Globe, Clock, Database, Shield, Server, Smartphone, Mail, Save,
   Bell, Download, Upload, Trash2, Search, RefreshCw, Building2, Image,
-  MessageSquare, AlertTriangle, Users,
+  MessageSquare, AlertTriangle, Users, History, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { adminAPI, assetAPI } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
@@ -21,6 +22,8 @@ import CompanyOrgTab from './settings/CompanyOrgTab';
 import PermissionMatrixTab from './settings/PermissionMatrixTab';
 import IntegrationsTab from './settings/IntegrationsTab';
 import EmailTemplateEditor from './settings/EmailTemplateEditor';
+import BackupTab from './settings/BackupTab';
+import AuditLogTab from './settings/AuditLogTab';
 import { SectionCard } from '../../components/SectionCard';
 import type { SystemSettings, NotificationTemplate, HealthCheckResult, NotificationLog } from './settings/types';
 
@@ -28,19 +31,22 @@ import type { SystemSettings, NotificationTemplate, HealthCheckResult, Notificat
 // tab ids the content blocks below switch on — they intentionally do NOT
 // run in visual order, so groups can be rearranged without touching any
 // of the `{tab === N && ...}` render blocks.
+// `roles` on a group or item hides it from users whose role isn't listed —
+// omit `roles` to show it to everyone who can reach this page (SUPERADMIN
+// and IT_ADMIN). Mirrors the same `roles` pattern nav.tsx/Layout.tsx use.
 const TAB_GROUPS = [
   {
     label: 'ทั่วไป', icon: <Globe size={15} />,
     items: [
-      { index: 0, label: 'ข้อมูลระบบ', icon: <Globe size={16} /> },
-      { index: 1, label: 'กฎการยืม', icon: <Clock size={16} /> },
+      { index: 0, label: 'ข้อมูลระบบ', icon: <Globe size={16} />, roles: ['SUPERADMIN'] },
+      { index: 1, label: 'กฎการยืม', icon: <Clock size={16} />, roles: ['SUPERADMIN'] },
       { index: 7, label: 'การสร้างรหัสทรัพย์สิน', icon: <Building2 size={16} /> },
     ]
   },
   {
     label: 'ผู้ใช้ & สิทธิ์', icon: <Users size={15} />,
     items: [
-      { index: 8, label: 'ผู้ใช้งาน', icon: <Users size={16} /> },
+      { index: 8, label: 'ผู้ใช้งาน', icon: <Users size={16} />, roles: ['SUPERADMIN'] },
       { index: 10, label: 'ตารางสิทธิ์รายเมนู', icon: <Shield size={16} /> },
       { index: 9, label: 'บริษัท & หน่วยงาน', icon: <Building2 size={16} /> },
     ]
@@ -48,16 +54,18 @@ const TAB_GROUPS = [
   {
     label: 'การแจ้งเตือน', icon: <Bell size={15} />,
     items: [
-      { index: 2, label: 'LINE แจ้งเตือน', icon: <Smartphone size={16} /> },
-      { index: 3, label: 'Templates อีเมล', icon: <Mail size={16} /> },
+      { index: 2, label: 'LINE แจ้งเตือน', icon: <Smartphone size={16} />, roles: ['SUPERADMIN'] },
+      { index: 3, label: 'Templates อีเมล', icon: <Mail size={16} />, roles: ['SUPERADMIN'] },
     ]
   },
   {
     label: 'ความปลอดภัย & ระบบ', icon: <Shield size={15} />,
     items: [
-      { index: 4, label: 'ความปลอดภัย', icon: <Shield size={16} /> },
-      { index: 5, label: 'ระบบ / Health', icon: <Server size={16} /> },
-      { index: 6, label: 'จัดการข้อมูล', icon: <Database size={16} /> },
+      { index: 4, label: 'ความปลอดภัย', icon: <Shield size={16} />, roles: ['SUPERADMIN'] },
+      { index: 5, label: 'ระบบ / Health', icon: <Server size={16} />, roles: ['SUPERADMIN'] },
+      { index: 6, label: 'จัดการข้อมูล', icon: <Database size={16} />, roles: ['SUPERADMIN'] },
+      { index: 12, label: 'Backup', icon: <Download size={16} /> },
+      { index: 13, label: 'Audit Log', icon: <History size={16} /> },
       { index: 11, label: 'เชื่อมต่อระบบภายนอก', icon: <Server size={16} /> },
     ]
   },
@@ -65,9 +73,11 @@ const TAB_GROUPS = [
 
 export default function SettingsPage() {
   const toast = useToast();
-  const { refreshSettings } = useAuth();
+  const { user, refreshSettings } = useAuth();
   const theme = useTheme();
+  const [searchParams] = useSearchParams();
   const [tab, setTab] = useState(0);
+  const visible = (entry: { roles?: string[] }) => !entry.roles || entry.roles.includes(user?.role || '');
   const [settings, setSettings] = useState<SystemSettings | null>(null);
   const [orig, setOrig] = useState<SystemSettings | null>(null);
   const [templates, setTemplates] = useState<NotificationTemplate[]>([]);
@@ -75,6 +85,8 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [logs, setLogs] = useState<NotificationLog[]>([]);
   const [logLoading, setLogLoading] = useState(false);
+  const [logPage, setLogPage] = useState(1);
+  const [logTotalPages, setLogTotalPages] = useState(1);
   const [pingResult, setPingResult] = useState<HealthCheckResult | null>(null);
   const [pingLoading, setPingLoading] = useState(false);
   const [backingUp, setBackingUp] = useState(false);
@@ -90,10 +102,10 @@ export default function SettingsPage() {
 
   const borrowDays = parseInt(String(settings?.borrowDays || '3'), 10);
 
-  const fetchLogs = () => {
+  const fetchLogs = (page = 1) => {
     setLogLoading(true);
-    adminAPI.notificationLogs({ page: 1, limit: 30 })
-      .then(r => { setLogs(r.data.data || []); })
+    adminAPI.notificationLogs({ page, limit: 30 })
+      .then(r => { setLogs(r.data.data || []); setLogPage(r.data.page || page); setLogTotalPages(r.data.totalPages || 1); })
       .catch(() => {})
       .finally(() => setLogLoading(false));
   };
@@ -115,6 +127,14 @@ export default function SettingsPage() {
   };
 
   useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam !== null && !isNaN(Number(tabParam))) {
+      setTab(Number(tabParam));
+    } else if (user?.role !== 'SUPERADMIN') {
+      const firstVisible = TAB_GROUPS.flatMap(g => g.items).find(visible);
+      if (firstVisible) setTab(firstVisible.index);
+    }
+    if (user?.role !== 'SUPERADMIN') { setLoading(false); return; }
     Promise.all([adminAPI.settings(), adminAPI.notificationTemplates()])
       .then(([s, t]) => { setSettings(s.data || {}); setOrig(s.data || {}); setTemplates(t.data || []); })
       .catch(() => toast.error('ไม่สามารถโหลดการตั้งค่าได้'))
@@ -211,7 +231,7 @@ export default function SettingsPage() {
             top: { md: 16 },
           }}
         >
-          {TAB_GROUPS.map((group, gi) => (
+          {TAB_GROUPS.filter(group => group.items.some(visible)).map((group, gi) => (
             <Box key={group.label} sx={{ mt: gi === 0 ? 0 : 1.25 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 1.25, py: 0.75 }}>
                 <Box sx={{ display: 'flex', color: theme.palette.text.disabled }}>{group.icon}</Box>
@@ -219,7 +239,7 @@ export default function SettingsPage() {
                   {group.label}
                 </Typography>
               </Box>
-              {group.items.map(item => {
+              {group.items.filter(visible).map(item => {
                 const active = tab === item.index;
                 return (
                   <Box
@@ -454,7 +474,7 @@ export default function SettingsPage() {
           <Card sx={{ mt: 2 }}>
             <Box sx={{ px: 2.5, py: 1.5, borderBottom: '0.5px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Typography variant="subtitle2" fontWeight={700}>ประวัติการแจ้งเตือนล่าสุด</Typography>
-              <Button size="small" startIcon={<RefreshCw size={14} />} onClick={fetchLogs} disabled={logLoading}>รีเฟรช</Button>
+              <Button size="small" startIcon={<RefreshCw size={14} />} onClick={() => fetchLogs(logPage)} disabled={logLoading}>รีเฟรช</Button>
             </Box>
             <TableContainer>
               <Table size="small">
@@ -487,6 +507,15 @@ export default function SettingsPage() {
                 </TableBody>
               </Table>
             </TableContainer>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1, px: 2, py: 1 }}>
+              <Typography variant="caption" color="text.secondary">หน้า {logPage} / {logTotalPages}</Typography>
+              <IconButton size="small" disabled={logLoading || logPage <= 1} onClick={() => fetchLogs(logPage - 1)}>
+                <ChevronLeft size={16} />
+              </IconButton>
+              <IconButton size="small" disabled={logLoading || logPage >= logTotalPages} onClick={() => fetchLogs(logPage + 1)}>
+                <ChevronRight size={16} />
+              </IconButton>
+            </Box>
           </Card>
         </Box>
       )}
@@ -557,7 +586,7 @@ export default function SettingsPage() {
       {tab === 6 && (
         <Grid container spacing={2}>
           <Grid item xs={12} md={6}>
-            <SectionCard title="Backup" icon={Download}>
+            <SectionCard title="ส่งออกข้อมูลทรัพย์สิน (JSON)" icon={Download}>
               <Button variant="outlined" startIcon={backingUp ? <CircularProgress size={18} /> : <Download size={18} />} disabled={backingUp}
                 onClick={async () => {
                   setBackingUp(true);
@@ -667,6 +696,14 @@ export default function SettingsPage() {
 
       {tab === 11 && (
         <IntegrationsTab />
+      )}
+
+      {tab === 12 && (
+        <BackupTab />
+      )}
+
+      {tab === 13 && (
+        <AuditLogTab />
       )}
         </Box>
       </Box>

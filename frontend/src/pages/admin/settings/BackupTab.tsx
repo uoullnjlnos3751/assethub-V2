@@ -1,19 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box, Typography, Button, Paper, Table, TableBody, TableCell, TableContainer,
+  Box, Typography, Button, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, IconButton, CircularProgress, Alert, Dialog, DialogTitle,
-  DialogContent, DialogActions, DialogContentText
+  DialogContent, DialogActions, DialogContentText,
 } from '@mui/material';
 import {
   Download as DownloadIcon,
   Delete as DeleteIcon,
   Restore as RestoreIcon,
-  AddCircleOutline as AddIcon
+  AddCircleOutline as AddIcon,
 } from '@mui/icons-material';
-import { systemBackupAPI } from '../../services/api';
-import { formatDateTime } from '../../utils/dateUtils';
-import { useAuth } from '../../contexts/AuthContext';
-
+import { Database } from 'lucide-react';
+import { systemBackupAPI } from '../../../services/api';
+import { formatDateTime } from '../../../utils/dateUtils';
+import { useAuth } from '../../../contexts/AuthContext';
+import { SectionCard } from '../../../components/SectionCard';
 
 interface BackupFile {
   filename: string;
@@ -21,21 +22,20 @@ interface BackupFile {
   createdAt: string;
 }
 
-export default function BackupPage() {
+export default function BackupTab() {
   const { user } = useAuth();
   // Restore/delete overwrite or remove a full database backup — the backend
-  // now requires SUPERADMIN for both (backup.ts), matching every other
-  // destructive admin action. This route still admits IT_ADMIN for viewing
-  // and creating backups, so hide just these two actions rather than the
-  // whole page.
+  // requires SUPERADMIN for both; hide just these two actions for IT_ADMIN
+  // rather than the whole tab, matching the route-level access this tab
+  // replaces (admin/backup previously admitted IT_ADMIN too).
   const canDestroy = user?.role === 'SUPERADMIN';
   const [backups, setBackups] = useState<BackupFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  
+
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; action: 'delete' | 'restore' | null; filename: string }>({
-    open: false, action: null, filename: ''
+    open: false, action: null, filename: '',
   });
 
   const fetchBackups = async () => {
@@ -50,9 +50,7 @@ export default function BackupPage() {
     }
   };
 
-  useEffect(() => {
-    fetchBackups();
-  }, []);
+  useEffect(() => { fetchBackups(); }, []);
 
   const handleCreate = async () => {
     try {
@@ -71,12 +69,10 @@ export default function BackupPage() {
   const handleConfirmAction = async () => {
     const { action, filename } = confirmDialog;
     setConfirmDialog({ open: false, action: null, filename: '' });
-    
     try {
       setLoading(true);
       setError('');
       setSuccess('');
-      
       if (action === 'delete') {
         await systemBackupAPI.delete(filename);
         setSuccess('ลบไฟล์ Backup สำเร็จ');
@@ -84,7 +80,6 @@ export default function BackupPage() {
       } else if (action === 'restore') {
         await systemBackupAPI.restore(filename);
         setSuccess('กู้คืนข้อมูลจาก Backup สำเร็จ');
-        // Optionally trigger a page reload or state clear
       }
     } catch (err: any) {
       setError(err.response?.data?.message || `การ${action === 'restore' ? 'กู้คืนข้อมูล' : 'ลบไฟล์'}ล้มเหลว`);
@@ -102,34 +97,29 @@ export default function BackupPage() {
   };
 
   return (
-    <Box sx={{ p: 3, maxWidth: 1200, mx: 'auto' }}>
-      <Typography variant="h5" fontWeight={600} mb={3} color="primary">
-        การจัดการข้อมูล & Backup
-      </Typography>
+    <Box>
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
 
-      {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
-      {success && <Alert severity="success" sx={{ mb: 3 }}>{success}</Alert>}
-
-      <Paper sx={{ p: 3, borderRadius: 2 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
+      <SectionCard title="Backup ฐานข้อมูล" icon={Database}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2, flexWrap: 'wrap', gap: 1.5 }}>
           <Box>
-            <Typography variant="h6" fontWeight={500}>ไฟล์ข้อมูลสำรองทั้งหมด ({backups.length} ไฟล์)</Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            <Typography variant="body2" fontWeight={600}>ไฟล์ข้อมูลสำรองทั้งหมด ({backups.length} ไฟล์)</Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
               💡 ระบบทำการสำรองข้อมูลอัตโนมัติทุกวันเวลา 02:00 น. และจะเก็บไฟล์ย้อนหลังไว้สูงสุด 180 วัน
             </Typography>
           </Box>
           <Button
-            variant="contained"
-            startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <AddIcon />}
-            onClick={handleCreate}
-            disabled={loading}
+            variant="contained" size="small"
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <AddIcon fontSize="small" />}
+            onClick={handleCreate} disabled={loading}
           >
             สร้าง Backup ตอนนี้
           </Button>
         </Box>
 
         <TableContainer>
-          <Table>
+          <Table size="small">
             <TableHead>
               <TableRow>
                 <TableCell>ชื่อไฟล์</TableCell>
@@ -140,46 +130,26 @@ export default function BackupPage() {
             </TableHead>
             <TableBody>
               {loading && backups.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
-                    <CircularProgress />
-                  </TableCell>
-                </TableRow>
+                <TableRow><TableCell colSpan={4} align="center" sx={{ py: 3 }}><CircularProgress size={22} /></TableCell></TableRow>
               ) : backups.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={4} align="center" sx={{ py: 3, color: 'text.secondary' }}>
-                    ยังไม่มีข้อมูลแบ็คอัพ
-                  </TableCell>
-                </TableRow>
+                <TableRow><TableCell colSpan={4} align="center" sx={{ py: 3, color: 'text.secondary' }}>ยังไม่มีข้อมูลแบ็คอัพ</TableCell></TableRow>
               ) : (
                 backups.map((b) => (
-                  <TableRow key={b.filename}>
-                    <TableCell sx={{ fontWeight: 500 }}>{b.filename}</TableCell>
-                    <TableCell>{formatSize(b.size)}</TableCell>
-                    <TableCell>{formatDateTime(b.createdAt)}</TableCell>
+                  <TableRow key={b.filename} hover>
+                    <TableCell sx={{ fontSize: '0.78rem', fontWeight: 500 }}>{b.filename}</TableCell>
+                    <TableCell sx={{ fontSize: '0.78rem' }}>{formatSize(b.size)}</TableCell>
+                    <TableCell sx={{ fontSize: '0.78rem' }}>{formatDateTime(b.createdAt)}</TableCell>
                     <TableCell align="right">
-                      <IconButton 
-                        color="primary" 
-                        onClick={() => systemBackupAPI.download(b.filename)}
-                        title="ดาวน์โหลด"
-                      >
-                        <DownloadIcon />
+                      <IconButton size="small" color="primary" onClick={() => systemBackupAPI.download(b.filename)} title="ดาวน์โหลด">
+                        <DownloadIcon fontSize="small" />
                       </IconButton>
                       {canDestroy && (
                         <>
-                          <IconButton
-                            color="warning"
-                            onClick={() => setConfirmDialog({ open: true, action: 'restore', filename: b.filename })}
-                            title="กู้คืนข้อมูล"
-                          >
-                            <RestoreIcon />
+                          <IconButton size="small" color="warning" onClick={() => setConfirmDialog({ open: true, action: 'restore', filename: b.filename })} title="กู้คืนข้อมูล">
+                            <RestoreIcon fontSize="small" />
                           </IconButton>
-                          <IconButton
-                            color="error"
-                            onClick={() => setConfirmDialog({ open: true, action: 'delete', filename: b.filename })}
-                            title="ลบ"
-                          >
-                            <DeleteIcon />
+                          <IconButton size="small" color="error" onClick={() => setConfirmDialog({ open: true, action: 'delete', filename: b.filename })} title="ลบ">
+                            <DeleteIcon fontSize="small" />
                           </IconButton>
                         </>
                       )}
@@ -190,7 +160,7 @@ export default function BackupPage() {
             </TableBody>
           </Table>
         </TableContainer>
-      </Paper>
+      </SectionCard>
 
       <Dialog open={confirmDialog.open} onClose={() => setConfirmDialog({ ...confirmDialog, open: false })}>
         <DialogTitle sx={{ color: confirmDialog.action === 'restore' ? 'warning.main' : 'error.main' }}>
@@ -198,22 +168,14 @@ export default function BackupPage() {
         </DialogTitle>
         <DialogContent>
           <DialogContentText>
-            {confirmDialog.action === 'restore' 
+            {confirmDialog.action === 'restore'
               ? `คำเตือน: การกู้คืนข้อมูลจะทำการลบข้อมูลปัจจุบันและแทนที่ด้วยข้อมูลจากไฟล์ ${confirmDialog.filename} คุณแน่ใจหรือไม่?`
-              : `คุณแน่ใจหรือไม่ที่จะลบไฟล์แบ็คอัพ ${confirmDialog.filename}? การกระทำนี้ไม่สามารถยกเลิกได้`
-            }
+              : `คุณแน่ใจหรือไม่ที่จะลบไฟล์แบ็คอัพ ${confirmDialog.filename}? การกระทำนี้ไม่สามารถยกเลิกได้`}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmDialog({ ...confirmDialog, open: false })} color="inherit">
-            ยกเลิก
-          </Button>
-          <Button 
-            onClick={handleConfirmAction} 
-            color={confirmDialog.action === 'restore' ? 'warning' : 'error'} 
-            variant="contained" 
-            autoFocus
-          >
+          <Button onClick={() => setConfirmDialog({ ...confirmDialog, open: false })} color="inherit">ยกเลิก</Button>
+          <Button onClick={handleConfirmAction} color={confirmDialog.action === 'restore' ? 'warning' : 'error'} variant="contained" autoFocus>
             {confirmDialog.action === 'restore' ? 'กู้คืนข้อมูล' : 'ลบไฟล์'}
           </Button>
         </DialogActions>

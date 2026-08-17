@@ -11,9 +11,7 @@ import CableIcon from '@mui/icons-material/Cable';
 import ScienceIcon from '@mui/icons-material/Science';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import BuildCircleIcon from '@mui/icons-material/BuildCircle';
-import PeopleIcon from '@mui/icons-material/People';
 import SettingsIcon from '@mui/icons-material/Settings';
-import NotificationsIcon from '@mui/icons-material/Notifications';
 import HandymanIcon from '@mui/icons-material/Handyman';
 import HistoryIcon from '@mui/icons-material/History';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -34,7 +32,6 @@ import InventoryIcon from '@mui/icons-material/Inventory';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import DomainIcon from '@mui/icons-material/Domain';
-import DatabaseIcon from '@mui/icons-material/Storage';
 import VolunteerActivismIcon from '@mui/icons-material/VolunteerActivism';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
@@ -181,17 +178,6 @@ export const adminNav: NavEntry[] = [
       { label: 'ประเภท/สถานที่/ผู้จำหน่าย/สถานะ/บริษัท/แผนก', path: '/admin/master-data', icon: <DomainIcon fontSize="small" /> },
     ],
   },
-  {
-    label: 'ตั้งค่าระบบ',
-    icon: <SettingsIcon fontSize="small" />,
-    roles: ['SUPERADMIN', 'IT_ADMIN'],
-    children: [
-      { label: 'ตั้งค่าระบบหลัก', path: '/admin/settings', icon: <SettingsIcon fontSize="small" />, roles: ['SUPERADMIN'] },
-      { label: 'จัดการผู้ใช้งาน', path: '/admin/users', icon: <PeopleIcon fontSize="small" />, roles: ['SUPERADMIN'] },
-      { label: 'จัดการ Backup', path: '/admin/backup', icon: <DatabaseIcon fontSize="small" /> },
-      { label: 'Flowchart ขั้นตอนระบบ', path: '/admin/flowcharts', icon: <AccountTreeIcon fontSize="small" /> },
-      { label: 'Audit Log', path: '/admin/audit-log', icon: <ReceiptLongIcon fontSize="small" /> },
-      { label: 'ประวัติแจ้งเตือน', path: '/admin/notification-logs', icon: <NotificationsIcon fontSize="small" />, roles: ['SUPERADMIN'] },
-    ],
-  },
+  { label: 'ตั้งค่าระบบ', path: '/admin/settings', icon: <SettingsIcon fontSize="small" />, roles: ['SUPERADMIN', 'IT_ADMIN'] },
+  { label: 'Flowchart ขั้นตอนระบบ', path: '/admin/flowcharts', icon: <AccountTreeIcon fontSize="small" />, roles: ['IT_ADMIN', 'SUPERADMIN'] },
 ];

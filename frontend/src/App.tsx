@@ -50,11 +50,7 @@ const ReportBorrowPage = lazy(() => import('./pages/reports/ReportBorrowPage'));
 const ReportPMPage = lazy(() => import('./pages/reports/ReportPMPage'));
 const ReportMaintenancePage = lazy(() => import('./pages/reports/ReportMaintenancePage'));
 const EmployeeClearancePage = lazy(() => import('./pages/reports/EmployeeClearancePage'));
-const AuditLogPage = lazy(() => import('./pages/admin/AuditLogPage'));
-const UsersPage = lazy(() => import('./pages/admin/UsersPage'));
 const SettingsPage = lazy(() => import('./pages/admin/SettingsPage'));
-const NotificationLogsPage = lazy(() => import('./pages/admin/NotificationLogsPage'));
-const BackupPage = lazy(() => import('./pages/admin/BackupPage'));
 const MasterDataManagementPage = lazy(() => import('./pages/admin/MasterDataManagementPage'));
 const AssetHistoryPage = lazy(() => import('./pages/assets/AssetHistoryPage'));
 const ContractsPage = lazy(() => import('./pages/contracts/ContractsPage'));
@@ -138,11 +134,11 @@ export default function App() {
           <Route path="reports/maintenance" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN', 'VIEWER']}><ReportMaintenancePage /></ProtectedRoute>} />
           <Route path="reports/user-clearance" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><EmployeeClearancePage /></ProtectedRoute>} />
           {/* Admin */}
-          <Route path="admin/users" element={<ProtectedRoute roles={['SUPERADMIN']}><UsersPage /></ProtectedRoute>} />
-          <Route path="admin/settings" element={<ProtectedRoute roles={['SUPERADMIN']}><SettingsPage /></ProtectedRoute>} />
-          <Route path="admin/backup" element={<ProtectedRoute roles={['SUPERADMIN', 'IT_ADMIN']}><BackupPage /></ProtectedRoute>} />
-          <Route path="admin/notification-logs" element={<ProtectedRoute roles={['SUPERADMIN']}><NotificationLogsPage /></ProtectedRoute>} />
-          <Route path="admin/audit-log" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><AuditLogPage /></ProtectedRoute>} />
+          <Route path="admin/users" element={<Navigate to="/admin/settings?tab=8" replace />} />
+          <Route path="admin/settings" element={<ProtectedRoute roles={['SUPERADMIN', 'IT_ADMIN']}><SettingsPage /></ProtectedRoute>} />
+          <Route path="admin/backup" element={<Navigate to="/admin/settings?tab=12" replace />} />
+          <Route path="admin/notification-logs" element={<Navigate to="/admin/settings?tab=2" replace />} />
+          <Route path="admin/audit-log" element={<Navigate to="/admin/settings?tab=13" replace />} />
           <Route path="admin/master-data" element={<ProtectedRoute roles={['SUPERADMIN', 'IT_ADMIN']}><MasterDataManagementPage /></ProtectedRoute>} />
           <Route path="admin/flowcharts" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><FlowchartsPage /></ProtectedRoute>} />
           
