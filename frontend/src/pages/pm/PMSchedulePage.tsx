@@ -21,6 +21,7 @@ import {
   Snackbar,
   Alert,
   GlobalStyles,
+  Chip,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
@@ -241,6 +242,17 @@ export default function PMSchedulePage() {
   const totalCompleted = filteredPlans.reduce((sum, p) => sum + (p.completedCount || 0), 0);
   const overallPct = totalPlanned > 0 ? Math.round(totalCompleted / totalPlanned * 100) : 0;
 
+  // Real observed pace — total completed / weeks elapsed since PM start, not a configured assumption
+  const teamPaceLabel = useMemo(() => {
+    if (!pmStartDate || totalCompleted === 0) return null;
+    const start = new Date(pmStartDate);
+    const today = new Date();
+    const weeksElapsed = Math.max(1, Math.ceil((today.getTime() - start.getTime()) / (7 * 86400000)));
+    const perWeek = Math.round(totalCompleted / weeksElapsed);
+    const perDay = +(totalCompleted / (weeksElapsed * 7)).toFixed(1);
+    return { perWeek, perDay };
+  }, [pmStartDate, totalCompleted]);
+
   // Status counts for cards
   const completedPlansCount = filteredPlans.filter(p => {
     const pct = p.plannedDeviceCount > 0 ? (p.completedCount || 0) / p.plannedDeviceCount * 100 : 0;
@@ -314,6 +326,41 @@ export default function PMSchedulePage() {
     end.setHours(23, 59, 59, 999);
     return today >= start && today <= end;
   };
+
+  // Per-week rollup of real plan data (weekly view only) — which plans are
+  // active that week, their combined target/completed count, and a status
+  // chip derived from whether the week is past/current/future.
+  const weeklySummaryRows = useMemo(() => {
+    if (viewMode !== 'weekly') return [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return columns
+      .map((col) => {
+        const activePlans = filteredPlans.filter((p) => {
+          if (!p.startDate || !p.endDate) return false;
+          const s = new Date(p.startDate);
+          const e = new Date(p.endDate);
+          return s <= col.end && e >= col.start;
+        });
+        if (activePlans.length === 0) return null;
+        const target = activePlans.reduce((sum, p) => sum + (p.plannedDeviceCount || 0), 0);
+        const completed = activePlans.reduce((sum, p) => sum + (p.completedCount || 0), 0);
+        const pct = target > 0 ? Math.round((completed / target) * 100) : 0;
+        const deptLabel = Array.from(new Set(activePlans.map((p) => [p.company, p.deptTask].filter(Boolean).join(' · '))))
+          .filter(Boolean)
+          .join(', ');
+        const leads = Array.from(new Set(activePlans.map((p) => p.lead).filter(Boolean))) as string[];
+        const teamLabel = leads.length === 0 ? 'ไม่ระบุ' : leads.length === 1 ? leads[0] : `${leads[0]} + ${leads.length - 1}`;
+        const isCurrent = isTodayInCol(col);
+        const isPast = col.end < today;
+        let status: { label: string; color: 'secondary' | 'success' | 'error' | 'default' };
+        if (isCurrent) status = { label: 'สัปดาห์นี้', color: 'secondary' };
+        else if (isPast) status = pct >= 100 ? { label: 'เสร็จสิ้น', color: 'success' } : { label: 'ล่าช้า', color: 'error' };
+        else status = { label: 'กำหนดการ', color: 'default' };
+        return { key: col.start.getTime(), col, deptLabel: deptLabel || 'ไม่ระบุ', target, teamLabel, status };
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null);
+  }, [columns, filteredPlans, viewMode]);
 
   // Render Gantt Chart Cell (Continuous blocks logic)
   const renderGanttCell = (plan: any, col: any, pct: number, isHeaderRow: boolean = false) => {
@@ -770,6 +817,73 @@ export default function PMSchedulePage() {
           </Table>
         </TableContainer>
       </Paper>
+
+      {/* ── Weekly Summary + Scheduling Conditions ── */}
+      <Box className="no-print" sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', mt: 2.5, flexWrap: 'wrap' }}>
+        <Paper variant="outlined" sx={{ flex: '1 1 480px', minWidth: 0 }}>
+          <Box sx={{ p: '14px 18px', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 700 }}>สรุปงานตามสัปดาห์</Typography>
+            <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>จำนวนเครื่องที่วางแผนทำ PM</Typography>
+          </Box>
+          {viewMode !== 'weekly' ? (
+            <Box sx={{ p: 3, textAlign: 'center', color: 'text.secondary', fontSize: 12.5 }}>สลับเป็นมุมมอง "รายสัปดาห์" ด้านบนเพื่อดูสรุปนี้</Box>
+          ) : weeklySummaryRows.length === 0 ? (
+            <Box sx={{ p: 3, textAlign: 'center', color: 'text.secondary', fontSize: 12.5 }}>ไม่มีแผน PM ในช่วงสัปดาห์ที่แสดงอยู่</Box>
+          ) : (
+            <TableContainer>
+              <Table size="small" sx={{ fontSize: 12 }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>สัปดาห์</TableCell>
+                    <TableCell sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>ช่วงวันที่</TableCell>
+                    <TableCell sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>บริษัท / แผนก</TableCell>
+                    <TableCell sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary' }} align="center">เป้าหมาย (เครื่อง)</TableCell>
+                    <TableCell sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>ทีมที่ลงงาน</TableCell>
+                    <TableCell sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>สถานะ</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {weeklySummaryRows.map((row) => (
+                    <TableRow key={row.key} hover>
+                      <TableCell sx={{ fontWeight: 700, color: 'info.main' }}>{row.col.label}</TableCell>
+                      <TableCell sx={{ fontSize: 11.5, color: 'text.secondary' }}>
+                        {formatThaiMonthDay(row.col.start)} – {formatThaiMonthDay(row.col.end)}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: 11.5 }}>{row.deptLabel}</TableCell>
+                      <TableCell align="center">{row.target}</TableCell>
+                      <TableCell sx={{ fontSize: 11.5 }}>{row.teamLabel}</TableCell>
+                      <TableCell>
+                        <Chip size="small" label={row.status.label} color={row.status.color === 'default' ? undefined : row.status.color} variant={row.status.color === 'default' ? 'outlined' : 'filled'} sx={{ fontSize: 10.5, height: 22 }} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </Paper>
+
+        <Paper variant="outlined" sx={{ width: 320, flex: 'none', p: '16px 18px' }}>
+          <Typography sx={{ fontSize: 13, fontWeight: 700, mb: 1.5 }}>เงื่อนไขการจัดตาราง</Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {[
+              { label: 'หน่วยเวลา', sub: viewMode === 'weekly' ? 'วางแผนเป็นรายสัปดาห์ (W)' : 'วางแผนเป็นรายวัน', val: viewMode === 'weekly' ? 'รายสัปดาห์' : 'รายวัน' },
+              { label: 'หัวหน้าโครงการ', sub: 'กรองดูตารางเฉพาะทีมได้', val: `${uniqueLeads.length} คน` },
+              { label: 'วันเริ่ม PM', sub: 'กำหนดจุดตั้งต้นของทั้งโครงการ', val: pmStartDate ? fmtDate(pmStartDate) : '—' },
+              { label: 'อัตราความเร็วจริง', sub: teamPaceLabel ? `เฉลี่ยจากข้อมูลจริง ${teamPaceLabel.perDay} เครื่อง/วัน` : 'ยังไม่มีข้อมูลงานที่เสร็จ', val: teamPaceLabel ? `${teamPaceLabel.perWeek} เครื่อง/สัปดาห์` : '—' },
+              { label: 'ส่งออก', sub: 'Excel พร้อมหัวตารางสัปดาห์', val: 'XLSX' },
+            ].map((row) => (
+              <Box key={row.label} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, p: '10px 12px', borderRadius: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'action.hover' }}>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography sx={{ fontSize: 12.5 }}>{row.label}</Typography>
+                  <Typography sx={{ fontSize: 10.5, color: 'text.secondary' }}>{row.sub}</Typography>
+                </Box>
+                <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: 'info.main', whiteSpace: 'nowrap' }}>{row.val}</Typography>
+              </Box>
+            ))}
+          </Box>
+        </Paper>
+      </Box>
 
       {/* ── Toast Notification ── */}
       <Snackbar open={!!toast} autoHideDuration={3000} onClose={() => setToast(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
