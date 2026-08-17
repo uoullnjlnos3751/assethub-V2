@@ -304,6 +304,7 @@ export const adminAPI = {
   resetNotificationTemplate: (id: number) => api.post(`/admin/notification-templates/${id}/reset`),
   testNotificationTemplate: (id: number, to: string) => api.post(`/admin/notification-templates/${id}/test`, { to }),
   notificationLogs: (params?: any) => api.get('/admin/notification-logs', { params }),
+  externalApiInfo: () => api.get('/admin/external-api-info'),
   forceLogoutAll: () => api.post('/admin/force-logout-all'),
   backup: () => api.get('/admin/backup', { responseType: 'blob' }), // Legacy JSON backup
   restore: (file: File) => {

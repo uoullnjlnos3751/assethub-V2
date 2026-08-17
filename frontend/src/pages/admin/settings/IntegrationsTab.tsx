@@ -1,7 +1,11 @@
-import React from 'react';
-import { Box, Typography, Chip, alpha, useTheme } from '@mui/material';
-import { Plug } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import {
+  Box, Typography, Chip, alpha, useTheme,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+} from '@mui/material';
+import { Plug, KeyRound, ShieldCheck } from 'lucide-react';
 import { SectionCard } from '../../../components/SectionCard';
+import { adminAPI } from '../../../services/api';
 
 type Status = 'connected' | 'not_connected' | 'not_in_system';
 
@@ -22,7 +26,8 @@ const CONNECTORS: Connector[] = [
   { name: 'Print Server', status: 'not_in_system', note: 'ไม่มีโค้ดเชื่อมต่อ — จัดการเครื่องพิมพ์ผ่านข้อมูลหลักแทน' },
   { name: 'ระบบจัดซื้อ (PO)', status: 'not_in_system', note: 'ไม่มีโค้ดเชื่อมต่อ' },
   { name: 'ระบบ HR / ผังองค์กร', status: 'not_in_system', note: 'ไม่มีโค้ดเชื่อมต่อ' },
-  { name: 'สำรองข้อมูล', status: 'connected', note: 'ใช้จริง — export/import ไฟล์ JSON ผ่านเมนู "จัดการ Backup" (ไม่ใช่ระบบอัตโนมัติรายวัน)' },
+  { name: 'สำรองข้อมูล', status: 'connected', note: 'ใช้จริง — สำรองฐานข้อมูลเต็มรูปแบบอัตโนมัติทุกวัน 02:00 น. ผ่านเมนู "ตั้งค่า / Backup"' },
+  { name: 'External Asset API (Read-only)', status: 'connected', note: 'ใช้จริง — เซิร์ฟเวอร์ภายนอกแยกต่างหาก ให้ข้อมูล hardware/OS/สถานะออนไลน์แบบอ่านอย่างเดียว ผ่าน API key ด้านล่าง' },
 ];
 
 const STATUS_LABEL: Record<Status, string> = { connected: 'เชื่อมต่ออยู่', not_connected: 'ยังไม่พร้อมใช้งาน', not_in_system: 'ไม่มีในระบบนี้' };
@@ -39,6 +44,16 @@ function StatusChip({ s }: { s: Status }) {
 
 export default function IntegrationsTab() {
   const theme = useTheme();
+  // Key and base URL come from the server (backend/.env) rather than being
+  // written into this file — the repository is public, so anything hardcoded
+  // here would be published and would stay in the git history permanently.
+  const [apiInfo, setApiInfo] = useState<{ configured: boolean; baseUrl: string; apiKey: string } | null>(null);
+  useEffect(() => {
+    adminAPI.externalApiInfo().then(r => setApiInfo(r.data)).catch(() => setApiInfo(null));
+  }, []);
+  const baseUrl = apiInfo?.baseUrl || 'http://<agent-server>:3500';
+  const apiKey = apiInfo?.apiKey || '(ยังไม่ได้ตั้งค่า)';
+
   const connectedCount = CONNECTORS.filter(c => c.status === 'connected').length;
   const notConnectedCount = CONNECTORS.filter(c => c.status === 'not_connected').length;
   const notInSystemCount = CONNECTORS.filter(c => c.status === 'not_in_system').length;
@@ -82,16 +97,79 @@ export default function IntegrationsTab() {
 
       <SectionCard title="API Key และการเข้าถึงจากภายนอก" icon={Plug}>
         <Box sx={{
-          borderRadius: '12px', p: 2.5, textAlign: 'center',
-          border: `1px dashed ${theme.palette.divider}`,
+          borderRadius: '12px', p: 1.25,
+          bgcolor: theme.palette.background.paper,
+          border: `1px solid ${theme.palette.divider}`,
+          display: 'flex', flexDirection: 'column', gap: 1.5, mb: 2.5,
         }}>
-          <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: theme.palette.text.secondary, mb: 0.5 }}>
-            🔑 เร็วๆ นี้
-          </Typography>
-          <Typography sx={{ fontSize: '0.72rem', color: theme.palette.text.disabled, maxWidth: 420, mx: 'auto', lineHeight: 1.7 }}>
-            ระบบยังไม่มีการจัดการ API key แยกต่างหาก (เก็บ hash, จำกัดสิทธิ์/IP, หมดอายุอัตโนมัติ, นับจำนวนเรียกใช้)
-            จึงยังไม่แสดงตารางตัวอย่างในหน้านี้ เพื่อไม่ให้เข้าใจผิดว่ามีคีย์ที่ใช้งานได้จริงอยู่แล้ว
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+            <KeyRound size={16} color={theme.palette.text.secondary} style={{ flexShrink: 0 }} />
+            <Box sx={{ flex: '1 1 260px', minWidth: 0 }}>
+              <Typography sx={{ fontSize: '0.65rem', color: theme.palette.text.secondary, fontWeight: 600, mb: 0.25 }}>API Key (Read-only)</Typography>
+              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.85rem', fontWeight: 700, wordBreak: 'break-all' }}>
+                {apiKey}
+              </Typography>
+            </Box>
+            <Box sx={{ flex: '1 1 220px', minWidth: 0 }}>
+              <Typography sx={{ fontSize: '0.65rem', color: theme.palette.text.secondary, fontWeight: 600, mb: 0.25 }}>Header</Typography>
+              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.8rem', wordBreak: 'break-all' }}>
+                x-api-key: {apiKey}
+              </Typography>
+            </Box>
+            <Box sx={{ flex: '1 1 200px', minWidth: 0 }}>
+              <Typography sx={{ fontSize: '0.65rem', color: theme.palette.text.secondary, fontWeight: 600, mb: 0.25 }}>Base URL</Typography>
+              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.8rem', wordBreak: 'break-all' }}>
+                {baseUrl}
+              </Typography>
+            </Box>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, p: 1.25, borderRadius: '10px', bgcolor: alpha(theme.palette.success.main, 0.06) }}>
+            <ShieldCheck size={15} color={theme.palette.success.main} style={{ flexShrink: 0, marginTop: 1 }} />
+            <Typography sx={{ fontSize: '0.68rem', color: theme.palette.text.secondary, lineHeight: 1.6 }}>
+              คีย์นี้แยกจาก key ของ agent เอง และเป็นแบบอ่านอย่างเดียว (read-only) เท่านั้น — ไม่สามารถแก้ไขหรือลบข้อมูลผ่าน API ชุดนี้ได้
+            </Typography>
+          </Box>
+        </Box>
+
+        <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: theme.palette.text.secondary, mb: 1 }}>Endpoints</Typography>
+        <TableContainer sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 2, mb: 2 }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 700, fontSize: '0.7rem', color: 'text.secondary', width: '38%' }}>Endpoint</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '0.7rem', color: 'text.secondary' }}>คำอธิบาย</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {[
+                { path: 'GET /api/external/agents', desc: 'รายการเครื่องทั้งหมด (hardware, OS, license, battery, disk, online/offline)' },
+                { path: 'GET /api/external/agent/:hostname', desc: 'ข้อมูลเต็มของเครื่องเดียว (รวม RAM slots, monitors, printers, USB, software)' },
+                { path: 'GET /api/external/search?q=keyword', desc: 'ค้นหาตาม hostname, serial, IP หรือ user' },
+                { path: 'GET /api/external/summary', desc: 'สรุปจำนวน online / offline / total / Trend Micro' },
+              ].map(ep => (
+                <TableRow key={ep.path} hover>
+                  <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.72rem', fontWeight: 600 }}>{ep.path}</TableCell>
+                  <TableCell sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>{ep.desc}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+
+        <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: theme.palette.text.secondary, mb: 1 }}>ตัวอย่างการเรียกใช้</Typography>
+        <Box sx={{
+          borderRadius: '10px', p: 1.5,
+          bgcolor: theme.palette.mode === 'dark' ? alpha('#000', 0.25) : theme.palette.background.default,
+          border: `1px solid ${theme.palette.divider}`,
+          fontFamily: 'monospace', fontSize: '0.72rem', lineHeight: 1.9,
+          overflowX: 'auto', whiteSpace: 'pre',
+        }}>
+{`GET ${baseUrl}/api/external/agents
+Header: x-api-key: ${apiKey}
+
+GET ${baseUrl}/api/external/agent/HQ-TRRT-N016
+GET ${baseUrl}/api/external/search?q=1FNHN42
+GET ${baseUrl}/api/external/summary`}
         </Box>
       </SectionCard>
     </Box>
