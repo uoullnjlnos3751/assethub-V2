@@ -636,7 +636,7 @@ export default function PMSchedulePage() {
             <BarChartIcon fontSize="small" color="action" />
             <Box>
               <Typography sx={{ fontSize: 13, fontWeight: 700 }}>ตารางแผนงาน (Gantt Chart) - {viewMode === 'daily' ? 'รายวัน' : 'รายสัปดาห์'}</Typography>
-              <Typography sx={{ fontSize: 10, color: 'text.secondary', mt: 0.25 }}>
+              <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 0.25 }}>
                 {columns[0]?.subLabel} ถึง {columns[columns.length - 1]?.subLabel} {selectedYear + 543}
                 {' · '}
                 <Box component="span" sx={{ fontWeight: 600 }}>{filteredPlans.length} แผนงาน</Box>
@@ -670,19 +670,19 @@ export default function PMSchedulePage() {
         </Box>
 
         <TableContainer sx={{ maxHeight: '65vh' }}>
-          <Table className="gantt-table" size="small" sx={{ fontSize: 11 }}>
+          <Table className="gantt-table" size="small">
             <TableHead>
               <TableRow>
-                <TableCell sx={{ width: 40, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2 }}>WBS</TableCell>
-                <TableCell sx={{ minWidth: 160, bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2 }}>TASK (บริษัท / แผนกงาน)</TableCell>
-                <TableCell sx={{ width: 60, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2 }}>LEAD</TableCell>
-                <TableCell sx={{ width: 40, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2 }}>แผน</TableCell>
-                <TableCell sx={{ width: 40, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2 }}>เสร็จ</TableCell>
-                <TableCell sx={{ width: 40, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2 }}>เหลือ</TableCell>
-                <TableCell sx={{ width: 60, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2 }}>START</TableCell>
-                <TableCell sx={{ width: 60, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2 }}>END</TableCell>
-                <TableCell sx={{ width: 30, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2 }}>วัน</TableCell>
-                <TableCell sx={{ width: 40, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2 }}>%</TableCell>
+                <TableCell sx={{ width: 40, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2, fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>WBS</TableCell>
+                <TableCell sx={{ minWidth: 160, bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2, fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>TASK (บริษัท / แผนกงาน)</TableCell>
+                <TableCell sx={{ width: 60, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2, fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>LEAD</TableCell>
+                <TableCell sx={{ width: 40, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2, fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>แผน</TableCell>
+                <TableCell sx={{ width: 40, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2, fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>เสร็จ</TableCell>
+                <TableCell sx={{ width: 40, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2, fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>เหลือ</TableCell>
+                <TableCell sx={{ width: 60, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2, fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>START</TableCell>
+                <TableCell sx={{ width: 60, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2, fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>END</TableCell>
+                <TableCell sx={{ width: 30, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2, fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>วัน</TableCell>
+                <TableCell sx={{ width: 40, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2, fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>%</TableCell>
                 {columns.map(col => {
                   const isToday = isTodayInCol(col);
                   return (
@@ -698,10 +698,11 @@ export default function PMSchedulePage() {
                         borderLeftColor: isToday ? 'error.main' : undefined,
                         borderRightColor: isToday ? 'error.main' : undefined,
                         position: 'sticky', top: 0, zIndex: 2,
+                        fontSize: 11, fontWeight: 600, color: 'text.secondary',
                       }}
                     >
                       {col.label}<br />
-                      <Box component="span" sx={{ fontSize: 8, fontWeight: isToday ? 700 : 400, color: isToday ? 'error.main' : 'text.secondary' }}>
+                      <Box component="span" sx={{ fontSize: 10, fontWeight: isToday ? 700 : 400, color: isToday ? 'error.main' : 'text.secondary' }}>
                         {isToday ? '★ วันนี้' : col.subLabel.split(' ')[0]}
                       </Box>
                     </TableCell>
@@ -712,16 +713,16 @@ export default function PMSchedulePage() {
             <TableBody>
               {/* ── Level 0: Total Summary Row ── */}
               <TableRow sx={{ bgcolor: 'action.hover' }}>
-                <TableCell sx={{ textAlign: 'center', color: 'text.secondary', fontWeight: 600 }}>1</TableCell>
-                <TableCell sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5 }}><CorporateFareIcon sx={{ fontSize: 14 }} /> TRR GROUP (ทั้งหมดในระบบ)</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>-</TableCell>
-                <TableCell sx={{ textAlign: 'center', fontWeight: 600 }}>{totalPlanned}</TableCell>
-                <TableCell sx={{ textAlign: 'center', fontWeight: 600 }}>{totalCompleted}</TableCell>
-                <TableCell sx={{ textAlign: 'center', color: 'error.main', fontWeight: 600 }}>{totalPlanned - totalCompleted}</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>-</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>-</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>-</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>
+                <TableCell sx={{ textAlign: 'center', color: 'text.secondary', fontWeight: 600, fontSize: 12 }}>1</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 0.5 }}><CorporateFareIcon sx={{ fontSize: 14 }} /> TRR GROUP (ทั้งหมดในระบบ)</TableCell>
+                <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>-</TableCell>
+                <TableCell sx={{ textAlign: 'center', fontWeight: 600, fontSize: 12 }}>{totalPlanned}</TableCell>
+                <TableCell sx={{ textAlign: 'center', fontWeight: 600, fontSize: 12 }}>{totalCompleted}</TableCell>
+                <TableCell sx={{ textAlign: 'center', color: 'error.main', fontWeight: 600, fontSize: 12 }}>{totalPlanned - totalCompleted}</TableCell>
+                <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>-</TableCell>
+                <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>-</TableCell>
+                <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>-</TableCell>
+                <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>
                   <Box component="span" sx={{ color: `${getProgressColor(overallPct)}.main`, fontWeight: 600 }}>{overallPct}%</Box>
                 </TableCell>
                 <TableCell colSpan={columns.length} sx={{ bgcolor: (t) => alpha(t.palette.success.main, 0.08), textAlign: 'center', fontSize: 11, color: 'success.main', fontWeight: 600 }}>
@@ -732,7 +733,7 @@ export default function PMSchedulePage() {
               {/* ── Grouped Sites Rows ── */}
               {groupedPlans.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10 + columns.length} sx={{ textAlign: 'center', py: 3, color: 'text.secondary' }}>
+                  <TableCell colSpan={10 + columns.length} sx={{ textAlign: 'center', py: 3, color: 'text.secondary', fontSize: 12 }}>
                     ไม่มีข้อมูลกำหนดการสำหรับปี {selectedYear + 543}
                   </TableCell>
                 </TableRow>
@@ -753,19 +754,19 @@ export default function PMSchedulePage() {
                   return (
                     <React.Fragment key={group.site}>
                       <TableRow hover onClick={() => toggleSite(group.site)} sx={{ bgcolor: 'action.hover', fontWeight: 600, cursor: 'pointer' }}>
-                        <TableCell sx={{ textAlign: 'center' }}>{siteWbs}</TableCell>
-                        <TableCell sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>{siteWbs}</TableCell>
+                        <TableCell sx={{ fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 0.5 }}>
                           <ChevronRightRotateIcon sx={{ fontSize: 14, transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s', color: 'primary.main' }} />
                           <BusinessIcon sx={{ fontSize: 14 }} /> {group.site}
                         </TableCell>
-                        <TableCell sx={{ textAlign: 'center' }}>{group.lead || '-'}</TableCell>
-                        <TableCell sx={{ textAlign: 'center' }}>{group.totalPlanned}</TableCell>
-                        <TableCell sx={{ textAlign: 'center' }}>{group.totalCompleted}</TableCell>
-                        <TableCell sx={{ textAlign: 'center', color: 'error.main' }}>{group.totalPlanned - group.totalCompleted}</TableCell>
-                        <TableCell sx={{ textAlign: 'center', fontSize: 9 }}>{group.startDate ? fmtDate(group.startDate) : '-'}</TableCell>
-                        <TableCell sx={{ textAlign: 'center', fontSize: 9 }}>{group.endDate ? fmtDate(group.endDate) : '-'}</TableCell>
-                        <TableCell sx={{ textAlign: 'center' }}>{siteDays}</TableCell>
-                        <TableCell sx={{ textAlign: 'center' }}>
+                        <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>{group.lead || '-'}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>{group.totalPlanned}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>{group.totalCompleted}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', color: 'error.main', fontSize: 12 }}>{group.totalPlanned - group.totalCompleted}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', fontSize: 11, color: 'text.secondary' }}>{group.startDate ? fmtDate(group.startDate) : '-'}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', fontSize: 11, color: 'text.secondary' }}>{group.endDate ? fmtDate(group.endDate) : '-'}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>{siteDays}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>
                           <Box component="span" sx={{ color: 'success.main', fontWeight: 600 }}>{sitePct}%</Box>
                         </TableCell>
                         {columns.map(col => renderGanttCell(siteDummyPlan, col, sitePct, true))}
@@ -786,23 +787,23 @@ export default function PMSchedulePage() {
                             sx={{ cursor: 'pointer' }}
                             onClick={() => navigate(`/pm/runs?planId=${plan.id}`)}
                           >
-                            <TableCell sx={{ textAlign: 'center', color: 'text.secondary' }}>{planWbs}</TableCell>
-                            <TableCell sx={{ pl: 3.5 }}>
+                            <TableCell sx={{ textAlign: 'center', color: 'text.secondary', fontSize: 11 }}>{planWbs}</TableCell>
+                            <TableCell sx={{ pl: 3.5, fontSize: 12 }}>
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><FolderIcon sx={{ fontSize: 13 }} /> {plan.deptTask || 'ทั่วไป'}</Box>
                               {plan.deviceType && (
-                                <Box sx={{ fontSize: 10, color: 'info.main', fontWeight: 600, mt: 0.25, pl: 2.25, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <Box sx={{ fontSize: 11, color: 'info.main', fontWeight: 600, mt: 0.25, pl: 2.25, display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                   <ComputerIcon sx={{ fontSize: 11 }} /> {plan.deviceType}
                                 </Box>
                               )}
                             </TableCell>
-                            <TableCell sx={{ textAlign: 'center' }}>{plan.lead || group.lead || '-'}</TableCell>
-                            <TableCell sx={{ textAlign: 'center' }}>{plan.plannedDeviceCount}</TableCell>
-                            <TableCell sx={{ textAlign: 'center' }}>{plan.completedCount || 0}</TableCell>
-                            <TableCell sx={{ textAlign: 'center', color: 'error.main' }}>{plan.plannedDeviceCount - (plan.completedCount || 0)}</TableCell>
-                            <TableCell sx={{ textAlign: 'center', fontSize: 9 }}>{pStartVal ? fmtDate(pStartVal) : '-'}</TableCell>
-                            <TableCell sx={{ textAlign: 'center', fontSize: 9 }}>{pEndVal ? fmtDate(pEndVal) : '-'}</TableCell>
-                            <TableCell sx={{ textAlign: 'center' }}>{pDays}</TableCell>
-                            <TableCell sx={{ textAlign: 'center' }}>
+                            <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>{plan.lead || group.lead || '-'}</TableCell>
+                            <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>{plan.plannedDeviceCount}</TableCell>
+                            <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>{plan.completedCount || 0}</TableCell>
+                            <TableCell sx={{ textAlign: 'center', color: 'error.main', fontSize: 12 }}>{plan.plannedDeviceCount - (plan.completedCount || 0)}</TableCell>
+                            <TableCell sx={{ textAlign: 'center', fontSize: 11, color: 'text.secondary' }}>{pStartVal ? fmtDate(pStartVal) : '-'}</TableCell>
+                            <TableCell sx={{ textAlign: 'center', fontSize: 11, color: 'text.secondary' }}>{pEndVal ? fmtDate(pEndVal) : '-'}</TableCell>
+                            <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>{pDays}</TableCell>
+                            <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>
                               <Box component="span" sx={{ color: `${getProgressColor(planPct)}.main`, fontWeight: 600 }}>{planPct}%</Box>
                             </TableCell>
                             {columns.map(col => renderGanttCell(plan, col, planPct))}
@@ -826,12 +827,12 @@ export default function PMSchedulePage() {
             <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>จำนวนเครื่องที่วางแผนทำ PM</Typography>
           </Box>
           {viewMode !== 'weekly' ? (
-            <Box sx={{ p: 3, textAlign: 'center', color: 'text.secondary', fontSize: 12.5 }}>สลับเป็นมุมมอง "รายสัปดาห์" ด้านบนเพื่อดูสรุปนี้</Box>
+            <Box sx={{ p: 3, textAlign: 'center', color: 'text.secondary', fontSize: 12 }}>สลับเป็นมุมมอง "รายสัปดาห์" ด้านบนเพื่อดูสรุปนี้</Box>
           ) : weeklySummaryRows.length === 0 ? (
-            <Box sx={{ p: 3, textAlign: 'center', color: 'text.secondary', fontSize: 12.5 }}>ไม่มีแผน PM ในช่วงสัปดาห์ที่แสดงอยู่</Box>
+            <Box sx={{ p: 3, textAlign: 'center', color: 'text.secondary', fontSize: 12 }}>ไม่มีแผน PM ในช่วงสัปดาห์ที่แสดงอยู่</Box>
           ) : (
             <TableContainer>
-              <Table size="small" sx={{ fontSize: 12 }}>
+              <Table size="small">
                 <TableHead>
                   <TableRow>
                     <TableCell sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>สัปดาห์</TableCell>
@@ -845,15 +846,15 @@ export default function PMSchedulePage() {
                 <TableBody>
                   {weeklySummaryRows.map((row) => (
                     <TableRow key={row.key} hover>
-                      <TableCell sx={{ fontWeight: 700, color: 'info.main' }}>{row.col.label}</TableCell>
-                      <TableCell sx={{ fontSize: 11.5, color: 'text.secondary' }}>
+                      <TableCell sx={{ fontSize: 12, fontWeight: 700, color: 'info.main' }}>{row.col.label}</TableCell>
+                      <TableCell sx={{ fontSize: 11, color: 'text.secondary' }}>
                         {formatThaiMonthDay(row.col.start)} – {formatThaiMonthDay(row.col.end)}
                       </TableCell>
-                      <TableCell sx={{ fontSize: 11.5 }}>{row.deptLabel}</TableCell>
-                      <TableCell align="center">{row.target}</TableCell>
-                      <TableCell sx={{ fontSize: 11.5 }}>{row.teamLabel}</TableCell>
-                      <TableCell>
-                        <Chip size="small" label={row.status.label} color={row.status.color === 'default' ? undefined : row.status.color} variant={row.status.color === 'default' ? 'outlined' : 'filled'} sx={{ fontSize: 10.5, height: 22 }} />
+                      <TableCell sx={{ fontSize: 12 }}>{row.deptLabel}</TableCell>
+                      <TableCell sx={{ fontSize: 12 }} align="center">{row.target}</TableCell>
+                      <TableCell sx={{ fontSize: 12 }}>{row.teamLabel}</TableCell>
+                      <TableCell sx={{ fontSize: 12 }}>
+                        <Chip size="small" label={row.status.label} color={row.status.color === 'default' ? undefined : row.status.color} variant={row.status.color === 'default' ? 'outlined' : 'filled'} sx={{ fontSize: 11, height: 22 }} />
                       </TableCell>
                     </TableRow>
                   ))}
@@ -875,10 +876,10 @@ export default function PMSchedulePage() {
             ].map((row) => (
               <Box key={row.label} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, p: '10px 12px', borderRadius: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'action.hover' }}>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography sx={{ fontSize: 12.5 }}>{row.label}</Typography>
-                  <Typography sx={{ fontSize: 10.5, color: 'text.secondary' }}>{row.sub}</Typography>
+                  <Typography sx={{ fontSize: 12 }}>{row.label}</Typography>
+                  <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>{row.sub}</Typography>
                 </Box>
-                <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: 'info.main', whiteSpace: 'nowrap' }}>{row.val}</Typography>
+                <Typography sx={{ fontSize: 12, fontWeight: 700, color: 'info.main', whiteSpace: 'nowrap' }}>{row.val}</Typography>
               </Box>
             ))}
           </Box>
