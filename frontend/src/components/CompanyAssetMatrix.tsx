@@ -5,6 +5,7 @@ import {
 } from '@mui/material';
 import { Filter, Download, Settings2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { assetAPI } from '../services/api';
 
 const STATUS_BUCKETS = [
   { id: 'InUse', label: 'InUse - ใช้งาน' },
@@ -42,12 +43,37 @@ export default function CompanyAssetMatrix({ assets }: { assets: any[] }) {
   const theme = useTheme();
   const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);
 
+  // Master data defines each company's raw asset.company codes (e.g. TRR's
+  // assetCompanyCodes = "TRR,TRRSK") — without this, aliased codes for the
+  // same real company would render as separate rows in the matrix.
+  const [companyRows, setCompanyRows] = useState<{ code: string | null; name: string; assetCompanyCodes: string | null }[]>([]);
+  useEffect(() => {
+    assetAPI.companies().then(res => setCompanyRows(res.data || [])).catch(() => {});
+  }, []);
+
+  const codeToCanonical = useMemo(() => {
+    const map = new Map<string, string>();
+    // Master data has a few duplicate rows aliasing the same raw code (e.g. two
+    // rows both claim "TRR"). Process codeless rows first so a properly coded
+    // row always wins the conflict instead of an arbitrary array-order pick.
+    const withoutCode = companyRows.filter(c => !c.code);
+    const withCode = companyRows.filter(c => c.code);
+    for (const c of [...withoutCode, ...withCode]) {
+      const label = c.code || c.name;
+      const rawCodes = (c.assetCompanyCodes || '').split(',').map(s => s.trim()).filter(Boolean);
+      for (const raw of rawCodes) map.set(raw, label);
+    }
+    return map;
+  }, [companyRows]);
+
+  const normalizeCompany = (raw: string) => codeToCanonical.get(raw) || raw;
+
   // Extract unique companies and types
   const allCompanies = useMemo(() => {
-    const set = new Set(assets.map(a => a.company).filter(Boolean));
+    const set = new Set(assets.map(a => a.company).filter(Boolean).map(normalizeCompany));
     return Array.from(set).sort() as string[];
-  }, [assets]);
-  
+  }, [assets, codeToCanonical]);
+
   const allTypes = useMemo(() => {
     const set = new Set(assets.map(a => a.type).filter(Boolean));
     return Array.from(set).sort() as string[];
@@ -97,7 +123,7 @@ export default function CompanyAssetMatrix({ assets }: { assets: any[] }) {
 
     // Populate
     for (const asset of assets) {
-      const company = asset.company;
+      const company = asset.company ? normalizeCompany(asset.company) : asset.company;
       const type = asset.type;
       if (!company || !type) continue;
       if (!selectedTypes.includes(type)) continue;
@@ -113,7 +139,7 @@ export default function CompanyAssetMatrix({ assets }: { assets: any[] }) {
     }
 
     return data;
-  }, [assets, allCompanies, selectedTypes, selectedBuckets]);
+  }, [assets, allCompanies, selectedTypes, selectedBuckets, codeToCanonical]);
 
   // Handle Export to Excel
   const exportToExcel = () => {

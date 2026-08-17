@@ -996,7 +996,7 @@ router.get('/options/domains', authenticate, async (_req: Request, res: Response
 
 router.get('/options/companies', authenticate, async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const defaults = ['PS', 'TRR', 'TRR Corp', 'TRRL', 'TRRP', 'TRRT', 'TRW', 'TRRSK', 'SSEC', 'TMI', 'TRM'];
+    const defaults = ['PS', 'TRR', 'TRRCORP', 'TRRL', 'TRRP', 'TRRT', 'TRW', 'TRRSK', 'SSEC', 'TMI', 'TRM'];
     const rows = await prisma.asset.findMany({ where: { company: { not: null } }, distinct: ['company'], select: { company: true }, orderBy: { company: 'asc' } });
     const existing = new Set(rows.map((r) => r.company).filter((v): v is string => v !== null && v !== ''));
     defaults.forEach((d) => existing.add(d));
