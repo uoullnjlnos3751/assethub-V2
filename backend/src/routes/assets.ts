@@ -2109,6 +2109,40 @@ router.get('/:id', authenticate, async (req: Request, res: Response, next: NextF
   } catch (err) { next(err); }
 });
 
+// Live hardware/status read from the separate external asset-monitoring
+// agent server (hostname == assetName). Read-only, gated the same as the
+// GLPI spec pull below since both call an external system with a stored key.
+router.get('/:id/external-agent', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const asset = await prisma.asset.findUnique({ where: { id }, select: { assetName: true } });
+    if (!asset) throw new AppError('ไม่พบทรัพย์สิน', 404);
+
+    const hostname = asset.assetName;
+    if (!hostname) return res.json({ available: false, reason: 'no_hostname' });
+
+    const baseUrl = process.env.EXTERNAL_ASSET_API_URL;
+    const apiKey = process.env.EXTERNAL_ASSET_API_KEY;
+    if (!baseUrl || !apiKey) return res.json({ available: false, reason: 'not_configured' });
+
+    let response: globalThis.Response;
+    try {
+      response = await fetch(`${baseUrl}/api/external/agent/${encodeURIComponent(hostname)}`, {
+        headers: { 'x-api-key': apiKey },
+        signal: AbortSignal.timeout(5000),
+      });
+    } catch {
+      return res.json({ available: false, reason: 'unreachable' });
+    }
+
+    if (response.status === 404) return res.json({ available: false, reason: 'not_found' });
+    if (!response.ok) return res.json({ available: false, reason: 'error' });
+
+    const data = await response.json();
+    res.json({ available: true, hostname, data });
+  } catch (err) { next(err); }
+});
+
 router.post('/upsert', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { detail, ...assetData } = req.body;

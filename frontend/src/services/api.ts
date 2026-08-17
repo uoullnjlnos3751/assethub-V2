@@ -124,6 +124,7 @@ export const assetAPI = {
   getGLPISpec: (id: number) => api.get(`/assets/${id}/glpi-spec`),
   queryGLPISpec: (serial: string) => api.get(`/assets/glpi-spec`, { params: { serial } }),
   syncGLPI: (id: number, field?: string) => api.post(`/assets/${id}/glpi-sync`, { field }),
+  externalAgent: (id: number) => api.get(`/assets/${id}/external-agent`),
   getAssetHistory: (id: number, params?: any) => api.get(`/assets/${id}/history`, { params }),
   getGlobalHistory: (params?: any) => api.get('/assets/global-history', { params }),
   searchOwners: (q: string) => api.get('/assets/owners/search-ad', { params: { q } }),

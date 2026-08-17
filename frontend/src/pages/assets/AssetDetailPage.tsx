@@ -30,6 +30,7 @@ import { AssetTimeline } from './components/AssetTimeline';
 import { AssetActionsPanel } from './components/AssetActionsPanel';
 import { AssetInsightTiles } from './components/AssetInsightTiles';
 import { AssetSpecMiniCard } from './components/AssetSpecMiniCard';
+import { AssetLiveStatusCard } from './components/AssetLiveStatusCard';
 import { AssetServiceHistoryCard } from './components/AssetServiceHistoryCard';
 import { AssetDocumentsRail } from './components/AssetDocumentsRail';
 import { PillTabBar } from '../../components/PillTabBar';
@@ -58,6 +59,8 @@ export default function AssetDetailPage() {
   const [glpiSpec, setGlpiSpec] = useState<any>(null);
   const [loadingGLPI, setLoadingGLPI] = useState(false);
   const [syncingGLPI, setSyncingGLPI] = useState(false);
+  const [externalAgent, setExternalAgent] = useState<any>(null);
+  const [loadingExternalAgent, setLoadingExternalAgent] = useState(false);
   const [toast, setToast] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'warning' | 'info' }>({
     open: false,
     message: '',
@@ -107,6 +110,29 @@ export default function AssetDetailPage() {
         });
     }
   }, [asset?.id, asset?.serialNo, id]);
+
+  // Live status (battery, CPU/RAM load, online state) from the separate
+  // external monitoring agent — same "is this a computer" gate as GLPI,
+  // since only computers run the agent. IT_ADMIN/SUPERADMIN only on the
+  // backend, so this silently stays empty for other roles rather than erroring.
+  useEffect(() => {
+    if (!asset || !id || asset.id !== parseInt(id)) return;
+    const t = (asset.type || '').toLowerCase();
+    const cat = (asset.category?.name || '').toLowerCase();
+    const isComputer = ['notebook', 'laptop', 'macbook', 'pc desktop', 'desktop', 'workstation', 'all-in-one', 'mini pc', 'thin client', 'computer'].some(k => t.includes(k)) || cat === 'คอมพิวเตอร์' || t === 'pc';
+
+    if (isComputer) {
+      setLoadingExternalAgent(true);
+      assetAPI.externalAgent(parseInt(id))
+        .then((res) => {
+          setExternalAgent(res.data?.available ? res.data.data : null);
+        })
+        .catch(() => setExternalAgent(null))
+        .finally(() => setLoadingExternalAgent(false));
+    } else {
+      setExternalAgent(null);
+    }
+  }, [asset?.id, id]);
 
   const handleGLPISync = async (field?: string, label?: string) => {
     if (!id || !asset) return;
@@ -226,6 +252,7 @@ export default function AssetDetailPage() {
                 including when AssetFinanceCard hides itself for want of data. */}
             <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 2, alignItems: 'stretch' }}>
               <AssetSpecMiniCard asset={asset} glpiSpec={glpiSpec} />
+              <AssetLiveStatusCard loading={loadingExternalAgent} agent={externalAgent} />
               <AssetFinanceCard asset={asset} />
             </Box>
 
