@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { AssetStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { authenticate, authorize } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
@@ -50,9 +51,14 @@ const pmPhotoUpload = multer({
   },
 });
 
+// Assets in these statuses are not due for PM: Retired/Lost/Damaged are gone
+// or unusable, and Maintenance means the device is already being worked on
+// so a routine PM check would be redundant until it's back in service.
+const PM_EXCLUDED_STATUSES: AssetStatus[] = ['Retired', 'Lost', 'Damaged', 'Maintenance'];
+
 function buildPMAssetWhere(plan: { company?: string | null; site?: string | null; deptTask?: string | null; deviceType?: string | null }) {
   return {
-    status: { notIn: ['Retired', 'Lost', 'Damaged'] },
+    status: { notIn: PM_EXCLUDED_STATUSES },
     ...(plan.company ? { company: { contains: plan.company } } : {}),
     ...(plan.site ? { location: { contains: plan.site } } : {}),
     ...(plan.deptTask ? { departmentId: { contains: plan.deptTask } } : {}),
@@ -475,7 +481,7 @@ router.get('/runs', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (re
   try {
     const { planId, status } = req.query;
     const where: any = {
-      asset: { status: { notIn: ['Retired', 'Lost', 'Damaged'] } }
+      asset: { status: { notIn: PM_EXCLUDED_STATUSES } }
     };
     if (planId) where.planId = parseInt(planId as string);
     if (status) where.status = status as string;
@@ -833,7 +839,7 @@ router.get('/dashboard', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), asyn
     const runs = await prisma.pMRun.findMany({
       where: {
         planId: { in: planIds },
-        asset: { status: { notIn: ['Retired', 'Lost', 'Damaged'] } }
+        asset: { status: { notIn: PM_EXCLUDED_STATUSES } }
       },
       include: { plan: true },
     });
@@ -992,7 +998,7 @@ router.get('/check-serial', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), a
     const { serialNo } = req.query;
     if (!serialNo) return res.json({ found: false });
     const asset = await prisma.asset.findFirst({
-      where: { serialNo: String(serialNo), status: { notIn: ['Retired', 'Lost', 'Damaged'] } },
+      where: { serialNo: String(serialNo), status: { notIn: PM_EXCLUDED_STATUSES } },
       select: {
         id: true,
         assetCode: true,
@@ -1115,7 +1121,7 @@ router.get('/runs/adhoc-search', authenticate, authorize('IT_ADMIN', 'SUPERADMIN
           { assetName: { contains: q, mode: 'insensitive' } },
           { ownerName: { contains: q, mode: 'insensitive' } },
         ],
-        status: { notIn: ['Retired', 'Lost', 'Damaged'] },
+        status: { notIn: PM_EXCLUDED_STATUSES },
       },
       take: 10,
     });
