@@ -137,6 +137,7 @@ export const assetAPI = {
   domainOptions: () => api.get('/assets/options/domains'),
   companyOptions: () => api.get('/assets/options/companies'),
   antivirusOptions: () => api.get('/assets/options/antivirus'),
+  nextCode: (params: { company: string; departmentId?: string; type?: string }) => api.get('/assets/next-code', { params }),
   deviceTypes: () => api.get('/assets/device-types'),
   filterOptions: () => api.get('/assets/filter-options'),
   createDeviceType: (data: any) => api.post('/assets/device-types', data),

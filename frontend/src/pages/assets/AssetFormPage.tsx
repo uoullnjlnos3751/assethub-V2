@@ -380,6 +380,19 @@ export default function AssetFormPage() {
     }
   }, [form.type]);
 
+  // Suggest the next IT asset code from real precedent (same company/dept/type),
+  // only for new assets — never overrides a code the user already typed.
+  const [codeSuggestion, setCodeSuggestion] = useState<{ suggested: string; matchedOn: string; basedOn: number } | null>(null);
+  useEffect(() => {
+    if (id || !form.company?.trim()) { setCodeSuggestion(null); return; }
+    const timer = setTimeout(() => {
+      assetAPI.nextCode({ company: form.company.trim(), departmentId: form.departmentId?.trim() || undefined, type: form.type?.trim() || undefined })
+        .then((res) => setCodeSuggestion(res.data?.suggested ? res.data : null))
+        .catch(() => setCodeSuggestion(null));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [id, form.company, form.departmentId, form.type]);
+
   /* ─── Field change tracking ─── */
   const trackChange = useCallback((field: string, label: string, newVal: string) => {
     const orig = originalSnapshot[field] ?? '';
@@ -693,6 +706,22 @@ export default function AssetFormPage() {
                   error={!!duplicates.assetName || (submitAttempted && !form.assetName?.trim())}
                   helperText={duplicates.assetName ? '⚠️ ชื่อทรัพย์สินนี้มีอยู่ในระบบแล้ว' : (submitAttempted && !form.assetName?.trim() ? 'กรุณาระบุชื่อทรัพย์สิน' : '')}
                 />
+                {!id && codeSuggestion && !form.assetName?.trim() && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.75, flexWrap: 'wrap' }}>
+                    <Typography variant="caption" color="text.secondary">
+                      💡 แนะนำ: <b>{codeSuggestion.suggested}</b>
+                      {' '}({codeSuggestion.matchedOn === 'company+department+type' ? `จากรูปแบบเดียวกัน ${codeSuggestion.basedOn} เครื่อง`
+                        : codeSuggestion.matchedOn === 'company+type' ? `จากบริษัท+ประเภทเดียวกัน ${codeSuggestion.basedOn} เครื่อง (ไม่ตรงแผนก)`
+                        : `จากบริษัทเดียวกันเท่านั้น ${codeSuggestion.basedOn} เครื่อง — ควรตรวจสอบก่อนใช้`})
+                    </Typography>
+                    <Chip
+                      size="small"
+                      label="ใช้รหัสนี้"
+                      onClick={() => setFormField('assetName', 'ชื่อทรัพย์สิน / รหัสทรัพย์สิน', codeSuggestion.suggested)}
+                      sx={{ height: 20, fontSize: '0.7rem', cursor: 'pointer', bgcolor: alpha(theme.palette.primary.main, .1), color: 'primary.main', fontWeight: 700 }}
+                    />
+                  </Box>
+                )}
               </Grid>
               <Grid item xs={12} sm={4}>
                 <Autocomplete

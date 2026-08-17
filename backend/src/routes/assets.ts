@@ -1004,6 +1004,90 @@ router.get('/options/companies', authenticate, async (_req: Request, res: Respon
   } catch (err) { next(err); }
 });
 
+// Suggests the next IT asset code (assetName, e.g. HQ-TRRCORP-N116) by finding
+// the most common code prefix among existing assets that match the same
+// company/department/type, then incrementing its highest trailing number.
+// Never invents a prefix that has no precedent in real data — degrades
+// through progressively broader matches and reports which tier was used.
+router.get('/next-code', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const company = String(req.query.company || '').trim();
+    const departmentId = String(req.query.departmentId || '').trim();
+    const type = String(req.query.type || '').trim();
+
+    if (!company) {
+      res.json({ suggested: null, matchedOn: null, basedOn: 0 });
+      return;
+    }
+
+    function extractPattern(names: string[]) {
+      const prefixCount = new Map<string, { count: number; maxNum: number; maxCode: string; digitLen: number }>();
+      for (const name of names) {
+        const m = name.match(/^(.*?)(\d+)$/);
+        if (!m) continue;
+        const prefix = m[1];
+        const numStr = m[2];
+        const num = parseInt(numStr, 10);
+        const entry = prefixCount.get(prefix) || { count: 0, maxNum: -1, maxCode: '', digitLen: numStr.length };
+        entry.count++;
+        if (num > entry.maxNum) { entry.maxNum = num; entry.maxCode = name; entry.digitLen = numStr.length; }
+        prefixCount.set(prefix, entry);
+      }
+      if (prefixCount.size === 0) return null;
+      const [bestPrefix, info] = [...prefixCount.entries()].sort((a, b) => b[1].count - a[1].count)[0];
+      return {
+        prefix: bestPrefix,
+        maxCode: info.maxCode,
+        count: info.count,
+        suggested: bestPrefix + String(info.maxNum + 1).padStart(info.digitLen, '0'),
+      };
+    }
+
+    let matchedOn: string | null = null;
+    let result: ReturnType<typeof extractPattern> = null;
+
+    if (departmentId && type) {
+      const rows = await prisma.asset.findMany({
+        where: { company, departmentId, type, assetName: { not: null } },
+        select: { assetName: true },
+      });
+      result = extractPattern(rows.map((r) => r.assetName!));
+      if (result) matchedOn = 'company+department+type';
+    }
+
+    if (!result && type) {
+      const rows = await prisma.asset.findMany({
+        where: { company, type, assetName: { not: null } },
+        select: { assetName: true },
+      });
+      result = extractPattern(rows.map((r) => r.assetName!));
+      if (result) matchedOn = 'company+type';
+    }
+
+    if (!result) {
+      const rows = await prisma.asset.findMany({
+        where: { company, assetName: { not: null } },
+        select: { assetName: true },
+      });
+      result = extractPattern(rows.map((r) => r.assetName!));
+      if (result) matchedOn = 'company';
+    }
+
+    if (!result) {
+      res.json({ suggested: null, matchedOn: null, basedOn: 0 });
+      return;
+    }
+
+    res.json({
+      suggested: result.suggested,
+      prefix: result.prefix,
+      lastCode: result.maxCode,
+      basedOn: result.count,
+      matchedOn,
+    });
+  } catch (err) { next(err); }
+});
+
 router.get('/options/antivirus', authenticate, async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const defaults = ['Trend Micro Apex One', 'Sangfor Endpoint Secure', 'ESET Endpoint Security'];
