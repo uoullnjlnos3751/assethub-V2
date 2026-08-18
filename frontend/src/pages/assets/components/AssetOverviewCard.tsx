@@ -23,7 +23,7 @@ function Fact({ label, value, sub, mono, accent }: {
         fontSize: '0.86rem', fontWeight: 700, mt: '2px',
         color: accent ? theme.palette.primary.main : theme.palette.text.primary,
         fontFamily: mono ? 'monospace' : undefined,
-        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        wordBreak: 'break-word',
       }}>
         {value ?? '—'}
       </Typography>
