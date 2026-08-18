@@ -115,16 +115,15 @@ export function AssetOverviewCard({ asset }: { asset: any }) {
         </Box>
       </Box>
 
-      {/* At-a-glance facts — kept to exactly 8 (2 balanced rows of 4 at the
-          card's usual width) by moving warranty expiry up into the identity
-          block above instead of adding it as a 9th, lopsided cell here. */}
-      {/* auto-fit rather than fixed viewport breakpoints: this card sits in a
-          flex column between the app nav and the context rail, so its own width
-          is far narrower than the viewport — a viewport-driven 4-up grid
-          truncated every value at desktop sizes. */}
+      {/* At-a-glance facts — kept to exactly 8 cells (2 rows of 4, per the
+          design handoff) by moving warranty expiry up into the identity block
+          above instead of adding it as a 9th, lopsided cell here. Fixed column
+          counts rather than auto-fit: auto-fit sizes columns off the card's
+          own width, which can land on 3 or 5-up instead of 4 and scramble the
+          Serial/Owner/Dept/Location · Date/Vendor/Price/Value grouping. */}
       <Box sx={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+        gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' },
         rowGap: 2, columnGap: 1.25,
         mt: 2.5,
       }}>
