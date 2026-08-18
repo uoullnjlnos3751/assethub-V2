@@ -232,20 +232,6 @@ function applySecretField(data: any, key: string, incoming: unknown) {
   data[key] = incoming;
 }
 
-// Connection details for the external asset-monitoring API, so the
-// integrations screen can show them without the key being written into the
-// frontend bundle — this repository is public, and a key committed here would
-// stay in its history for good. Values come from backend/.env, which is not
-// tracked. SUPERADMIN only: this deliberately returns the key in the clear,
-// because the whole point of the panel is for an admin to read it.
-router.get('/external-api-info', authenticate, authorize('SUPERADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
-  try {
-    const baseUrl = process.env.EXTERNAL_ASSET_API_URL || '';
-    const apiKey = process.env.EXTERNAL_ASSET_API_KEY || '';
-    res.json({ configured: !!(baseUrl && apiKey), baseUrl, apiKey });
-  } catch (err) { next(err); }
-});
-
 router.get('/settings', authenticate, authorize('SUPERADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     let settings = await prisma.notificationSetting.findFirst();
