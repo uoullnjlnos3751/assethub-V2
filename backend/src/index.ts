@@ -1,6 +1,7 @@
 import { createApp } from './app';
 import { startNotificationWorker } from './services/notification';
 import { startOverdueChecker } from './jobs/overdueChecker';
+import { startAgentSpecSync } from './jobs/agentSpecSync';
 import { startAutoBackup } from './services/backup';
 import { validateProductionEnv } from './config/env';
 import { prisma } from './lib/prisma';
@@ -14,6 +15,7 @@ const server = app.listen(Number(PORT), '0.0.0.0', () => {
   console.log(`Server running on http://localhost:${PORT}`);
   startNotificationWorker();
   startOverdueChecker();
+  startAgentSpecSync();
   startAutoBackup();
 });
 

@@ -87,6 +87,7 @@ export const adminNav: NavEntry[] = [
       { label: 'Rack & Infra', path: '/assets?typeGroup=rack', icon: <HandymanIcon fontSize="small" /> },
       { label: 'นำเข้า/ส่งออก ข้อมูล', path: '/assets/import-export', icon: <ImportExportIcon fontSize="small" />, roles: ['SUPERADMIN', 'IT_ADMIN'] },
       { label: 'พิมพ์ QR สติ๊กเกอร์', path: '/assets/print-qr', icon: <PrintIcon fontSize="small" />, roles: ['SUPERADMIN', 'IT_ADMIN'] },
+      { label: 'ตรวจสอบข้อมูลจาก Agent', path: '/assets/agent-drift', icon: <RouterIcon fontSize="small" />, roles: ['SUPERADMIN', 'IT_ADMIN'] },
     ],
   },
   {

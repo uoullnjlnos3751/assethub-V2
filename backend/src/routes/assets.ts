@@ -5,6 +5,10 @@ import { AppError } from '../middleware/errorHandler';
 import { Prisma } from '@prisma/client';
 import { fetchGLPISpecBySerial } from '../services/glpi';
 import { searchADUsers } from '../services/ldap';
+import {
+  AGENT_FIELD_LABELS, agentValueSatisfied, computeDrift, fetchAgentRecord,
+  fetchAllAgentRecords, fillBlanksFromAgent, mapAgentToAssetSpec, matchAssetForAgent,
+} from '../services/externalAgent';
 import { cleanMasterValue } from '../utils/assetHelpers';
 import multer from 'multer';
 import * as xlsx from 'xlsx';
@@ -2162,105 +2166,6 @@ router.get('/:id', authenticate, async (req: Request, res: Response, next: NextF
   } catch (err) { next(err); }
 });
 
-// Fetch one machine's record from the external monitoring agent. Returns null
-// for every failure mode the caller should treat as "no live data" rather than
-// an error — the asset may simply not run the agent.
-async function fetchAgentRecord(hostname: string | null | undefined): Promise<any | null> {
-  if (!hostname) return null;
-  const baseUrl = process.env.EXTERNAL_ASSET_API_URL;
-  const apiKey = process.env.EXTERNAL_ASSET_API_KEY;
-  if (!baseUrl || !apiKey) return null;
-
-  try {
-    const response = await fetch(`${baseUrl}/api/external/agent/${encodeURIComponent(hostname)}`, {
-      headers: { 'x-api-key': apiKey },
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!response.ok) return null;
-    return await response.json();
-  } catch {
-    return null;
-  }
-}
-
-// Agent reading -> asset column, for the fields where the agent's value is
-// directly comparable to what the registry stores.
-//
-// Deliberately excluded, because the agent's value means something different
-// rather than something newer:
-//   storage1       agent reports formatted capacity ("C: 465.13 GB"); the
-//                  registry records the nominal size the machine was bought
-//                  with ("512 GB"). Live disk usage is shown separately.
-//   windowsLicense the registry keeps the product key; the agent only knows
-//                  the activation state ("Licensed").
-//   ownerName      agent reports the Windows login ("TRRGROUP\\watchara.kid"),
-//                  the registry wants the person's display name.
-//
-// Strings are cleaned on the way in — agent CPU names carry "(R)"/"(TM)" noise
-// that nobody wants stored.
-function mapAgentToAssetSpec(a: any): Record<string, string | null> {
-  if (!a) return {};
-  const text = (v: any) => {
-    const s = String(v ?? '').trim();
-    return s === '' ? null : s;
-  };
-  const cleanCpu = (v: any) => {
-    const s = text(v);
-    return s ? s.replace(/\((?:R|TM)\)/gi, '').replace(/\s{2,}/g, ' ').trim() : null;
-  };
-  // Matches the format already used across the registry: "DDR4 - SODIMM 16 GB".
-  const slots: string[] = (a.ram_slots || [])
-    .filter((s: any) => s && s.size_gb)
-    .map((s: any) => `${s.type ? `${s.type} - ` : ''}SODIMM ${s.size_gb} GB`);
-
-  // The agent reports the DNS domain ("trrgroup.com"); the registry records the
-  // NetBIOS name ("TRRGROUP") throughout. Convert rather than offer a value
-  // that would make this one asset inconsistent with every other.
-  const domain = text(a.domain);
-  const netbiosDomain = domain ? domain.split('.')[0].toUpperCase() : null;
-
-  const cpu = cleanCpu(a.cpu_name);
-  return {
-    brand: text(a.computer_manufacturer),
-    model: text(a.computer_model),
-    snComputer: text(a.serial_number),
-    cpu: cpu ? (a.cpu_cores ? `${cpu} (${a.cpu_cores} Cores)` : cpu) : null,
-    ram: a.ram_total_gb ? `${Math.round(a.ram_total_gb)} GB` : null,
-    ramSlot1: slots[0] ?? null,
-    ramSlot2: slots[1] ?? null,
-    ramType: text(a.ram_slots?.[0]?.type),
-    ramSpeed: text(a.ram_slots?.[0]?.speed_mhz),
-    gpu: text(a.gpu_name),
-    osType: a.os_name?.includes('Windows') ? 'Windows' : text(a.os_name),
-    osVersion: text(a.os_name),
-    officeLicense: text(a.office_name),
-    antivirusStatus: a.tm_installed ? 'Trend Micro Apex One' : null,
-    domainName: netbiosDomain,
-  };
-}
-
-// Whether the registry's value already covers what the agent reports.
-//
-// Equal is the obvious case; "already contains it" is the one that matters in
-// practice, because the registry is often the more specific of the two — it
-// records "NVIDIA GeForce MX550 (2 GB)" where the agent only sees "NVIDIA
-// GeForce MX550", and "Microsoft Windows 11 Pro 25H2" where the agent reports
-// "Microsoft Windows 11 Pro". Flagging those as differing would invite someone
-// to "fix" them by throwing the extra detail away.
-function agentValueSatisfied(current: any, incoming: string): boolean {
-  const cur = String(current ?? '').trim().toLowerCase();
-  const next = String(incoming ?? '').trim().toLowerCase();
-  if (!next) return true;
-  return cur === next || (cur.length > next.length && cur.includes(next));
-}
-
-const AGENT_FIELD_LABELS: Record<string, string> = {
-  brand: 'ยี่ห้อ', model: 'รุ่น', snComputer: 'Serial (เครื่อง)', cpu: 'CPU', ram: 'RAM',
-  ramSlot1: 'RAM Slot 1', ramSlot2: 'RAM Slot 2', ramType: 'ชนิด RAM', ramSpeed: 'ความเร็ว RAM',
-  gpu: 'การ์ดจอ', osType: 'ระบบปฏิบัติการ', osVersion: 'เวอร์ชัน OS',
-  officeLicense: 'MS Office', antivirusStatus: 'Antivirus', domainName: 'Domain',
-};
-
 // Live hardware/status read from the separate external asset-monitoring
 // agent server (hostname == assetName). Read-only, gated the same as the
 // GLPI spec pull below since both call an external system with a stored key.
@@ -2330,6 +2235,77 @@ router.post('/:id/agent-sync', authenticate, authorize('IT_ADMIN', 'SUPERADMIN')
       message: `อัปเดต ${changed.length} รายการตามระบบ Agent แล้ว (${changed.join(', ')})`,
       updated: changed.length,
       fields: Object.keys(updates),
+    });
+  } catch (err) { next(err); }
+});
+
+// Fleet-wide view of how far the registry has drifted from what the agent sees.
+// Registered under /agent/... rather than /:id/... so it cannot be shadowed by
+// the numeric-id routes above.
+router.get('/agent/drift', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const records = await fetchAllAgentRecords();
+    if (records.length === 0) return res.json({ available: false, machines: [], unmatched: [] });
+
+    const machines: any[] = [];
+    const unmatched: any[] = [];
+
+    for (const summary of records) {
+      const record = await fetchAgentRecord(summary.hostname);
+      if (!record) continue;
+
+      const match = await matchAssetForAgent(prisma, record);
+      if (!match) {
+        unmatched.push({
+          hostname: record.hostname,
+          serialNo: record.serial_number ?? null,
+          model: record.computer_model ?? null,
+          brand: record.computer_manufacturer ?? null,
+          loggedUser: record.logged_user ?? null,
+          online: !!record.online,
+        });
+        continue;
+      }
+
+      const { blanks, conflicts } = computeDrift(match.asset, mapAgentToAssetSpec(record));
+      machines.push({
+        hostname: record.hostname,
+        online: !!record.online,
+        lastSeen: record.last_seen ?? null,
+        matchedBy: match.matchedBy,
+        assetId: match.asset.id,
+        assetCode: match.asset.assetCode,
+        ownerName: match.asset.ownerName,
+        blanks,
+        conflicts,
+      });
+    }
+
+    res.json({
+      available: true,
+      machines,
+      unmatched,
+      totals: {
+        machines: machines.length,
+        blanks: machines.reduce((n, m) => n + m.blanks.length, 0),
+        conflicts: machines.reduce((n, m) => n + m.conflicts.length, 0),
+      },
+    });
+  } catch (err) { next(err); }
+});
+
+// Fill every empty field the agent can supply, across the fleet. Safe by
+// construction — it only writes where the registry holds nothing, so no
+// existing value can be lost. Conflicts are never touched here.
+router.post('/agent/fill-blanks', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const assetIds = Array.isArray(req.body?.assetIds) ? req.body.assetIds.map(Number).filter(Boolean) : undefined;
+    const result = await fillBlanksFromAgent(prisma, { actorUserId: req.user!.userId, assetIds });
+    res.json({
+      ...result,
+      message: result.fieldsFilled === 0
+        ? 'ไม่มีช่องว่างที่ Agent เติมให้ได้'
+        : `เติมข้อมูล ${result.fieldsFilled} ช่อง ใน ${result.assetsUpdated} เครื่อง`,
     });
   } catch (err) { next(err); }
 });

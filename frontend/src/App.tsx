@@ -32,6 +32,7 @@ const VendorsPage = lazy(() => import('./pages/assets/VendorsPage'));
 const AssetStatusesPage = lazy(() => import('./pages/assets/AssetStatusesPage'));
 const ImportExportPage = lazy(() => import('./pages/assets/ImportExportPage'));
 const PrintQRPage = lazy(() => import('./pages/assets/PrintQRPage'));
+const AgentDriftPage = lazy(() => import('./pages/assets/AgentDriftPage'));
 const DonationListPage = lazy(() => import('./pages/donations/DonationListPage'));
 const DonationFormPage = lazy(() => import('./pages/donations/DonationFormPage'));
 const DonationDetailPage = lazy(() => import('./pages/donations/DonationDetailPage'));
@@ -95,6 +96,7 @@ export default function App() {
           <Route path="assets/statuses" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><AssetStatusesPage /></ProtectedRoute>} />
           <Route path="assets/import-export" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><ImportExportPage /></ProtectedRoute>} />
           <Route path="assets/print-qr" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><PrintQRPage /></ProtectedRoute>} />
+          <Route path="assets/agent-drift" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><AgentDriftPage /></ProtectedRoute>} />
           <Route path="delivery" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><DeliveryPage /></ProtectedRoute>} />
           <Route path="inventory" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><InventoryPage /></ProtectedRoute>} />
           <Route path="categories" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><CategoryPage /></ProtectedRoute>} />
