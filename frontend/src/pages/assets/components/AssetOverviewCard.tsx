@@ -106,10 +106,18 @@ export function AssetOverviewCard({ asset }: { asset: any }) {
             {asset.category?.name ? ` · ${asset.category.name}` : ''}
             {asset.company ? ` · ${asset.company}` : ''}
           </Typography>
+          {warrantyEnd && (
+            <Typography sx={{ fontSize: '0.73rem', color: theme.palette.text.disabled, mt: '1px' }}>
+              {inWarranty ? 'ประกันถึง' : 'ประกันหมดอายุ'} {fmtDate(warrantyEnd)}
+              {inWarranty ? ` · เหลือ ${Math.max(0, Math.round((warrantyEnd.getTime() - Date.now()) / 86400000)).toLocaleString('th-TH')} วัน` : ''}
+            </Typography>
+          )}
         </Box>
       </Box>
 
-      {/* At-a-glance facts */}
+      {/* At-a-glance facts — kept to exactly 8 (2 balanced rows of 4 at the
+          card's usual width) by moving warranty expiry up into the identity
+          block above instead of adding it as a 9th, lopsided cell here. */}
       {/* auto-fit rather than fixed viewport breakpoints: this card sits in a
           flex column between the app nav and the context rail, so its own width
           is far narrower than the viewport — a viewport-driven 4-up grid
@@ -145,13 +153,6 @@ export function AssetOverviewCard({ asset }: { asset: any }) {
           value={dep ? fmtBaht(dep.bookValue) : '—'}
           sub={dep ? (dep.fullyDepreciated ? 'ตัดค่าเสื่อมครบแล้ว' : `ตัดแล้ว ${Math.round(dep.pct * 100)}%`) : 'ยังไม่ได้ตั้งอายุใช้งาน'}
           mono accent
-        />
-        <Fact
-          label="วันหมดประกัน"
-          value={fmtDate(asset.warrantyEndDate)}
-          sub={warrantyEnd && inWarranty
-            ? `เหลือ ${Math.max(0, Math.round((warrantyEnd.getTime() - Date.now()) / 86400000)).toLocaleString('th-TH')} วัน`
-            : null}
         />
       </Box>
     </Box>
