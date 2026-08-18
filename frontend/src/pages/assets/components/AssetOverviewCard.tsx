@@ -7,24 +7,21 @@ import { calcDepreciation, fmtBaht } from './assetFinance';
 const fmtDate = (d?: string | Date | null) =>
   d ? new Date(d).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
-/** One cell of the at-a-glance grid: small label over a bold value, optional sub-line. */
-function Fact({ label, value, sub, mono }: {
-  label: string; value: React.ReactNode; sub?: string | null; mono?: boolean;
+/** One cell of the at-a-glance grid: small label over a bold value, optional sub-line.
+ * Flat — no border/background box — so the grid reads as plain paired text
+ * rather than a wall of cards, matching the design handoff. */
+function Fact({ label, value, sub, mono, accent }: {
+  label: string; value: React.ReactNode; sub?: string | null; mono?: boolean; accent?: boolean;
 }) {
   const theme = useTheme();
   return (
-    <Box sx={{
-      border: `1px solid ${theme.palette.divider}`,
-      borderRadius: '13px',
-      p: '11px 13px',
-      bgcolor: alpha(theme.palette.text.primary, theme.palette.mode === 'dark' ? 0.03 : 0.02),
-      minWidth: 0,
-    }}>
+    <Box sx={{ minWidth: 0 }}>
       <Typography sx={{ fontSize: '0.69rem', color: theme.palette.text.secondary, lineHeight: 1.4 }}>
         {label}
       </Typography>
       <Typography sx={{
-        fontSize: '0.84rem', fontWeight: 700, mt: '2px', color: theme.palette.text.primary,
+        fontSize: '0.86rem', fontWeight: 700, mt: '2px',
+        color: accent ? theme.palette.primary.main : theme.palette.text.primary,
         fontFamily: mono ? 'monospace' : undefined,
         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
       }}>
@@ -119,16 +116,13 @@ export function AssetOverviewCard({ asset }: { asset: any }) {
           truncated every value at desktop sizes. */}
       <Box sx={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-        gap: 1.25,
-        mt: 2,
+        gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+        rowGap: 2, columnGap: 1.25,
+        mt: 2.5,
       }}>
         <Fact label="Serial Number" value={asset.serialNo} mono />
-        <Fact
-          label="ผู้ครอบครอง"
-          value={asset.ownerName}
-          sub={asset.departmentId ? `แผนก ${asset.departmentId}` : null}
-        />
+        <Fact label="ผู้ครอบครอง" value={asset.ownerName} />
+        <Fact label="แผนก" value={asset.departmentId} />
         <Fact
           label="สถานที่"
           value={asset.location}
@@ -144,13 +138,13 @@ export function AssetOverviewCard({ asset }: { asset: any }) {
           label="ราคาซื้อ"
           value={asset.purchasePrice != null ? fmtBaht(Number(asset.purchasePrice)) : '—'}
           sub={asset.budgetCode || null}
-          mono
+          mono accent
         />
         <Fact
           label="มูลค่าคงเหลือ"
           value={dep ? fmtBaht(dep.bookValue) : '—'}
           sub={dep ? (dep.fullyDepreciated ? 'ตัดค่าเสื่อมครบแล้ว' : `ตัดแล้ว ${Math.round(dep.pct * 100)}%`) : 'ยังไม่ได้ตั้งอายุใช้งาน'}
-          mono
+          mono accent
         />
         <Fact
           label="วันหมดประกัน"
