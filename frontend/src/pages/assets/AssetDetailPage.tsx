@@ -60,7 +60,9 @@ export default function AssetDetailPage() {
   const [loadingGLPI, setLoadingGLPI] = useState(false);
   const [syncingGLPI, setSyncingGLPI] = useState(false);
   const [externalAgent, setExternalAgent] = useState<any>(null);
+  const [agentSpec, setAgentSpec] = useState<Record<string, string | null> | null>(null);
   const [loadingExternalAgent, setLoadingExternalAgent] = useState(false);
+  const [syncingAgent, setSyncingAgent] = useState(false);
   const [toast, setToast] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'warning' | 'info' }>({
     open: false,
     message: '',
@@ -126,13 +128,40 @@ export default function AssetDetailPage() {
       assetAPI.externalAgent(parseInt(id))
         .then((res) => {
           setExternalAgent(res.data?.available ? res.data.data : null);
+          setAgentSpec(res.data?.available ? res.data.spec : null);
         })
-        .catch(() => setExternalAgent(null))
+        .catch(() => { setExternalAgent(null); setAgentSpec(null); })
         .finally(() => setLoadingExternalAgent(false));
     } else {
       setExternalAgent(null);
+      setAgentSpec(null);
     }
   }, [asset?.id, id]);
+
+  // Apply the agent's reading to the asset — one field, or every differing one.
+  const handleAgentSync = async (field?: string, label?: string) => {
+    if (!id) return;
+    const confirmMsg = field
+      ? `อัปเดต "${label}" ของทรัพย์สินนี้ตามข้อมูลจากระบบ Agent หรือไม่?`
+      : 'อัปเดตทุกช่องที่ไม่ตรงกันตามข้อมูลจากระบบ Agent หรือไม่? (ค่าเดิมจะถูกเขียนทับ)';
+    if (!window.confirm(confirmMsg)) return;
+
+    setSyncingAgent(true);
+    try {
+      const res = await assetAPI.agentSync(parseInt(id), field);
+      setToast({ open: true, message: res.data?.message || 'อัปเดตตาม Agent เรียบร้อย', severity: 'success' });
+      const fresh = await assetAPI.get(parseInt(id));
+      setAsset(fresh.data);
+    } catch (err: any) {
+      setToast({
+        open: true,
+        message: err.response?.data?.error || 'ไม่สามารถอัปเดตข้อมูลจากระบบ Agent ได้',
+        severity: 'error',
+      });
+    } finally {
+      setSyncingAgent(false);
+    }
+  };
 
   const handleGLPISync = async (field?: string, label?: string) => {
     if (!id || !asset) return;
@@ -296,6 +325,10 @@ export default function AssetDetailPage() {
               loadingGLPI={loadingGLPI}
               syncingGLPI={syncingGLPI}
               onSync={handleGLPISync}
+              agent={externalAgent}
+              agentSpec={agentSpec ?? undefined}
+              syncingAgent={syncingAgent}
+              onAgentSync={handleAgentSync}
             />
           )}
           {activeTab === 'pm' && <PMTab asset={asset} />}

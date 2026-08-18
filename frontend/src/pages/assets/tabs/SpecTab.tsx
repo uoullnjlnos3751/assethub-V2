@@ -17,6 +17,7 @@ import {
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SyncIcon from '@mui/icons-material/Sync';
 import { getStatusLabel } from '../../../config/statusConfig';
+import { AgentSpecCard } from './AgentSpecCard';
 
 /* ─── Spec item ───────────────────────────────────────────────── */
 function SpecItem({ label, value, mono, colorClass }: {
@@ -71,12 +72,16 @@ function SectionHeader({ title }: { title: string }) {
 }
 
 /* ─── Spec sections by type ───────────────────────────────────── */
-export function SpecTab({ asset, glpiSpec, loadingGLPI, syncingGLPI, onSync }: {
+export function SpecTab({ asset, glpiSpec, loadingGLPI, syncingGLPI, onSync, agent, agentSpec, syncingAgent, onAgentSync }: {
   asset: any;
   glpiSpec?: any;
   loadingGLPI?: boolean;
   syncingGLPI?: boolean;
   onSync?: (field?: string, label?: string) => void;
+  agent?: any;
+  agentSpec?: Record<string, string | null>;
+  syncingAgent?: boolean;
+  onAgentSync?: (field?: string, label?: string) => void;
 }) {
   const t = (asset.type || '').toLowerCase();
   const cat = (asset.category?.name || '').toLowerCase();
@@ -123,6 +128,18 @@ export function SpecTab({ asset, glpiSpec, loadingGLPI, syncingGLPI, onSync }: {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {/* Agent first — unlike GLPI it is actually connected, so this is the card
+          that carries real data for the machines the agent covers. */}
+      {agent && agentSpec && (
+        <AgentSpecCard
+          agent={agent}
+          spec={agentSpec}
+          asset={asset}
+          syncing={syncingAgent}
+          onSync={onAgentSync}
+        />
+      )}
+
       {isComputer && (glpiSpec || loadingGLPI) && (
         <Card sx={{ overflow: 'hidden' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: '12px 18px', borderBottom: '1px solid', borderColor: 'divider', bgcolor: (theme) => alpha(theme.palette.primary.main, 0.04) }}>

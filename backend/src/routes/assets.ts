@@ -2162,6 +2162,105 @@ router.get('/:id', authenticate, async (req: Request, res: Response, next: NextF
   } catch (err) { next(err); }
 });
 
+// Fetch one machine's record from the external monitoring agent. Returns null
+// for every failure mode the caller should treat as "no live data" rather than
+// an error — the asset may simply not run the agent.
+async function fetchAgentRecord(hostname: string | null | undefined): Promise<any | null> {
+  if (!hostname) return null;
+  const baseUrl = process.env.EXTERNAL_ASSET_API_URL;
+  const apiKey = process.env.EXTERNAL_ASSET_API_KEY;
+  if (!baseUrl || !apiKey) return null;
+
+  try {
+    const response = await fetch(`${baseUrl}/api/external/agent/${encodeURIComponent(hostname)}`, {
+      headers: { 'x-api-key': apiKey },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+// Agent reading -> asset column, for the fields where the agent's value is
+// directly comparable to what the registry stores.
+//
+// Deliberately excluded, because the agent's value means something different
+// rather than something newer:
+//   storage1       agent reports formatted capacity ("C: 465.13 GB"); the
+//                  registry records the nominal size the machine was bought
+//                  with ("512 GB"). Live disk usage is shown separately.
+//   windowsLicense the registry keeps the product key; the agent only knows
+//                  the activation state ("Licensed").
+//   ownerName      agent reports the Windows login ("TRRGROUP\\watchara.kid"),
+//                  the registry wants the person's display name.
+//
+// Strings are cleaned on the way in — agent CPU names carry "(R)"/"(TM)" noise
+// that nobody wants stored.
+function mapAgentToAssetSpec(a: any): Record<string, string | null> {
+  if (!a) return {};
+  const text = (v: any) => {
+    const s = String(v ?? '').trim();
+    return s === '' ? null : s;
+  };
+  const cleanCpu = (v: any) => {
+    const s = text(v);
+    return s ? s.replace(/\((?:R|TM)\)/gi, '').replace(/\s{2,}/g, ' ').trim() : null;
+  };
+  // Matches the format already used across the registry: "DDR4 - SODIMM 16 GB".
+  const slots: string[] = (a.ram_slots || [])
+    .filter((s: any) => s && s.size_gb)
+    .map((s: any) => `${s.type ? `${s.type} - ` : ''}SODIMM ${s.size_gb} GB`);
+
+  // The agent reports the DNS domain ("trrgroup.com"); the registry records the
+  // NetBIOS name ("TRRGROUP") throughout. Convert rather than offer a value
+  // that would make this one asset inconsistent with every other.
+  const domain = text(a.domain);
+  const netbiosDomain = domain ? domain.split('.')[0].toUpperCase() : null;
+
+  const cpu = cleanCpu(a.cpu_name);
+  return {
+    brand: text(a.computer_manufacturer),
+    model: text(a.computer_model),
+    snComputer: text(a.serial_number),
+    cpu: cpu ? (a.cpu_cores ? `${cpu} (${a.cpu_cores} Cores)` : cpu) : null,
+    ram: a.ram_total_gb ? `${Math.round(a.ram_total_gb)} GB` : null,
+    ramSlot1: slots[0] ?? null,
+    ramSlot2: slots[1] ?? null,
+    ramType: text(a.ram_slots?.[0]?.type),
+    ramSpeed: text(a.ram_slots?.[0]?.speed_mhz),
+    gpu: text(a.gpu_name),
+    osType: a.os_name?.includes('Windows') ? 'Windows' : text(a.os_name),
+    osVersion: text(a.os_name),
+    officeLicense: text(a.office_name),
+    antivirusStatus: a.tm_installed ? 'Trend Micro Apex One' : null,
+    domainName: netbiosDomain,
+  };
+}
+
+// Whether the registry's value already covers what the agent reports.
+//
+// Equal is the obvious case; "already contains it" is the one that matters in
+// practice, because the registry is often the more specific of the two — it
+// records "NVIDIA GeForce MX550 (2 GB)" where the agent only sees "NVIDIA
+// GeForce MX550", and "Microsoft Windows 11 Pro 25H2" where the agent reports
+// "Microsoft Windows 11 Pro". Flagging those as differing would invite someone
+// to "fix" them by throwing the extra detail away.
+function agentValueSatisfied(current: any, incoming: string): boolean {
+  const cur = String(current ?? '').trim().toLowerCase();
+  const next = String(incoming ?? '').trim().toLowerCase();
+  if (!next) return true;
+  return cur === next || (cur.length > next.length && cur.includes(next));
+}
+
+const AGENT_FIELD_LABELS: Record<string, string> = {
+  brand: 'ยี่ห้อ', model: 'รุ่น', snComputer: 'Serial (เครื่อง)', cpu: 'CPU', ram: 'RAM',
+  ramSlot1: 'RAM Slot 1', ramSlot2: 'RAM Slot 2', ramType: 'ชนิด RAM', ramSpeed: 'ความเร็ว RAM',
+  gpu: 'การ์ดจอ', osType: 'ระบบปฏิบัติการ', osVersion: 'เวอร์ชัน OS',
+  officeLicense: 'MS Office', antivirusStatus: 'Antivirus', domainName: 'Domain',
+};
+
 // Live hardware/status read from the separate external asset-monitoring
 // agent server (hostname == assetName). Read-only, gated the same as the
 // GLPI spec pull below since both call an external system with a stored key.
@@ -2170,29 +2269,68 @@ router.get('/:id/external-agent', authenticate, authorize('IT_ADMIN', 'SUPERADMI
     const id = parseInt(req.params.id);
     const asset = await prisma.asset.findUnique({ where: { id }, select: { assetName: true } });
     if (!asset) throw new AppError('ไม่พบทรัพย์สิน', 404);
+    if (!asset.assetName) return res.json({ available: false, reason: 'no_hostname' });
 
-    const hostname = asset.assetName;
-    if (!hostname) return res.json({ available: false, reason: 'no_hostname' });
+    const data = await fetchAgentRecord(asset.assetName);
+    if (!data) return res.json({ available: false, reason: 'unavailable' });
 
-    const baseUrl = process.env.EXTERNAL_ASSET_API_URL;
-    const apiKey = process.env.EXTERNAL_ASSET_API_KEY;
-    if (!baseUrl || !apiKey) return res.json({ available: false, reason: 'not_configured' });
+    // spec is the same mapping the sync endpoint writes, so the comparison the
+    // user sees and the value they'd apply can never drift apart.
+    res.json({ available: true, hostname: asset.assetName, data, spec: mapAgentToAssetSpec(data) });
+  } catch (err) { next(err); }
+});
 
-    let response: globalThis.Response;
-    try {
-      response = await fetch(`${baseUrl}/api/external/agent/${encodeURIComponent(hostname)}`, {
-        headers: { 'x-api-key': apiKey },
-        signal: AbortSignal.timeout(5000),
-      });
-    } catch {
-      return res.json({ available: false, reason: 'unreachable' });
+// Apply the agent's reading to the asset — one field when `field` is given,
+// otherwise every mapped field that actually differs.
+router.post('/:id/agent-sync', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const asset = await prisma.asset.findUnique({ where: { id } });
+    if (!asset) throw new AppError('ไม่พบทรัพย์สิน', 404);
+    if (!asset.assetName) throw new AppError('ทรัพย์สินนี้ไม่มีชื่อเครื่อง (hostname) สำหรับจับคู่กับ Agent', 400);
+
+    const data = await fetchAgentRecord(asset.assetName);
+    if (!data) throw new AppError('ไม่พบข้อมูลจากระบบ Agent สำหรับเครื่องนี้', 404);
+
+    const spec = mapAgentToAssetSpec(data);
+    const field = req.body?.field as string | undefined;
+
+    if (field && !(field in spec)) throw new AppError(`ไม่รองรับการอัปเดตฟิลด์ "${field}"`, 400);
+
+    const fields = field ? [field] : Object.keys(spec);
+    const updates: Record<string, string> = {};
+    const changed: string[] = [];
+    for (const key of fields) {
+      const next = spec[key];
+      if (next == null) continue;
+      // A blanket "sync all" must never trade a more specific stored value for
+      // the agent's shorter one; an explicit single-field request is the user
+      // deciding they want the agent's version regardless.
+      if (!field && agentValueSatisfied((asset as any)[key], next)) continue;
+      if (String((asset as any)[key] ?? '').trim() === next) continue;
+      updates[key] = next;
+      changed.push(AGENT_FIELD_LABELS[key] || key);
     }
 
-    if (response.status === 404) return res.json({ available: false, reason: 'not_found' });
-    if (!response.ok) return res.json({ available: false, reason: 'error' });
+    if (Object.keys(updates).length === 0) {
+      return res.json({ message: 'ข้อมูลตรงกับ Agent อยู่แล้ว ไม่มีอะไรต้องอัปเดต', updated: 0, fields: [] });
+    }
 
-    const data = await response.json();
-    res.json({ available: true, hostname, data });
+    await prisma.asset.update({ where: { id }, data: updates });
+    await prisma.assetHistory.create({
+      data: {
+        assetId: id,
+        actionType: 'AGENT_SYNC',
+        actorUserId: req.user!.userId,
+        note: `อัปเดตสเปกตามระบบ Agent: ${changed.join(', ')}`,
+      },
+    });
+
+    res.json({
+      message: `อัปเดต ${changed.length} รายการตามระบบ Agent แล้ว (${changed.join(', ')})`,
+      updated: changed.length,
+      fields: Object.keys(updates),
+    });
   } catch (err) { next(err); }
 });
 
