@@ -197,7 +197,7 @@ export default function PMFloorPlanPage() {
       }
       setIsSearching(true);
       try {
-        const res = await assetAPI.getAll({ search: searchAsset, limit: 10 });
+        const res = await assetAPI.list({ search: searchAsset, limit: 10 });
         setSearchResults(res.data.data || []);
       } catch (err) {
         console.error(err);

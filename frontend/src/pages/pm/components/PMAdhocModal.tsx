@@ -62,7 +62,7 @@ export const PMAdhocModal: React.FC<PMAdhocModalProps> = ({ open, onClose, onSuc
     setAdhocSearchError('');
 
     searchTimer.current = setTimeout(() => {
-      pmAPI.adhocSearchAssets(adhocSearch.trim())
+      pmAPI.adhocSearch(adhocSearch.trim())
         .then(res => {
           setAdhocResults(res.data || []);
           setAdhocSearchError('');

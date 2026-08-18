@@ -27,6 +27,10 @@ export interface PMSwHub {
   createdAt: string;
   updatedAt: string;
   items: PMSwHubItem[];
+  // The by-plan and by-id endpoints include the linked plan and its template
+  // (backend/src/routes/pmSwHub.ts) — the form reads plan.template.items to
+  // know which checklist rows to render.
+  plan?: PMSwHubPlan | null;
 }
 
 export interface PMSwHubTemplateItem {

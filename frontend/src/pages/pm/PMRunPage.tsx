@@ -760,7 +760,7 @@ export default function PMRunPage() {
     }
 
     if (!pre['staff_name'] && user && !readOnly) {
-      pre['staff_name'] = user.displayName || user.username || '';
+      pre['staff_name'] = user.displayName || user.adUsername || '';
     }
 
     setAnswers(pre);
@@ -1283,7 +1283,7 @@ export default function PMRunPage() {
             onClick={() => {
               const firstRun = runs.find((r) => r.id === selectedRunIds[0]);
               if (firstRun) {
-                setAnswers({ staff_name: user?.displayName || user?.username || '' });
+                setAnswers({ staff_name: user?.displayName || user?.adUsername || '' });
                 setBulkPMModal({ open: true, templateId: firstRun.plan?.templateId || null });
               }
             }}
@@ -1352,7 +1352,7 @@ export default function PMRunPage() {
                       variant="outlined"
                       startIcon={<RestartAltIcon />}
                       onClick={() => {
-                        setAnswers({ staff_name: user?.displayName || user?.username || '' });
+                        setAnswers({ staff_name: user?.displayName || user?.adUsername || '' });
                         localStorage.removeItem(`pm_draft_${pmModal.run.id}`);
                       }}
                     >
@@ -1483,7 +1483,7 @@ export default function PMRunPage() {
               {/* Quick Actions */}
               <Box sx={{ p: '14px 24px', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexShrink: 0, gap: 1.5, bgcolor: 'action.hover' }}>
                 <Button size="small" variant="outlined" startIcon={<CheckIcon />} onClick={() => setAll('yes')}>ทำทั้งหมด (Yes)</Button>
-                <Button size="small" variant="outlined" startIcon={<RestartAltIcon />} onClick={() => setAnswers({ staff_name: user?.displayName || user?.username || '' })}>ล้างข้อมูล</Button>
+                <Button size="small" variant="outlined" startIcon={<RestartAltIcon />} onClick={() => setAnswers({ staff_name: user?.displayName || user?.adUsername || '' })}>ล้างข้อมูล</Button>
               </Box>
 
               {/* Checklist Scrollable Body */}
