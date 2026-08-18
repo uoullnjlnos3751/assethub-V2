@@ -239,6 +239,16 @@ export default function AssetFormPage() {
 
   const assetAge = useMemo(() => calculateAge(form.purchaseDate), [form.purchaseDate]);
 
+  // The department list is now a fixed set of codes from master data rather than
+  // free text, so a typo can't become a permanent option for the next person.
+  // Existing assets predate that list, so whatever this record already holds
+  // stays selectable — otherwise opening an older asset to edit something
+  // unrelated would blank out its department.
+  const departmentSelectOptions = useMemo(
+    () => Array.from(new Set([...departmentOptions, form.departmentId].filter(Boolean))) as string[],
+    [departmentOptions, form.departmentId],
+  );
+
   const typeLower = form.type?.toLowerCase() || '';
   const catName = categories.find(c => c.id === selectedCategory)?.name || '';
 
@@ -1034,10 +1044,9 @@ export default function AssetFormPage() {
 
               <Grid item xs={12} sm={4}>
                 <Autocomplete
-                  freeSolo
-                  options={departmentOptions}
-                  value={form.departmentId}
-                  onInputChange={(_, newInputValue) => setFormField('departmentId', 'แผนก', newInputValue)}
+                  options={departmentSelectOptions}
+                  value={form.departmentId || null}
+                  onChange={(_, newValue) => setFormField('departmentId', 'แผนก', newValue || '')}
                   renderInput={(params) => (
                     <TextField
                       {...params}
@@ -1046,7 +1055,9 @@ export default function AssetFormPage() {
                       size="small"
                       required
                       error={submitAttempted && !form.departmentId?.trim()}
-                      helperText={submitAttempted && !form.departmentId?.trim() ? 'กรุณาระบุแผนก' : ''}
+                      helperText={submitAttempted && !form.departmentId?.trim()
+                        ? 'กรุณาระบุแผนก'
+                        : 'เลือกจากรหัสแผนกที่กำหนดไว้ — เพิ่ม/แก้รหัสได้ที่ ข้อมูลหลัก › แผนก'}
                     />
                   )}
                 />

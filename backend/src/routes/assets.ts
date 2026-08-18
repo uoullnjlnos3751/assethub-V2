@@ -1015,8 +1015,29 @@ router.get('/options/brands', authenticate, async (_req: Request, res: Response,
   } catch (err) { next(err); }
 });
 
+// The asset registry stores a department *code* ("PUR"); departments.code is its
+// home. The AD sync (intraSync) additionally writes one row here per department
+// *name* it sees ("จัดซื้อ", "ฝ่ายจัดซื้อ", …) and stamps those with a generated
+// DPT-xxxx placeholder code — org reference data, not values an asset may hold —
+// so they're filtered out of this list.
+//
+// This used to return SELECT DISTINCT asset.departmentId, which fed the dropdown
+// from the data it was supposed to constrain: one typo entered once became a
+// permanent option everyone else could pick, so the value list only ever grew
+// (42 distinct values by the time this was found, including "สำนักงานใหญ่" — a
+// location — and placeholders like "N00"/"EOF"/"BUG").
 router.get('/options/departments', authenticate, async (_req: Request, res: Response, next: NextFunction) => {
   try {
+    const managed = await prisma.department.findMany({
+      where: { NOT: { code: { startsWith: 'DPT-' } } },
+      select: { code: true },
+      orderBy: { code: 'asc' },
+    });
+    const curated = managed.map((r) => r.code).filter((c): c is string => !!c && c.trim() !== '');
+    if (curated.length > 0) return res.json(curated);
+
+    // No curated codes configured yet (fresh or unseeded database) — fall back to
+    // what the assets carry so the dropdown is still usable.
     const rows = await prisma.asset.findMany({ where: { departmentId: { not: null } }, distinct: ['departmentId'], select: { departmentId: true }, orderBy: { departmentId: 'asc' } });
     res.json(rows.map((r) => r.departmentId));
   } catch (err) { next(err); }
