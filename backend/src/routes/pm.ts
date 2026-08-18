@@ -223,7 +223,13 @@ router.get('/plans', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (r
     if (planIds.length > 0) {
       runStats = await (prisma.pMRun.groupBy as any)({
         by: ['planId', 'status'],
-        where: { planId: { in: planIds } },
+        // Exclude runs whose asset has since left service (retired/lost/
+        // damaged/under maintenance) — same rule /pm/dashboard and /pm/runs
+        // already apply. Without it, a run stuck in DRAFT because nobody
+        // will ever perform PM on a retired device keeps the plan's count
+        // below 100% forever, showing "เกินกำหนด" even once every device
+        // still in service has actually been completed.
+        where: { planId: { in: planIds }, asset: { status: { notIn: PM_EXCLUDED_STATUSES } } },
         _count: { id: true },
       });
     }
