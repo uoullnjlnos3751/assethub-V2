@@ -170,6 +170,41 @@ const resolveLocationRefId = async (location?: string | null): Promise<number | 
   return rows.length === 1 ? rows[0].id : null;
 };
 
+// AD hands back a company's full legal name — ldap.ts's getEmployeeProfile reads
+// itasset_company_name_eng, and searchADUsers returns the raw `company` attribute
+// — but every asset row and every PM plan's scope filter matches on the short
+// company code instead. An asset saved straight from an AD owner-autofill
+// therefore lands outside its own company's PM scope and silently never gets a
+// PM run generated (found this way: HQ-PS-N051 stored as "Phitsanulok Sugar
+// Co., Ltd." instead of "PS", invisible to plan #33 forever). Map any legal name
+// we recognise back to its master-data code before saving.
+const resolveCompanyCode = async (company?: string | null): Promise<string | null | undefined> => {
+  const trimmed = company ? String(company).trim() : '';
+  if (!trimmed) return company;
+
+  const companies = await prisma.company.findMany({
+    where: { isActive: true },
+    select: { code: true, name: true, nameEng: true, assetCompanyCodes: true },
+  });
+  const norm = (s?: string | null) => String(s ?? '').trim().toUpperCase();
+  const target = norm(trimmed);
+
+  // Already a known asset company code — leave it exactly as entered.
+  for (const c of companies) {
+    const codes = (c.assetCompanyCodes || c.code || '').split(',').map(norm).filter(Boolean);
+    if (codes.includes(target)) return trimmed;
+  }
+  // Otherwise swap a matched legal name (Thai or English) for its code.
+  for (const c of companies) {
+    if (norm(c.nameEng) === target || norm(c.name) === target) {
+      const code = (c.assetCompanyCodes || '').split(',')[0].trim() || c.code;
+      if (code) return code;
+    }
+  }
+  // Unrecognised value: keep what the user typed rather than guess at a mapping.
+  return trimmed;
+};
+
 const normalizeAssetPayload = (data: any, isCreate = false) => {
   const purchaseDate = parseDate(data.purchaseDate);
   const poDate = parseDate(data.poDate);
@@ -2183,6 +2218,9 @@ router.post('/upsert', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async 
     if (data.location !== undefined && data.location !== existing?.location && data.locationRefId === undefined) {
       data.locationRefId = await resolveLocationRefId(data.location);
     }
+    if (data.company !== undefined) {
+      data.company = await resolveCompanyCode(data.company);
+    }
 
     // Check for duplicates
     const duplicateErrors = await checkDuplicateAssets(data, existing?.id);
@@ -2263,6 +2301,9 @@ router.post('/', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: 
     if (data.location && data.locationRefId === undefined) {
       data.locationRefId = await resolveLocationRefId(data.location);
     }
+    if (data.company !== undefined) {
+      data.company = await resolveCompanyCode(data.company);
+    }
 
     // Check for duplicates
     const duplicateErrors = await checkDuplicateAssets(data);
@@ -2327,6 +2368,9 @@ router.put('/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req
     }
     if (data.location !== undefined && data.location !== old.location && data.locationRefId === undefined) {
       data.locationRefId = await resolveLocationRefId(data.location);
+    }
+    if (data.company !== undefined) {
+      data.company = await resolveCompanyCode(data.company);
     }
 
     // Check for duplicates (excluding current asset)
