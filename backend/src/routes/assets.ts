@@ -141,12 +141,20 @@ const resolveAssignedToUserId = async (ownerName?: string | null): Promise<numbe
 // (unlike resolveAssignedToUserId) there's no ambiguous-match case to guard against —
 // only "no match", which is expected to be common until master data / free-text entry
 // converge (see migration 20260804000000_asset_master_data_fk for real-world match rates).
+// Asset.departmentId holds the short code ("PUR"), so match departments.code
+// first. Matching only on departments.name — which the AD sync fills with
+// department *names* ("จัดซื้อ") — meant this resolver almost never fired:
+// 75 of 792 assets were linked, and those 75 only because four values happened
+// to be spelled identically in both vocabularies. Name is kept as a fallback
+// for anything still recorded the long way round.
 const resolveDepartmentRefId = async (departmentId?: string | null): Promise<number | null> => {
   const trimmed = departmentId ? String(departmentId).trim() : '';
   if (!trimmed) return null;
   const rows = await prisma.$queryRaw<{ id: number }[]>`
     SELECT id FROM departments
-    WHERE upper(trim(regexp_replace(name, '\s+', ' ', 'g'))) = upper(trim(regexp_replace(${trimmed}, '\s+', ' ', 'g')))
+    WHERE upper(trim(code)) = upper(trim(${trimmed}))
+       OR upper(trim(regexp_replace(name, '\s+', ' ', 'g'))) = upper(trim(regexp_replace(${trimmed}, '\s+', ' ', 'g')))
+    ORDER BY (upper(trim(code)) = upper(trim(${trimmed}))) DESC
     LIMIT 1
   `;
   return rows.length === 1 ? rows[0].id : null;
