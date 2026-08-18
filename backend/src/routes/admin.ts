@@ -204,13 +204,41 @@ router.get('/external-api-info', authenticate, authorize('SUPERADMIN'), async (_
   } catch (err) { next(err); }
 });
 
+// Credentials the settings screen needs to show a field for, but must never
+// send the real value of. They were previously returned in full on every load
+// of ตั้งค่าระบบ, which put the live SMTP password and LINE tokens into the
+// browser — and into anything reading its network log — for no working reason:
+// the form only ever needs to know whether a value is set.
+const SETTINGS_SECRET_FIELDS = ['smtpPass', 'lineChannelAccessToken', 'lineWebhookVerifyToken'] as const;
+
+// Sent in place of a stored secret. A PUT carrying this exact string back means
+// "leave it alone" — see applySecretField below.
+export const SECRET_MASK = '••••••••';
+
+function redactSettings<T extends Record<string, any>>(settings: T): T {
+  const out: Record<string, any> = { ...settings };
+  for (const field of SETTINGS_SECRET_FIELDS) {
+    if (out[field]) out[field] = SECRET_MASK;
+  }
+  return out as T;
+}
+
+// The form round-trips whatever the GET handed it, so an untouched secret comes
+// back as the mask. Only a genuinely new value should be written; clearing a
+// secret still works, because an empty string is not the mask.
+function applySecretField(data: any, key: string, incoming: unknown) {
+  if (incoming === undefined) return;
+  if (incoming === SECRET_MASK) return;
+  data[key] = incoming;
+}
+
 router.get('/settings', authenticate, authorize('SUPERADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     let settings = await prisma.notificationSetting.findFirst();
     if (!settings) {
       settings = await prisma.notificationSetting.create({ data: {} });
     }
-    res.json(settings);
+    res.json(redactSettings(settings));
   } catch (err) { next(err); }
 });
 
@@ -247,14 +275,14 @@ router.put('/settings', authenticate, authorize('SUPERADMIN'), async (req: Reque
     if (smtpHost !== undefined) data.smtpHost = smtpHost;
     if (smtpPort !== undefined) data.smtpPort = smtpPort;
     if (smtpUser !== undefined) data.smtpUser = smtpUser;
-    if (smtpPass !== undefined) data.smtpPass = smtpPass;
+    applySecretField(data, 'smtpPass', smtpPass);
     if (smtpFromEmail !== undefined) data.smtpFromEmail = smtpFromEmail;
     if (smtpFromName !== undefined) data.smtpFromName = smtpFromName;
     if (emailCc !== undefined) data.emailCc = emailCc;
     if (enableLine !== undefined) data.enableLine = enableLine;
-    if (lineChannelAccessToken !== undefined) data.lineChannelAccessToken = lineChannelAccessToken;
+    applySecretField(data, 'lineChannelAccessToken', lineChannelAccessToken);
     if (lineWebhookUrl !== undefined) data.lineWebhookUrl = lineWebhookUrl;
-    if (lineWebhookVerifyToken !== undefined) data.lineWebhookVerifyToken = lineWebhookVerifyToken;
+    applySecretField(data, 'lineWebhookVerifyToken', lineWebhookVerifyToken);
     if (lineSendMode !== undefined) data.lineSendMode = lineSendMode;
     if (lineUserIds !== undefined) data.lineUserIds = lineUserIds;
     if (lineEnabledStatuses !== undefined) data.lineEnabledStatuses = lineEnabledStatuses;
@@ -268,7 +296,7 @@ router.put('/settings', authenticate, authorize('SUPERADMIN'), async (req: Reque
       settings = await prisma.notificationSetting.update({ where: { id: settings.id }, data });
     }
     invalidateSettingsCache();
-    res.json(settings);
+    res.json(redactSettings(settings));
   } catch (err) { next(err); }
 });
 

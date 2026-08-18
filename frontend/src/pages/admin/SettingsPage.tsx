@@ -27,6 +27,10 @@ import AuditLogTab from './settings/AuditLogTab';
 import { SectionCard } from '../../components/SectionCard';
 import type { SystemSettings, NotificationTemplate, HealthCheckResult, NotificationLog } from './settings/types';
 
+// Mirrors SECRET_MASK in backend/src/routes/admin.ts — the API sends this in
+// place of a stored credential, and treats it coming back as "unchanged".
+const SECRET_MASK = '••••••••';
+
 // Grouped left-nav for the settings page. The `index` values are the
 // tab ids the content blocks below switch on — they intentionally do NOT
 // run in visual order, so groups can be rearranged without touching any
@@ -403,7 +407,8 @@ export default function SettingsPage() {
             <Grid item xs={12} md={6}>
               <SectionCard title="ตั้งค่า LINE" icon={Smartphone}>
                 <FormControlLabel control={<Switch checked={settings?.enableLine ?? false} onChange={e => setSettings({ ...settings, enableLine: e.target.checked })} color="success" />} label="เปิด LINE Notification" sx={{ mb: 2 }} />
-                <TextField label="Channel Access Token" fullWidth size="small" type={settings?.lineChannelAccessToken ? 'password' : 'text'} value={settings?.lineChannelAccessToken || ''} onChange={e => setSettings({ ...settings, lineChannelAccessToken: e.target.value })} sx={{ mb: 2 }} />
+                <TextField label="Channel Access Token" fullWidth size="small" type={settings?.lineChannelAccessToken ? 'password' : 'text'} value={settings?.lineChannelAccessToken || ''} onChange={e => setSettings({ ...settings, lineChannelAccessToken: e.target.value })} sx={{ mb: 2 }}
+                  helperText={settings?.lineChannelAccessToken === SECRET_MASK ? 'มีค่าบันทึกไว้แล้ว — พิมพ์ทับเฉพาะเมื่อต้องการเปลี่ยน' : ''} />
                 <TextField label="Webhook URL" fullWidth size="small" value={settings?.lineWebhookUrl || ''} onChange={e => setSettings({ ...settings, lineWebhookUrl: e.target.value })} sx={{ mb: 2 }} />
                 <TextField label="Verify Token" fullWidth size="small" value={settings?.lineWebhookVerifyToken || ''} onChange={e => setSettings({ ...settings, lineWebhookVerifyToken: e.target.value })} sx={{ mb: 2 }} />
                 <Divider sx={{ my: 2 }} />
@@ -425,7 +430,8 @@ export default function SettingsPage() {
                     <Grid item xs={8}><TextField label="Host" fullWidth size="small" value={settings?.smtpHost || ''} onChange={e => setSettings({ ...settings, smtpHost: e.target.value })} /></Grid>
                     <Grid item xs={4}><TextField label="Port" fullWidth size="small" value={settings?.smtpPort || '587'} onChange={e => setSettings({ ...settings, smtpPort: e.target.value })} /></Grid>
                     <Grid item xs={12}><TextField label="Username" fullWidth size="small" value={settings?.smtpUser || ''} onChange={e => setSettings({ ...settings, smtpUser: e.target.value })} /></Grid>
-                    <Grid item xs={12}><TextField label="Password" fullWidth size="small" type="password" value={settings?.smtpPass || ''} onChange={e => setSettings({ ...settings, smtpPass: e.target.value })} /></Grid>
+                    <Grid item xs={12}><TextField label="Password" fullWidth size="small" type="password" value={settings?.smtpPass || ''} onChange={e => setSettings({ ...settings, smtpPass: e.target.value })}
+                      helperText={settings?.smtpPass === SECRET_MASK ? 'มีค่าบันทึกไว้แล้ว — พิมพ์ทับเฉพาะเมื่อต้องการเปลี่ยน' : ''} /></Grid>
                     <Grid item xs={7}><TextField label="From Email" fullWidth size="small" value={settings?.smtpFromEmail || ''} onChange={e => setSettings({ ...settings, smtpFromEmail: e.target.value })} /></Grid>
                     <Grid item xs={5}><TextField label="From Name" fullWidth size="small" value={settings?.smtpFromName || ''} onChange={e => setSettings({ ...settings, smtpFromName: e.target.value })} /></Grid>
                     <Grid item xs={12}><TextField label="CC Emails (คั่นด้วยลูกน้ำ)" fullWidth size="small" value={settings?.emailCc || ''} onChange={e => setSettings({ ...settings, emailCc: e.target.value })} placeholder="admin@trrgroup.com, support@trrgroup.com" /></Grid>
