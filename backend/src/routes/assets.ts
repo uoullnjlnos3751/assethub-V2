@@ -943,51 +943,48 @@ router.get('/owners/search-ad', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'
 
 router.get('/options/types', authenticate, async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const [managedTypes, assetTypes] = await Promise.all([
-      prisma.deviceType.findMany({
-        where: { isActive: true },
-        select: { name: true },
-        orderBy: { name: 'asc' },
-      }),
-      prisma.asset.findMany({
-        where: { type: { not: null } },
-        distinct: ['type'],
-        select: { type: true },
-        orderBy: { type: 'asc' },
-      }),
-    ]);
+    // Master data only — see the note on /options/locations below.
+    const managedTypes = await prisma.deviceType.findMany({
+      where: { isActive: true },
+      select: { name: true },
+      orderBy: { name: 'asc' },
+    });
+    if (managedTypes.length > 0) return res.json(managedTypes.map((row) => row.name).filter(Boolean));
 
-    const options = new Set<string>();
-    managedTypes.forEach((row) => row.name && options.add(row.name));
-    assetTypes.forEach((row) => row.type && options.add(row.type));
-
-    res.json(Array.from(options).sort((a, b) => a.localeCompare(b)));
+    const assetTypes = await prisma.asset.findMany({
+      where: { type: { not: null } },
+      distinct: ['type'],
+      select: { type: true },
+      orderBy: { type: 'asc' },
+    });
+    res.json(assetTypes.map((row) => row.type).filter(Boolean));
   } catch (err) { next(err); }
 });
 
+// Master data only — see the note on /options/departments. These lists used to
+// union the master table with SELECT DISTINCT over the assets, which meant a
+// value only had to be entered once to become a permanent option for everyone
+// (that is how "Net Cube" and "Net Cube  (Thailand) Co.,Ltd" both ended up on
+// the vendor dropdown, and how a deactivated master row kept being offered).
+// The form keeps whatever the record already holds selectable, so existing
+// values that predate the master list are not lost.
 router.get('/options/locations', authenticate, async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const [managed, existing] = await Promise.all([
-      prisma.assetLocation.findMany({ where: { isActive: true }, select: { name: true }, orderBy: { name: 'asc' } }),
-      prisma.asset.findMany({ where: { location: { not: null } }, distinct: ['location'], select: { location: true }, orderBy: { location: 'asc' } }),
-    ]);
-    const options = new Set<string>();
-    managed.forEach((row) => row.name && options.add(row.name));
-    existing.forEach((row) => row.location && options.add(row.location));
-    res.json(Array.from(options).sort((a, b) => a.localeCompare(b)));
+    const managed = await prisma.assetLocation.findMany({ where: { isActive: true }, select: { name: true }, orderBy: { name: 'asc' } });
+    if (managed.length > 0) return res.json(managed.map((row) => row.name).filter(Boolean));
+
+    const existing = await prisma.asset.findMany({ where: { location: { not: null } }, distinct: ['location'], select: { location: true }, orderBy: { location: 'asc' } });
+    res.json(existing.map((row) => row.location).filter(Boolean));
   } catch (err) { next(err); }
 });
 
 router.get('/options/vendors', authenticate, async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const [managed, existing] = await Promise.all([
-      prisma.vendor.findMany({ where: { isActive: true }, select: { name: true }, orderBy: { name: 'asc' } }),
-      prisma.asset.findMany({ where: { vendor: { not: null } }, distinct: ['vendor'], select: { vendor: true }, orderBy: { vendor: 'asc' } }),
-    ]);
-    const options = new Set<string>();
-    managed.forEach((row) => row.name && options.add(row.name));
-    existing.forEach((row) => row.vendor && options.add(row.vendor));
-    res.json(Array.from(options).sort((a, b) => a.localeCompare(b)));
+    const managed = await prisma.vendor.findMany({ where: { isActive: true }, select: { name: true }, orderBy: { name: 'asc' } });
+    if (managed.length > 0) return res.json(managed.map((row) => row.name).filter(Boolean));
+
+    const existing = await prisma.asset.findMany({ where: { vendor: { not: null } }, distinct: ['vendor'], select: { vendor: true }, orderBy: { vendor: 'asc' } });
+    res.json(existing.map((row) => row.vendor).filter(Boolean));
   } catch (err) { next(err); }
 });
 

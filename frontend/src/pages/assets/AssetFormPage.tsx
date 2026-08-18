@@ -248,6 +248,14 @@ export default function AssetFormPage() {
     () => Array.from(new Set([...departmentOptions, form.departmentId].filter(Boolean))) as string[],
     [departmentOptions, form.departmentId],
   );
+  const companySelectOptions = useMemo(
+    () => Array.from(new Set([...companyOptions, form.company].filter(Boolean))) as string[],
+    [companyOptions, form.company],
+  );
+  const locationSelectOptions = useMemo(
+    () => Array.from(new Set([...locationOptions, form.location].filter(Boolean))) as string[],
+    [locationOptions, form.location],
+  );
 
   const typeLower = form.type?.toLowerCase() || '';
   const catName = categories.find(c => c.id === selectedCategory)?.name || '';
@@ -1027,10 +1035,9 @@ export default function AssetFormPage() {
 
               <Grid item xs={12} sm={4}>
                 <Autocomplete
-                  freeSolo
-                  options={companyOptions}
-                  value={form.company}
-                  onInputChange={(_, newInputValue) => setFormField('company', 'Company', newInputValue)}
+                  options={companySelectOptions}
+                  value={form.company || null}
+                  onChange={(_, newValue) => setFormField('company', 'Company', newValue || '')}
                   renderInput={(params) => (
                     <TextField
                       {...params}
@@ -1074,10 +1081,9 @@ export default function AssetFormPage() {
 
               <Grid item xs={12} sm={4}>
                 <Autocomplete
-                  freeSolo
-                  options={locationOptions}
-                  value={form.location}
-                  onInputChange={(_, newInputValue) => setFormField('location', 'Location', newInputValue)}
+                  options={locationSelectOptions}
+                  value={form.location || null}
+                  onChange={(_, newValue) => setFormField('location', 'Location', newValue || '')}
                   renderInput={(params) => (
                     <TextField
                       {...params}
