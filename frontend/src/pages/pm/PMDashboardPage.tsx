@@ -1,315 +1,571 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box,
-  Typography,
-  Button,
-  Select,
-  MenuItem,
-  Chip,
-  Table,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableCell,
-  TableContainer,
-  Paper,
-  Card,
-  CardActionArea,
-  LinearProgress,
-  ToggleButtonGroup,
-  ToggleButton,
-  Alert,
+  Alert, Box, Button, Card, Chip, CircularProgress, Divider, GlobalStyles,
+  LinearProgress, ListSubheader, Menu, MenuItem, Select, Snackbar, Table, TableBody,
+  TableCell, TableContainer, TableHead, TableRow, Tooltip, Typography, alpha, useTheme,
 } from '@mui/material';
-import { alpha } from '@mui/material/styles';
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip as RTooltip } from 'recharts';
 import ShieldIcon from '@mui/icons-material/Shield';
-import BarChartIcon from '@mui/icons-material/BarChart';
-import BoltIcon from '@mui/icons-material/Bolt';
-import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
-import DescriptionIcon from '@mui/icons-material/Description';
-import BuildIcon from '@mui/icons-material/Build';
+import PrintIcon from '@mui/icons-material/Print';
+import DownloadIcon from '@mui/icons-material/Download';
 import AddIcon from '@mui/icons-material/Add';
-import GpsFixedIcon from '@mui/icons-material/GpsFixed';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
-import WarningAmberIcon from '@mui/icons-material/WarningAmber';
-import AssignmentLateIcon from '@mui/icons-material/AssignmentLate';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import AssignmentIcon from '@mui/icons-material/Assignment';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import AutorenewIcon from '@mui/icons-material/Autorenew';
-import EventIcon from '@mui/icons-material/Event';
-import BusinessIcon from '@mui/icons-material/Business';
-import PlaceIcon from '@mui/icons-material/Place';
+import BuildIcon from '@mui/icons-material/Build';
+import DescriptionIcon from '@mui/icons-material/Description';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import TableRowsIcon from '@mui/icons-material/TableRows';
+import BarChartIcon from '@mui/icons-material/BarChart';
 import { pmAPI } from '../../services/api';
-import { formatDate } from '../../utils/dateUtils';
+import { SectionCard } from '../../components/SectionCard';
+import { Inbox, PieChart as PieIcon, Building2, MonitorSmartphone, CalendarRange, ListChecks } from 'lucide-react';
+import { CoverageLegend, MonthStrip, RankedBars, StackedBar } from './components/CoverageBars';
+import {
+  CoveragePayload, CoverageState, Selection, STATES, dimensionCounts, emptySelection,
+  filterPlans, filterRows, groupBy, pct, planStatus, planStatusColor, scopeSummary,
+  selectionActive, stateColors, tally,
+} from './pmCoverage';
+import { REPORTS, ReportKey, exportCsv, exportSheet, exportWorkbook } from './pmExport';
 
-function fmtDate(d: string | null) {
-  if (!d) return '—';
-  return formatDate(d);
-}
+const fmt = (n: number) => n.toLocaleString('en-US');
 
-function progressColor(pct: number): 'success' | 'info' | 'warning' | 'error' {
-  if (pct >= 100) return 'success';
-  if (pct >= 50) return 'info';
-  if (pct >= 20) return 'warning';
-  return 'error';
-}
-
-function getRowStatus(plan: any) {
-  const total = plan.totalCount ?? (plan.runs?.length || 0);
-  const done = plan.completedCount ?? (plan.runs?.filter((r: any) => r.status === 'COMPLETED').length || 0);
-  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-  const today = new Date();
-  const end = plan.endDate ? new Date(plan.endDate) : null;
-  const start = plan.startDate ? new Date(plan.startDate) : null;
-  const isOverdue = !!(end && today > end && pct < 100);
-  const isActive = !!(start && end && today >= start && today <= end);
-  const isDone = pct >= 100;
-
-  if (isDone) return { total, done, pct, color: 'success' as const, label: 'เสร็จสิ้น', Icon: CheckCircleIcon };
-  if (isOverdue) return { total, done, pct, color: 'error' as const, label: 'เกินกำหนด', Icon: WarningAmberIcon };
-  if (isActive) return { total, done, pct, color: 'info' as const, label: 'กำลังดำเนิน', Icon: AutorenewIcon };
-  return { total, done, pct, color: 'default' as const, label: 'กำหนดการ', Icon: EventIcon };
-}
+/** Chips for the long tail of a dimension collapse into one "อื่นๆ" toggle. */
+const CHIP_LIMIT = { company: 12, type: 6 };
 
 export default function PMDashboardPage() {
+  const theme = useTheme();
   const navigate = useNavigate();
-  const [dashboard, setDashboard] = useState<any>(null);
+  const colors = stateColors(theme);
+
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [data, setData] = useState<CoveragePayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'PLANNED' | 'ADHOC'>('PLANNED');
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [sel, setSel] = useState<Selection>(emptySelection);
+  const [showTable, setShowTable] = useState<{ company: boolean; type: boolean }>({ company: false, type: false });
+  const [exportAnchor, setExportAnchor] = useState<null | HTMLElement>(null);
+  const [toast, setToast] = useState('');
 
   useEffect(() => {
     setLoading(true);
-    pmAPI.dashboard({ year: selectedYear })
-      .then(res => {
-        setDashboard(res.data);
-        setError('');
-      })
-      .catch(() => setError('โหลดข้อมูล PM Dashboard ไม่สำเร็จ'))
+    pmAPI.coverage({ year })
+      .then(res => { setData(res.data); setError(''); })
+      .catch(() => setError('โหลดข้อมูล PM ไม่สำเร็จ'))
       .finally(() => setLoading(false));
-  }, [selectedYear]);
+  }, [year]);
+
+  // Clear filters when the year changes — a company that exists in one year's
+  // data may not exist in another, and a stale chip would silently empty the page.
+  useEffect(() => { setSel(emptySelection()); }, [year]);
+
+  const rows = data?.rows || [];
+  const plans = data?.plans || [];
+
+  /** The headline breakdown always shows all three states — it IS the state
+   *  chart, so filtering it by state would be circular. */
+  const overall = useMemo(() => tally(filterRows(rows, sel, 'state')), [rows, sel]);
+  const scoped = useMemo(() => tally(filterRows(rows, sel, null)), [rows, sel]);
+  const byCompany = useMemo(() => groupBy(rows, sel, 'c', 'company'), [rows, sel]);
+  const byType = useMemo(() => groupBy(rows, sel, 't', 'type'), [rows, sel]);
+  const visiblePlans = useMemo(() => filterPlans(plans, sel), [plans, sel]);
+  const companyChips = useMemo(() => dimensionCounts(rows, 'c'), [rows]);
+  const typeChips = useMemo(() => dimensionCounts(rows, 't'), [rows]);
+
+  const planned = overall.DONE + overall.PENDING;
+  const coverPct = pct(planned, overall.total);
+  const progressPct = pct(overall.DONE, planned);
+
+  const toggle = <T,>(key: keyof Selection, value: T) => {
+    setSel(prev => {
+      const next: Selection = {
+        state: new Set(prev.state), company: new Set(prev.company), type: new Set(prev.type),
+      };
+      const set = next[key] as Set<T>;
+      set.has(value) ? set.delete(value) : set.add(value);
+      return next;
+    });
+  };
+
+  const runExport = (fn: () => void, label: string) => {
+    try { fn(); setToast(`กำลังดาวน์โหลด ${label}`); }
+    catch { setToast('ส่งออกไฟล์ไม่สำเร็จ'); }
+    setExportAnchor(null);
+  };
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, gap: 1.25, color: 'primary.main', fontSize: 14 }}>
-        กำลังโหลดข้อมูล PM...
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240, gap: 1.5 }}>
+        <CircularProgress size={20} />
+        <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>กำลังโหลดข้อมูล PM…</Typography>
       </Box>
     );
   }
 
-  // Base data
-  const plans: any[] = dashboard?.plans || [];
+  const chipSx = (active: boolean, color?: string) => ({
+    fontSize: 12, height: 26, fontWeight: active ? 600 : 500, cursor: 'pointer',
+    borderColor: active ? (color || theme.palette.primary.main) : theme.palette.divider,
+    bgcolor: active ? alpha(color || theme.palette.primary.main, 0.1) : 'transparent',
+    color: active ? (color || theme.palette.primary.main) : theme.palette.text.secondary,
+    '&:hover': { borderColor: color || theme.palette.primary.main },
+  });
 
-  // Select data based on tab
-  const displayPlans = plans.filter((p: any) => activeTab === 'ADHOC' ? p.isAdhoc : !p.isAdhoc);
-  const planned = activeTab === 'ADHOC' ? (dashboard?.plannedAdhoc || 0) : (dashboard?.planned || 0);
-  const completed = activeTab === 'ADHOC' ? (dashboard?.completedAdhoc || 0) : (dashboard?.completed || 0);
-  const remaining = activeTab === 'ADHOC' ? (dashboard?.remainingAdhoc || 0) : (dashboard?.remaining || 0);
-  const overdue = activeTab === 'ADHOC' ? 0 : (dashboard?.overdue || 0);
-  const pctAll = planned > 0 ? Math.round(completed / planned * 100) : 0;
+  const renderDimChips = (
+    list: { name: string; count: number }[], key: 'company' | 'type', limit: number,
+  ) => {
+    const shown = list.slice(0, limit);
+    const rest = list.slice(limit);
+    const restOn = rest.length > 0 && rest.every(r => sel[key].has(r.name));
+    return (
+      <>
+        {shown.map(c => (
+          <Chip
+            key={c.name} variant="outlined" size="small" onClick={() => toggle(key, c.name)}
+            sx={chipSx(sel[key].has(c.name))}
+            label={<>{c.name} <Box component="span" sx={{ fontSize: 10.5, opacity: 0.65, ml: 0.25 }}>{fmt(c.count)}</Box></>}
+          />
+        ))}
+        {rest.length > 0 && (
+          <Chip
+            variant="outlined" size="small" sx={chipSx(restOn)}
+            onClick={() => setSel(prev => {
+              const next: Selection = {
+                state: new Set(prev.state), company: new Set(prev.company), type: new Set(prev.type),
+              };
+              const allOn = rest.every(r => next[key].has(r.name));
+              rest.forEach(r => (allOn ? next[key].delete(r.name) : next[key].add(r.name)));
+              return next;
+            })}
+            label={<>อื่นๆ ({rest.length}) <Box component="span" sx={{ fontSize: 10.5, opacity: 0.65, ml: 0.25 }}>
+              {fmt(rest.reduce((a, r) => a + r.count, 0))}</Box></>}
+          />
+        )}
+      </>
+    );
+  };
 
-  const notGenerated = displayPlans.filter((plan: any) => (plan.totalCount ?? plan.runs?.length ?? 0) === 0).length;
-  const activePlans = displayPlans.filter((plan: any) => {
-    const start = plan.startDate ? new Date(plan.startDate) : null;
-    const end = plan.endDate ? new Date(plan.endDate) : null;
-    const total = plan.totalCount ?? (plan.runs?.length || 0);
-    const done = plan.completedCount ?? (plan.runs?.filter((r: any) => r.status === 'COMPLETED').length || 0);
-    return start && end && new Date() >= start && new Date() <= end && done < total;
-  }).length;
+  const donut = (segs: { name: string; value: number; color: string }[], centre: string, centreLabel: string) => {
+    const total = segs.reduce((a, s) => a + s.value, 0);
+    return (
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.25, flexWrap: 'wrap' }}>
+        <Box sx={{ width: 138, height: 138, position: 'relative', flexShrink: 0 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie data={segs} cx="50%" cy="50%" innerRadius={44} outerRadius={64}
+                paddingAngle={2} dataKey="value" stroke="none" startAngle={90} endAngle={-270}>
+                {segs.map(s => <Cell key={s.name} fill={s.color} />)}
+              </Pie>
+              <RTooltip
+                contentStyle={{
+                  borderRadius: 8, border: `1px solid ${theme.palette.divider}`,
+                  background: theme.palette.background.paper, boxShadow: theme.shadows[4], fontSize: 12,
+                }}
+                formatter={(v: any, n: any) => [`${fmt(v)} เครื่อง (${pct(v, total)}%)`, n]}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+          <Box sx={{
+            position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center', pointerEvents: 'none',
+          }}>
+            <Typography sx={{ fontSize: 26, fontWeight: 800, lineHeight: 1, letterSpacing: '-.02em' }}>{centre}</Typography>
+            <Typography sx={{ fontSize: 10, color: 'text.disabled', mt: 0.4 }}>{centreLabel}</Typography>
+          </Box>
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 150, display: 'flex', flexDirection: 'column', gap: 1.2 }}>
+          {segs.map(s => (
+            <Box key={s.name} sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: 12.5 }}>
+              <Box sx={{ width: 11, height: 11, borderRadius: '3px', bgcolor: s.color, flex: 'none' }} />
+              <Typography sx={{ fontSize: 12.5, color: 'text.secondary', flex: 1 }}>{s.name}</Typography>
+              <Typography sx={{ fontSize: 12.5, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{fmt(s.value)}</Typography>
+              <Typography sx={{ fontSize: 11, color: 'text.disabled', minWidth: 40, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                {pct(s.value, total)}%
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+      </Box>
+    );
+  };
 
-  const stats: { icon: React.ElementType; label: string; val: number | string; color: 'info' | 'success' | 'warning' | 'error' | 'secondary' }[] = [
-    { icon: GpsFixedIcon, label: 'เป้าหมาย', val: planned, color: 'info' },
-    { icon: CheckCircleIcon, label: 'เสร็จแล้ว', val: completed, color: 'success' },
-    { icon: HourglassEmptyIcon, label: 'รอดำเนินการ', val: remaining, color: 'warning' },
-    { icon: WarningAmberIcon, label: 'เกินกำหนด', val: overdue, color: 'error' },
-    { icon: AssignmentLateIcon, label: 'ยังไม่ Generate', val: notGenerated, color: 'secondary' },
-    { icon: TrendingUpIcon, label: 'ความคืบหน้า', val: `${pctAll}%`, color: progressColor(pctAll) },
-  ];
-
-  const workflow = [
-    { title: '1. Template', copy: 'เตรียม Checklist มาตรฐานก่อนเริ่มรอบ PM', color: 'secondary' as const, Icon: DescriptionIcon, action: () => navigate('/pm/templates') },
-    { title: '2. Plan', copy: 'กำหนด scope, ระยะเวลา, ผู้รับผิดชอบ และจำนวนเครื่อง', color: 'info' as const, Icon: AssignmentIcon, action: () => navigate('/pm/plans') },
-    { title: '3. Generate', copy: `${notGenerated} แผนยังไม่มีรายการงาน`, color: notGenerated > 0 ? 'warning' as const : 'success' as const, Icon: BoltIcon, action: () => navigate('/pm/plans') },
-    { title: '4. Execute', copy: `${activePlans} แผนกำลังอยู่ในช่วงดำเนินการ`, color: 'success' as const, Icon: PlayArrowIcon, action: () => navigate('/pm/runs') },
-  ];
-
-  const quickActions = [
-    { Icon: AssignmentIcon, title: 'แผน PM', sub: `${displayPlans.length} แผน`, color: 'info' as const, onClick: () => navigate('/pm/plans') },
-    { Icon: CalendarMonthIcon, title: 'กำหนดการ PM (Gantt)', sub: 'Gantt Chart แผนรายสัปดาห์', color: 'success' as const, onClick: () => navigate('/pm/schedule') },
-    { Icon: BuildIcon, title: 'ทำ PM Checklist', sub: `${remaining} รายการรอ`, color: 'warning' as const, onClick: () => navigate('/pm/runs') },
-    { Icon: DescriptionIcon, title: 'จัดการ Template', sub: 'Checklist มาตรฐานก่อนสร้างแผน', color: 'secondary' as const, onClick: () => navigate('/pm/templates') },
-  ];
+  const barCard = (
+    title: string, icon: any, groups: ReturnType<typeof groupBy>, which: 'company' | 'type',
+  ) => (
+    <SectionCard title={title} icon={icon}>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }} className="pm-noprint">
+        <Button
+          size="small" variant="text"
+          startIcon={showTable[which] ? <BarChartIcon sx={{ fontSize: 15 }} /> : <TableRowsIcon sx={{ fontSize: 15 }} />}
+          onClick={() => setShowTable(s => ({ ...s, [which]: !s[which] }))}
+          sx={{ fontSize: 11.5, fontWeight: 600 }}
+        >
+          {showTable[which] ? 'ดูเป็นกราฟ' : 'ดูเป็นตาราง'}
+        </Button>
+      </Box>
+      {showTable[which] ? (
+        <TableContainer sx={{ overflowX: 'auto' }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={thSx}>{which === 'company' ? 'บริษัท' : 'ประเภท'}</TableCell>
+                {STATES.map(s => <TableCell key={s.key} align="right" sx={thSx}>{s.label}</TableCell>)}
+                <TableCell align="right" sx={thSx}>รวม</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {groups.map(g => (
+                <TableRow key={g.name} hover>
+                  <TableCell sx={{ fontSize: 12.5 }}>{g.name}</TableCell>
+                  {STATES.map(s => (
+                    <TableCell key={s.key} align="right" sx={numSx}>{fmt(g[s.key])}</TableCell>
+                  ))}
+                  <TableCell align="right" sx={{ ...numSx, fontWeight: 700 }}>{fmt(g.total)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      ) : (
+        <RankedBars groups={groups} />
+      )}
+    </SectionCard>
+  );
 
   return (
     <Box>
-      {/* ── Header ── */}
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5, mb: 2.5 }}>
+      <GlobalStyles styles={printStyles(theme)} />
+
+      {/* Letterhead — only ever visible on paper. A printout that does not say
+          which filters produced it is unreadable a week later. */}
+      <Box className="pm-printhead" sx={{ display: 'none' }}>
+        <Box className="pm-ph-top">
+          <Box>
+            <Box className="pm-ph-org">TRR Group · ฝ่ายเทคโนโลยีสารสนเทศ</Box>
+            <Box className="pm-ph-title">รายงานความครอบคลุมการบำรุงรักษาเชิงป้องกัน (PM)</Box>
+            <Box className="pm-ph-year">ปีงบประมาณ {year + 543}</Box>
+          </Box>
+          <Box className="pm-ph-meta">
+            <div>พิมพ์เมื่อ {new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+            {data?.generated && (
+              <div>ข้อมูล ณ {new Date(data.generated).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+            )}
+          </Box>
+        </Box>
+        <Box className="pm-ph-scope">
+          <b>ขอบเขตรายงาน:</b> {scopeSummary(sel)} &nbsp;|&nbsp; <b>รวม {fmt(overall.total)} เครื่อง</b>
+          {' '}(สร้างแผนแล้ว {fmt(planned)} · ยังไม่ได้สร้างแผน {fmt(overall.UNPLANNED)})
+        </Box>
+      </Box>
+
+      {/* ── Header ─────────────────────────────────────────────── */}
+      <Box className="pm-noprint" sx={{
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+        flexWrap: 'wrap', gap: 1.5, mb: 2.5,
+      }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Box sx={{ width: 40, height: 40, borderRadius: 2.5, bgcolor: (t) => alpha(t.palette.primary.main, t.palette.mode === 'dark' ? 0.16 : 0.08), border: '1px solid', borderColor: 'primary.main', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Box sx={{
+            width: 40, height: 40, borderRadius: 2.5, display: 'flex', alignItems: 'center',
+            justifyContent: 'center', border: '1px solid', borderColor: 'primary.main',
+            bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.16 : 0.08),
+          }}>
             <ShieldIcon color="primary" />
           </Box>
           <Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Typography sx={{ fontSize: 17, fontWeight: 800 }}>PM Dashboard</Typography>
-              <Select size="small" value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} sx={{ fontSize: 12, fontWeight: 700 }}>
+              <Select size="small" value={year} onChange={e => setYear(Number(e.target.value))}
+                sx={{ fontSize: 12, fontWeight: 700 }}>
                 {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(y => (
                   <MenuItem key={y} value={y}>ปี {y + 543}</MenuItem>
                 ))}
               </Select>
             </Box>
-            <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 0.25 }}>ศูนย์ติดตาม Preventive Maintenance ปี {selectedYear + 543}</Typography>
+            <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 0.25 }}>
+              ความครอบคลุมการบำรุงรักษาเชิงป้องกัน ปี {year + 543}
+            </Typography>
           </Box>
         </Box>
+
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
-          <ToggleButtonGroup size="small" exclusive value={activeTab} onChange={(_, v) => v && setActiveTab(v)} sx={{ mr: 1 }}>
-            <ToggleButton value="PLANNED"><BarChartIcon fontSize="small" sx={{ mr: 0.5 }} /> PM ตามแผน</ToggleButton>
-            <ToggleButton value="ADHOC"><BoltIcon fontSize="small" sx={{ mr: 0.5 }} /> PM นอกแผน</ToggleButton>
-          </ToggleButtonGroup>
-          <Button variant="outlined" startIcon={<CalendarMonthIcon />} onClick={() => navigate('/pm/schedule')}>Gantt Chart</Button>
-          <Button variant="outlined" startIcon={<DescriptionIcon />} onClick={() => navigate('/pm/templates')}>Template</Button>
-          <Button variant="outlined" startIcon={<BuildIcon />} onClick={() => navigate('/pm/runs')}>ทำ PM</Button>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('/pm/plans')}>สร้างแผน</Button>
+          <Button variant="outlined" size="small" startIcon={<CalendarMonthIcon />} onClick={() => navigate('/pm/schedule')}>Gantt</Button>
+          <Button variant="outlined" size="small" startIcon={<DescriptionIcon />} onClick={() => navigate('/pm/templates')}>Template</Button>
+          <Button variant="outlined" size="small" startIcon={<BuildIcon />} onClick={() => navigate('/pm/runs')}>ทำ PM</Button>
+          <Button variant="outlined" size="small" startIcon={<DownloadIcon />}
+            onClick={e => setExportAnchor(e.currentTarget)}>ส่งออก</Button>
+          <Button variant="outlined" size="small" startIcon={<PrintIcon />} onClick={() => window.print()}>พิมพ์รายงาน</Button>
+          <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => navigate('/pm/plans')}>สร้างแผน</Button>
         </Box>
       </Box>
+
+      <Menu anchorEl={exportAnchor} open={Boolean(exportAnchor)} onClose={() => setExportAnchor(null)}
+        slotProps={{ paper: { sx: { minWidth: 320 } } }}>
+        <MenuItem onClick={() => runExport(() => exportWorkbook(data!, sel), 'ไฟล์ Excel รวมทุกรายงาน')}>
+          <Box>
+            <Typography sx={{ fontSize: 13, fontWeight: 700 }}>Excel รวมทุกรายงาน (.xlsx)</Typography>
+            <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>{REPORTS.length} ชีตในไฟล์เดียว</Typography>
+          </Box>
+        </MenuItem>
+        <Divider />
+        {(['exec', 'ops'] as const).map(group => [
+          <ListSubheader key={`h-${group}`} sx={{ fontSize: 10, fontWeight: 700, letterSpacing: '.05em', lineHeight: 2.4 }}>
+            {group === 'exec' ? 'สรุปสำหรับผู้บริหาร' : 'รายการสำหรับทีมงาน'}
+          </ListSubheader>,
+          ...REPORTS.filter(r => r.group === group).map(rep => (
+            <MenuItem key={rep.key} sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}
+              onClick={() => runExport(() => exportSheet(data!, sel, rep.key as ReportKey), rep.label)}>
+              <Typography sx={{ fontSize: 12.5 }}>{rep.label}</Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                <Typography sx={{ fontSize: 10.5, color: 'text.disabled', fontVariantNumeric: 'tabular-nums' }}>
+                  {fmt(rep.count(data!, sel))} แถว
+                </Typography>
+                <Tooltip title="ส่งออกเป็น CSV แทน">
+                  <Box component="span" onClick={e => { e.stopPropagation(); runExport(() => exportCsv(data!, sel, rep.key as ReportKey), `${rep.label} (CSV)`); }}
+                    sx={{
+                      fontSize: 9.5, fontWeight: 700, px: 0.7, py: 0.15, borderRadius: '4px',
+                      border: `1px solid ${theme.palette.divider}`, color: 'text.disabled',
+                      '&:hover': { borderColor: 'primary.main', color: 'primary.main' },
+                    }}>CSV</Box>
+                </Tooltip>
+              </Box>
+            </MenuItem>
+          )),
+        ])}
+        <Divider />
+        <Typography sx={{ fontSize: 10.5, color: 'text.disabled', px: 2, py: 1, lineHeight: 1.6, maxWidth: 320 }}>
+          ทุกไฟล์ยึดตามตัวกรองที่เลือกอยู่ · CSV เข้ารหัส UTF-8 (มี BOM) เปิดใน Excel ภาษาไทยได้ทันที
+        </Typography>
+      </Menu>
 
       {error && <Alert severity="error" sx={{ mb: 2.5 }}>{error}</Alert>}
 
-      {/* ── Overall Stats ── */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 1.5, mb: 2.5 }}>
-        {stats.map(s => (
-          <Card key={s.label} variant="outlined" sx={{ p: '14px 16px', display: 'flex', alignItems: 'center', gap: 1.5, bgcolor: (t) => alpha(t.palette[s.color].main, t.palette.mode === 'dark' ? 0.16 : 0.08), borderColor: `${s.color}.main` }}>
-            <s.icon sx={{ fontSize: 26, color: `${s.color}.main` }} />
-            <Box>
-              <Typography sx={{ fontSize: 24, fontWeight: 800, color: `${s.color}.main`, lineHeight: 1 }}>{s.val}</Typography>
-              <Typography sx={{ fontSize: 10, color: 'text.secondary', mt: 0.25 }}>{s.label}</Typography>
-            </Box>
-          </Card>
+      {/* ── Filters ────────────────────────────────────────────── */}
+      <Card variant="outlined" className="pm-noprint" sx={{ p: 2, mb: 2, display: 'flex', flexDirection: 'column', gap: 1.4 }}>
+        {([
+          { label: 'สถานะ', node: STATES.map(s => (
+            <Chip key={s.key} variant="outlined" size="small" onClick={() => toggle('state', s.key as CoverageState)}
+              sx={chipSx(sel.state.has(s.key), colors[s.key])}
+              icon={<Box sx={{ width: 8, height: 8, borderRadius: '2px', bgcolor: colors[s.key], ml: '8px !important' }} />}
+              label={<>{s.label} <Box component="span" sx={{ fontSize: 10.5, opacity: 0.7, ml: 0.25 }}>{fmt(overall[s.key])}</Box></>}
+            />
+          )) },
+          { label: 'บริษัท', node: renderDimChips(companyChips, 'company', CHIP_LIMIT.company) },
+          { label: 'ประเภทอุปกรณ์', node: renderDimChips(typeChips, 'type', CHIP_LIMIT.type) },
+        ]).map(row => (
+          <Box key={row.label} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, flexWrap: 'wrap' }}>
+            <Typography sx={{
+              flex: '0 0 92px', fontSize: 10.5, fontWeight: 700, color: 'text.disabled',
+              letterSpacing: '.04em', pt: 0.7,
+            }}>{row.label}</Typography>
+            <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>{row.node}</Box>
+            {row.label === 'สถานะ' && selectionActive(sel) && (
+              <Button size="small" color="error" onClick={() => setSel(emptySelection())}
+                sx={{ fontSize: 11.5, fontWeight: 600, ml: 'auto' }}>ล้างตัวกรองทั้งหมด</Button>
+            )}
+          </Box>
         ))}
+      </Card>
+
+      {/* ── Hero ───────────────────────────────────────────────── */}
+      <Card variant="outlined" sx={{ p: 2.5, mb: 2 }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '300px minmax(0,1fr)' }, gap: 2.5 }}>
+          <Box>
+            <Typography sx={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.06em', color: 'text.disabled' }}>
+              ยังไม่ได้สร้างแผน PM
+            </Typography>
+            <Typography sx={{
+              fontSize: 56, fontWeight: 800, lineHeight: 0.95, letterSpacing: '-.03em',
+              color: colors.UNPLANNED, mt: 0.5, fontVariantNumeric: 'tabular-nums',
+            }}>
+              {fmt(overall.UNPLANNED)}
+              <Box component="span" sx={{ fontSize: 20, fontWeight: 600, color: 'text.secondary', ml: 0.75 }}>เครื่อง</Box>
+            </Typography>
+            <Typography sx={{ fontSize: 12.5, color: 'text.secondary', mt: 1, maxWidth: '34ch' }}>
+              คิดเป็น <b>{pct(overall.UNPLANNED, overall.total)}%</b> ของเครื่องที่เข้าเกณฑ์ PM — ยังไม่เคยถูกดึงเข้าแผนไหนเลยในปีนี้
+            </Typography>
+            <Typography sx={{
+              fontSize: 11.5, color: 'text.disabled', mt: 1.25, pt: 1.25,
+              borderTop: `1px dashed ${theme.palette.divider}`,
+            }}>
+              ฐานคำนวณ: <b>{fmt(overall.total)}</b> เครื่องที่เข้าเกณฑ์{' '}
+              {sel.company.size || sel.type.size
+                ? '(ตามตัวกรองที่เลือก)'
+                : '(ไม่นับเครื่องที่ปลดระวาง สูญหาย ชำรุด หรือกำลังซ่อม)'}
+              {' '}· สร้างแผนแล้ว <b>{fmt(planned)}</b> เครื่อง
+            </Typography>
+          </Box>
+          <Box>
+            <StackedBar t={overall} showPct minLabel={0.09} />
+            <CoverageLegend t={overall} />
+            {sel.state.size > 0 && (
+              <Typography className="pm-noprint" sx={{
+                mt: 1.5, fontSize: 11.5, color: 'text.secondary', p: '7px 10px',
+                bgcolor: theme.palette.action.hover, borderRadius: '7px',
+                borderLeft: `2px solid ${theme.palette.primary.main}`,
+              }}>
+                แถบด้านบนแสดงภาพรวมทั้งหมดเสมอ · กราฟและตารางด้านล่างกรองเฉพาะ{' '}
+                <b>{STATES.filter(s => sel.state.has(s.key)).map(s => s.label).join(' + ')}</b> ({fmt(scoped.total)} เครื่อง)
+              </Typography>
+            )}
+          </Box>
+        </Box>
+      </Card>
+
+      {/* ── Donuts ─────────────────────────────────────────────── */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2,minmax(0,1fr))' }, gap: 2, mb: 2 }}>
+        <SectionCard title="ครอบคลุมแค่ไหน" icon={PieIcon}>
+          {donut([
+            { name: 'สร้างแผนแล้ว', value: planned, color: theme.palette.primary.main },
+            { name: 'ยังไม่ได้สร้างแผน', value: overall.UNPLANNED, color: colors.UNPLANNED },
+          ], `${coverPct}%`, 'ครอบคลุม')}
+        </SectionCard>
+        <SectionCard title="ในแผนแล้ว ทำไปเท่าไร" icon={ListChecks}>
+          {donut([
+            { name: 'ทำเสร็จแล้ว', value: overall.DONE, color: colors.DONE },
+            { name: 'รอทำ', value: overall.PENDING, color: colors.PENDING },
+          ], `${progressPct}%`, 'คืบหน้า')}
+        </SectionCard>
       </Box>
 
-      {/* ── Overall progress ── */}
-      {planned > 0 && (
-        <Card variant="outlined" sx={{ p: '14px 18px', mb: 2.5 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-            <Typography sx={{ fontSize: 13, fontWeight: 700 }}>ความคืบหน้าโดยรวม ปี {selectedYear + 543}</Typography>
-            <Typography sx={{ fontSize: 14, fontWeight: 800, color: `${progressColor(pctAll)}.main` }}>{pctAll}%</Typography>
-          </Box>
-          <LinearProgress variant="determinate" value={pctAll} color={progressColor(pctAll)} sx={{ height: 10, borderRadius: 99 }} />
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.75, fontSize: 11, color: 'text.secondary' }}>
-            <span>เสร็จแล้ว {completed} เครื่อง</span>
-            <span>เป้าหมาย {planned} เครื่อง</span>
-          </Box>
-        </Card>
-      )}
-
-      {/* ── Operational workflow ── */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(170px,1fr))', gap: 1.25, mb: 2.25 }}>
-        {workflow.map(step => (
-          <Card key={step.title} variant="outlined" sx={{ borderTop: 3, borderTopColor: `${step.color}.main` }}>
-            <CardActionArea onClick={step.action} sx={{ p: '12px 14px' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.5 }}>
-                <step.Icon sx={{ fontSize: 15, color: `${step.color}.main` }} />
-                <Typography sx={{ fontSize: 12, fontWeight: 800 }}>{step.title}</Typography>
-              </Box>
-              <Typography sx={{ fontSize: 10, color: 'text.secondary', lineHeight: 1.45 }}>{step.copy}</Typography>
-            </CardActionArea>
-          </Card>
-        ))}
+      {/* ── Ranked bars ────────────────────────────────────────── */}
+      <Box className="pm-bars" sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2,minmax(0,1fr))' }, gap: 2, mb: 2 }}>
+        {barCard('แยกตามบริษัท', Building2, byCompany, 'company')}
+        {barCard('แยกตามประเภทอุปกรณ์', MonitorSmartphone, byType, 'type')}
       </Box>
 
-      {/* ── Quick Actions ── */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 1.25, mb: 2.25 }}>
-        {quickActions.map(a => (
-          <Card key={a.title} variant="outlined" sx={{ bgcolor: (t) => alpha(t.palette[a.color].main, t.palette.mode === 'dark' ? 0.16 : 0.08), borderColor: `${a.color}.main` }}>
-            <CardActionArea onClick={a.onClick} sx={{ p: '14px 16px' }}>
-              <a.Icon sx={{ fontSize: 22, mb: 0.75, color: `${a.color}.main` }} />
-              <Typography sx={{ fontSize: 13, fontWeight: 700 }}>{a.title}</Typography>
-              <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 0.25 }}>{a.sub}</Typography>
-            </CardActionArea>
-          </Card>
-        ))}
+      {/* ── Month strip ────────────────────────────────────────── */}
+      <Box sx={{ mb: 2 }}>
+        <SectionCard title={`จังหวะการทำ PM ตลอดปี ${year + 543}`} icon={CalendarRange}>
+          <MonthStrip monthly={data?.monthly || {}} year={year} />
+        </SectionCard>
       </Box>
 
-      {/* ── Plan breakdown table ── */}
-      {displayPlans.length > 0 && (
-        <TableContainer component={Paper} variant="outlined">
-          <Box sx={{ p: '14px 18px', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1 }}>
-            <BarChartIcon fontSize="small" color="action" />
-            <Typography sx={{ fontSize: 13, fontWeight: 700 }}>รายละเอียดแผน PM</Typography>
-            <Chip size="small" label={`${displayPlans.length} แผน`} color="info" variant="outlined" sx={{ fontWeight: 700 }} />
-          </Box>
-          <Table size="small">
-            <TableHead>
-              <TableRow sx={{ bgcolor: 'action.hover' }}>
-                {['แผนก / Site', 'ประเภท', 'เป้าหมาย', 'สร้างงาน', 'เสร็จ', 'ความคืบหน้า', 'วันเริ่ม', 'วันสิ้นสุด', 'สถานะ'].map(h => (
-                  <TableCell key={h} sx={{ fontSize: 10, fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '.05em', whiteSpace: 'nowrap' }}>{h}</TableCell>
-                ))}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {displayPlans.map((plan: any) => {
-                const s = getRowStatus(plan);
-                const isDept = Boolean(plan.deptTask);
-                const label = isDept ? plan.deptTask : plan.site;
-
-                return (
-                  <TableRow
-                    key={plan.id}
-                    hover
-                    sx={{ cursor: 'pointer' }}
-                    onClick={() => navigate(s.total > 0 ? `/pm/runs?planId=${plan.id}` : '/pm/plans')}
-                  >
-                    <TableCell>
-                      <Typography sx={{ fontWeight: 700, fontSize: 12 }}>{label || 'ทั่วไป'}</Typography>
-                      <Typography sx={{ fontSize: 10, color: 'text.secondary' }}>ปี {plan.year + 543}</Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        size="small"
-                        variant="outlined"
-                        color={isDept ? 'secondary' : 'info'}
-                        icon={isDept ? <BusinessIcon sx={{ fontSize: 12 }} /> : <PlaceIcon sx={{ fontSize: 12 }} />}
-                        label={isDept ? 'แผนก' : 'Location'}
-                        sx={{ fontSize: 10, fontWeight: 600, height: 20 }}
-                      />
-                    </TableCell>
-                    <TableCell sx={{ textAlign: 'center', fontWeight: 600 }}>{plan.plannedDeviceCount}</TableCell>
-                    <TableCell sx={{ textAlign: 'center', color: 'text.secondary' }}>{s.total}</TableCell>
-                    <TableCell sx={{ textAlign: 'center', fontWeight: 700, color: 'success.main' }}>{s.done}</TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 120 }}>
-                        <LinearProgress variant="determinate" value={s.pct} color={progressColor(s.pct)} sx={{ flex: 1, height: 6, borderRadius: 99 }} />
-                        <Typography sx={{ fontSize: 11, fontWeight: 700, minWidth: 34 }}>{s.pct}%</Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell sx={{ fontSize: 11, color: 'text.secondary', whiteSpace: 'nowrap' }}>{fmtDate(plan.startDate)}</TableCell>
-                    <TableCell sx={{ fontSize: 11, color: 'text.secondary', whiteSpace: 'nowrap' }}>{fmtDate(plan.endDate)}</TableCell>
-                    <TableCell>
-                      <Chip size="small" color={s.color} icon={<s.Icon sx={{ fontSize: 13 }} />} label={s.label} sx={{ fontSize: 10, fontWeight: 700, height: 22 }} />
+      {/* ── Plan table ─────────────────────────────────────────── */}
+      <Box className="pm-plantable">
+        <SectionCard title="รายละเอียดแผน PM" icon={Inbox}>
+          <Typography sx={{ fontSize: 11.5, color: 'text.disabled', mb: 1 }}>
+            {fmt(visiblePlans.length)} แผน
+            {visiblePlans.length !== plans.length && ` (จากทั้งหมด ${fmt(plans.length)})`}
+          </Typography>
+          <TableContainer sx={{ overflowX: 'auto' }}>
+            <Table size="small" sx={{ minWidth: 900 }}>
+              <TableHead>
+                <TableRow>
+                  {['แผน', 'บริษัท', 'ประเภท', 'ผู้รับผิดชอบ'].map(h => <TableCell key={h} sx={thSx}>{h}</TableCell>)}
+                  {['เป้าหมาย', 'สร้างงาน', 'เสร็จ'].map(h => <TableCell key={h} align="right" sx={thSx}>{h}</TableCell>)}
+                  {['ความคืบหน้า', 'ช่วงเวลา', 'สถานะ'].map(h => <TableCell key={h} sx={thSx}>{h}</TableCell>)}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {visiblePlans.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={10} sx={{ py: 4, textAlign: 'center', fontSize: 12.5, color: 'text.secondary', lineHeight: 1.8 }}>
+                      {scoped.DONE + scoped.PENDING > 0 ? (
+                        <>
+                          ไม่มีแผน PM ที่ผูกกับขอบเขตนี้ — แต่มี <b>{fmt(scoped.DONE + scoped.PENDING)} เครื่อง</b> ที่มีงาน PM แล้ว
+                          <br />แปลว่างานเหล่านั้นมาจาก <b>งานนอกแผน (Ad-hoc)</b> หรือแผนที่ไม่ได้ระบุบริษัทไว้
+                        </>
+                      ) : 'ไม่มีแผน PM ที่ตรงกับตัวกรองที่เลือก'}
                     </TableCell>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      )}
+                ) : visiblePlans.map(p => {
+                  const st = planStatus(p);
+                  const c = planStatusColor(theme, st.key);
+                  const prog = pct(p.done, p.generated || p.planned);
+                  const range = p.startDate && p.endDate
+                    ? `${new Date(p.startDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} – ${new Date(p.endDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}`
+                    : '—';
+                  return (
+                    <TableRow key={p.id} hover sx={{ cursor: 'pointer' }}
+                      onClick={() => navigate(p.generated > 0 ? `/pm/runs?planId=${p.id}` : '/pm/plans')}>
+                      <TableCell sx={{ fontSize: 12.5, fontWeight: 700 }}>
+                        {p.dept || p.site || `แผน #${p.id}`}
+                        {p.isAdhoc && <Box component="span" sx={{ fontWeight: 400, color: 'text.disabled', ml: 0.5 }}>(นอกแผน)</Box>}
+                      </TableCell>
+                      <TableCell sx={mutedSx}>{p.company || '—'}</TableCell>
+                      <TableCell sx={mutedSx}>{p.deviceType || '—'}</TableCell>
+                      <TableCell sx={mutedSx}>{p.lead || '—'}</TableCell>
+                      <TableCell align="right" sx={numSx}>{fmt(p.planned)}</TableCell>
+                      <TableCell align="right" sx={numSx}>{fmt(p.generated)}</TableCell>
+                      <TableCell align="right" sx={{ ...numSx, fontWeight: 700 }}>{fmt(p.done)}</TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 118 }}>
+                          <LinearProgress variant="determinate" value={prog}
+                            sx={{
+                              flex: 1, height: 5, borderRadius: 99,
+                              bgcolor: theme.palette.action.hover,
+                              '& .MuiLinearProgress-bar': { bgcolor: c },
+                            }} />
+                          <Typography sx={{ fontSize: 11, fontWeight: 700, minWidth: 32, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                            {prog}%
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{ ...mutedSx, whiteSpace: 'nowrap' }}>{range}</TableCell>
+                      <TableCell>
+                        <Chip size="small" label={st.label} sx={{
+                          height: 20, fontSize: 10.5, fontWeight: 700,
+                          bgcolor: alpha(c, 0.12), color: c,
+                        }} />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </SectionCard>
+      </Box>
 
-      {/* ── Empty state ── */}
-      {plans.length === 0 && !loading && (
-        <Card variant="outlined" sx={{ p: 6, textAlign: 'center' }}>
-          <ShieldIcon sx={{ fontSize: 40, mb: 1.5, color: 'text.disabled' }} />
-          <Typography sx={{ fontSize: 14, fontWeight: 600 }}>ยังไม่มีข้อมูล PM</Typography>
-          <Typography sx={{ fontSize: 12, color: 'text.secondary', mt: 0.5, mb: 2 }}>เริ่มต้นด้วยการสร้างแผน PM และ Generate งาน</Typography>
-          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Button variant="outlined" startIcon={<DescriptionIcon />} onClick={() => navigate('/pm/templates')}>สร้าง Template</Button>
-            <Button variant="contained" startIcon={<AssignmentIcon />} onClick={() => navigate('/pm/plans')}>สร้างแผน PM</Button>
-          </Box>
-        </Card>
-      )}
+      <Snackbar open={!!toast} autoHideDuration={3500} onClose={() => setToast('')}
+        message={toast} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }} />
     </Box>
   );
 }
+
+const thSx = {
+  fontSize: 10, fontWeight: 700, color: 'text.disabled',
+  letterSpacing: '.05em', whiteSpace: 'nowrap',
+} as const;
+const numSx = { fontSize: 12.5, fontVariantNumeric: 'tabular-nums' } as const;
+const mutedSx = { fontSize: 12.5, color: 'text.secondary' } as const;
+
+/**
+ * Print rules. The screen page is a tool; the printed page is a document that
+ * leaves the building, so it drops every control, prints in the light palette
+ * whatever the viewer's theme, and forces the bar fills to actually ink.
+ */
+const printStyles = (theme: any) => ({
+  '@media print': {
+    '@page': { size: 'A4 portrait', margin: '14mm 12mm 16mm' },
+    'body': { background: '#fff !important' },
+    '*': { WebkitPrintColorAdjust: 'exact !important', printColorAdjust: 'exact !important' },
+    /* app chrome: sidebar, top bar, breadcrumbs, the floating chat bubble,
+       and every transient overlay */
+    ['.MuiDrawer-root, header.MuiAppBar-root, .MuiBreadcrumbs-root, .app-noprint, '
+      + '.pm-noprint, .MuiSnackbar-root, .MuiTooltip-popper, .MuiMenu-root']: {
+      display: 'none !important',
+    },
+    'main, .MuiBox-root': { boxShadow: 'none !important' },
+    '.pm-printhead': { display: 'block !important', marginBottom: '4mm' },
+    '.pm-ph-top': {
+      display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '14mm',
+      borderBottom: `2.5px solid ${theme.palette.primary.main}`, paddingBottom: '3mm',
+    },
+    '.pm-ph-org': { fontSize: '9pt', fontWeight: 600, color: theme.palette.primary.main, letterSpacing: '.04em' },
+    '.pm-ph-title': { fontSize: '16pt', fontWeight: 700, marginTop: '1.5mm', letterSpacing: '-.01em' },
+    '.pm-ph-year': { fontSize: '10pt', color: '#4b5c72', marginTop: '1mm' },
+    '.pm-ph-meta': { fontSize: '8.5pt', color: '#4b5c72', textAlign: 'right', lineHeight: 1.7, flex: 'none' },
+    '.pm-ph-scope': {
+      marginTop: '3mm', fontSize: '9pt', background: '#f2f5f9',
+      borderLeft: `2.5px solid ${theme.palette.primary.main}`, padding: '2.5mm 3.5mm', borderRadius: '3px',
+    },
+    /* Side by side the ranked bars lose their segment labels, so on paper each
+       gets the full width. */
+    '.pm-bars': { gridTemplateColumns: 'minmax(0,1fr) !important' },
+    '.MuiCard-root, .MuiPaper-root': { breakInside: 'avoid', boxShadow: 'none !important' },
+    /* the plan table is the appendix — own page, repeating header */
+    '.pm-plantable': { breakBefore: 'page' },
+    '.pm-plantable table': { minWidth: '0 !important', fontSize: '8.5pt' },
+    '.pm-plantable .MuiTableContainer-root': { overflow: 'visible !important' },
+    'thead': { display: 'table-header-group' },
+    'tr': { breakInside: 'avoid' },
+  },
+});

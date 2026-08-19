@@ -234,6 +234,8 @@ export const pmAPI = {
   deleteRun: (id: number) => api.delete(`/pm/runs/${id}`),
   updateRunNotes: (id: number, notes: string) => api.patch(`/pm/runs/${id}/notes`, { notes }),
   dashboard: (params?: any) => api.get('/pm/dashboard', { params }),
+  // Per-asset PM coverage for the dashboard — see backend/src/routes/pm.ts.
+  coverage: (params?: { year?: number }) => api.get('/pm/coverage', { params }),
   uploadPMPhoto: (runId: number, formData: FormData) => {
     return api.post(`/pm/runs/${runId}/upload`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },

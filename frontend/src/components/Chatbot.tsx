@@ -102,7 +102,9 @@ export const Chatbot: React.FC = () => {
   };
 
   return (
-    <div style={{ position: 'fixed', bottom: 30, right: 30, zIndex: 9999 }}>
+    // `app-noprint` lets a page's print stylesheet drop the floating bubble;
+    // it is chrome, never part of a printed report.
+    <div className="app-noprint" style={{ position: 'fixed', bottom: 30, right: 30, zIndex: 9999 }}>
       {/* Chat Window */}
       {isOpen && (
         <div style={{

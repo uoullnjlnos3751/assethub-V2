@@ -56,6 +56,9 @@ const pmPhotoUpload = multer({
 // so a routine PM check would be redundant until it's back in service.
 const PM_EXCLUDED_STATUSES: AssetStatus[] = ['Retired', 'Lost', 'Damaged', 'Maintenance'];
 
+// Shown wherever an asset has no company / type / department recorded.
+const UNSPECIFIED = '(ไม่ระบุ)';
+
 function buildPMAssetWhere(plan: { company?: string | null; site?: string | null; deptTask?: string | null; deviceType?: string | null }) {
   return {
     status: { notIn: PM_EXCLUDED_STATUSES },
@@ -834,6 +837,92 @@ router.post('/runs/:id/perform', authenticate, authorize('IT_ADMIN', 'SUPERADMIN
 });
 
 // ── PM Dashboard ──
+
+// GET /pm/coverage — the PM dashboard's data source.
+//
+// /pm/dashboard answers "how far through the plans are we", which is why it
+// could report 65% while only a fifth of the fleet was ever put in a plan.
+// This endpoint answers the question that was missing: of every asset that is
+// DUE for PM, how many are covered by a plan at all? It returns one row per
+// eligible asset rather than pre-aggregated counts, so the client can pivot by
+// company / device type / state and export the underlying list without a
+// round-trip per filter combination. The fleet is a few hundred rows, so the
+// payload stays small.
+router.get('/coverage', authenticate, authorize('IT_ADMIN', 'SUPERADMIN', 'VIEWER'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const year = parseInt(String(req.query.year || new Date().getFullYear()));
+
+    const [assets, runs, plans] = await Promise.all([
+      prisma.asset.findMany({
+        where: { status: { notIn: PM_EXCLUDED_STATUSES } },
+        select: {
+          id: true, assetCode: true, serialNo: true, type: true, company: true,
+          departmentId: true, location: true, ownerName: true,
+        },
+        orderBy: { assetCode: 'asc' },
+      }),
+      prisma.pMRun.findMany({
+        where: { year },
+        select: { assetId: true, planId: true, status: true, completedAt: true, performedAt: true },
+      }),
+      prisma.pMPlan.findMany({ where: { year }, orderBy: { id: 'asc' } }),
+    ]);
+
+    // An asset counts as DONE if ANY of its runs this year is complete — a
+    // machine can appear in more than one plan, and one finished check is
+    // enough for the year.
+    const stateByAsset = new Map<number, 'DONE' | 'PENDING'>();
+    for (const run of runs) {
+      if (run.status === 'COMPLETED') stateByAsset.set(run.assetId, 'DONE');
+      else if (!stateByAsset.has(run.assetId)) stateByAsset.set(run.assetId, 'PENDING');
+    }
+
+    const rows = assets.map(a => ({
+      a: a.assetCode || '',
+      n: a.serialNo || '',
+      o: a.ownerName || '',
+      t: a.type || UNSPECIFIED,
+      c: a.company || UNSPECIFIED,
+      d: a.departmentId || UNSPECIFIED,
+      l: a.location || '',
+      s: stateByAsset.get(a.id) || 'UNPLANNED',
+    }));
+
+    const runsByPlan = new Map<number, { total: number; done: number }>();
+    for (const run of runs) {
+      const acc = runsByPlan.get(run.planId) || { total: 0, done: 0 };
+      acc.total++;
+      if (run.status === 'COMPLETED') acc.done++;
+      runsByPlan.set(run.planId, acc);
+    }
+
+    const monthly: Record<string, number> = {};
+    for (const run of runs) {
+      if (run.status !== 'COMPLETED') continue;
+      const when = run.completedAt || run.performedAt;
+      if (!when) continue;
+      const key = when.getFullYear() + '-' + String(when.getMonth() + 1).padStart(2, '0');
+      monthly[key] = (monthly[key] || 0) + 1;
+    }
+
+    res.json({
+      year,
+      generated: new Date().toISOString(),
+      rows,
+      plans: plans.map(pl => {
+        const acc = runsByPlan.get(pl.id) || { total: 0, done: 0 };
+        return {
+          id: pl.id, site: pl.site, dept: pl.deptTask, company: pl.company, lead: pl.lead,
+          deviceType: pl.deviceType, planned: pl.plannedDeviceCount,
+          generated: acc.total, done: acc.done,
+          startDate: pl.startDate, endDate: pl.endDate, isAdhoc: pl.isAdhoc,
+        };
+      }),
+      monthly,
+    });
+  } catch (err) { next(err); }
+});
+
 router.get('/dashboard', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { year } = req.query;
