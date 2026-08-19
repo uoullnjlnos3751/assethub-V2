@@ -33,7 +33,7 @@ export function PMTab({ asset, onReloadAsset }: { asset: any; onReloadAsset?: ()
 
   React.useEffect(() => {
     pmAPI.adhocCheck(asset.id).then(r => setPmCheck(r.data)).catch(() => {});
-    pmAPI.templates().then(r => setTemplates(r.data || [])).catch(() => {});
+    pmAPI.templates(true).then(r => setTemplates(r.data || [])).catch(() => {});
   }, [asset.id]);
 
   const handleStartPM = async () => {

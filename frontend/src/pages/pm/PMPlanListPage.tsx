@@ -8,6 +8,7 @@ import {
   TextField,
   Select,
   MenuItem,
+  ListSubheader,
   Chip,
   Table,
   TableHead,
@@ -141,6 +142,7 @@ function PlanFormFields({
   locOptions,
   deptOptions,
   typeOptions,
+  leadOptions,
   templates,
   disabled,
   onNoTemplateClick,
@@ -152,6 +154,7 @@ function PlanFormFields({
   locOptions: string[];
   deptOptions: string[];
   typeOptions: string[];
+  leadOptions: { users: string[]; legacy: string[] };
   templates: any[];
   disabled?: { year?: boolean; company?: boolean; site?: boolean; dept?: boolean; template?: boolean; countMin?: number };
   onNoTemplateClick?: () => void;
@@ -205,7 +208,17 @@ function PlanFormFields({
       <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.25 }}>
         <Box>
           <Typography sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary', mb: 0.5 }}>ผู้รับผิดชอบ (Lead)</Typography>
-          <TextField fullWidth size="small" placeholder="ชื่อผู้รับผิดชอบ" value={form.lead} onChange={(e) => onChange({ lead: e.target.value })} />
+          {/* Was free text, and all 31 plans in 2569 ended up holding the
+              literal "IT Support" — no way to filter or report by owner.
+              Values already stored stay selectable via leadOptions.legacy. */}
+          <Select fullWidth size="small" displayEmpty value={form.lead}
+            onChange={(e) => onChange({ lead: e.target.value })}
+            renderValue={(v) => (v as string) || <Box component="span" sx={{ color: 'text.disabled' }}>ยังไม่ระบุ</Box>}>
+            <MenuItem value="">ยังไม่ระบุ</MenuItem>
+            {leadOptions.users.map((n) => <MenuItem key={n} value={n}>{n}</MenuItem>)}
+            {leadOptions.legacy.length > 0 && <ListSubheader sx={{ fontSize: 10, lineHeight: 2.2 }}>ค่าเดิมในระบบ</ListSubheader>}
+            {leadOptions.legacy.map((n) => <MenuItem key={n} value={n}>{n}</MenuItem>)}
+          </Select>
         </Box>
         <Box>
           <Typography sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary', mb: 0.5 }}>จำนวนเครื่องตามแผน</Typography>
@@ -295,6 +308,7 @@ export default function PMPlanListPage() {
   const [locOptions, setLocOptions] = useState<string[]>([]);
   const [companyOptions, setCompanyOptions] = useState<string[]>([]);
   const [typeOptions, setTypeOptions] = useState<string[]>([]);
+  const [leadOptions, setLeadOptions] = useState<{ users: string[]; legacy: string[] }>({ users: [], legacy: [] });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [eligibility, setEligibility] = useState<any>(null);
@@ -345,18 +359,20 @@ export default function PMPlanListPage() {
     setLoading(true);
     Promise.all([
       pmAPI.plans(),
-      pmAPI.templates(),
+      pmAPI.templates(true),
       assetAPI.departmentOptions(),
       assetAPI.locationOptions(),
       assetAPI.companyOptions(),
       assetAPI.typeOptions(),
-    ]).then(([p, t, d, l, c, ty]) => {
+      pmAPI.leads(),
+    ]).then(([p, t, d, l, c, ty, ld]) => {
       setPlans(p.data || []);
       setTemplates(t.data || []);
       setDeptOptions((d.data || []).map((x: any) => typeof x === 'string' ? x : x.name || x));
       setLocOptions((l.data || []).map((x: any) => typeof x === 'string' ? x : x.name || x));
       setCompanyOptions((c.data || []).map((x: any) => typeof x === 'string' ? x : x.name || x));
       setTypeOptions((ty.data || []).map((x: any) => typeof x === 'string' ? x : x.name || x));
+      setLeadOptions({ users: ld.data?.users || [], legacy: ld.data?.legacy || [] });
     }).finally(() => setLoading(false));
   };
 
@@ -936,6 +952,7 @@ export default function PMPlanListPage() {
             locOptions={formLocOptions}
             deptOptions={formDeptOptions}
             typeOptions={typeOptions}
+            leadOptions={leadOptions}
             templates={templates}
             onNoTemplateClick={() => { setModalOpen(false); setTimeout(() => { window.location.href = '/pm/templates'; }, 100); }}
           />
@@ -995,6 +1012,7 @@ export default function PMPlanListPage() {
                   locOptions={editLocOptions}
                   deptOptions={editDeptOptions}
                   typeOptions={typeOptions}
+                  leadOptions={leadOptions}
                   templates={templates}
                   disabled={{
                     year: hasCompletedRuns,

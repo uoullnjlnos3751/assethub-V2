@@ -36,7 +36,7 @@ export const PMAdhocModal: React.FC<PMAdhocModalProps> = ({ open, onClose, onSuc
       
       // Load templates
       setAdhocTemplatesLoading(true);
-      pmAPI.templates()
+      pmAPI.templates(true)
         .then((res: any) => {
           setAdhocTemplates(res.data || []);
           setAdhocTemplatesError('');

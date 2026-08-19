@@ -98,9 +98,15 @@ async function getPMEligibility(client: any, plan: { year: number; company?: str
 }
 
 // ── PM Templates ──
-router.get('/templates', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+// `?activeOnly=1` hides retired templates. The template manager needs to see
+// them all so they can be brought back; the pickers that create work must not
+// offer them — two near-identical names ("PM ตรวจนับประจำปี" and
+// "PM ตรวจนับประจำปี 2026") are easy to confuse when only one is live.
+router.get('/templates', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const activeOnly = req.query.activeOnly === '1' || req.query.activeOnly === 'true';
     const templates = await prisma.pMTemplate.findMany({
+      where: activeOnly ? { active: true } : {},
       include: { templateItems: true },
       orderBy: { year: 'desc' },
     });
@@ -207,6 +213,39 @@ router.put('/templates/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), 
 
     const keptCount = referencedIds.size;
     res.json({ ...updated, _warning: keptCount > 0 ? `${keptCount} รายการที่มีข้อมูล PM ผูกอยู่ไม่ถูกลบ` : null });
+  } catch (err) { next(err); }
+});
+
+
+// GET /pm/leads — people who can be assigned as a plan owner.
+//
+// The Lead field was free text and every one of the 31 plans in 2569 held
+// the literal string "IT Support", so it carried no information and could
+// not be filtered or reported on. /admin/users is SUPERADMIN-only, hence
+// this narrow read: active IT staff, name and username only.
+router.get('/leads', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const users = await prisma.appUser.findMany({
+      where: { isActive: true, role: { in: ['IT_ADMIN', 'SUPERADMIN'] } },
+      select: { id: true, displayName: true, adUsername: true },
+      orderBy: { displayName: 'asc' },
+    });
+
+    // Whatever the existing plans already carry stays selectable, so editing
+    // an old plan cannot silently drop its owner.
+    const existing = await prisma.pMPlan.findMany({
+      where: { lead: { not: null } },
+      distinct: ['lead'],
+      select: { lead: true },
+    });
+
+    const names = users.map(u => u.displayName || u.adUsername).filter((n): n is string => !!n);
+    const seen = new Set(names.map(n => n.toLowerCase()));
+    const legacy = existing
+      .map(r => (r.lead || '').trim())
+      .filter(n => n && !seen.has(n.toLowerCase()));
+
+    res.json({ users: names, legacy });
   } catch (err) { next(err); }
 });
 

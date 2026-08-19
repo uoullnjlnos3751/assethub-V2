@@ -226,10 +226,14 @@ export const borrowAPI = {
 
 // PM
 export const pmAPI = {
-  templates: () => api.get('/pm/templates'),
+  // `activeOnly` for pickers that create work; omit it in the template manager.
+  templates: (activeOnly?: boolean) =>
+    api.get('/pm/templates', { params: activeOnly ? { activeOnly: 1 } : {} }),
   createTemplate: (data: any) => api.post('/pm/templates', data),
   updateTemplate: (id: number, data: any) => api.put(`/pm/templates/${id}`, data),
   plans: (params?: any) => api.get('/pm/plans', { params }),
+  // Assignable plan owners — see backend/src/routes/pm.ts.
+  leads: () => api.get('/pm/leads'),
   createPlan: (data: any) => api.post('/pm/plans', data),
   updatePlan: (id: number, data: any) => api.put(`/pm/plans/${id}`, data),
   deletePlan: (id: number) => api.delete(`/pm/plans/${id}`),
