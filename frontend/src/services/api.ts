@@ -234,6 +234,8 @@ export const pmAPI = {
   plans: (params?: any) => api.get('/pm/plans', { params }),
   // Assignable plan owners — see backend/src/routes/pm.ts.
   leads: () => api.get('/pm/leads'),
+  // Scope no plan covers — see backend/src/routes/pm.ts.
+  planGaps: (params?: { year?: number }) => api.get('/pm/plans/gaps', { params }),
   createPlan: (data: any) => api.post('/pm/plans', data),
   updatePlan: (id: number, data: any) => api.put(`/pm/plans/${id}`, data),
   deletePlan: (id: number) => api.delete(`/pm/plans/${id}`),

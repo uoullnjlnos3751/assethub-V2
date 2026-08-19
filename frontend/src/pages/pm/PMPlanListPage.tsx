@@ -27,7 +27,7 @@ import {
   Tooltip,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { alpha } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import dayjs from 'dayjs';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import AddIcon from '@mui/icons-material/Add';
@@ -52,6 +52,8 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import { pmAPI, assetAPI } from '../../services/api';
+import { PlanGapPanel, GapPrefill } from './components/PlanGapPanel';
+import { PlanGap } from './pmPlanGaps';
 import { formatDate } from '../../utils/dateUtils';
 import { Modal } from './components/Modal';
 
@@ -309,6 +311,12 @@ export default function PMPlanListPage() {
   const [companyOptions, setCompanyOptions] = useState<string[]>([]);
   const [typeOptions, setTypeOptions] = useState<string[]>([]);
   const [leadOptions, setLeadOptions] = useState<{ users: string[]; legacy: string[] }>({ users: [], legacy: [] });
+  const [gaps, setGaps] = useState<PlanGap[]>([]);
+  // Chip filters. Company/type also scope the gap panel above the list.
+  const [selCompany, setSelCompany] = useState<Set<string>>(new Set());
+  const [selType, setSelType] = useState<Set<string>>(new Set());
+  const [selStatus, setSelStatus] = useState<Set<string>>(new Set());
+  const [collapsedCos, setCollapsedCos] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [eligibility, setEligibility] = useState<any>(null);
@@ -365,7 +373,8 @@ export default function PMPlanListPage() {
       assetAPI.companyOptions(),
       assetAPI.typeOptions(),
       pmAPI.leads(),
-    ]).then(([p, t, d, l, c, ty, ld]) => {
+      pmAPI.planGaps({ year: filterYear }),
+    ]).then(([p, t, d, l, c, ty, ld, gp]) => {
       setPlans(p.data || []);
       setTemplates(t.data || []);
       setDeptOptions((d.data || []).map((x: any) => typeof x === 'string' ? x : x.name || x));
@@ -373,10 +382,12 @@ export default function PMPlanListPage() {
       setCompanyOptions((c.data || []).map((x: any) => typeof x === 'string' ? x : x.name || x));
       setTypeOptions((ty.data || []).map((x: any) => typeof x === 'string' ? x : x.name || x));
       setLeadOptions({ users: ld.data?.users || [], legacy: ld.data?.legacy || [] });
+      setGaps(gp.data?.gaps || []);
     }).finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchAll(); }, []);
+  // Gaps are year-scoped, so the whole payload is refetched when the year changes.
+  useEffect(() => { fetchAll(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filterYear]);
 
   // Scoped department lists for the two modals. Re-fetched on company change,
   // and any selection that is no longer offered is cleared rather than left
@@ -538,6 +549,27 @@ export default function PMPlanListPage() {
     } finally { setSaving(false); }
   };
 
+  /** Opens the create form already filled in from a gap row or a merged
+   *  selection. Several plans at once are queued so the user confirms each
+   *  one rather than having them written silently. */
+  const [gapQueue, setGapQueue] = useState<GapPrefill[]>([]);
+  const openFromGap = (prefills: GapPrefill[]) => {
+    if (!prefills.length) return;
+    const [first, ...rest] = prefills;
+    setGapQueue(rest);
+    setForm(prev => ({
+      ...prev,
+      year: filterYear,
+      company: first.company,
+      site: '',
+      deptTask: first.dept,
+      deviceType: first.type,
+      plannedDeviceCount: first.count,
+    }));
+    setModalOpen(true);
+    if (rest.length) showToast(`เตรียมไว้ ${prefills.length} แผน — บันทึกทีละแผน เหลืออีก ${rest.length}`);
+  };
+
   const handleOpenEdit = (plan: any) => {
     setSelectedPlanForEdit(plan);
     setEditForm({
@@ -621,11 +653,22 @@ export default function PMPlanListPage() {
     } finally { setSaving(false); }
   };
 
+  /** Single source of truth for a plan's status — used by the chips, their
+   *  counts and the filter alike. */
+  const planStatusKey = (p: any): string => {
+    const completed = p.runs?.filter((r: any) => r.status === 'COMPLETED').length || p.completedCount || 0;
+    const total = p.runs?.length || p.totalCount || 0;
+    if (total === 0) return 'NOT_GENERATED';
+    if (completed >= total) return 'COMPLETED';
+    if (p.endDate && new Date(p.endDate) < new Date()) return 'OVERDUE';
+    return 'IN_PROGRESS';
+  };
+
   const filteredPlans = plans.filter(p => {
     if (p.year !== filterYear) return false;
-    if (filterCompany && p.company !== filterCompany) return false;
+    if (selCompany.size && !selCompany.has(p.company)) return false;
     if (filterDept && p.deptTask !== filterDept) return false;
-    if (filterDeviceType && p.deviceType !== filterDeviceType) return false;
+    if (selType.size && !selType.has(p.deviceType)) return false;
     if (searchTerm) {
       const q = searchTerm.toLowerCase();
       const matchesSearch = (p.deptTask || '').toLowerCase().includes(q) ||
@@ -635,21 +678,18 @@ export default function PMPlanListPage() {
         (p.deviceType || '').toLowerCase().includes(q);
       if (!matchesSearch) return false;
     }
-    if (filterStatus) {
-      const completed = p.runs?.filter((r: any) => r.status === 'COMPLETED').length || p.completedCount || 0;
-      const total = p.runs?.length || p.totalCount || 0;
-      const isOverdue = p.endDate && new Date(p.endDate) < new Date() && completed < total;
-      if (filterStatus === 'COMPLETED' && completed < total) return false;
-      if (filterStatus === 'IN_PROGRESS' && (completed >= total || isOverdue)) return false;
-      if (filterStatus === 'OVERDUE' && !isOverdue) return false;
-      if (filterStatus === 'NOT_GENERATED' && total > 0) return false;
-    }
+    if (selStatus.size && !selStatus.has(planStatusKey(p))) return false;
     return true;
   });
   const totalPlanned = filteredPlans.reduce((s: number, p: any) => s + (p.plannedDeviceCount || 0), 0);
   const totalRuns = filteredPlans.reduce((s: number, p: any) => s + (p.runs?.length || p.totalCount || 0), 0);
   const totalDone = filteredPlans.reduce((s: number, p: any) => s + (p.runs?.filter((r: any) => r.status === 'COMPLETED').length || p.completedCount || 0), 0);
   const overallPct = totalRuns > 0 ? Math.round(totalDone / totalRuns * 100) : 0;
+
+  // Gap rows narrowed by the same company/type chips the plan list uses.
+  const visibleGapUnits = gaps
+    .filter(g => (!selCompany.size || selCompany.has(g.company)) && (!selType.size || selType.has(g.type)))
+    .reduce((s, g) => s + g.free, 0);
 
   // Plans that need generation (no runs yet)
   const plansNeedGenerate = filteredPlans.filter(p => {
@@ -661,6 +701,56 @@ export default function PMPlanListPage() {
   const deviceTypeFilterOptions = Array.from(new Set(plans.filter(p => p.year === filterYear).map((p: any) => p.deviceType).filter(Boolean))) as string[];
 
   const yearOptions = Array.from({ length: 4 }, (_, i) => new Date().getFullYear() - 1 + i);
+
+  const theme = useTheme();
+  const yearPlans = plans.filter(p => p.year === filterYear);
+  // Choices come from the plans plus the gap rows, so a company that has no
+  // plan yet — the very case the gap panel is about — still gets a chip.
+  const companyChoices = Array.from(new Set([
+    ...yearPlans.map((p: any) => p.company).filter(Boolean),
+    ...gaps.map(g => g.company),
+  ])) as string[];
+  companyChoices.sort((a, b) => a.localeCompare(b, 'th'));
+  const typeChoices = Array.from(new Set([
+    ...yearPlans.map((p: any) => p.deviceType).filter(Boolean),
+    ...gaps.map(g => g.type),
+  ])) as string[];
+  typeChoices.sort((a, b) => a.localeCompare(b, 'th'));
+
+  const toggleSet = (setter: React.Dispatch<React.SetStateAction<Set<string>>>, v: string) =>
+    setter(prev => { const n = new Set(prev); n.has(v) ? n.delete(v) : n.add(v); return n; });
+
+  const anyPlanFilter = !!(searchTerm || filterDept || selCompany.size || selType.size || selStatus.size);
+  const clearPlanFilters = () => {
+    setSearchTerm(''); setFilterDept('');
+    setSelCompany(new Set()); setSelType(new Set()); setSelStatus(new Set());
+  };
+
+  const PLAN_STATUS_CHIPS: { key: string; label: string; color: (t: any) => string }[] = [
+    { key: 'NOT_GENERATED', label: 'ยังไม่ Generate', color: (t) => t.palette.error.main },
+    { key: 'OVERDUE', label: 'ล่าช้ากว่ากำหนด', color: (t) => t.palette.error.main },
+    { key: 'IN_PROGRESS', label: 'กำลังดำเนินการ', color: (t) => t.palette.info.main },
+    { key: 'COMPLETED', label: 'เสร็จสิ้นแล้ว', color: (t) => t.palette.success.main },
+  ];
+
+  const planChipSx = (active: boolean, color?: string) => ({
+    fontSize: 11, height: 23, fontWeight: active ? 600 : 500, cursor: 'pointer',
+    borderColor: active ? (color || theme.palette.primary.main) : theme.palette.divider,
+    bgcolor: active ? alpha(color || theme.palette.primary.main, 0.1) : 'transparent',
+    color: active ? (color || theme.palette.primary.main) : theme.palette.text.secondary,
+    '& .MuiChip-label': { px: 1 },
+    '&:hover': { borderColor: color || theme.palette.primary.main },
+  });
+
+  const planChipRow = (label: string, node: React.ReactNode) => (
+    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, flexWrap: 'wrap' }}>
+      <Typography sx={{
+        flex: '0 0 60px', fontSize: 9.5, fontWeight: 700, color: 'text.disabled',
+        letterSpacing: '.04em', pt: 0.6,
+      }}>{label}</Typography>
+      <Box sx={{ display: 'flex', gap: 0.6, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>{node}</Box>
+    </Box>
+  );
 
   return (
     <Box>
@@ -706,70 +796,76 @@ export default function PMPlanListPage() {
         </Box>
       </Box>
 
-      {/* ── Filters Bar ── */}
-      <Card variant="outlined" sx={{ p: '10px 14px', mb: 1.75, display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
-        <Select size="small" sx={{ width: 110 }} value={filterYear} onChange={e => setFilterYear(Number(e.target.value))}>
-          {yearOptions.map(y => <MenuItem key={y} value={y}>ปี {y + 543}</MenuItem>)}
-        </Select>
-        <Select size="small" displayEmpty sx={{ width: 140 }} value={filterCompany} onChange={e => setFilterCompany(e.target.value)}
-          renderValue={(v) => v || <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary' }}><BusinessIcon sx={{ fontSize: 14 }} /> ทุกบริษัท</Box>}>
-          <MenuItem value="">ทุกบริษัท</MenuItem>
-          {companyOptions.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}
-        </Select>
-        <Select size="small" displayEmpty sx={{ width: 140 }} value={filterDept} onChange={e => setFilterDept(e.target.value)}
-          renderValue={(v) => v || <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary' }}><EngineeringIcon sx={{ fontSize: 14 }} /> ทุกแผนก</Box>}>
-          <MenuItem value="">ทุกแผนก</MenuItem>
-          {deptOptions.map(d => <MenuItem key={d} value={d}>{d}</MenuItem>)}
-        </Select>
-        <Select size="small" displayEmpty sx={{ width: 150 }} value={filterDeviceType} onChange={e => setFilterDeviceType(e.target.value)}
-          renderValue={(v) => v || <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary' }}><ComputerIcon sx={{ fontSize: 14 }} /> ทุกประเภท</Box>}>
-          <MenuItem value="">ทุกประเภท</MenuItem>
-          {deviceTypeFilterOptions.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
-        </Select>
-        <Select size="small" displayEmpty sx={{ width: 170 }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-          renderValue={(v) => v ? ({ COMPLETED: 'เสร็จสิ้นแล้ว', IN_PROGRESS: 'กำลังดำเนินการ', OVERDUE: 'ล่าช้ากว่ากำหนด', NOT_GENERATED: 'ยังไม่ Generate' } as any)[v as string] : <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary' }}><BarChartIcon sx={{ fontSize: 14 }} /> ทุกสถานะ</Box>}>
-          <MenuItem value="">ทุกสถานะ</MenuItem>
-          <MenuItem value="COMPLETED">เสร็จสิ้นแล้ว</MenuItem>
-          <MenuItem value="IN_PROGRESS">กำลังดำเนินการ</MenuItem>
-          <MenuItem value="OVERDUE">ล่าช้ากว่ากำหนด</MenuItem>
-          <MenuItem value="NOT_GENERATED">ยังไม่ Generate</MenuItem>
-        </Select>
-        <TextField
-          size="small"
-          sx={{ flex: 1, minWidth: 160 }}
-          placeholder="ค้นหาชื่อแผนก, บริษัท, ผู้รับผิดชอบ..."
-          value={searchTerm}
-          onChange={e => setSearchTerm(e.target.value)}
-          InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }}
-        />
-        <ToggleButtonGroup size="small" exclusive value={viewMode} onChange={(_, v) => v && setViewMode(v)}>
-          <ToggleButton value="table"><TableRowsIcon fontSize="small" sx={{ mr: 0.5 }} /> ตาราง</ToggleButton>
-          <ToggleButton value="card"><ViewModuleIcon fontSize="small" sx={{ mr: 0.5 }} /> การ์ด</ToggleButton>
-        </ToggleButtonGroup>
+      {/* ── Filters ──────────────────────────────────────────────────
+          Company, device type and status are short lists used on every visit,
+          so they are chips carrying their counts — the same selection also
+          scopes the gap panel above. Year, department and search stay as
+          controls because their value sets are long or free-form. */}
+      <Card variant="outlined" sx={{ p: 1.4, mb: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Select size="small" sx={{ width: 108 }} value={filterYear} onChange={e => setFilterYear(Number(e.target.value))}>
+            {yearOptions.map(y => <MenuItem key={y} value={y}>ปี {y + 543}</MenuItem>)}
+          </Select>
+          <Select size="small" displayEmpty sx={{ width: 136 }} value={filterDept} onChange={e => setFilterDept(e.target.value)}
+            renderValue={(v) => v || <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary' }}><EngineeringIcon sx={{ fontSize: 14 }} /> ทุกแผนก</Box>}>
+            <MenuItem value="">ทุกแผนก</MenuItem>
+            {deptOptions.map(d => <MenuItem key={d} value={d}>{d}</MenuItem>)}
+          </Select>
+          <TextField
+            size="small"
+            sx={{ flex: 1, minWidth: 170 }}
+            placeholder="ค้นหาชื่อแผนก, บริษัท, ผู้รับผิดชอบ..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }}
+          />
+          <ToggleButtonGroup size="small" exclusive value={viewMode} onChange={(_, v) => v && setViewMode(v)}>
+            <ToggleButton value="table"><TableRowsIcon fontSize="small" sx={{ mr: 0.5 }} /> ตาราง</ToggleButton>
+            <ToggleButton value="card"><ViewModuleIcon fontSize="small" sx={{ mr: 0.5 }} /> การ์ด</ToggleButton>
+          </ToggleButtonGroup>
+          {anyPlanFilter && (
+            <Button size="small" color="error" onClick={clearPlanFilters} sx={{ fontSize: 10.5, fontWeight: 600 }}>
+              ล้างตัวกรอง
+            </Button>
+          )}
+        </Box>
+
+        {planChipRow('สถานะ', PLAN_STATUS_CHIPS.map(s => (
+          <Chip key={s.key} variant="outlined" size="small"
+            onClick={() => toggleSet(setSelStatus, s.key)}
+            sx={planChipSx(selStatus.has(s.key), s.color(theme))}
+            label={<>{s.label} <Box component="span" sx={{ fontSize: 9.5, opacity: 0.7 }}>{yearPlans.filter(p => planStatusKey(p) === s.key).length}</Box></>} />
+        )))}
+
+        {planChipRow('บริษัท', companyChoices.map(c => (
+          <Chip key={c} variant="outlined" size="small"
+            onClick={() => toggleSet(setSelCompany, c)}
+            sx={planChipSx(selCompany.has(c))}
+            label={<>{c} <Box component="span" sx={{ fontSize: 9.5, opacity: 0.65 }}>{yearPlans.filter(p => p.company === c).length}</Box></>} />
+        )))}
+
+        {typeChoices.length > 1 && planChipRow('ประเภท', typeChoices.map(t => (
+          <Chip key={t} variant="outlined" size="small"
+            onClick={() => toggleSet(setSelType, t)}
+            sx={planChipSx(selType.has(t))}
+            label={<>{t} <Box component="span" sx={{ fontSize: 9.5, opacity: 0.65 }}>{yearPlans.filter(p => p.deviceType === t).length}</Box></>} />
+        )))}
       </Card>
 
-      {/* ── Stats + Progress (Combined compact) ── */}
-      <Card variant="outlined" sx={{ p: '10px 16px', mb: 1.75, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-        {[
-          { icon: AssignmentIcon, label: 'แผน', val: filteredPlans.length, color: 'info' as const },
-          { icon: GpsFixedIcon, label: 'เป้าหมาย', val: totalPlanned, color: 'secondary' as const },
-          { icon: CheckCircleIcon, label: 'เสร็จ', val: totalDone, color: 'success' as const },
-          { icon: EventIcon, label: 'เหลือ', val: totalRuns - totalDone, color: 'warning' as const },
-        ].map(s => (
-          <Box key={s.label} sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-            <s.icon sx={{ fontSize: 18, color: `${s.color}.main` }} />
-            <Box>
-              <Typography sx={{ fontSize: 16, fontWeight: 800, color: `${s.color}.main`, lineHeight: 1 }}>{s.val}</Typography>
-              <Typography sx={{ fontSize: 9, color: 'text.secondary' }}>{s.label}</Typography>
-            </Box>
-          </Box>
-        ))}
-        <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 180 }}>
-          <LinearProgress variant="determinate" value={overallPct} color={progressColor(overallPct)} sx={{ flex: 1, height: 7, borderRadius: 99 }} />
-          <Typography sx={{ fontSize: 13, fontWeight: 700, color: `${progressColor(overallPct)}.main`, minWidth: 36 }}>{overallPct}%</Typography>
-          <Typography sx={{ fontSize: 10, color: 'text.secondary', whiteSpace: 'nowrap' }}>{totalDone}/{totalRuns}</Typography>
-        </Box>
-      </Card>
+      {/* ── Scope with no plan — see components/PlanGapPanel.tsx ── */}
+      {!loading && gaps.length > 0 && (
+        <PlanGapPanel
+          gaps={gaps}
+          selCompany={selCompany}
+          selType={selType}
+          onToggleCompany={(name) => setSelCompany(prev => {
+            const next = new Set(prev);
+            next.has(name) ? next.delete(name) : next.add(name);
+            return next;
+          })}
+          onCreate={openFromGap}
+        />
+      )}
 
       {/* ── Plan List ── */}
       {loading ? (
@@ -777,8 +873,12 @@ export default function PMPlanListPage() {
       ) : filteredPlans.length === 0 ? (
         <Card variant="outlined" sx={{ textAlign: 'center', p: 6 }}>
           <AssignmentIcon sx={{ fontSize: 32, mb: 1, color: 'text.disabled' }} />
-          <Typography sx={{ fontSize: 14, fontWeight: 600 }}>ยังไม่มีแผน PM ปี {filterYear + 543}</Typography>
-          <Typography sx={{ fontSize: 12, color: 'text.secondary', mt: 0.5, mb: 2 }}>กดปุ่ม "สร้างแผน PM" เพื่อเริ่มต้น</Typography>
+          <Typography sx={{ fontSize: 14, fontWeight: 600 }}>
+            {visibleGapUnits > 0
+              ? <>ยังไม่มีแผน PM ในขอบเขตนี้ — แต่มี {visibleGapUnits.toLocaleString('en-US')} เครื่องรออยู่</>
+              : <>ยังไม่มีแผน PM ปี {filterYear + 543}</>}
+          </Typography>
+          <Typography sx={{ fontSize: 12, color: 'text.secondary', mt: 0.5, mb: 2 }}>{visibleGapUnits > 0 ? 'กด "สร้างแผน" ในตารางช่องว่างด้านบนเพื่อเริ่ม' : 'กดปุ่ม "สร้างแผน PM" เพื่อเริ่มต้น'}</Typography>
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => setModalOpen(true)}>สร้างแผน PM แรก</Button>
         </Card>
       ) : viewMode === 'table' ? (

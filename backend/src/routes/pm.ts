@@ -310,6 +310,58 @@ router.post('/plans', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (
   } catch (err) { next(err); }
 });
 
+
+// GET /pm/plans/gaps — scope that no plan covers.
+//
+// The plan list could say what had been planned but never what had not, and
+// this is the page where you would fix that. A company/department pair counts
+// as covered when some non-ad-hoc plan names it; everything else is a gap,
+// broken down by device type because one plan carries one type.
+//
+// `free` is the number worth acting on: machines with no PM run at all this
+// year. `total` includes ones already picked up by an overlapping plan, which
+// is why the two differ and why a row with free = 0 is dropped entirely.
+//
+// Registered above /plans/:id so "gaps" is not parsed as an id.
+router.get('/plans/gaps', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const year = parseInt(String(req.query.year || new Date().getFullYear()));
+
+    const [plans, assets, runs] = await Promise.all([
+      prisma.pMPlan.findMany({ where: { year }, select: { company: true, deptTask: true, isAdhoc: true } }),
+      prisma.asset.findMany({
+        where: { status: { notIn: PM_EXCLUDED_STATUSES } },
+        select: { id: true, company: true, departmentId: true, type: true },
+      }),
+      prisma.pMRun.findMany({ where: { year }, distinct: ['assetId'], select: { assetId: true } }),
+    ]);
+
+    // Ad-hoc plans carry no company/department, so they cover nothing in the
+    // scoping sense even though their machines do have runs — which the
+    // per-asset `inRun` check below still accounts for.
+    const covered = new Set(
+      plans.filter(pl => !pl.isAdhoc).map(pl => (pl.company || '') + '|' + (pl.deptTask || '')),
+    );
+    const inRun = new Set(runs.map(r => r.assetId));
+
+    const map = new Map<string, { company: string; dept: string; type: string; total: number; free: number }>();
+    for (const a of assets) {
+      if (covered.has((a.company || '') + '|' + (a.departmentId || ''))) continue;
+      const company = a.company || UNSPECIFIED;
+      const dept = a.departmentId || UNSPECIFIED;
+      const type = a.type || UNSPECIFIED;
+      const key = company + '|' + dept + '|' + type;
+      let g = map.get(key);
+      if (!g) { g = { company, dept, type, total: 0, free: 0 }; map.set(key, g); }
+      g.total++;
+      if (!inRun.has(a.id)) g.free++;
+    }
+
+    const gaps = [...map.values()].filter(g => g.free > 0).sort((x, y) => y.free - x.free);
+    res.json({ year, gaps, totalFree: gaps.reduce((s, g) => s + g.free, 0) });
+  } catch (err) { next(err); }
+});
+
 router.get('/plans/cleanup-mismatch', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const plans = await prisma.pMPlan.findMany();
