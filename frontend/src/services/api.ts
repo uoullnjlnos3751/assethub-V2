@@ -133,7 +133,10 @@ export const assetAPI = {
   searchOwners: (q: string) => api.get('/assets/owners/search-ad', { params: { q } }),
   typeOptions: () => api.get('/assets/options/types'),
   brandOptions: () => api.get('/assets/options/brands'),
-  locationOptions: () => api.get('/assets/options/locations'),
+  // `company` narrows the list to sites that company holds assets at;
+  // omit it for the full curated list.
+  locationOptions: (company?: string) =>
+    api.get('/assets/options/locations', { params: company ? { company } : {} }),
   vendorOptions: () => api.get('/assets/options/vendors'),
   statusOptions: () => api.get('/assets/options/statuses'),
   osTypeOptions: () => api.get('/assets/options/os-types'),

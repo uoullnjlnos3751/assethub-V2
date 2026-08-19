@@ -998,10 +998,31 @@ router.get('/options/types', authenticate, async (_req: Request, res: Response, 
 // the vendor dropdown, and how a deactivated master row kept being offered).
 // The form keeps whatever the record already holds selectable, so existing
 // values that predate the master list are not lost.
-router.get('/options/locations', authenticate, async (_req: Request, res: Response, next: NextFunction) => {
+// `?company=XXX` narrows the list the same way /options/departments does:
+// every company but TRRCORP keeps its machines at a single site, so offering
+// all six curated locations invites a plan scoped to a site that company has
+// no assets at, which then generates nothing.
+router.get('/options/locations', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const company = typeof req.query.company === 'string' ? req.query.company.trim() : '';
+
     const managed = await prisma.assetLocation.findMany({ where: { isActive: true }, select: { name: true }, orderBy: { name: 'asc' } });
-    if (managed.length > 0) return res.json(managed.map((row) => row.name).filter(Boolean));
+    const curated = managed.map((row) => row.name).filter((n): n is string => !!n && n.trim() !== '');
+
+    if (curated.length > 0 && company) {
+      const present = await prisma.asset.findMany({
+        where: { company, location: { not: null } },
+        distinct: ['location'],
+        select: { location: true },
+      });
+      const owned = new Set(
+        present.map((r) => (r.location || '').trim().toUpperCase()).filter(Boolean),
+      );
+      const scoped = curated.filter((name) => owned.has(name.trim().toUpperCase()));
+      return res.json(scoped.length > 0 ? scoped : curated);
+    }
+
+    if (curated.length > 0) return res.json(curated);
 
     const existing = await prisma.asset.findMany({ where: { location: { not: null } }, distinct: ['location'], select: { location: true }, orderBy: { location: 'asc' } });
     res.json(existing.map((row) => row.location).filter(Boolean));

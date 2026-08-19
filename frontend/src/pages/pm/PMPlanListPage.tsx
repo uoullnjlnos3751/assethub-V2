@@ -290,6 +290,8 @@ export default function PMPlanListPage() {
   // may reference any department.
   const [formDeptOptions, setFormDeptOptions] = useState<string[]>([]);
   const [editDeptOptions, setEditDeptOptions] = useState<string[]>([]);
+  const [formLocOptions, setFormLocOptions] = useState<string[]>([]);
+  const [editLocOptions, setEditLocOptions] = useState<string[]>([]);
   const [locOptions, setLocOptions] = useState<string[]>([]);
   const [companyOptions, setCompanyOptions] = useState<string[]>([]);
   const [typeOptions, setTypeOptions] = useState<string[]>([]);
@@ -367,14 +369,24 @@ export default function PMPlanListPage() {
     if (!modalOpen) return;
     const company = (form.company === '__ALL__' || !form.company) ? '' : form.company;
     let cancelled = false;
-    assetAPI.departmentOptions(company)
-      .then(res => {
+    Promise.all([assetAPI.departmentOptions(company), assetAPI.locationOptions(company)])
+      .then(([d, l]) => {
         if (cancelled) return;
-        const list = (res.data || []).map((x: any) => typeof x === 'string' ? x : x.name || x);
-        setFormDeptOptions(list);
-        setForm(prev => (prev.deptTask && !list.includes(prev.deptTask) ? { ...prev, deptTask: '' } : prev));
+        const depts = (d.data || []).map((x: any) => typeof x === 'string' ? x : x.name || x);
+        const locs = (l.data || []).map((x: any) => typeof x === 'string' ? x : x.name || x);
+        setFormDeptOptions(depts);
+        setFormLocOptions(locs);
+        setForm(prev => ({
+          ...prev,
+          deptTask: prev.deptTask && !depts.includes(prev.deptTask) ? '' : prev.deptTask,
+          site: prev.site && !locs.includes(prev.site) ? '' : prev.site,
+        }));
       })
-      .catch(() => { if (!cancelled) setFormDeptOptions(deptOptions); });
+      .catch(() => {
+        if (cancelled) return;
+        setFormDeptOptions(deptOptions);
+        setFormLocOptions(locOptions);
+      });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modalOpen, form.company]);
@@ -383,17 +395,24 @@ export default function PMPlanListPage() {
     if (!editModalOpen) return;
     const company = (editForm.company === '__ALL__' || !editForm.company) ? '' : editForm.company;
     let cancelled = false;
-    assetAPI.departmentOptions(company)
-      .then(res => {
+    Promise.all([assetAPI.departmentOptions(company), assetAPI.locationOptions(company)])
+      .then(([d, l]) => {
         if (cancelled) return;
-        const list: string[] = (res.data || []).map((x: any) => typeof x === 'string' ? x : x.name || x);
-        // On edit the plan's own department is kept selectable even when it is
-        // outside the scoped list — dropping it would silently rewrite the
-        // scope of an existing plan on save.
-        const current = editForm.deptTask;
-        setEditDeptOptions(current && !list.includes(current) ? [...list, current] : list);
+        const depts: string[] = (d.data || []).map((x: any) => typeof x === 'string' ? x : x.name || x);
+        const locs: string[] = (l.data || []).map((x: any) => typeof x === 'string' ? x : x.name || x);
+        // On edit the plan's own department and site stay selectable even when
+        // they fall outside the scoped lists — dropping them would silently
+        // rewrite the scope of an existing plan on save.
+        const keep = (list: string[], current: string) =>
+          current && !list.includes(current) ? [...list, current] : list;
+        setEditDeptOptions(keep(depts, editForm.deptTask));
+        setEditLocOptions(keep(locs, editForm.site));
       })
-      .catch(() => { if (!cancelled) setEditDeptOptions(deptOptions); });
+      .catch(() => {
+        if (cancelled) return;
+        setEditDeptOptions(deptOptions);
+        setEditLocOptions(locOptions);
+      });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editModalOpen, editForm.company]);
@@ -914,7 +933,7 @@ export default function PMPlanListPage() {
             onChange={(patch) => setForm((p) => ({ ...p, ...patch }))}
             yearOptions={yearOptions}
             companyOptions={companyOptions}
-            locOptions={locOptions}
+            locOptions={formLocOptions}
             deptOptions={formDeptOptions}
             typeOptions={typeOptions}
             templates={templates}
@@ -973,7 +992,7 @@ export default function PMPlanListPage() {
                   onChange={(patch) => setEditForm((p) => ({ ...p, ...patch }))}
                   yearOptions={yearOptions}
                   companyOptions={companyOptions}
-                  locOptions={locOptions}
+                  locOptions={editLocOptions}
                   deptOptions={editDeptOptions}
                   typeOptions={typeOptions}
                   templates={templates}
