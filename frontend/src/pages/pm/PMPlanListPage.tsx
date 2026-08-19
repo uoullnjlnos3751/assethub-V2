@@ -126,10 +126,10 @@ function EligibilityStats({ data }: { data: any }) {
     <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 1 }}>
       {items.map((item) => (
         <Paper key={item.label} variant="outlined" sx={{ p: '8px 10px' }}>
-          <Typography sx={{ fontSize: 18, fontWeight: 800, lineHeight: 1, color: item.color === 'inherit' ? 'text.primary' : `${item.color}.main` }}>
+          <Typography sx={{ fontSize: 21, fontWeight: 800, lineHeight: 1, letterSpacing: '-.02em', fontVariantNumeric: 'tabular-nums', color: item.color === 'inherit' ? 'text.primary' : `${item.color}.main` }}>
             {item.value}
           </Typography>
-          <Typography sx={{ fontSize: 10, color: 'text.secondary', mt: 0.5 }}>{item.label}</Typography>
+          <Typography sx={{ fontSize: 10.5, color: 'text.secondary', mt: 0.4 }}>{item.label}</Typography>
         </Paper>
       ))}
     </Box>
@@ -852,6 +852,37 @@ export default function PMPlanListPage() {
         )))}
       </Card>
 
+      {/* ── Stats ──────────────────────────────────────────────────
+          Six figures on one line at the shared 21px/10.5px step. "ยังไม่
+          Generate" and "ไม่มีแผนรองรับ" are the two that ask for action; the
+          rest are context. */}
+      <Card variant="outlined" sx={{ p: '10px 14px', mb: 1.5, display: 'flex', alignItems: 'center', gap: 2.5, flexWrap: 'wrap' }}>
+        {[
+          { icon: AssignmentIcon, label: 'แผน', val: filteredPlans.length, color: 'info' as const },
+          { icon: GpsFixedIcon, label: 'เป้าหมาย', val: totalPlanned, color: 'secondary' as const },
+          { icon: CheckCircleIcon, label: 'เสร็จ', val: totalDone, color: 'success' as const },
+          { icon: EventIcon, label: 'เหลือ', val: totalRuns - totalDone, color: 'warning' as const },
+          { icon: BoltIcon, label: 'ยังไม่ Generate', val: plansNeedGenerate.length, color: plansNeedGenerate.length ? 'error' as const : 'success' as const },
+          { icon: GpsFixedIcon, label: 'ไม่มีแผนรองรับ', val: visibleGapUnits, color: 'warning' as const },
+        ].map(s => (
+          <Box key={s.label} sx={{ display: 'flex', alignItems: 'center', gap: 0.9 }}>
+            <s.icon sx={{ fontSize: 17, color: `${s.color}.main` }} />
+            <Box>
+              <Typography sx={{
+                fontSize: 21, fontWeight: 800, lineHeight: 1, letterSpacing: '-.02em',
+                fontVariantNumeric: 'tabular-nums', color: `${s.color}.main`,
+              }}>{s.val.toLocaleString('en-US')}</Typography>
+              <Typography sx={{ fontSize: 10.5, color: 'text.secondary', mt: 0.3 }}>{s.label}</Typography>
+            </Box>
+          </Box>
+        ))}
+        <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 170 }}>
+          <LinearProgress variant="determinate" value={overallPct} color={progressColor(overallPct)} sx={{ flex: 1, height: 6, borderRadius: 99 }} />
+          <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: `${progressColor(overallPct)}.main`, minWidth: 34, fontVariantNumeric: 'tabular-nums' }}>{overallPct}%</Typography>
+          <Typography sx={{ fontSize: 10, color: 'text.disabled', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{totalDone}/{totalRuns}</Typography>
+        </Box>
+      </Card>
+
       {/* ── Scope with no plan — see components/PlanGapPanel.tsx ── */}
       {!loading && gaps.length > 0 && (
         <PlanGapPanel
@@ -873,7 +904,7 @@ export default function PMPlanListPage() {
       ) : filteredPlans.length === 0 ? (
         <Card variant="outlined" sx={{ textAlign: 'center', p: 6 }}>
           <AssignmentIcon sx={{ fontSize: 32, mb: 1, color: 'text.disabled' }} />
-          <Typography sx={{ fontSize: 14, fontWeight: 600 }}>
+          <Typography sx={{ fontSize: 13, fontWeight: 600 }}>
             {visibleGapUnits > 0
               ? <>ยังไม่มีแผน PM ในขอบเขตนี้ — แต่มี {visibleGapUnits.toLocaleString('en-US')} เครื่องรออยู่</>
               : <>ยังไม่มีแผน PM ปี {filterYear + 543}</>}
@@ -902,7 +933,7 @@ export default function PMPlanListPage() {
                     <TableCell>
                       <Box sx={{ fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 0.75 }}>
                         {plan.deptTask || 'ทุกแผนก'}
-                        {plan.isAdhoc && <Chip size="small" label="นอกแผน" sx={{ height: 16, fontSize: 8 }} color="secondary" />}
+                        {plan.isAdhoc && <Chip size="small" label="นอกแผน" sx={{ height: 16, fontSize: 9.5 }} color="secondary" />}
                       </Box>
                       {!plan.isAdhoc && (
                         <Box sx={{ fontSize: 10, color: 'text.secondary', mt: 0.25, display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -923,7 +954,7 @@ export default function PMPlanListPage() {
                         <LinearProgress variant="determinate" value={s.pct} color={s.color === 'default' || s.color === 'secondary' ? 'inherit' : s.color} sx={{ flex: 1, minWidth: 60, height: 5, borderRadius: 99 }} />
                         <Typography sx={{ fontSize: 10, fontWeight: 700, minWidth: 30 }}>{s.pct}%</Typography>
                       </Box>
-                      <Typography sx={{ fontSize: 9, color: 'text.secondary', mt: 0.25 }}>{s.done}/{s.total} (เป้า {plan.plannedDeviceCount})</Typography>
+                      <Typography sx={{ fontSize: 9.5, color: 'text.secondary', mt: 0.25 }}>{s.done}/{s.total} (เป้า {plan.plannedDeviceCount})</Typography>
                     </TableCell>
                     <TableCell>
                       <Chip size="small" color={s.color} icon={<s.Icon sx={{ fontSize: 13 }} />} label={s.label} sx={{ fontSize: 10, fontWeight: 700, height: 22 }} />
@@ -971,9 +1002,9 @@ export default function PMPlanListPage() {
                         <AssignmentIcon color="primary" sx={{ fontSize: 16 }} />
                       </Box>
                       <Box>
-                        <Box sx={{ fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                        <Box sx={{ fontSize: 12.5, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.75 }}>
                           {deptLabel}
-                          {plan.isAdhoc && <Chip size="small" icon={<PushPinIcon sx={{ fontSize: 11 }} />} label="นอกแผน" color="secondary" sx={{ height: 18, fontSize: 9 }} />}
+                          {plan.isAdhoc && <Chip size="small" icon={<PushPinIcon sx={{ fontSize: 11 }} />} label="นอกแผน" color="secondary" sx={{ height: 18, fontSize: 9.5 }} />}
                         </Box>
                         {!plan.isAdhoc && (
                           <Box sx={{ fontSize: 10, color: 'text.secondary', fontWeight: 500, mt: 0.25, display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -987,7 +1018,7 @@ export default function PMPlanListPage() {
                         )}
                       </Box>
                     </Box>
-                    <Chip size="small" color={s.color} icon={<s.Icon sx={{ fontSize: 13 }} />} label={s.label} sx={{ fontSize: 9, fontWeight: 700, height: 22 }} />
+                    <Chip size="small" color={s.color} icon={<s.Icon sx={{ fontSize: 13 }} />} label={s.label} sx={{ fontSize: 9.5, fontWeight: 700, height: 22 }} />
                   </Box>
 
                   <Box sx={{ mb: 1.25 }}>
@@ -1006,7 +1037,7 @@ export default function PMPlanListPage() {
                       { Icon: EventAvailableIcon, lbl: 'สิ้นสุด', val: fmtDate(plan.endDate) },
                     ].map(i => (
                       <Box key={i.lbl} sx={{ bgcolor: 'action.hover', borderRadius: 1, p: '5px 8px' }}>
-                        <Box sx={{ fontSize: 9, color: 'text.secondary', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Box sx={{ fontSize: 9.5, color: 'text.secondary', display: 'flex', alignItems: 'center', gap: 0.5 }}>
                           <i.Icon sx={{ fontSize: 10 }} /> {i.lbl}
                         </Box>
                         <Typography sx={{ fontSize: 11, fontWeight: 600 }}>{i.val}</Typography>
@@ -1140,7 +1171,7 @@ export default function PMPlanListPage() {
       <Modal open={generateModal.open} onClose={() => setGenerateModal({ open: false, plan: null })} title="Generate งาน PM">
         <Box sx={{ p: '18px 20px' }}>
           <Alert severity="info" icon={<EventIcon fontSize="inherit" />} sx={{ mb: 1.5 }}>
-            <Typography sx={{ fontSize: 13, fontWeight: 700, mb: 0.5 }}>
+            <Typography sx={{ fontSize: 12.5, fontWeight: 700, mb: 0.5 }}>
               แผน: {generateModal.plan?.deptTask || generateModal.plan?.site || 'ทั่วไป'}
             </Typography>
             <Typography sx={{ fontSize: 11 }}>
