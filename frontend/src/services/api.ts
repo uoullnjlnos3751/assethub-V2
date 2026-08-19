@@ -137,7 +137,10 @@ export const assetAPI = {
   vendorOptions: () => api.get('/assets/options/vendors'),
   statusOptions: () => api.get('/assets/options/statuses'),
   osTypeOptions: () => api.get('/assets/options/os-types'),
-  departmentOptions: () => api.get('/assets/options/departments'),
+  // `company` narrows the list to departments that company owns assets in;
+  // omit it for the full curated list.
+  departmentOptions: (company?: string) =>
+    api.get('/assets/options/departments', { params: company ? { company } : {} }),
   domainOptions: () => api.get('/assets/options/domains'),
   companyOptions: () => api.get('/assets/options/companies'),
   antivirusOptions: () => api.get('/assets/options/antivirus'),

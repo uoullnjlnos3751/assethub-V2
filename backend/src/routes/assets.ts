@@ -1053,14 +1053,39 @@ router.get('/options/brands', authenticate, async (_req: Request, res: Response,
 // permanent option everyone else could pick, so the value list only ever grew
 // (42 distinct values by the time this was found, including "สำนักงานใหญ่" — a
 // location — and placeholders like "N00"/"EOF"/"BUG").
-router.get('/options/departments', authenticate, async (_req: Request, res: Response, next: NextFunction) => {
+//
+// `?company=XXX` narrows the list to departments that company actually owns
+// assets in. The full curated list is 32 codes while TRRT only has two (IT,
+// SEC) and TRW two — picking one of the other thirty produces a plan that
+// matches no machines at all. Note this is an intersection, not a switch back
+// to SELECT DISTINCT: the master table still decides which values are legal,
+// the asset data only decides which of them are relevant here.
+router.get('/options/departments', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const company = typeof req.query.company === 'string' ? req.query.company.trim() : '';
+
     const managed = await prisma.department.findMany({
       where: { NOT: { code: { startsWith: 'DPT-' } } },
       select: { code: true },
       orderBy: { code: 'asc' },
     });
     const curated = managed.map((r) => r.code).filter((c): c is string => !!c && c.trim() !== '');
+
+    if (curated.length > 0 && company) {
+      const present = await prisma.asset.findMany({
+        where: { company, departmentId: { not: null } },
+        distinct: ['departmentId'],
+        select: { departmentId: true },
+      });
+      const owned = new Set(
+        present.map((r) => (r.departmentId || '').trim().toUpperCase()).filter(Boolean),
+      );
+      const scoped = curated.filter((code) => owned.has(code.trim().toUpperCase()));
+      // A company whose assets carry only uncurated values (or none at all)
+      // would otherwise get an empty dropdown and no way to proceed.
+      return res.json(scoped.length > 0 ? scoped : curated);
+    }
+
     if (curated.length > 0) return res.json(curated);
 
     // No curated codes configured yet (fresh or unseeded database) — fall back to

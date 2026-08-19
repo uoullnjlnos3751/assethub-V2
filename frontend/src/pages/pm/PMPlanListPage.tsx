@@ -283,6 +283,13 @@ export default function PMPlanListPage() {
   const [plans, setPlans] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
   const [deptOptions, setDeptOptions] = useState<string[]>([]);
+  // The create/edit modals show only the departments the chosen company
+  // actually owns assets in — the full list is 32 codes while TRRT has two,
+  // and a plan scoped to a department with no machines generates nothing.
+  // The filter bar above keeps the full list, since it filters plans that
+  // may reference any department.
+  const [formDeptOptions, setFormDeptOptions] = useState<string[]>([]);
+  const [editDeptOptions, setEditDeptOptions] = useState<string[]>([]);
   const [locOptions, setLocOptions] = useState<string[]>([]);
   const [companyOptions, setCompanyOptions] = useState<string[]>([]);
   const [typeOptions, setTypeOptions] = useState<string[]>([]);
@@ -352,6 +359,44 @@ export default function PMPlanListPage() {
   };
 
   useEffect(() => { fetchAll(); }, []);
+
+  // Scoped department lists for the two modals. Re-fetched on company change,
+  // and any selection that is no longer offered is cleared rather than left
+  // sitting in a field the user can no longer see in the list.
+  useEffect(() => {
+    if (!modalOpen) return;
+    const company = (form.company === '__ALL__' || !form.company) ? '' : form.company;
+    let cancelled = false;
+    assetAPI.departmentOptions(company)
+      .then(res => {
+        if (cancelled) return;
+        const list = (res.data || []).map((x: any) => typeof x === 'string' ? x : x.name || x);
+        setFormDeptOptions(list);
+        setForm(prev => (prev.deptTask && !list.includes(prev.deptTask) ? { ...prev, deptTask: '' } : prev));
+      })
+      .catch(() => { if (!cancelled) setFormDeptOptions(deptOptions); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modalOpen, form.company]);
+
+  useEffect(() => {
+    if (!editModalOpen) return;
+    const company = (editForm.company === '__ALL__' || !editForm.company) ? '' : editForm.company;
+    let cancelled = false;
+    assetAPI.departmentOptions(company)
+      .then(res => {
+        if (cancelled) return;
+        const list: string[] = (res.data || []).map((x: any) => typeof x === 'string' ? x : x.name || x);
+        // On edit the plan's own department is kept selectable even when it is
+        // outside the scoped list — dropping it would silently rewrite the
+        // scope of an existing plan on save.
+        const current = editForm.deptTask;
+        setEditDeptOptions(current && !list.includes(current) ? [...list, current] : list);
+      })
+      .catch(() => { if (!cancelled) setEditDeptOptions(deptOptions); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editModalOpen, editForm.company]);
 
   useEffect(() => {
     if (!modalOpen) return;
@@ -870,7 +915,7 @@ export default function PMPlanListPage() {
             yearOptions={yearOptions}
             companyOptions={companyOptions}
             locOptions={locOptions}
-            deptOptions={deptOptions}
+            deptOptions={formDeptOptions}
             typeOptions={typeOptions}
             templates={templates}
             onNoTemplateClick={() => { setModalOpen(false); setTimeout(() => { window.location.href = '/pm/templates'; }, 100); }}
@@ -929,7 +974,7 @@ export default function PMPlanListPage() {
                   yearOptions={yearOptions}
                   companyOptions={companyOptions}
                   locOptions={locOptions}
-                  deptOptions={deptOptions}
+                  deptOptions={editDeptOptions}
                   typeOptions={typeOptions}
                   templates={templates}
                   disabled={{
