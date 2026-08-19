@@ -2,6 +2,9 @@ import React from 'react';
 import { Box, Tooltip, Typography, useTheme } from '@mui/material';
 import { CoverageState, Group, STATES, Tally, pct, stateColors } from '../pmCoverage';
 
+/** Label set for the active source mode — falls back to the plain STATES. */
+type StateList = { key: CoverageState; label: string }[];
+
 /**
  * Stacked coverage bars.
  *
@@ -14,13 +17,14 @@ import { CoverageState, Group, STATES, Tally, pct, stateColors } from '../pmCove
 
 const fmt = (n: number) => n.toLocaleString('en-US');
 
-export function StackedBar({ t, height = 46, showPct = false, minLabel = 0.09, scope }: {
+export function StackedBar({ t, height = 46, showPct = false, minLabel = 0.09, scope, states = STATES }: {
   t: Tally;
   height?: number;
   showPct?: boolean;
   /** Segments narrower than this fraction drop their label — the tooltip still has it. */
   minLabel?: number;
   scope?: string;
+  states?: StateList;
 }) {
   const theme = useTheme();
   const colors = stateColors(theme);
@@ -31,7 +35,7 @@ export function StackedBar({ t, height = 46, showPct = false, minLabel = 0.09, s
       display: 'flex', gap: '2px', height, borderRadius: '8px', overflow: 'hidden',
       bgcolor: theme.palette.action.hover,
     }}>
-      {STATES.map(s => {
+      {states.map(s => {
         const v = t[s.key];
         if (!v) return null;
         const share = v / t.total;
@@ -70,12 +74,12 @@ export function StackedBar({ t, height = 46, showPct = false, minLabel = 0.09, s
   );
 }
 
-export function CoverageLegend({ t }: { t: Tally }) {
+export function CoverageLegend({ t, states = STATES }: { t: Tally; states?: StateList }) {
   const theme = useTheme();
   const colors = stateColors(theme);
   return (
     <Box sx={{ display: 'flex', gap: 2.25, flexWrap: 'wrap', mt: 1.5 }}>
-      {STATES.map(s => (
+      {states.map(s => (
         <Box key={s.key} sx={{ display: 'flex', alignItems: 'center', gap: 0.9, fontSize: 12 }}>
           <Box sx={{ width: 11, height: 11, borderRadius: '3px', bgcolor: colors[s.key], flex: 'none' }} />
           <Typography component="span" sx={{ fontSize: 12, color: 'text.secondary' }}>{s.label}</Typography>
@@ -95,7 +99,7 @@ export function CoverageLegend({ t }: { t: Tally }) {
  * Ranked rows. Bar length is scaled against the largest group, so row length
  * compares real volume across groups rather than only the internal mix.
  */
-export function RankedBars({ groups, unit = 'เครื่อง' }: { groups: Group[]; unit?: string }) {
+export function RankedBars({ groups, unit = 'เครื่อง', states = STATES }: { groups: Group[]; unit?: string; states?: StateList }) {
   const theme = useTheme();
   const max = groups.length ? groups[0].total : 0;
 
@@ -125,6 +129,7 @@ export function RankedBars({ groups, unit = 'เครื่อง' }: { groups:
           <Box sx={{ width: `${max > 0 ? Math.max(6, (g.total / max) * 100) : 0}%` }}>
             <StackedBar
               t={g}
+              states={states}
               height={22}
               minLabel={0.16}
               scope={`${g.name} · ${fmt(g.total)} ${unit}`}

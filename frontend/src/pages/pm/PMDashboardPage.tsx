@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Alert, Box, Button, Card, Chip, CircularProgress, Divider, GlobalStyles,
   LinearProgress, ListSubheader, Menu, MenuItem, Select, Snackbar, Table, TableBody,
+  ToggleButton, ToggleButtonGroup,
   TableCell, TableContainer, TableHead, TableRow, Tooltip, Typography, alpha, useTheme,
 } from '@mui/material';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip as RTooltip } from 'recharts';
@@ -15,14 +16,17 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import TableRowsIcon from '@mui/icons-material/TableRows';
 import BarChartIcon from '@mui/icons-material/BarChart';
+import EventRepeatIcon from '@mui/icons-material/EventRepeat';
+import BoltIcon from '@mui/icons-material/Bolt';
+import AllInclusiveIcon from '@mui/icons-material/AllInclusive';
 import { pmAPI } from '../../services/api';
 import { SectionCard } from '../../components/SectionCard';
 import { Inbox, PieChart as PieIcon, Building2, MonitorSmartphone, CalendarRange, ListChecks } from 'lucide-react';
 import { CoverageLegend, MonthStrip, RankedBars, StackedBar } from './components/CoverageBars';
 import {
-  CoveragePayload, CoverageState, Selection, STATES, dimensionCounts, emptySelection,
-  filterPlans, filterRows, groupBy, pct, planStatus, planStatusColor, scopeSummary,
-  selectionActive, stateColors, tally,
+  CoveragePayload, CoverageState, Selection, SOURCE_MODES, SourceMode, dimensionCounts,
+  emptySelection, filterPlans, filterRows, groupBy, pct, planStatus, planStatusColor,
+  scopeSummary, selectionActive, stateColors, statesFor, tally,
 } from './pmCoverage';
 import { REPORTS, ReportKey, exportCsv, exportSheet, exportWorkbook } from './pmExport';
 
@@ -41,6 +45,9 @@ export default function PMDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [sel, setSel] = useState<Selection>(emptySelection);
+  // Which PM counts as coverage: everything, only scheduled plans, or only
+  // ad-hoc work. See SOURCE_MODES in pmCoverage.ts for why this matters.
+  const [mode, setMode] = useState<SourceMode>('ALL');
   const [showTable, setShowTable] = useState<{ company: boolean; type: boolean }>({ company: false, type: false });
   const [exportAnchor, setExportAnchor] = useState<null | HTMLElement>(null);
   const [toast, setToast] = useState('');
@@ -57,18 +64,25 @@ export default function PMDashboardPage() {
   // data may not exist in another, and a stale chip would silently empty the page.
   useEffect(() => { setSel(emptySelection()); }, [year]);
 
+  // Switching source can strand a state chip (a machine that was DONE under
+  // ALL may be UNPLANNED under PLAN), so the state filter resets with it.
+  useEffect(() => {
+    setSel(prev => (prev.state.size ? { ...prev, state: new Set<CoverageState>() } : prev));
+  }, [mode]);
+
   const rows = data?.rows || [];
   const plans = data?.plans || [];
 
   /** The headline breakdown always shows all three states — it IS the state
    *  chart, so filtering it by state would be circular. */
-  const overall = useMemo(() => tally(filterRows(rows, sel, 'state')), [rows, sel]);
-  const scoped = useMemo(() => tally(filterRows(rows, sel, null)), [rows, sel]);
-  const byCompany = useMemo(() => groupBy(rows, sel, 'c', 'company'), [rows, sel]);
-  const byType = useMemo(() => groupBy(rows, sel, 't', 'type'), [rows, sel]);
-  const visiblePlans = useMemo(() => filterPlans(plans, sel), [plans, sel]);
-  const companyChips = useMemo(() => dimensionCounts(rows, 'c'), [rows]);
-  const typeChips = useMemo(() => dimensionCounts(rows, 't'), [rows]);
+  const overall = useMemo(() => tally(filterRows(rows, sel, 'state', mode), mode), [rows, sel, mode]);
+  const scoped = useMemo(() => tally(filterRows(rows, sel, null, mode), mode), [rows, sel, mode]);
+  const byCompany = useMemo(() => groupBy(rows, sel, 'c', 'company', mode), [rows, sel, mode]);
+  const byType = useMemo(() => groupBy(rows, sel, 't', 'type', mode), [rows, sel, mode]);
+  const visiblePlans = useMemo(() => filterPlans(plans, sel, mode), [plans, sel, mode]);
+  const companyChips = useMemo(() => dimensionCounts(rows, 'c', mode), [rows, mode]);
+  const typeChips = useMemo(() => dimensionCounts(rows, 't', mode), [rows, mode]);
+  const states = useMemo(() => statesFor(mode), [mode]);
 
   const planned = overall.DONE + overall.PENDING;
   const coverPct = pct(planned, overall.total);
@@ -206,7 +220,7 @@ export default function PMDashboardPage() {
             <TableHead>
               <TableRow>
                 <TableCell sx={thSx}>{which === 'company' ? 'บริษัท' : 'ประเภท'}</TableCell>
-                {STATES.map(s => <TableCell key={s.key} align="right" sx={thSx}>{s.label}</TableCell>)}
+                {states.map(s => <TableCell key={s.key} align="right" sx={thSx}>{s.label}</TableCell>)}
                 <TableCell align="right" sx={thSx}>รวม</TableCell>
               </TableRow>
             </TableHead>
@@ -214,7 +228,7 @@ export default function PMDashboardPage() {
               {groups.map(g => (
                 <TableRow key={g.name} hover>
                   <TableCell sx={{ fontSize: 12.5 }}>{g.name}</TableCell>
-                  {STATES.map(s => (
+                  {states.map(s => (
                     <TableCell key={s.key} align="right" sx={numSx}>{fmt(g[s.key])}</TableCell>
                   ))}
                   <TableCell align="right" sx={{ ...numSx, fontWeight: 700 }}>{fmt(g.total)}</TableCell>
@@ -224,7 +238,7 @@ export default function PMDashboardPage() {
           </Table>
         </TableContainer>
       ) : (
-        <RankedBars groups={groups} />
+        <RankedBars groups={groups} states={states} />
       )}
     </SectionCard>
   );
@@ -250,7 +264,7 @@ export default function PMDashboardPage() {
           </Box>
         </Box>
         <Box className="pm-ph-scope">
-          <b>ขอบเขตรายงาน:</b> {scopeSummary(sel)} &nbsp;|&nbsp; <b>รวม {fmt(overall.total)} เครื่อง</b>
+          <b>ขอบเขตรายงาน:</b> {scopeSummary(sel, mode)} &nbsp;|&nbsp; <b>รวม {fmt(overall.total)} เครื่อง</b>
           {' '}(สร้างแผนแล้ว {fmt(planned)} · ยังไม่ได้สร้างแผน {fmt(overall.UNPLANNED)})
         </Box>
       </Box>
@@ -297,7 +311,7 @@ export default function PMDashboardPage() {
 
       <Menu anchorEl={exportAnchor} open={Boolean(exportAnchor)} onClose={() => setExportAnchor(null)}
         slotProps={{ paper: { sx: { minWidth: 320 } } }}>
-        <MenuItem onClick={() => runExport(() => exportWorkbook(data!, sel), 'ไฟล์ Excel รวมทุกรายงาน')}>
+        <MenuItem onClick={() => runExport(() => exportWorkbook(data!, sel, mode), 'ไฟล์ Excel รวมทุกรายงาน')}>
           <Box>
             <Typography sx={{ fontSize: 13, fontWeight: 700 }}>Excel รวมทุกรายงาน (.xlsx)</Typography>
             <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>{REPORTS.length} ชีตในไฟล์เดียว</Typography>
@@ -310,14 +324,14 @@ export default function PMDashboardPage() {
           </ListSubheader>,
           ...REPORTS.filter(r => r.group === group).map(rep => (
             <MenuItem key={rep.key} sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}
-              onClick={() => runExport(() => exportSheet(data!, sel, rep.key as ReportKey), rep.label)}>
+              onClick={() => runExport(() => exportSheet(data!, sel, mode, rep.key as ReportKey), rep.label)}>
               <Typography sx={{ fontSize: 12.5 }}>{rep.label}</Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
                 <Typography sx={{ fontSize: 10.5, color: 'text.disabled', fontVariantNumeric: 'tabular-nums' }}>
-                  {fmt(rep.count(data!, sel))} แถว
+                  {fmt(rep.count(data!, sel, mode))} แถว
                 </Typography>
                 <Tooltip title="ส่งออกเป็น CSV แทน">
-                  <Box component="span" onClick={e => { e.stopPropagation(); runExport(() => exportCsv(data!, sel, rep.key as ReportKey), `${rep.label} (CSV)`); }}
+                  <Box component="span" onClick={e => { e.stopPropagation(); runExport(() => exportCsv(data!, sel, mode, rep.key as ReportKey), `${rep.label} (CSV)`); }}
                     sx={{
                       fontSize: 9.5, fontWeight: 700, px: 0.7, py: 0.15, borderRadius: '4px',
                       border: `1px solid ${theme.palette.divider}`, color: 'text.disabled',
@@ -338,8 +352,41 @@ export default function PMDashboardPage() {
 
       {/* ── Filters ────────────────────────────────────────────── */}
       <Card variant="outlined" className="pm-noprint" sx={{ p: 2, mb: 2, display: 'flex', flexDirection: 'column', gap: 1.4 }}>
+      {/* Source toggle — what counts as PM coverage */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap', pb: 1.4, borderBottom: `1px solid ${theme.palette.divider}` }}>
+        <Typography sx={{ flex: '0 0 92px', fontSize: 10.5, fontWeight: 700, color: 'text.disabled', letterSpacing: '.04em' }}>
+          ขอบเขตงาน
+        </Typography>
+        <ToggleButtonGroup
+          size="small" exclusive value={mode}
+          onChange={(_, v) => v && setMode(v as SourceMode)}
+          sx={{
+            '& .MuiToggleButton-root': {
+              fontSize: 12, fontWeight: 600, px: 1.5, py: 0.5, textTransform: 'none',
+              gap: 0.6, color: 'text.secondary',
+            },
+            '& .Mui-selected': { color: 'primary.main' },
+          }}
+        >
+          {SOURCE_MODES.map(m => (
+            <ToggleButton key={m.key} value={m.key}>
+              {m.key === 'ALL' ? <AllInclusiveIcon sx={{ fontSize: 14 }} />
+                : m.key === 'PLAN' ? <EventRepeatIcon sx={{ fontSize: 14 }} />
+                : <BoltIcon sx={{ fontSize: 14 }} />}
+              {m.label}
+            </ToggleButton>
+          ))}
+        </ToggleButtonGroup>
+        <Typography sx={{ fontSize: 11, color: 'text.disabled', flex: 1, minWidth: 200 }}>
+          {SOURCE_MODES.find(m => m.key === mode)!.hint}
+        </Typography>
+      </Box>
         {([
-          { label: 'สถานะ', node: STATES.map(s => (
+          // In ADHOC the scope is already "machines with ad-hoc work", so the
+          // UNPLANNED bucket is structurally always 0 and the chip is noise.
+          { label: 'สถานะ', node: states
+            .filter(s => !(mode === 'ADHOC' && s.key === 'UNPLANNED'))
+            .map(s => (
             <Chip key={s.key} variant="outlined" size="small" onClick={() => toggle('state', s.key as CoverageState)}
               sx={chipSx(sel.state.has(s.key), colors[s.key])}
               icon={<Box sx={{ width: 8, height: 8, borderRadius: '2px', bgcolor: colors[s.key], ml: '8px !important' }} />}
@@ -368,32 +415,38 @@ export default function PMDashboardPage() {
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '300px minmax(0,1fr)' }, gap: 2.5 }}>
           <Box>
             <Typography sx={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.06em', color: 'text.disabled' }}>
-              ยังไม่ได้สร้างแผน PM
+              {mode === 'ADHOC' ? 'เครื่องที่ทำ PM นอกแผน' : states[2].label}
             </Typography>
             <Typography sx={{
               fontSize: 56, fontWeight: 800, lineHeight: 0.95, letterSpacing: '-.03em',
-              color: colors.UNPLANNED, mt: 0.5, fontVariantNumeric: 'tabular-nums',
+              color: mode === 'ADHOC' ? colors.DONE : colors.UNPLANNED, mt: 0.5, fontVariantNumeric: 'tabular-nums',
             }}>
-              {fmt(overall.UNPLANNED)}
+              {fmt(mode === 'ADHOC' ? overall.total : overall.UNPLANNED)}
               <Box component="span" sx={{ fontSize: 20, fontWeight: 600, color: 'text.secondary', ml: 0.75 }}>เครื่อง</Box>
             </Typography>
             <Typography sx={{ fontSize: 12.5, color: 'text.secondary', mt: 1, maxWidth: '34ch' }}>
-              คิดเป็น <b>{pct(overall.UNPLANNED, overall.total)}%</b> ของเครื่องที่เข้าเกณฑ์ PM — ยังไม่เคยถูกดึงเข้าแผนไหนเลยในปีนี้
+              {mode === 'ADHOC'
+                ? <>เครื่องที่ถูกทำ PM นอกแผนในปีนี้ — ไม่ได้อยู่ในแผนตามกำหนด</>
+                : mode === 'PLAN'
+                ? <>คิดเป็น <b>{pct(overall.UNPLANNED, overall.total)}%</b> ของเครื่องที่เข้าเกณฑ์ PM — ยังไม่มีแผนตามกำหนดรองรับ (งานนอกแผนไม่นับ)</>
+                : <>คิดเป็น <b>{pct(overall.UNPLANNED, overall.total)}%</b> ของเครื่องที่เข้าเกณฑ์ PM — ยังไม่เคยถูกดึงเข้าแผนไหนเลยในปีนี้</>}
             </Typography>
             <Typography sx={{
               fontSize: 11.5, color: 'text.disabled', mt: 1.25, pt: 1.25,
               borderTop: `1px dashed ${theme.palette.divider}`,
             }}>
-              ฐานคำนวณ: <b>{fmt(overall.total)}</b> เครื่องที่เข้าเกณฑ์{' '}
-              {sel.company.size || sel.type.size
-                ? '(ตามตัวกรองที่เลือก)'
-                : '(ไม่นับเครื่องที่ปลดระวาง สูญหาย ชำรุด หรือกำลังซ่อม)'}
-              {' '}· สร้างแผนแล้ว <b>{fmt(planned)}</b> เครื่อง
+              ฐานคำนวณ: <b>{fmt(overall.total)}</b> เครื่อง{' '}
+              {mode === 'ADHOC'
+                ? '(เฉพาะเครื่องที่มีงาน PM นอกแผน)'
+                : sel.company.size || sel.type.size
+                ? 'ที่เข้าเกณฑ์ (ตามตัวกรองที่เลือก)'
+                : 'ที่เข้าเกณฑ์ (ไม่นับเครื่องที่ปลดระวาง สูญหาย ชำรุด หรือกำลังซ่อม)'}
+              {' '}· ทำเสร็จแล้ว <b>{fmt(overall.DONE)}</b> · รอทำ <b>{fmt(overall.PENDING)}</b>
             </Typography>
           </Box>
           <Box>
-            <StackedBar t={overall} showPct minLabel={0.09} />
-            <CoverageLegend t={overall} />
+            <StackedBar t={overall} states={states} showPct minLabel={0.09} />
+            <CoverageLegend t={overall} states={states} />
             {sel.state.size > 0 && (
               <Typography className="pm-noprint" sx={{
                 mt: 1.5, fontSize: 11.5, color: 'text.secondary', p: '7px 10px',
@@ -401,7 +454,7 @@ export default function PMDashboardPage() {
                 borderLeft: `2px solid ${theme.palette.primary.main}`,
               }}>
                 แถบด้านบนแสดงภาพรวมทั้งหมดเสมอ · กราฟและตารางด้านล่างกรองเฉพาะ{' '}
-                <b>{STATES.filter(s => sel.state.has(s.key)).map(s => s.label).join(' + ')}</b> ({fmt(scoped.total)} เครื่อง)
+                <b>{states.filter(s => sel.state.has(s.key)).map(s => s.label).join(' + ')}</b> ({fmt(scoped.total)} เครื่อง)
               </Typography>
             )}
           </Box>
@@ -410,11 +463,11 @@ export default function PMDashboardPage() {
 
       {/* ── Donuts ─────────────────────────────────────────────── */}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2,minmax(0,1fr))' }, gap: 2, mb: 2 }}>
-        <SectionCard title="ครอบคลุมแค่ไหน" icon={PieIcon}>
+        <SectionCard title={mode === 'ADHOC' ? 'งานนอกแผนคืบหน้าแค่ไหน' : 'ครอบคลุมแค่ไหน'} icon={PieIcon}>
           {donut([
-            { name: 'สร้างแผนแล้ว', value: planned, color: theme.palette.primary.main },
-            { name: 'ยังไม่ได้สร้างแผน', value: overall.UNPLANNED, color: colors.UNPLANNED },
-          ], `${coverPct}%`, 'ครอบคลุม')}
+            { name: mode === 'ADHOC' ? 'มีงานนอกแผน' : 'มีงาน PM แล้ว', value: planned, color: theme.palette.primary.main },
+            { name: states[2].label, value: overall.UNPLANNED, color: colors.UNPLANNED },
+          ], `${coverPct}%`, mode === 'ADHOC' ? 'มีงาน' : 'ครอบคลุม')}
         </SectionCard>
         <SectionCard title="ในแผนแล้ว ทำไปเท่าไร" icon={ListChecks}>
           {donut([

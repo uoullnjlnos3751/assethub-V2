@@ -868,14 +868,33 @@ router.get('/coverage', authenticate, authorize('IT_ADMIN', 'SUPERADMIN', 'VIEWE
       prisma.pMPlan.findMany({ where: { year }, orderBy: { id: 'asc' } }),
     ]);
 
-    // An asset counts as DONE if ANY of its runs this year is complete — a
-    // machine can appear in more than one plan, and one finished check is
-    // enough for the year.
-    const stateByAsset = new Map<number, 'DONE' | 'PENDING'>();
+    const adhocPlanIds = new Set(plans.filter(pl => pl.isAdhoc).map(pl => pl.id));
+
+    // State is tracked per source, not just overall, so the dashboard can ask
+    // "how much is covered by SCHEDULED PM" separately from "what got picked
+    // up ad-hoc". Nine TRR machines are only covered ad-hoc, and rolling that
+    // into one number hid the fact that TRR has no scheduled plan at all.
+    //
+    // An asset counts as DONE for a source if ANY of its runs from that source
+    // is complete — a machine can appear in more than one plan, and one
+    // finished check is enough for the year.
+    type Src = 'plan' | 'adhoc';
+    const stateByAsset = new Map<number, Partial<Record<Src, 'DONE' | 'PENDING'>>>();
     for (const run of runs) {
-      if (run.status === 'COMPLETED') stateByAsset.set(run.assetId, 'DONE');
-      else if (!stateByAsset.has(run.assetId)) stateByAsset.set(run.assetId, 'PENDING');
+      const src: Src = adhocPlanIds.has(run.planId) ? 'adhoc' : 'plan';
+      const entry = stateByAsset.get(run.assetId) || {};
+      if (run.status === 'COMPLETED') entry[src] = 'DONE';
+      else if (!entry[src]) entry[src] = 'PENDING';
+      stateByAsset.set(run.assetId, entry);
     }
+
+    // The overall state keeps DONE winning over PENDING across both sources.
+    const overallState = (e?: Partial<Record<Src, 'DONE' | 'PENDING'>>) => {
+      if (!e) return 'UNPLANNED';
+      if (e.plan === 'DONE' || e.adhoc === 'DONE') return 'DONE';
+      if (e.plan || e.adhoc) return 'PENDING';
+      return 'UNPLANNED';
+    };
 
     const rows = assets.map(a => ({
       a: a.assetCode || '',
@@ -885,7 +904,10 @@ router.get('/coverage', authenticate, authorize('IT_ADMIN', 'SUPERADMIN', 'VIEWE
       c: a.company || UNSPECIFIED,
       d: a.departmentId || UNSPECIFIED,
       l: a.location || '',
-      s: stateByAsset.get(a.id) || 'UNPLANNED',
+      s: overallState(stateByAsset.get(a.id)),
+      // per-source state; omitted when the asset has no run from that source
+      sp: stateByAsset.get(a.id)?.plan || null,
+      sa: stateByAsset.get(a.id)?.adhoc || null,
     }));
 
     const runsByPlan = new Map<number, { total: number; done: number }>();

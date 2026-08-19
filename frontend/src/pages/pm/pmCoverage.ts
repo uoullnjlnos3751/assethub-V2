@@ -20,7 +20,50 @@ export interface CoverageRow {
   /** company */        c: string;
   /** departmentId */   d: string;
   /** location */       l: string;
-  /** state */          s: CoverageState;
+  /** state, counting PM from any source */ s: CoverageState;
+  /** state from scheduled plans only, null when no such run exists */ sp: 'DONE' | 'PENDING' | null;
+  /** state from ad-hoc plans only, null when no such run exists */    sa: 'DONE' | 'PENDING' | null;
+}
+
+/**
+ * Which PM counts.
+ *
+ * Nine TRR machines have been PM'd, but every one of them through ad-hoc
+ * work — TRR has no scheduled plan at all. Rolled into a single number that
+ * reads as "covered", which is the opposite of the truth. Splitting the
+ * source lets the same page answer both questions honestly.
+ */
+export type SourceMode = 'ALL' | 'PLAN' | 'ADHOC';
+
+export const SOURCE_MODES: { key: SourceMode; label: string; hint: string }[] = [
+  { key: 'ALL',   label: 'ทั้งหมด',    hint: 'นับงาน PM ทุกแบบ' },
+  { key: 'PLAN',  label: 'PM ตามแผน',  hint: 'นับเฉพาะงานที่มาจากแผนตามกำหนด — งานนอกแผนไม่นับเป็นความครอบคลุม' },
+  { key: 'ADHOC', label: 'PM นอกแผน',  hint: 'ดูเฉพาะเครื่องที่ถูกทำ PM นอกแผน' },
+];
+
+/**
+ * The row's state under a given source mode. Under PLAN, a machine covered
+ * only by ad-hoc work correctly falls back to UNPLANNED — it genuinely has no
+ * scheduled plan.
+ */
+export function stateUnder(row: CoverageRow, mode: SourceMode): CoverageState {
+  if (mode === 'PLAN') return row.sp || 'UNPLANNED';
+  if (mode === 'ADHOC') return row.sa || 'UNPLANNED';
+  return row.s;
+}
+
+/**
+ * ADHOC is a spotlight, not a coverage view: the whole fleet is not "missing"
+ * ad-hoc work, so that mode narrows to the machines ad-hoc PM actually
+ * touched and drops the UNPLANNED bucket entirely.
+ */
+export const modeScopedRows = (rows: CoverageRow[], mode: SourceMode) =>
+  mode === 'ADHOC' ? rows.filter(r => r.sa !== null) : rows;
+
+/** The UNPLANNED bucket means something different in each mode. */
+export function unplannedLabel(mode: SourceMode): string {
+  if (mode === 'PLAN') return 'ยังไม่มีแผนตามกำหนด';
+  return 'ยังไม่ได้สร้างแผน';
 }
 
 export type CoverageState = 'DONE' | 'PENDING' | 'UNPLANNED';
@@ -77,6 +120,10 @@ export const STATES: { key: CoverageState; label: string }[] = [
 export const STATE_LABEL: Record<CoverageState, string> =
   STATES.reduce((acc, s) => ({ ...acc, [s.key]: s.label }), {} as Record<CoverageState, string>);
 
+/** STATES with the UNPLANNED label reworded for the active source mode. */
+export const statesFor = (mode: SourceMode) =>
+  STATES.map(s => (s.key === 'UNPLANNED' ? { ...s, label: unplannedLabel(mode) } : s));
+
 /**
  * Chart colours, drawn from the palette in theme.ts rather than picked fresh.
  *
@@ -106,9 +153,9 @@ export interface Tally {
 
 export const emptyTally = (): Tally => ({ DONE: 0, PENDING: 0, UNPLANNED: 0, total: 0 });
 
-export function tally(rows: CoverageRow[]): Tally {
+export function tally(rows: CoverageRow[], mode: SourceMode = 'ALL'): Tally {
   const t = emptyTally();
-  for (const r of rows) { t[r.s]++; t.total++; }
+  for (const r of rows) { t[stateUnder(r, mode)]++; t.total++; }
   return t;
 }
 
@@ -117,36 +164,41 @@ export function tally(rows: CoverageRow[]): Tally {
  * picking one company would leave the by-company chart with a single bar and
  * destroy the comparison the chart exists to make.
  */
-export function matches(row: CoverageRow, sel: Selection, skip: 'state' | 'company' | 'type' | null): boolean {
-  if (skip !== 'state' && sel.state.size && !sel.state.has(row.s)) return false;
+export function matches(
+  row: CoverageRow, sel: Selection, skip: 'state' | 'company' | 'type' | null, mode: SourceMode = 'ALL',
+): boolean {
+  if (skip !== 'state' && sel.state.size && !sel.state.has(stateUnder(row, mode))) return false;
   if (skip !== 'company' && sel.company.size && !sel.company.has(row.c)) return false;
   if (skip !== 'type' && sel.type.size && !sel.type.has(row.t)) return false;
   return true;
 }
 
-export const filterRows = (rows: CoverageRow[], sel: Selection, skip: 'state' | 'company' | 'type' | null) =>
-  rows.filter(r => matches(r, sel, skip));
+export const filterRows = (
+  rows: CoverageRow[], sel: Selection, skip: 'state' | 'company' | 'type' | null, mode: SourceMode = 'ALL',
+) => modeScopedRows(rows, mode).filter(r => matches(r, sel, skip, mode));
 
 export interface Group extends Tally { name: string }
 
 export function groupBy(
-  rows: CoverageRow[], sel: Selection, key: 'c' | 't', skip: 'company' | 'type',
+  rows: CoverageRow[], sel: Selection, key: 'c' | 't', skip: 'company' | 'type', mode: SourceMode = 'ALL',
 ): Group[] {
   const map = new Map<string, Group>();
-  for (const r of rows) {
-    if (!matches(r, sel, skip)) continue;
+  for (const r of modeScopedRows(rows, mode)) {
+    if (!matches(r, sel, skip, mode)) continue;
     const name = r[key];
     let g = map.get(name);
     if (!g) { g = { name, ...emptyTally() }; map.set(name, g); }
-    g[r.s]++; g.total++;
+    g[stateUnder(r, mode)]++; g.total++;
   }
   return [...map.values()].sort((a, b) => b.total - a.total);
 }
 
 /** Counts across the whole dataset, for the filter chips. */
-export function dimensionCounts(rows: CoverageRow[], key: 'c' | 't'): { name: string; count: number }[] {
+export function dimensionCounts(
+  rows: CoverageRow[], key: 'c' | 't', mode: SourceMode = 'ALL',
+): { name: string; count: number }[] {
   const map = new Map<string, number>();
-  for (const r of rows) map.set(r[key], (map.get(r[key]) || 0) + 1);
+  for (const r of modeScopedRows(rows, mode)) map.set(r[key], (map.get(r[key]) || 0) + 1);
   return [...map.entries()]
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count);
@@ -155,8 +207,10 @@ export function dimensionCounts(rows: CoverageRow[], key: 'c' | 't'): { name: st
 export const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
 
 /** Plans carry their own company/type tags, so they filter on those directly. */
-export function filterPlans(plans: CoveragePlan[], sel: Selection): CoveragePlan[] {
+export function filterPlans(plans: CoveragePlan[], sel: Selection, mode: SourceMode = 'ALL'): CoveragePlan[] {
   return plans.filter(p => {
+    if (mode === 'PLAN' && p.isAdhoc) return false;
+    if (mode === 'ADHOC' && !p.isAdhoc) return false;
     if (sel.company.size && !(p.company && sel.company.has(p.company))) return false;
     if (sel.type.size && !(p.deviceType && sel.type.has(p.deviceType))) return false;
     return true;
@@ -183,8 +237,9 @@ export function planStatusColor(theme: Theme, key: PlanStatusKey): string {
 }
 
 /** Human-readable description of the active filters — printed and exported. */
-export function scopeBits(sel: Selection): string[] {
+export function scopeBits(sel: Selection, mode: SourceMode = 'ALL'): string[] {
   const bits: string[] = [];
+  if (mode !== 'ALL') bits.push('ขอบเขตงาน: ' + SOURCE_MODES.find(m => m.key === mode)!.label);
   if (sel.company.size) bits.push(`บริษัท: ${[...sel.company].join(', ')}`);
   if (sel.type.size) bits.push(`ประเภทอุปกรณ์: ${[...sel.type].join(', ')}`);
   if (sel.state.size) {
@@ -193,5 +248,5 @@ export function scopeBits(sel: Selection): string[] {
   return bits;
 }
 
-export const scopeSummary = (sel: Selection) =>
-  scopeBits(sel).join('  ·  ') || 'ทุกบริษัท ทุกประเภทอุปกรณ์ ทุกสถานะ';
+export const scopeSummary = (sel: Selection, mode: SourceMode = 'ALL') =>
+  scopeBits(sel, mode).join('  ·  ') || 'ทุกบริษัท ทุกประเภทอุปกรณ์ ทุกสถานะ';
