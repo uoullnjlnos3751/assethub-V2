@@ -1,897 +1,450 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box,
-  Typography,
-  Button,
-  IconButton,
-  TextField,
-  Select,
-  MenuItem,
-  Card,
-  Paper,
-  Table,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableCell,
-  TableContainer,
-  ToggleButtonGroup,
-  ToggleButton,
-  Snackbar,
-  Alert,
-  GlobalStyles,
-  Chip,
+  Alert, Box, Button, Card, Chip, CircularProgress, Divider, GlobalStyles,
+  Menu, MenuItem, Select, Snackbar, Typography, alpha, useTheme,
 } from '@mui/material';
-import { alpha } from '@mui/material/styles';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import dayjs from 'dayjs';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
-import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import PrintIcon from '@mui/icons-material/Print';
+import DownloadIcon from '@mui/icons-material/Download';
 import BarChartIcon from '@mui/icons-material/BarChart';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import AutorenewIcon from '@mui/icons-material/Autorenew';
-import EventIcon from '@mui/icons-material/Event';
-import UnfoldLessIcon from '@mui/icons-material/UnfoldLess';
-import UnfoldMoreIcon from '@mui/icons-material/UnfoldMore';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import RestartAltIcon from '@mui/icons-material/RestartAlt';
-import BusinessIcon from '@mui/icons-material/Business';
-import CorporateFareIcon from '@mui/icons-material/CorporateFare';
-import FolderIcon from '@mui/icons-material/Folder';
-import ComputerIcon from '@mui/icons-material/Computer';
-import ChevronRightRotateIcon from '@mui/icons-material/ChevronRight';
-import * as XLSX from 'xlsx';
+import BuildIcon from '@mui/icons-material/Build';
+import AddIcon from '@mui/icons-material/Add';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { Building2, LayoutList } from 'lucide-react';
 import { pmAPI } from '../../services/api';
-import { formatDate } from '../../utils/dateUtils';
+import { SectionCard } from '../../components/SectionCard';
+import {
+  GanttAxis, GanttBar, GanttLegend, GanttRow, GanttTrack, StatePill,
+} from './components/GanttChart';
+import {
+  PLAN_STATES, RawPlan, SchedGroup, SchedSelection, buildTimeline,
+  emptySchedSelection, groupState, matchesPlan, normalise, pct, planStateColors,
+  rollup, schedScopeSummary, schedSelectionActive, thDate,
+} from './pmSchedule';
+import { buildScheduleReports, exportScheduleCsv, exportScheduleWorkbook } from './pmScheduleExport';
 
-// Helper to format date
-function fmtDate(d: string | Date | null) {
-  if (!d) return '—';
-  return formatDate(d);
-}
-
-// Get Monday of the week for a given date
-function getMonday(d: Date) {
-  const date = new Date(d);
-  const day = date.getDay();
-  const diff = date.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
-  return new Date(date.setDate(diff));
-}
-
-// Get calendar week number of the year
-function getCalendarWeek(date: Date) {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + 4 - (d.getDay() || 7));
-  const yearStart = new Date(d.getFullYear(), 0, 1);
-  const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-  return weekNo;
-}
-
-// Format date to Thai month short
-function formatThaiMonthDay(date: Date) {
-  const day = date.getDate();
-  const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
-  return `${day} ${months[date.getMonth()]}`;
-}
-
-const PRINT_STYLES = {
-  '@media print': {
-    'body': { background: '#fff', color: '#000' },
-    '.pms-root': { padding: '0 !important', margin: '0 !important', width: '100% !important' },
-    '.no-print': { display: 'none !important' },
-    '.pms-card': { border: 'none !important', boxShadow: 'none !important', marginBottom: '0 !important' },
-    '.gantt-table': { width: '100% !important', border: '1px solid #000 !important' },
-    '.gantt-table th, .gantt-table td': { border: '1px solid #000 !important', color: '#000 !important' },
-    'header, nav, aside, footer, .sidebar, .topbar': { display: 'none !important' },
-    'body *': { visibility: 'hidden' },
-    '.pms-root, .pms-root *': { visibility: 'visible' },
-    '.pms-root ~ .pms-root': { display: 'none' },
-  },
-};
+const fmt = (n: number) => n.toLocaleString('en-US');
+const ROW_H = { company: 40, group: 26, dept: 24 };
 
 export default function PMSchedulePage() {
+  const theme = useTheme();
   const navigate = useNavigate();
-  const [plans, setPlans] = useState<any[]>([]);
+  const colors = planStateColors(theme);
+
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [raw, setRaw] = useState<RawPlan[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear()); // Default to current year
+  const [error, setError] = useState('');
+  const [sel, setSel] = useState<SchedSelection>(emptySchedSelection);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [exportAnchor, setExportAnchor] = useState<null | HTMLElement>(null);
+  const [toast, setToast] = useState('');
 
-  // Interactive filters
-  const [pmStartDate, setPmStartDate] = useState<string>('');
-  const [selectedLead, setSelectedLead] = useState<string>('ALL');
-  const [searchTerm, setSearchTerm] = useState<string>('');
-  const [timeOffset, setTimeOffset] = useState<number>(0);
-  const [viewMode, setViewMode] = useState<'daily' | 'weekly'>('weekly');
-  const [showAdhoc, setShowAdhoc] = useState<boolean>(false);
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'COMPLETED' | 'IN_PROGRESS' | 'PENDING'>('ALL');
-  const [selectedCompanyFilter, setSelectedCompanyFilter] = useState<string>('ALL');
-
-  // Group Expanded State — default all collapsed
-  const [expandedSites, setExpandedSites] = useState<Record<string, boolean>>({});
-
-  // Export / Feedback states
-  const [toast, setToast] = useState<string | null>(null);
-  const [exporting, setExporting] = useState(false);
-
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3000);
-  };
+  // Fixed at mount so every bar, the today line and the exported header all
+  // agree on "now" even if the tab is left open across midnight.
+  const today = useMemo(() => { const t = new Date(); t.setHours(0, 0, 0, 0); return t; }, []);
 
   useEffect(() => {
     setLoading(true);
-    pmAPI.dashboard({ year: selectedYear })
-      .then(res => {
-        const plansList = res.data?.plans || [];
-        setPlans(plansList);
-
-        // Default all collapsed
-        setExpandedSites({});
-
-        // Find earliest start date to default PM Start Date
-        const validPlans = plansList.filter((p: any) => p.startDate && new Date(p.startDate).getFullYear() === selectedYear);
-        if (validPlans.length > 0) {
-          const minTime = Math.min(...validPlans.map((p: any) => new Date(p.startDate).getTime()));
-          const minDateStr = new Date(minTime).toISOString().split('T')[0];
-          setPmStartDate(minDateStr);
-        } else {
-          setPmStartDate(`${selectedYear}-01-01`);
-        }
-        setTimeOffset(0);
-      })
-      .catch(err => console.error('Error fetching PM plans:', err))
+    pmAPI.plans({ year })
+      .then(res => { setRaw(res.data || []); setError(''); })
+      .catch(() => setError('โหลดกำหนดการ PM ไม่สำเร็จ'))
       .finally(() => setLoading(false));
-  }, [selectedYear]);
+  }, [year]);
 
-  // Filter plans by selected Lead, Search Term, Status, Company, and Ad-hoc toggle
-  const filteredPlans = plans.filter(p => {
-    if (!showAdhoc && p.isAdhoc) return false;
-    const matchesLead = selectedLead === 'ALL' || p.lead === selectedLead;
-    const label = p.deptTask || '';
-    const matchesSearch = label.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (p.site || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (p.company || '').toLowerCase().includes(searchTerm.toLowerCase());
+  useEffect(() => { setSel(emptySchedSelection()); setCollapsed({}); }, [year]);
 
-    // Status filter
-    const pct = p.plannedDeviceCount > 0 ? (p.completedCount || 0) / p.plannedDeviceCount * 100 : 0;
-    let matchesStatus = true;
-    if (statusFilter === 'COMPLETED') matchesStatus = pct >= 100;
-    else if (statusFilter === 'IN_PROGRESS') matchesStatus = pct > 0 && pct < 100;
-    else if (statusFilter === 'PENDING') matchesStatus = pct === 0;
+  const plans = useMemo(() => normalise(raw, today), [raw, today]);
+  const dated = useMemo(() => plans.filter(p => p.start && p.end), [plans]);
+  const undated = useMemo(() => plans.filter(p => !p.start || !p.end), [plans]);
 
-    // Company filter
-    const matchesCompany = selectedCompanyFilter === 'ALL' || p.company === selectedCompanyFilter;
+  const visible = useMemo(() => dated.filter(p => matchesPlan(p, sel, null)), [dated, sel]);
+  const timeline = useMemo(() => buildTimeline(dated), [dated]);
 
-    return matchesLead && matchesSearch && matchesStatus && matchesCompany;
+  const byCompany = useMemo(() => rollup(visible, 'company'), [visible]);
+  const totals = useMemo(() => {
+    const total = visible.reduce((a, p) => a + p.total, 0);
+    const done = visible.reduce((a, p) => a + p.done, 0);
+    const late = visible.filter(p => p.state === 'OVERDUE');
+    const running = visible.filter(p => p.state === 'RUNNING');
+    const remain = (list: typeof visible) => list.reduce((a, p) => a + (p.total - p.done), 0);
+    return { total, done, late, running, lateUnits: remain(late), runUnits: remain(running) };
+  }, [visible]);
+
+  const toggle = (key: keyof SchedSelection, value: string) => {
+    setSel(prev => {
+      const next: SchedSelection = {
+        state: new Set(prev.state), company: new Set(prev.company), dept: new Set(prev.dept),
+      };
+      const set = next[key] as Set<string>;
+      set.has(value) ? set.delete(value) : set.add(value);
+      return next;
+    });
+  };
+
+  const runExport = (fn: () => void, label: string) => {
+    try { fn(); setToast(`กำลังดาวน์โหลด ${label}`); }
+    catch { setToast('ส่งออกไฟล์ไม่สำเร็จ'); }
+    setExportAnchor(null);
+  };
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240, gap: 1.5 }}>
+        <CircularProgress size={20} />
+        <Typography sx={{ fontSize: 12.5, color: 'text.secondary' }}>กำลังโหลดกำหนดการ PM…</Typography>
+      </Box>
+    );
+  }
+
+  const chipSx = (active: boolean, color?: string) => ({
+    fontSize: 11, height: 23, fontWeight: active ? 600 : 500, cursor: 'pointer',
+    borderColor: active ? (color || theme.palette.primary.main) : theme.palette.divider,
+    bgcolor: active ? alpha(color || theme.palette.primary.main, 0.1) : 'transparent',
+    color: active ? (color || theme.palette.primary.main) : theme.palette.text.secondary,
+    '& .MuiChip-label': { px: 1 },
+    '&:hover': { borderColor: color || theme.palette.primary.main },
   });
 
-  // Unique companies for filter dropdown
-  const uniqueCompanies = Array.from(new Set(plans.map((p: any) => p.company).filter(Boolean))) as string[];
-
-  // Grouping filtered plans by Company (Site)
-  const groupedPlans = useMemo(() => {
-    const groups: Record<string, {
-      site: string;
-      plans: any[];
-      totalPlanned: number;
-      totalCompleted: number;
-      startDate: Date | null;
-      endDate: Date | null;
-      lead: string;
-    }> = {};
-
-    filteredPlans.forEach(plan => {
-      const siteKey = [plan.company, plan.site].filter(Boolean).join(' - ') || 'ทั่วไป';
-      if (!groups[siteKey]) {
-        groups[siteKey] = {
-          site: siteKey,
-          plans: [],
-          totalPlanned: 0,
-          totalCompleted: 0,
-          startDate: null,
-          endDate: null,
-          lead: plan.lead || 'ไม่ระบุ'
-        };
-      }
-
-      groups[siteKey].plans.push(plan);
-      groups[siteKey].totalPlanned += plan.plannedDeviceCount || 0;
-      groups[siteKey].totalCompleted += plan.completedCount || 0;
-
-      if (plan.startDate) {
-        const pStart = new Date(plan.startDate);
-        if (!groups[siteKey].startDate || pStart < groups[siteKey].startDate) {
-          groups[siteKey].startDate = pStart;
-        }
-      }
-      if (plan.endDate) {
-        const pEnd = new Date(plan.endDate);
-        if (!groups[siteKey].endDate || pEnd > groups[siteKey].endDate) {
-          groups[siteKey].endDate = pEnd;
-        }
-      }
+  /** Counts ignore their own dimension so a chip never zeroes itself out. */
+  const dimCounts = (key: 'company' | 'dept') => {
+    const m = new Map<string, number>();
+    dated.forEach(p => {
+      if (!matchesPlan(p, sel, key)) return;
+      m.set(p[key], (m.get(p[key]) || 0) + 1);
     });
-
-    return Object.values(groups).sort((a, b) => a.site.localeCompare(b.site));
-  }, [filteredPlans]);
-
-  // Toggle Collapse / Expand
-  const toggleSite = (siteName: string) => {
-    setExpandedSites(prev => ({
-      ...prev,
-      [siteName]: !prev[siteName]
-    }));
+    sel[key].forEach(v => { if (!m.has(v)) m.set(v, 0); });
+    return [...m.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'th'))
+      .map(([name, count]) => ({ name, count }));
   };
 
-  // Collapse All / Expand All
-  const collapseAll = () => setExpandedSites({});
-  const expandAll = () => {
-    const expanded: Record<string, boolean> = {};
-    groupedPlans.forEach(g => { expanded[g.site] = true; });
-    setExpandedSites(expanded);
+  const filterRow = (label: string, node: React.ReactNode, withReset = false) => (
+    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, flexWrap: 'wrap' }}>
+      <Typography sx={{
+        flex: '0 0 78px', fontSize: 9.5, fontWeight: 700, color: 'text.disabled',
+        letterSpacing: '.04em', pt: 0.6,
+      }}>{label}</Typography>
+      <Box sx={{ display: 'flex', gap: 0.6, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>{node}</Box>
+      {withReset && schedSelectionActive(sel) && (
+        <Button size="small" color="error" onClick={() => setSel(emptySchedSelection())}
+          sx={{ fontSize: 10.5, fontWeight: 600, ml: 'auto', minWidth: 0 }}>ล้างตัวกรอง</Button>
+      )}
+    </Box>
+  );
+
+  const gutterSx = {
+    display: 'flex', alignItems: 'center', gap: 0.75, px: 1, minWidth: 0, overflow: 'hidden',
+    borderRight: `1px solid ${theme.palette.divider}`,
   };
-
-  // Unique leads list for the dropdown
-  const uniqueLeads = Array.from(new Set(plans.map((p: any) => p.lead).filter(Boolean))) as string[];
-
-  // Calculate total machines and completed machines overall
-  const totalPlanned = filteredPlans.reduce((sum, p) => sum + (p.plannedDeviceCount || 0), 0);
-  const totalCompleted = filteredPlans.reduce((sum, p) => sum + (p.completedCount || 0), 0);
-  const overallPct = totalPlanned > 0 ? Math.round(totalCompleted / totalPlanned * 100) : 0;
-
-  // Real observed pace — total completed / weeks elapsed since PM start, not a configured assumption
-  const teamPaceLabel = useMemo(() => {
-    if (!pmStartDate || totalCompleted === 0) return null;
-    const start = new Date(pmStartDate);
-    const today = new Date();
-    const weeksElapsed = Math.max(1, Math.ceil((today.getTime() - start.getTime()) / (7 * 86400000)));
-    const perWeek = Math.round(totalCompleted / weeksElapsed);
-    const perDay = +(totalCompleted / (weeksElapsed * 7)).toFixed(1);
-    return { perWeek, perDay };
-  }, [pmStartDate, totalCompleted]);
-
-  // Status counts for cards
-  const completedPlansCount = filteredPlans.filter(p => {
-    const pct = p.plannedDeviceCount > 0 ? (p.completedCount || 0) / p.plannedDeviceCount * 100 : 0;
-    return pct >= 100;
-  }).length;
-  const activePlansCount = filteredPlans.filter(p => {
-    const pct = p.plannedDeviceCount > 0 ? (p.completedCount || 0) / p.plannedDeviceCount * 100 : 0;
-    return pct > 0 && pct < 100;
-  }).length;
-  const pendingPlansCount = filteredPlans.filter(p => {
-    const pct = p.plannedDeviceCount > 0 ? (p.completedCount || 0) / p.plannedDeviceCount * 100 : 0;
-    return pct === 0;
-  }).length;
-
-  // Generate columns based on view mode
-  const generateColumns = () => {
-    const cols = [];
-    const baseDate = pmStartDate ? new Date(pmStartDate) : new Date();
-
-    if (viewMode === 'weekly') {
-      baseDate.setDate(baseDate.getDate() + (timeOffset * 7));
-      let current = getMonday(baseDate);
-      for (let i = 0; i < 12; i++) {
-        const next = new Date(current);
-        next.setDate(current.getDate() + 6);
-        next.setHours(23, 59, 59, 999);
-        cols.push({
-          start: new Date(current),
-          end: next,
-          label: `W${getCalendarWeek(current)}`,
-          subLabel: formatThaiMonthDay(current),
-        });
-        current.setDate(current.getDate() + 7);
-      }
-    } else {
-      // Daily mode
-      baseDate.setDate(baseDate.getDate() + timeOffset);
-      let current = new Date(baseDate);
-      current.setHours(0, 0, 0, 0);
-      for (let i = 0; i < 21; i++) {
-        const next = new Date(current);
-        next.setHours(23, 59, 59, 999);
-        cols.push({
-          start: new Date(current),
-          end: next,
-          label: current.getDate().toString(),
-          subLabel: formatThaiMonthDay(current),
-          isWeekend: current.getDay() === 0 || current.getDay() === 6
-        });
-        current.setDate(current.getDate() + 1);
-      }
-    }
-    return cols;
+  const metaSx = {
+    display: 'flex', alignItems: 'center', justifyContent: 'flex-end', px: 1,
+    borderLeft: `1px solid ${theme.palette.divider}`,
+    fontSize: 10.5, fontVariantNumeric: 'tabular-nums', color: 'text.secondary',
   };
-
-  const columns = generateColumns();
-
-  const getProgressColor = (pct: number): 'success' | 'info' | 'warning' | 'error' => {
-    if (pct >= 100) return 'success';
-    if (pct >= 50) return 'info';
-    if (pct >= 20) return 'warning';
-    return 'error';
+  const nameSx = {
+    fontSize: 11.5, fontWeight: 600, color: 'text.primary', minWidth: 0,
+    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   };
+  const subSx = { fontSize: 9.5, color: 'text.disabled', whiteSpace: 'nowrap', flex: 'none' };
 
-  const isTodayInCol = (col: any) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const start = new Date(col.start);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(col.end);
-    end.setHours(23, 59, 59, 999);
-    return today >= start && today <= end;
-  };
-
-  // Per-week rollup of real plan data (weekly view only) — which plans are
-  // active that week, their combined target/completed count, and a status
-  // chip derived from whether the week is past/current/future.
-  const weeklySummaryRows = useMemo(() => {
-    if (viewMode !== 'weekly') return [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return columns
-      .map((col) => {
-        const activePlans = filteredPlans.filter((p) => {
-          if (!p.startDate || !p.endDate) return false;
-          const s = new Date(p.startDate);
-          const e = new Date(p.endDate);
-          return s <= col.end && e >= col.start;
-        });
-        if (activePlans.length === 0) return null;
-        const target = activePlans.reduce((sum, p) => sum + (p.plannedDeviceCount || 0), 0);
-        const completed = activePlans.reduce((sum, p) => sum + (p.completedCount || 0), 0);
-        const pct = target > 0 ? Math.round((completed / target) * 100) : 0;
-        const deptLabel = Array.from(new Set(activePlans.map((p) => [p.company, p.deptTask].filter(Boolean).join(' · '))))
-          .filter(Boolean)
-          .join(', ');
-        const leads = Array.from(new Set(activePlans.map((p) => p.lead).filter(Boolean))) as string[];
-        const teamLabel = leads.length === 0 ? 'ไม่ระบุ' : leads.length === 1 ? leads[0] : `${leads[0]} + ${leads.length - 1}`;
-        const isCurrent = isTodayInCol(col);
-        const isPast = col.end < today;
-        let status: { label: string; color: 'secondary' | 'success' | 'error' | 'default' };
-        if (isCurrent) status = { label: 'สัปดาห์นี้', color: 'secondary' };
-        else if (isPast) status = pct >= 100 ? { label: 'เสร็จสิ้น', color: 'success' } : { label: 'ล่าช้า', color: 'error' };
-        else status = { label: 'กำหนดการ', color: 'default' };
-        return { key: col.start.getTime(), col, deptLabel: deptLabel || 'ไม่ระบุ', target, teamLabel, status };
-      })
-      .filter((r): r is NonNullable<typeof r> => r !== null);
-  }, [columns, filteredPlans, viewMode]);
-
-  // Render Gantt Chart Cell (Continuous blocks logic)
-  const renderGanttCell = (plan: any, col: any, pct: number, isHeaderRow: boolean = false) => {
-    const isToday = isTodayInCol(col);
-    const startVal = plan.startDate ? new Date(plan.startDate) : null;
-    const endVal = plan.endDate ? new Date(plan.endDate) : null;
-
-    const hasBar = startVal && endVal && startVal <= col.end && endVal >= col.start;
-
-    const barColor: 'success' | 'info' | 'warning' = pct >= 100 ? 'success' : pct > 0 ? 'info' : 'warning';
-
-    return (
-      <TableCell
-        key={col.start.getTime()}
-        sx={{
-          p: hasBar ? '8px 0px' : '12px 14px',
-          verticalAlign: 'middle',
-          position: 'relative',
-          bgcolor: (t) => isToday ? alpha(t.palette.error.main, 0.05) : (!isHeaderRow && col.isWeekend ? 'action.hover' : 'transparent'),
-          borderLeft: isToday ? '2.5px solid' : undefined,
-          borderRight: isToday ? '2.5px solid' : undefined,
-          borderLeftColor: isToday ? 'error.main' : undefined,
-          borderRightColor: isToday ? 'error.main' : undefined,
-        }}
-        title={hasBar ? `${plan.deptTask || plan.site || 'แผนงาน'}: ${pct}% (${fmtDate(plan.startDate)} - ${fmtDate(plan.endDate)})` : undefined}
-      >
-        {hasBar && (
-          <Box
-            sx={{
-              height: 10, mx: 'auto', width: '95%', borderRadius: 1,
-              bgcolor: (t) => alpha(t.palette[barColor].main, isHeaderRow ? 0.3 : 1),
-              transition: 'all 0.2s ease',
-              '&:hover': { transform: 'scaleY(1.3)', cursor: 'pointer' },
-            }}
-          />
-        )}
-      </TableCell>
-    );
-  };
-
-  // Excel Export Handler (Hierarchical Structure)
-  const handleExportExcel = () => {
-    try {
-      setExporting(true);
-      const dataRows: any[] = [];
-
-      // Title & Settings Headers
-      dataRows.push(['รายงานกำหนดการ PM (PM Schedule Planner)']);
-      dataRows.push([`ปีโครงการ: ${selectedYear + 543}`, `หัวหน้าโครงการ: ${selectedLead === 'ALL' ? 'ทั้งหมด' : selectedLead}`, `วันเริ่ม PM: ${pmStartDate || '—'}`]);
-      dataRows.push([]); // blank line spacer
-
-      // Table Header Row
-      const tableHeaders = ['WBS', 'TASK (บริษัท / แผนกงาน)', 'LEAD', 'Device (แผน)', 'Completed (เสร็จ)', 'Remaining (เหลือ)', 'START', 'END', 'DAYS', '% DONE', 'สถานะ'];
-      columns.forEach(col => {
-        tableHeaders.push(`${col.label} (${col.subLabel})`);
-      });
-      dataRows.push(tableHeaders);
-
-      // Overall Summary Row (WBS 1)
-      const summaryRow = [
-        '1',
-        'TRR GROUP (ทั้งหมด)',
-        '-',
-        totalPlanned,
-        totalCompleted,
-        totalPlanned - totalCompleted,
-        '-',
-        '-',
-        '-',
-        `${overallPct}%`,
-        overallPct >= 100 ? 'เสร็จสิ้นแล้ว' : 'กำลังดำเนินการ'
-      ];
-      columns.forEach(() => {
-        summaryRow.push(overallPct >= 100 ? 'เสร็จสิ้นแล้ว' : 'กำลังดำเนินการ');
-      });
-      dataRows.push(summaryRow);
-
-      // Grouped Rows (Hierarchy Level 1 = Site, Level 2 = Dept)
-      groupedPlans.forEach((group, groupIdx) => {
-        const sitePct = group.totalPlanned > 0 ? Math.round(group.totalCompleted / group.totalPlanned * 100) : 0;
-
-        // 1. Write Company summary row (WBS 1.1, 1.2, ...)
-        const siteWbs = `1.${groupIdx + 1}`;
-        const days = (group.startDate && group.endDate) ? Math.max(1, Math.ceil((group.endDate.getTime() - group.startDate.getTime()) / 86400000)) : '-';
-        const siteRow = [
-          siteWbs,
-          `🏢 ${group.site}`,
-          group.lead || 'ไม่ระบุ',
-          group.totalPlanned,
-          group.totalCompleted,
-          group.totalPlanned - group.totalCompleted,
-          group.startDate ? fmtDate(group.startDate) : '-',
-          group.endDate ? fmtDate(group.endDate) : '-',
-          days,
-          `${sitePct}%`,
-          sitePct >= 100 ? 'เสร็จสิ้น' : sitePct > 0 ? 'กำลังดำเนินการ' : 'รอตรวจนับ'
-        ];
-
-        // Fill Gantt columns for Site Row
-        columns.forEach(col => {
-          const covers = group.startDate && group.endDate && group.startDate <= col.end && group.endDate >= col.start;
-          if (covers) {
-            siteRow.push(sitePct >= 100 ? 'เสร็จสิ้น (✓)' : sitePct > 0 ? 'กำลังดำเนินการ (⏳)' : 'ตามแผน (📅)');
-          } else {
-            siteRow.push('');
-          }
-        });
-        dataRows.push(siteRow);
-
-        // 2. Write Departments rows under this Site (WBS 1.1.1, 1.1.2, ...)
-        group.plans.forEach((plan, planIdx) => {
-          const planPct = plan.plannedDeviceCount > 0 ? Math.round((plan.completedCount || 0) / plan.plannedDeviceCount * 100) : 0;
-          const planWbs = `${siteWbs}.${planIdx + 1}`;
-
-          const pStartVal = plan.startDate ? new Date(plan.startDate) : null;
-          const pEndVal = plan.endDate ? new Date(plan.endDate) : null;
-          const pDays = (pStartVal && pEndVal) ? Math.max(1, Math.ceil((pEndVal.getTime() - pStartVal.getTime()) / 86400000)) : '-';
-
-          const planRow = [
-            planWbs,
-            `   ↳ 📁 ${plan.deptTask || 'ทั่วไป'}`,
-            plan.lead || group.lead || 'ไม่ระบุ',
-            plan.plannedDeviceCount,
-            plan.completedCount || 0,
-            plan.plannedDeviceCount - (plan.completedCount || 0),
-            pStartVal ? fmtDate(pStartVal) : '-',
-            pEndVal ? fmtDate(pEndVal) : '-',
-            pDays,
-            `${planPct}%`,
-            planPct >= 100 ? 'เสร็จสิ้น' : planPct > 0 ? 'กำลังดำเนินการ' : 'รอตรวจนับ'
-          ];
-
-          // Fill Gantt columns for Dept Row
-          columns.forEach(col => {
-            const covers = pStartVal && pEndVal && pStartVal <= col.end && pEndVal >= col.start;
-            if (covers) {
-              planRow.push(planPct >= 100 ? 'เสร็จสิ้น (✓)' : planPct > 0 ? 'กำลังดำเนินการ (⏳)' : 'ตามแผน (📅)');
-            } else {
-              planRow.push('');
-            }
-          });
-          dataRows.push(planRow);
-        });
-      });
-
-      // Generate spreadsheet
-      const ws = XLSX.utils.aoa_to_sheet(dataRows);
-
-      // Auto width formatting
-      const colWidths = tableHeaders.map((_, colIdx) => {
-        let maxLen = 12;
-        dataRows.forEach(row => {
-          const val = row[colIdx];
-          if (val !== undefined && val !== null) {
-            const len = val.toString().length;
-            if (len > maxLen) maxLen = len;
-          }
-        });
-        return { wch: maxLen + 2 };
-      });
-      ws['!cols'] = colWidths;
-
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'PM Schedule');
-
-      XLSX.writeFile(wb, `PM_Schedule_Planner_${selectedYear + 543}.xlsx`);
-      showToast('🚀 ส่งออกไฟล์ Excel สำเร็จ!');
-    } catch (err: any) {
-      console.error(err);
-      showToast('❌ ไม่สามารถส่งออกไฟล์ Excel ได้');
-    } finally {
-      setExporting(false);
-    }
-  };
+  const noTimeline = (
+    <Typography sx={{ py: 3.5, textAlign: 'center', color: 'text.disabled', fontSize: 11.5 }}>
+      ไม่มีแผนที่ตรงกับตัวกรองที่เลือก
+    </Typography>
+  );
 
   return (
-    <Box className="pms-root">
-      <GlobalStyles styles={PRINT_STYLES} />
+    <Box>
+      <GlobalStyles styles={printStyles(theme)} />
 
-      {/* ── Page Header ── */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5, mb: 2.25 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Box sx={{ width: 40, height: 40, borderRadius: 2.5, bgcolor: (t) => alpha(t.palette.primary.main, t.palette.mode === 'dark' ? 0.16 : 0.08), border: '1px solid', borderColor: 'primary.main', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <CalendarMonthIcon color="primary" />
-          </Box>
+      {/* Letterhead — paper only. A printed schedule that does not say what it
+          was filtered by is unreadable a week later. */}
+      <Box className="pms-printhead" sx={{ display: 'none' }}>
+        <Box className="pms-ph-top">
           <Box>
-            <Typography sx={{ fontSize: 16, fontWeight: 700 }}>กำหนดการ PM (PM Schedule Planner)</Typography>
-            <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 0.25 }}>แผนจัดโครงการ PM จำแนกรายบริษัทและแผนกย่อย — ปี {selectedYear + 543}</Typography>
+            <Box className="pms-ph-org">TRR Group · ฝ่ายเทคโนโลยีสารสนเทศ</Box>
+            <Box className="pms-ph-title">กำหนดการบำรุงรักษาเชิงป้องกัน (PM Schedule)</Box>
+            <Box className="pms-ph-year">ปีงบประมาณ {year + 543}</Box>
+          </Box>
+          <Box className="pms-ph-meta">
+            <div>พิมพ์เมื่อ {today.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
           </Box>
         </Box>
-        <Box className="no-print" sx={{ display: 'flex', gap: 1 }}>
-          <Button variant="contained" startIcon={<FileDownloadIcon />} onClick={handleExportExcel} disabled={exporting}>
-            {exporting ? 'กำลังส่งออก...' : 'ส่งออก Excel Planner'}
-          </Button>
-          <Button variant="outlined" startIcon={<PrintIcon />} onClick={() => window.print()}>พิมพ์แผนงาน</Button>
-          <Button variant="outlined" startIcon={<BarChartIcon />} onClick={() => navigate('/pm')}>Dashboard</Button>
+        <Box className="pms-ph-scope">
+          <b>ขอบเขต:</b> {schedScopeSummary(sel)} &nbsp;|&nbsp;{' '}
+          <b>{fmt(visible.length)} แผน</b> · ทำเสร็จ {fmt(totals.done)} จาก {fmt(totals.total)} เครื่อง
+          {totals.late.length > 0 && <> · เกินกำหนด {fmt(totals.late.length)} แผน</>}
         </Box>
       </Box>
 
-      {/* ── Status Cards Grid ── */}
-      <Box className="no-print" sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 2, mb: 2.5 }}>
+      {/* ── Header ─────────────────────────────────────────────── */}
+      <Box className="pms-noprint" sx={{
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+        flexWrap: 'wrap', gap: 1.25, mb: 2,
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+          <Box sx={{
+            width: 36, height: 36, borderRadius: 2.25, display: 'flex', alignItems: 'center',
+            justifyContent: 'center', border: '1px solid', borderColor: 'primary.main',
+            bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.16 : 0.08),
+          }}>
+            <CalendarMonthIcon color="primary" fontSize="small" />
+          </Box>
+          <Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography sx={{ fontSize: 16, fontWeight: 800 }}>กำหนดการ PM</Typography>
+              <Select size="small" value={year} onChange={e => setYear(Number(e.target.value))}
+                sx={{ fontSize: 11.5, fontWeight: 700, '& .MuiSelect-select': { py: 0.4 } }}>
+                {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(y => (
+                  <MenuItem key={y} value={y}>ปี {y + 543}</MenuItem>
+                ))}
+              </Select>
+            </Box>
+            <Typography sx={{ fontSize: 10.5, color: 'text.secondary', mt: 0.2 }}>
+              ตารางแผนงานรายบริษัทและรายแผนก ปี {year + 543}
+            </Typography>
+          </Box>
+        </Box>
+
+        <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Button variant="outlined" size="small" startIcon={<BarChartIcon />} onClick={() => navigate('/pm')}>ภาพรวม</Button>
+          <Button variant="outlined" size="small" startIcon={<BuildIcon />} onClick={() => navigate('/pm/runs')}>ทำ PM</Button>
+          <Button variant="outlined" size="small" startIcon={<DownloadIcon />}
+            onClick={e => setExportAnchor(e.currentTarget)}>ส่งออก</Button>
+          <Button variant="outlined" size="small" startIcon={<PrintIcon />} onClick={() => window.print()}>พิมพ์แผนงาน</Button>
+          <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => navigate('/pm/plans')}>สร้างแผน</Button>
+        </Box>
+      </Box>
+
+      <Menu anchorEl={exportAnchor} open={Boolean(exportAnchor)} onClose={() => setExportAnchor(null)}
+        slotProps={{ paper: { sx: { minWidth: 300 } } }}>
+        <MenuItem onClick={() => runExport(
+          () => exportScheduleWorkbook(year, visible, sel, today), 'ไฟล์ Excel รวมทุกชีต')}>
+          <Box>
+            <Typography sx={{ fontSize: 12.5, fontWeight: 700 }}>Excel รวมทุกชีต (.xlsx)</Typography>
+            <Typography sx={{ fontSize: 10.5, color: 'text.secondary' }}>สรุปรายบริษัท · รายแผนก · รายแผน</Typography>
+          </Box>
+        </MenuItem>
+        <Divider />
+        {buildScheduleReports(year, visible, sel, today).map(rep => (
+          <MenuItem key={rep.key} sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}
+            onClick={() => runExport(() => exportScheduleCsv(year, visible, sel, today, rep.key), rep.label)}>
+            <Typography sx={{ fontSize: 12 }}>{rep.label}</Typography>
+            <Typography sx={{ fontSize: 10, color: 'text.disabled', fontVariantNumeric: 'tabular-nums' }}>CSV</Typography>
+          </MenuItem>
+        ))}
+        <Divider />
+        <Typography sx={{ fontSize: 10, color: 'text.disabled', px: 2, py: 1, lineHeight: 1.6, maxWidth: 300 }}>
+          ทุกไฟล์ยึดตามตัวกรองที่เลือกอยู่ · CSV เข้ารหัส UTF-8 (มี BOM) เปิดใน Excel ภาษาไทยได้ทันที
+        </Typography>
+      </Menu>
+
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
+      {/* ── KPI strip ──────────────────────────────────────────── */}
+      <Box sx={{
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(132px,1fr))', gap: 1, mb: 1.5,
+      }}>
         {[
-          { label: 'เสร็จสิ้นแผนงาน', val: completedPlansCount, color: 'success' as const, Icon: CheckCircleIcon },
-          { label: 'กำลังดำเนินการตรวจ', val: activePlansCount, color: 'info' as const, Icon: AutorenewIcon },
-          { label: 'รอดำเนินการตามแผน', val: pendingPlansCount, color: 'warning' as const, Icon: EventIcon },
-        ].map((s) => (
-          <Card key={s.label} variant="outlined" sx={{ p: '18px 22px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderLeft: 3, borderLeftColor: `${s.color}.main` }}>
-            <Box>
-              <Typography sx={{ fontSize: 11, color: 'text.secondary', fontWeight: 600 }}>{s.label}</Typography>
-              <Typography sx={{ fontSize: 24, fontWeight: 700, mt: 0.5, color: `${s.color}.main` }}>{s.val} แผนก</Typography>
-            </Box>
-            <Box sx={{ width: 40, height: 40, borderRadius: 2, bgcolor: (t) => alpha(t.palette[s.color].main, 0.12), color: `${s.color}.main`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <s.Icon />
-            </Box>
+          { v: fmt(visible.length), l: 'แผนในกำหนดการ',
+            s: visible.length !== dated.length ? `จากทั้งหมด ${dated.length} แผน`
+              : timeline ? `${thDate(timeline.t0)} – ${thDate(timeline.weekStarts[timeline.weeks - 1])}` : '—',
+            c: theme.palette.text.primary },
+          { v: `${pct(totals.done, totals.total)}%`, l: 'ความคืบหน้ารวม',
+            s: `${fmt(totals.done)} จาก ${fmt(totals.total)} เครื่อง`, c: colors.DONE },
+          { v: fmt(totals.late.length), l: 'แผนที่เกินกำหนด',
+            s: totals.lateUnits ? `ค้างอยู่ ${fmt(totals.lateUnits)} เครื่อง` : 'ไม่มีงานค้าง', c: colors.OVERDUE },
+          { v: fmt(totals.running.length), l: 'แผนที่กำลังดำเนินการ',
+            s: totals.runUnits ? `เหลือ ${fmt(totals.runUnits)} เครื่อง` : 'ครบแล้ว', c: colors.RUNNING },
+        ].map(k => (
+          <Card key={k.l} variant="outlined" sx={{ p: '9px 12px' }}>
+            <Typography sx={{ fontSize: 21, fontWeight: 800, lineHeight: 1, letterSpacing: '-.02em', color: k.c, fontVariantNumeric: 'tabular-nums' }}>
+              {k.v}
+            </Typography>
+            <Typography sx={{ fontSize: 10.5, color: 'text.secondary', mt: 0.4 }}>{k.l}</Typography>
+            <Typography sx={{ fontSize: 9.5, color: 'text.disabled', mt: 0.1 }}>{k.s}</Typography>
           </Card>
         ))}
       </Box>
 
-      {/* ── Top Inputs Panel ── */}
-      <Card variant="outlined" className="pms-card no-print" sx={{ mb: 2.5 }}>
-        <Box sx={{ p: '12px 18px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 1.5 }}>
-          <Box>
-            <Typography sx={{ fontSize: 11, fontWeight: 500, color: 'text.secondary', mb: 0.75, textTransform: 'uppercase', letterSpacing: '0.05em' }}>ปีงบประมาณ (พ.ศ.)</Typography>
-            <Select fullWidth size="small" value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))}>
-              {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(y => (
-                <MenuItem key={y} value={y}>ปี {y + 543}</MenuItem>
-              ))}
-            </Select>
-          </Box>
-          <Box>
-            <Typography sx={{ fontSize: 11, fontWeight: 500, color: 'text.secondary', mb: 0.75, textTransform: 'uppercase', letterSpacing: '0.05em' }}>วันที่เริ่มแสดงผล</Typography>
-            <DatePicker
-              format="DD/MM/YYYY"
-              value={pmStartDate ? dayjs(pmStartDate) : null}
-              onChange={(newVal) => { setPmStartDate(newVal ? newVal.format('YYYY-MM-DD') : ''); setTimeOffset(0); }}
-              slotProps={{ textField: { size: 'small', fullWidth: true } }}
-            />
-          </Box>
-          <Box>
-            <Typography sx={{ fontSize: 11, fontWeight: 500, color: 'text.secondary', mb: 0.75, textTransform: 'uppercase', letterSpacing: '0.05em' }}>บริษัท (Company)</Typography>
-            <Select fullWidth size="small" value={selectedCompanyFilter} onChange={e => setSelectedCompanyFilter(e.target.value)}>
-              <MenuItem value="ALL">บริษัททั้งหมด</MenuItem>
-              {uniqueCompanies.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}
-            </Select>
-          </Box>
-          <Box>
-            <Typography sx={{ fontSize: 11, fontWeight: 500, color: 'text.secondary', mb: 0.75, textTransform: 'uppercase', letterSpacing: '0.05em' }}>ผู้ดูแล/หัวหน้างาน (Lead)</Typography>
-            <Select fullWidth size="small" value={selectedLead} onChange={e => setSelectedLead(e.target.value)}>
-              <MenuItem value="ALL">ผู้ดูแลทั้งหมด</MenuItem>
-              {uniqueLeads.map(l => <MenuItem key={l} value={l}>{l}</MenuItem>)}
-            </Select>
-          </Box>
-          <Box>
-            <Typography sx={{ fontSize: 11, fontWeight: 500, color: 'text.secondary', mb: 0.75, textTransform: 'uppercase', letterSpacing: '0.05em' }}>สถานะ (Status)</Typography>
-            <Select fullWidth size="small" value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)}>
-              <MenuItem value="ALL">ทุกสถานะ</MenuItem>
-              <MenuItem value="COMPLETED">เสร็จสิ้นแล้ว</MenuItem>
-              <MenuItem value="IN_PROGRESS">กำลังดำเนินการ</MenuItem>
-              <MenuItem value="PENDING">รอดำเนินการ</MenuItem>
-            </Select>
-          </Box>
-          <Box>
-            <Typography sx={{ fontSize: 11, fontWeight: 500, color: 'text.secondary', mb: 0.75, textTransform: 'uppercase', letterSpacing: '0.05em' }}>ค้นหาบริษัท หรือ แผนก</Typography>
-            <TextField fullWidth size="small" placeholder="พิมพ์ค้นหา..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-          </Box>
-        </Box>
+      {/* ── Filters ────────────────────────────────────────────── */}
+      <Card variant="outlined" className="pms-noprint" sx={{ p: 1.4, mb: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
+        {filterRow('สถานะแผน', PLAN_STATES.map(s => {
+          const n = dated.filter(p => p.state === s.key && matchesPlan(p, sel, 'state')).length;
+          return (
+            <Chip key={s.key} variant="outlined" size="small" onClick={() => toggle('state', s.key)}
+              sx={chipSx(sel.state.has(s.key), colors[s.key])}
+              icon={<Box sx={{ width: 7, height: 7, borderRadius: '2px', bgcolor: colors[s.key], ml: '7px !important' }} />}
+              label={<>{s.label} <Box component="span" sx={{ fontSize: 9.5, opacity: 0.7 }}>{fmt(n)}</Box></>} />
+          );
+        }), true)}
+        {filterRow('บริษัท', dimCounts('company').map(c => (
+          <Chip key={c.name} variant="outlined" size="small" onClick={() => toggle('company', c.name)}
+            sx={chipSx(sel.company.has(c.name))}
+            label={<>{c.name} <Box component="span" sx={{ fontSize: 9.5, opacity: 0.65 }}>{fmt(c.count)}</Box></>} />
+        )))}
+        {filterRow('แผนก', dimCounts('dept').map(c => (
+          <Chip key={c.name} variant="outlined" size="small" onClick={() => toggle('dept', c.name)}
+            sx={chipSx(sel.dept.has(c.name))}
+            label={<>{c.name} <Box component="span" sx={{ fontSize: 9.5, opacity: 0.65 }}>{fmt(c.count)}</Box></>} />
+        )))}
       </Card>
 
-      {/* ── Gantt Chart Card ── */}
-      <Paper variant="outlined" className="pms-card">
-        <Box sx={{ p: '10px 18px', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.25, alignItems: 'center' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-            <BarChartIcon fontSize="small" color="action" />
-            <Box>
-              <Typography sx={{ fontSize: 13, fontWeight: 700 }}>ตารางแผนงาน (Gantt Chart) - {viewMode === 'daily' ? 'รายวัน' : 'รายสัปดาห์'}</Typography>
-              <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 0.25 }}>
-                {columns[0]?.subLabel} ถึง {columns[columns.length - 1]?.subLabel} {selectedYear + 543}
-                {' · '}
-                <Box component="span" sx={{ fontWeight: 600 }}>{filteredPlans.length} แผนงาน</Box>
-                {' · '}
-                <Box component="span" sx={{ fontWeight: 600 }}>{totalPlanned} เครื่อง</Box>
-                {' · '}
-                <Box component="span" sx={{ color: `${getProgressColor(overallPct)}.main`, fontWeight: 700 }}>{overallPct}%</Box>
-              </Typography>
-            </Box>
-          </Box>
-
-          <Box className="no-print" sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
-            <Box sx={{ display: 'flex', gap: 0.5 }}>
-              <Button size="small" variant="outlined" startIcon={<UnfoldLessIcon fontSize="small" />} onClick={collapseAll}>ยุบทั้งหมด</Button>
-              <Button size="small" variant="outlined" startIcon={<UnfoldMoreIcon fontSize="small" />} onClick={expandAll}>ขยายทั้งหมด</Button>
-            </Box>
-
-            <Box sx={{ width: '1px', height: 20, bgcolor: 'divider' }} />
-
-            <ToggleButtonGroup size="small" exclusive value={viewMode} onChange={(_, v) => { if (v) { setViewMode(v); setTimeOffset(0); } }}>
-              <ToggleButton value="daily" sx={{ fontSize: 11 }}>รายวัน</ToggleButton>
-              <ToggleButton value="weekly" sx={{ fontSize: 11 }}>รายสัปดาห์</ToggleButton>
-            </ToggleButtonGroup>
-
-            <Box sx={{ display: 'flex', gap: 0.5 }}>
-              <IconButton size="small" onClick={() => setTimeOffset(prev => prev - (viewMode === 'weekly' ? 1 : 7))}><ChevronLeftIcon fontSize="small" /></IconButton>
-              <IconButton size="small" onClick={() => setTimeOffset(0)} disabled={timeOffset === 0}><RestartAltIcon fontSize="small" /></IconButton>
-              <IconButton size="small" onClick={() => setTimeOffset(prev => prev + (viewMode === 'weekly' ? 1 : 7))}><ChevronRightIcon fontSize="small" /></IconButton>
-            </Box>
-          </Box>
-        </Box>
-
-        <TableContainer sx={{ maxHeight: '65vh' }}>
-          <Table className="gantt-table" size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ width: 40, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2, fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>WBS</TableCell>
-                <TableCell sx={{ minWidth: 160, bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2, fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>TASK (บริษัท / แผนกงาน)</TableCell>
-                <TableCell sx={{ width: 60, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2, fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>LEAD</TableCell>
-                <TableCell sx={{ width: 40, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2, fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>แผน</TableCell>
-                <TableCell sx={{ width: 40, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2, fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>เสร็จ</TableCell>
-                <TableCell sx={{ width: 40, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2, fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>เหลือ</TableCell>
-                <TableCell sx={{ width: 60, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2, fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>START</TableCell>
-                <TableCell sx={{ width: 60, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2, fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>END</TableCell>
-                <TableCell sx={{ width: 30, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2, fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>วัน</TableCell>
-                <TableCell sx={{ width: 40, textAlign: 'center', bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 2, fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>%</TableCell>
-                {columns.map(col => {
-                  const isToday = isTodayInCol(col);
+      {/* ── Gantt 1: company roll-up ───────────────────────────── */}
+      <Box sx={{ mb: 1.5 }} className="pms-gantt-company">
+        <SectionCard title="ภาพรวมรายบริษัท" icon={Building2}>
+          <Typography sx={{ fontSize: 10.5, color: 'text.disabled', mb: 1 }}>
+            แต่ละแท่งคือช่วงเวลารวมของทุกแผนในบริษัทนั้น
+          </Typography>
+          {!timeline || !byCompany.length ? noTimeline : (
+            <Box sx={{ overflowX: 'auto' }}>
+              <Box sx={{ minWidth: 700 }}>
+                <GanttAxis tl={timeline} today={today} />
+                {byCompany.map(g => {
+                  const st = groupState(g);
+                  const late = g.plans.filter(p => p.state === 'OVERDUE').length;
                   return (
-                    <TableCell
-                      key={col.start.getTime()}
-                      sx={{
-                        width: viewMode === 'daily' ? 40 : 80,
-                        textAlign: 'center',
-                        minWidth: viewMode === 'daily' ? 35 : 75,
-                        bgcolor: isToday ? (t) => alpha(t.palette.error.main, 0.1) : 'action.hover',
-                        borderLeft: isToday ? '2.5px solid' : undefined,
-                        borderRight: isToday ? '2.5px solid' : undefined,
-                        borderLeftColor: isToday ? 'error.main' : undefined,
-                        borderRightColor: isToday ? 'error.main' : undefined,
-                        position: 'sticky', top: 0, zIndex: 2,
-                        fontSize: 11, fontWeight: 600, color: 'text.secondary',
-                      }}
-                    >
-                      {col.label}<br />
-                      <Box component="span" sx={{ fontSize: 10, fontWeight: isToday ? 700 : 400, color: isToday ? 'error.main' : 'text.secondary' }}>
-                        {isToday ? '★ วันนี้' : col.subLabel.split(' ')[0]}
+                    <GanttRow key={g.name} sx={{ borderBottom: `1px solid ${theme.palette.divider}` }}>
+                      <Box sx={gutterSx}>
+                        <Typography sx={nameSx}>{g.name}</Typography>
+                        <StatePill state={st} />
                       </Box>
-                    </TableCell>
+                      <GanttTrack tl={timeline} today={today} height={ROW_H.company}>
+                        <GanttBar
+                          tl={timeline} start={g.start} end={g.end} state={st}
+                          done={g.done} total={g.total} target={g.target} height={24}
+                          title={g.name}
+                          subtitle={`${g.plans.length} แผน${late ? ` · เกินกำหนด ${late} แผน` : ''}`}
+                        />
+                      </GanttTrack>
+                      <Box sx={metaSx}><b>{pct(g.done, g.total)}%</b></Box>
+                    </GanttRow>
                   );
                 })}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {/* ── Level 0: Total Summary Row ── */}
-              <TableRow sx={{ bgcolor: 'action.hover' }}>
-                <TableCell sx={{ textAlign: 'center', color: 'text.secondary', fontWeight: 600, fontSize: 12 }}>1</TableCell>
-                <TableCell sx={{ fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 0.5 }}><CorporateFareIcon sx={{ fontSize: 14 }} /> TRR GROUP (ทั้งหมดในระบบ)</TableCell>
-                <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>-</TableCell>
-                <TableCell sx={{ textAlign: 'center', fontWeight: 600, fontSize: 12 }}>{totalPlanned}</TableCell>
-                <TableCell sx={{ textAlign: 'center', fontWeight: 600, fontSize: 12 }}>{totalCompleted}</TableCell>
-                <TableCell sx={{ textAlign: 'center', color: 'error.main', fontWeight: 600, fontSize: 12 }}>{totalPlanned - totalCompleted}</TableCell>
-                <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>-</TableCell>
-                <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>-</TableCell>
-                <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>-</TableCell>
-                <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>
-                  <Box component="span" sx={{ color: `${getProgressColor(overallPct)}.main`, fontWeight: 600 }}>{overallPct}%</Box>
-                </TableCell>
-                <TableCell colSpan={columns.length} sx={{ bgcolor: (t) => alpha(t.palette.success.main, 0.08), textAlign: 'center', fontSize: 11, color: 'success.main', fontWeight: 600 }}>
-                  {overallPct >= 100 ? 'เสร็จสิ้นโครงการ PM แล้ว' : 'กำลังดำเนินการตามแผน'}
-                </TableCell>
-              </TableRow>
-
-              {/* ── Grouped Sites Rows ── */}
-              {groupedPlans.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={10 + columns.length} sx={{ textAlign: 'center', py: 3, color: 'text.secondary', fontSize: 12 }}>
-                    ไม่มีข้อมูลกำหนดการสำหรับปี {selectedYear + 543}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                groupedPlans.map((group, groupIdx) => {
-                  const sitePct = group.totalPlanned > 0 ? Math.round(group.totalCompleted / group.totalPlanned * 100) : 0;
-                  const isExpanded = expandedSites[group.site] === true;
-                  const siteWbs = `1.${groupIdx + 1}`;
-                  const siteDays = (group.startDate && group.endDate) ? Math.max(1, Math.ceil((group.endDate.getTime() - group.startDate.getTime()) / 86400000)) : '-';
-
-                  const siteDummyPlan = {
-                    startDate: group.startDate,
-                    endDate: group.endDate,
-                    site: group.site,
-                    deptTask: 'ภาพรวม'
-                  };
-
-                  return (
-                    <React.Fragment key={group.site}>
-                      <TableRow hover onClick={() => toggleSite(group.site)} sx={{ bgcolor: 'action.hover', fontWeight: 600, cursor: 'pointer' }}>
-                        <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>{siteWbs}</TableCell>
-                        <TableCell sx={{ fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <ChevronRightRotateIcon sx={{ fontSize: 14, transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s', color: 'primary.main' }} />
-                          <BusinessIcon sx={{ fontSize: 14 }} /> {group.site}
-                        </TableCell>
-                        <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>{group.lead || '-'}</TableCell>
-                        <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>{group.totalPlanned}</TableCell>
-                        <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>{group.totalCompleted}</TableCell>
-                        <TableCell sx={{ textAlign: 'center', color: 'error.main', fontSize: 12 }}>{group.totalPlanned - group.totalCompleted}</TableCell>
-                        <TableCell sx={{ textAlign: 'center', fontSize: 11, color: 'text.secondary' }}>{group.startDate ? fmtDate(group.startDate) : '-'}</TableCell>
-                        <TableCell sx={{ textAlign: 'center', fontSize: 11, color: 'text.secondary' }}>{group.endDate ? fmtDate(group.endDate) : '-'}</TableCell>
-                        <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>{siteDays}</TableCell>
-                        <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>
-                          <Box component="span" sx={{ color: 'success.main', fontWeight: 600 }}>{sitePct}%</Box>
-                        </TableCell>
-                        {columns.map(col => renderGanttCell(siteDummyPlan, col, sitePct, true))}
-                      </TableRow>
-
-                      {isExpanded && group.plans.map((plan, planIdx) => {
-                        const planPct = plan.plannedDeviceCount > 0 ? Math.round((plan.completedCount || 0) / plan.plannedDeviceCount * 100) : 0;
-                        const planWbs = `${siteWbs}.${planIdx + 1}`;
-
-                        const pStartVal = plan.startDate ? new Date(plan.startDate) : null;
-                        const pEndVal = plan.endDate ? new Date(plan.endDate) : null;
-                        const pDays = (pStartVal && pEndVal) ? Math.max(1, Math.ceil((pEndVal.getTime() - pStartVal.getTime()) / 86400000)) : '-';
-
-                        return (
-                          <TableRow
-                            key={plan.id}
-                            hover
-                            sx={{ cursor: 'pointer' }}
-                            onClick={() => navigate(`/pm/runs?planId=${plan.id}`)}
-                          >
-                            <TableCell sx={{ textAlign: 'center', color: 'text.secondary', fontSize: 11 }}>{planWbs}</TableCell>
-                            <TableCell sx={{ pl: 3.5, fontSize: 12 }}>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><FolderIcon sx={{ fontSize: 13 }} /> {plan.deptTask || 'ทั่วไป'}</Box>
-                              {plan.deviceType && (
-                                <Box sx={{ fontSize: 11, color: 'info.main', fontWeight: 600, mt: 0.25, pl: 2.25, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  <ComputerIcon sx={{ fontSize: 11 }} /> {plan.deviceType}
-                                </Box>
-                              )}
-                            </TableCell>
-                            <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>{plan.lead || group.lead || '-'}</TableCell>
-                            <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>{plan.plannedDeviceCount}</TableCell>
-                            <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>{plan.completedCount || 0}</TableCell>
-                            <TableCell sx={{ textAlign: 'center', color: 'error.main', fontSize: 12 }}>{plan.plannedDeviceCount - (plan.completedCount || 0)}</TableCell>
-                            <TableCell sx={{ textAlign: 'center', fontSize: 11, color: 'text.secondary' }}>{pStartVal ? fmtDate(pStartVal) : '-'}</TableCell>
-                            <TableCell sx={{ textAlign: 'center', fontSize: 11, color: 'text.secondary' }}>{pEndVal ? fmtDate(pEndVal) : '-'}</TableCell>
-                            <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>{pDays}</TableCell>
-                            <TableCell sx={{ textAlign: 'center', fontSize: 12 }}>
-                              <Box component="span" sx={{ color: `${getProgressColor(planPct)}.main`, fontWeight: 600 }}>{planPct}%</Box>
-                            </TableCell>
-                            {columns.map(col => renderGanttCell(plan, col, planPct))}
-                          </TableRow>
-                        );
-                      })}
-                    </React.Fragment>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
-
-      {/* ── Weekly Summary + Scheduling Conditions ── */}
-      <Box className="no-print" sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', mt: 2.5, flexWrap: 'wrap' }}>
-        <Paper variant="outlined" sx={{ flex: '1 1 480px', minWidth: 0 }}>
-          <Box sx={{ p: '14px 18px', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography sx={{ fontSize: 13, fontWeight: 700 }}>สรุปงานตามสัปดาห์</Typography>
-            <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>จำนวนเครื่องที่วางแผนทำ PM</Typography>
-          </Box>
-          {viewMode !== 'weekly' ? (
-            <Box sx={{ p: 3, textAlign: 'center', color: 'text.secondary', fontSize: 12 }}>สลับเป็นมุมมอง "รายสัปดาห์" ด้านบนเพื่อดูสรุปนี้</Box>
-          ) : weeklySummaryRows.length === 0 ? (
-            <Box sx={{ p: 3, textAlign: 'center', color: 'text.secondary', fontSize: 12 }}>ไม่มีแผน PM ในช่วงสัปดาห์ที่แสดงอยู่</Box>
-          ) : (
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>สัปดาห์</TableCell>
-                    <TableCell sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>ช่วงวันที่</TableCell>
-                    <TableCell sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>บริษัท / แผนก</TableCell>
-                    <TableCell sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary' }} align="center">เป้าหมาย (เครื่อง)</TableCell>
-                    <TableCell sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>ทีมที่ลงงาน</TableCell>
-                    <TableCell sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary' }}>สถานะ</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {weeklySummaryRows.map((row) => (
-                    <TableRow key={row.key} hover>
-                      <TableCell sx={{ fontSize: 12, fontWeight: 700, color: 'info.main' }}>{row.col.label}</TableCell>
-                      <TableCell sx={{ fontSize: 11, color: 'text.secondary' }}>
-                        {formatThaiMonthDay(row.col.start)} – {formatThaiMonthDay(row.col.end)}
-                      </TableCell>
-                      <TableCell sx={{ fontSize: 12 }}>{row.deptLabel}</TableCell>
-                      <TableCell sx={{ fontSize: 12 }} align="center">{row.target}</TableCell>
-                      <TableCell sx={{ fontSize: 12 }}>{row.teamLabel}</TableCell>
-                      <TableCell sx={{ fontSize: 12 }}>
-                        <Chip size="small" label={row.status.label} color={row.status.color === 'default' ? undefined : row.status.color} variant={row.status.color === 'default' ? 'outlined' : 'filled'} sx={{ fontSize: 11, height: 22 }} />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </Paper>
-
-        <Paper variant="outlined" sx={{ width: 320, flex: 'none', p: '16px 18px' }}>
-          <Typography sx={{ fontSize: 13, fontWeight: 700, mb: 1.5 }}>เงื่อนไขการจัดตาราง</Typography>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            {[
-              { label: 'หน่วยเวลา', sub: viewMode === 'weekly' ? 'วางแผนเป็นรายสัปดาห์ (W)' : 'วางแผนเป็นรายวัน', val: viewMode === 'weekly' ? 'รายสัปดาห์' : 'รายวัน' },
-              { label: 'หัวหน้าโครงการ', sub: 'กรองดูตารางเฉพาะทีมได้', val: `${uniqueLeads.length} คน` },
-              { label: 'วันเริ่ม PM', sub: 'กำหนดจุดตั้งต้นของทั้งโครงการ', val: pmStartDate ? fmtDate(pmStartDate) : '—' },
-              { label: 'อัตราความเร็วจริง', sub: teamPaceLabel ? `เฉลี่ยจากข้อมูลจริง ${teamPaceLabel.perDay} เครื่อง/วัน` : 'ยังไม่มีข้อมูลงานที่เสร็จ', val: teamPaceLabel ? `${teamPaceLabel.perWeek} เครื่อง/สัปดาห์` : '—' },
-              { label: 'ส่งออก', sub: 'Excel พร้อมหัวตารางสัปดาห์', val: 'XLSX' },
-            ].map((row) => (
-              <Box key={row.label} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, p: '10px 12px', borderRadius: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'action.hover' }}>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography sx={{ fontSize: 12 }}>{row.label}</Typography>
-                  <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>{row.sub}</Typography>
-                </Box>
-                <Typography sx={{ fontSize: 12, fontWeight: 700, color: 'info.main', whiteSpace: 'nowrap' }}>{row.val}</Typography>
               </Box>
-            ))}
-          </Box>
-        </Paper>
+            </Box>
+          )}
+          <GanttLegend />
+        </SectionCard>
       </Box>
 
-      {/* ── Toast Notification ── */}
-      <Snackbar open={!!toast} autoHideDuration={3000} onClose={() => setToast(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
-        <Alert severity={toast?.startsWith('❌') ? 'error' : 'success'} variant="filled" sx={{ whiteSpace: 'nowrap' }}>
-          {toast}
-        </Alert>
-      </Snackbar>
+      {/* ── Gantt 2: per department ────────────────────────────── */}
+      <Box className="pms-gantt-dept">
+        <SectionCard title="รายละเอียดรายแผนก" icon={LayoutList}>
+          <Typography sx={{ fontSize: 10.5, color: 'text.disabled', mb: 1 }}>
+            คลิกชื่อบริษัทเพื่อย่อ/ขยาย
+          </Typography>
+          {!timeline || !byCompany.length ? noTimeline : (
+            <Box sx={{ overflowX: 'auto' }}>
+              <Box sx={{ minWidth: 700 }}>
+                <GanttAxis tl={timeline} today={today} />
+                {byCompany.map(co => {
+                  const open = !collapsed[co.name];
+                  const depts: SchedGroup[] = rollup(co.plans, 'dept');
+                  return (
+                    <React.Fragment key={co.name}>
+                      <GanttRow sx={{
+                        bgcolor: theme.palette.action.hover,
+                        borderBottom: `1px solid ${theme.palette.divider}`,
+                      }}>
+                        <Box
+                          role="button" tabIndex={0}
+                          onClick={() => setCollapsed(c => ({ ...c, [co.name]: !c[co.name] }))}
+                          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setCollapsed(c => ({ ...c, [co.name]: !c[co.name] })); } }}
+                          sx={{ ...gutterSx, cursor: 'pointer', userSelect: 'none', '&:hover': { color: 'primary.main' } }}
+                        >
+                          <ExpandMoreIcon sx={{
+                            fontSize: 14, color: 'text.disabled', flex: 'none',
+                            transform: open ? 'none' : 'rotate(-90deg)', transition: 'transform .18s',
+                          }} />
+                          <Typography sx={{ ...nameSx, fontWeight: 700, fontSize: 11 }}>{co.name}</Typography>
+                          <Typography sx={subSx}>{depts.length} แผนก · {co.plans.length} แผน</Typography>
+                        </Box>
+                        <GanttTrack tl={timeline} today={today} height={ROW_H.group} />
+                        <Box sx={metaSx}>{fmt(co.done)}/{fmt(co.total)}</Box>
+                      </GanttRow>
+
+                      {open && depts.map(dp => (
+                        <GanttRow key={`${co.name}-${dp.name}`} sx={{ borderBottom: `1px solid ${theme.palette.divider}` }}>
+                          <Box sx={{ ...gutterSx, pl: 2.75 }}>
+                            <Typography sx={nameSx}>{dp.name}</Typography>
+                            {dp.plans.length > 1 && <Typography sx={subSx}>{dp.plans.length} แผน</Typography>}
+                          </Box>
+                          <GanttTrack tl={timeline} today={today} height={ROW_H.dept}>
+                            {/* one bar per plan, so a department running two
+                                separate windows shows two bars rather than one
+                                span that covers the gap between them */}
+                            {dp.plans.map(p => (
+                              <GanttBar
+                                key={p.id} tl={timeline} start={p.start!} end={p.end!} state={p.state}
+                                done={p.done} total={p.total} target={p.target} height={15}
+                                title={`${dp.name} · ${p.company}`}
+                                subtitle={`แผน #${p.id}${p.deviceType ? ` · ${p.deviceType}` : ''}`}
+                              />
+                            ))}
+                          </GanttTrack>
+                          <Box sx={metaSx}>{fmt(dp.done)}/{fmt(dp.total)}</Box>
+                        </GanttRow>
+                      ))}
+                    </React.Fragment>
+                  );
+                })}
+              </Box>
+            </Box>
+          )}
+
+          {undated.length > 0 && (
+            <Typography sx={{
+              mt: 1.25, fontSize: 10.5, color: 'text.secondary', p: '7px 10px',
+              bgcolor: theme.palette.action.hover, borderRadius: '7px',
+              borderLeft: `2px solid ${theme.palette.primary.main}`,
+            }}>
+              <b>ไม่ได้อยู่ในกำหนดการ:</b> {undated.map(p => p.dept).join(', ')} — รวม{' '}
+              <b>{fmt(undated.reduce((a, p) => a + p.done, 0))} เครื่อง</b> ที่ทำ PM แล้วแต่ไม่ได้ระบุช่วงเวลา
+              จึงวางบนไทม์ไลน์ไม่ได้
+            </Typography>
+          )}
+        </SectionCard>
+      </Box>
+
+      <Snackbar open={!!toast} autoHideDuration={3500} onClose={() => setToast('')}
+        message={toast} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }} />
     </Box>
   );
 }
+
+/**
+ * Print rules. The screen page is a tool; the printed page is a document, so it
+ * drops the app shell and every control, prints in the light palette whatever
+ * the viewer's theme, and forces the bar fills to actually ink.
+ */
+const printStyles = (theme: any) => ({
+  '@media print': {
+    '@page': { size: 'A4 landscape', margin: '12mm 10mm 14mm' },
+    'body': { background: '#fff !important' },
+    '*': { WebkitPrintColorAdjust: 'exact !important', printColorAdjust: 'exact !important' },
+    ['.MuiDrawer-root, header.MuiAppBar-root, .MuiBreadcrumbs-root, .app-noprint, '
+      + '.pms-noprint, .MuiSnackbar-root, .MuiTooltip-popper, .MuiMenu-root']: {
+      display: 'none !important',
+    },
+    '.pms-printhead': { display: 'block !important', marginBottom: '4mm' },
+    '.pms-ph-top': {
+      display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '14mm',
+      borderBottom: `2.5px solid ${theme.palette.primary.main}`, paddingBottom: '2.5mm',
+    },
+    '.pms-ph-org': { fontSize: '8.5pt', fontWeight: 600, color: theme.palette.primary.main, letterSpacing: '.04em' },
+    '.pms-ph-title': { fontSize: '15pt', fontWeight: 700, marginTop: '1.5mm', letterSpacing: '-.01em' },
+    '.pms-ph-year': { fontSize: '9.5pt', color: '#4b5c72', marginTop: '1mm' },
+    '.pms-ph-meta': { fontSize: '8pt', color: '#4b5c72', textAlign: 'right', lineHeight: 1.7, flex: 'none' },
+    '.pms-ph-scope': {
+      marginTop: '2.5mm', fontSize: '8.5pt', background: '#f2f5f9',
+      borderLeft: `2.5px solid ${theme.palette.primary.main}`, padding: '2mm 3mm', borderRadius: '3px',
+    },
+    '.MuiCard-root, .MuiPaper-root': { breakInside: 'avoid', boxShadow: 'none !important' },
+    // the timeline must not be cut off, so it prints unscrolled at full width
+    '.pms-gantt-company [style*="overflow-x"], .pms-gantt-dept [style*="overflow-x"]': { overflow: 'visible !important' },
+    '.pms-gantt-dept': { breakBefore: 'page' },
+  },
+});

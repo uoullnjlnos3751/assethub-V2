@@ -1,8 +1,8 @@
-import * as XLSX from 'xlsx';
 import {
   CoveragePayload, Selection, SourceMode, STATE_LABEL, filterPlans, filterRows,
   groupBy, pct, planStatus, scopeBits, stateUnder, statesFor, tally,
 } from './pmCoverage';
+import { Rows, stamp, writeCsv, writeWorkbook } from '../../utils/spreadsheet';
 
 /**
  * PM report exports.
@@ -153,79 +153,24 @@ export const REPORTS: ReportDef[] = [
 
 export const reportByKey = (key: ReportKey) => REPORTS.find(r => r.key === key)!;
 
-const stamp = () => {
-  const d = new Date();
-  const z = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}`;
-};
-
 /** Mode goes in the filename so two exports taken minutes apart stay distinguishable. */
 const modeTag = (mode: SourceMode) => (mode === 'ALL' ? '' : `-${mode.toLowerCase()}`);
 
-function triggerDownload(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.style.display = 'none';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 2000);
-}
-
-/** Column widths sized off the content so Thai text is not clipped in Excel. */
-function autoWidth(rows: (string | number)[][]) {
-  const widths: number[] = [];
-  for (const row of rows) {
-    row.forEach((cell, i) => {
-      const len = String(cell ?? '').length;
-      if (!widths[i] || widths[i] < len) widths[i] = len;
-    });
-  }
-  return widths.map(w => ({ wch: Math.min(Math.max(w + 2, 10), 48) }));
-}
-
-const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-
-/** Sheet names cannot exceed 31 chars or contain []:*?/\ — Thai labels get trimmed. */
-const sheetName = (label: string) => label.replace(/[[\]:*?/\\]/g, ' ').slice(0, 31);
-
-function sheetFor(rows: (string | number)[][]) {
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = autoWidth(rows);
-  return ws;
-}
-
 /** One .xlsx holding every report as its own sheet. */
 export function exportWorkbook(data: CoveragePayload, sel: Selection, mode: SourceMode) {
-  const wb = XLSX.utils.book_new();
-  for (const rep of REPORTS) {
-    XLSX.utils.book_append_sheet(wb, sheetFor(rep.build(data, sel, mode)), sheetName(rep.label));
-  }
-  const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-  triggerDownload(new Blob([out], { type: XLSX_MIME }),
-    `PM-report-${data.year + 543}${modeTag(mode)}-${stamp()}.xlsx`);
+  writeWorkbook(
+    REPORTS.map(rep => ({ name: rep.label, rows: rep.build(data, sel, mode) as Rows })),
+    `PM-report-${data.year + 543}${modeTag(mode)}-${stamp()}.xlsx`,
+  );
 }
 
 export function exportSheet(data: CoveragePayload, sel: Selection, mode: SourceMode, key: ReportKey) {
   const rep = reportByKey(key);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, sheetFor(rep.build(data, sel, mode)), sheetName(rep.label));
-  const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-  triggerDownload(new Blob([out], { type: XLSX_MIME }), `PM-${key}${modeTag(mode)}-${stamp()}.xlsx`);
+  writeWorkbook([{ name: rep.label, rows: rep.build(data, sel, mode) as Rows }],
+    `PM-${key}${modeTag(mode)}-${stamp()}.xlsx`);
 }
 
 export function exportCsv(data: CoveragePayload, sel: Selection, mode: SourceMode, key: ReportKey) {
   const rep = reportByKey(key);
-  const body = rep.build(data, sel, mode).map(row =>
-    row.map(cell => {
-      const v = cell === null || cell === undefined ? '' : String(cell);
-      return /[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
-    }).join(','),
-  ).join('\r\n');
-  // Excel on a Thai Windows install reads a BOM-less UTF-8 CSV as TIS-620 and
-  // mangles every Thai column, so the BOM is not optional here.
-  triggerDownload(new Blob([`﻿${body}`], { type: 'text/csv;charset=utf-8' }),
-    `PM-${key}${modeTag(mode)}-${stamp()}.csv`);
+  writeCsv(rep.build(data, sel, mode) as Rows, `PM-${key}${modeTag(mode)}-${stamp()}.csv`);
 }
