@@ -78,13 +78,14 @@ import {
   VIEW_MODE_KEY,
   DENSITY_KEY,
 } from './assetListConfig';
+import { custodyHolderLabel } from '../../constants/custodyHolders';
 
 export default function AssetListPage() {
   const { user } = useAuth();
   const toast = useToast();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [assets, setAssets] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -92,6 +93,11 @@ export default function AssetListPage() {
   const [statuses, setStatuses] = useState<string[]>(searchParams.get('status') ? [searchParams.get('status') as string] : []);
   const [type, setType] = useState(searchParams.get('type') || '');
   const typeGroup = searchParams.get('typeGroup') || '';
+  // Custody filter is URL-driven (the sidebar links to ?custodyHolder=HR_TRR).
+  // Read at component level, not inside fetchAssets, so it can sit in the
+  // effect's dep array — otherwise clicking the link from /assets would change
+  // the URL without refetching.
+  const custodyHolder = searchParams.get('custodyHolder') || '';
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [categories, setCategories] = useState<any[]>([]);
   const [typeOptions, setTypeOptions] = useState<string[]>([]);
@@ -179,6 +185,7 @@ export default function AssetListPage() {
         company: qCompany !== null ? (qCompany === '' ? '__EMPTY__' : qCompany) : (company || undefined),
         serialNo: qSerialNo !== null ? (qSerialNo === '' ? '__EMPTY__' : qSerialNo) : undefined,
         location: qLocation !== null ? (qLocation === '' ? '__EMPTY__' : qLocation) : undefined,
+        custodyHolder: custodyHolder || undefined,
         warrantyStatus: warrantyStatus || undefined,
         purchaseDateFrom: purchaseDateFrom || undefined,
         purchaseDateTo: purchaseDateTo || undefined,
@@ -213,7 +220,7 @@ export default function AssetListPage() {
   useEffect(() => {
     fetchAssets();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pageSize, statuses, type, typeGroup, selectedCategoryId, company, warrantyStatus, purchaseDateFrom, purchaseDateTo]);
+  }, [page, pageSize, statuses, type, typeGroup, selectedCategoryId, company, warrantyStatus, purchaseDateFrom, purchaseDateTo, custodyHolder]);
 
   const urlSearch = searchParams.get('search');
   useEffect(() => {
@@ -285,6 +292,13 @@ export default function AssetListPage() {
     statuses.forEach((s) => chips.push({ key: `status-${s}`, label: statusLabels[s] || s, onDelete: () => setStatuses((prev) => prev.filter((x) => x !== s)) }));
     if (type) chips.push({ key: 'type', label: `ประเภท: ${type}`, onDelete: () => setType('') });
     if (company) chips.push({ key: 'company', label: `บริษัท: ${company}`, onDelete: () => setCompany('') });
+    if (custodyHolder) {
+      chips.push({
+        key: 'custodyHolder',
+        label: custodyHolder === '__ANY__' ? 'รับฝากอยู่ (ทุกจุด)' : `รับฝากที่: ${custodyHolderLabel(custodyHolder)}`,
+        onDelete: () => { const next = new URLSearchParams(searchParams); next.delete('custodyHolder'); setSearchParams(next); },
+      });
+    }
     if (warrantyStatus) chips.push({ key: 'warranty', label: `ประกัน: ${warrantyStatusLabels[warrantyStatus] || warrantyStatus}`, onDelete: () => setWarrantyStatus('') });
     if (purchaseDateFrom || purchaseDateTo) {
       chips.push({
@@ -294,7 +308,8 @@ export default function AssetListPage() {
       });
     }
     return chips;
-  }, [search, statuses, type, company, warrantyStatus, purchaseDateFrom, purchaseDateTo]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, statuses, type, company, warrantyStatus, purchaseDateFrom, purchaseDateTo, custodyHolder]);
 
   const advancedFilterCount = (warrantyStatus ? 1 : 0) + (purchaseDateFrom || purchaseDateTo ? 1 : 0);
 

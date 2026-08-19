@@ -69,6 +69,12 @@ export const userNavItems: NavItem[] = [
   { label: 'ประวัติการยืม', path: '/borrow/my-history', icon: <HistoryIcon fontSize="small" /> },
 ];
 
+// ฝ่ายบุคคลที่รับฝากเครื่องคืนตอนพนักงานลาออก — เห็นเมนูเดียวเท่านั้น
+// (ถ้าไม่มีรายการนี้ HR จะตกไปใช้ userNavItems แล้วได้เมนูยืม-คืนที่ไม่เกี่ยวข้อง)
+export const custodyNavItems: NavItem[] = [
+  { label: 'เครื่องที่รับฝาก', path: '/custody', icon: <AssignmentReturnIcon fontSize="small" /> },
+];
+
 // จัดโครงสร้างตาม ITAM lifecycle: ภาพรวม → ทะเบียน/คลัง → ยืม-คืน → ซ่อมบำรุง → จำหน่ายออก → รายงาน → ตั้งค่า
 export const adminNav: NavEntry[] = [
   { label: 'แดชบอร์ด', path: '/dashboard', icon: <DashboardIcon fontSize="small" />, section: 'ภาพรวมระบบ' },
@@ -88,6 +94,7 @@ export const adminNav: NavEntry[] = [
       { label: 'นำเข้า/ส่งออก ข้อมูล', path: '/assets/import-export', icon: <ImportExportIcon fontSize="small" />, roles: ['SUPERADMIN', 'IT_ADMIN'] },
       { label: 'พิมพ์ QR สติ๊กเกอร์', path: '/assets/print-qr', icon: <PrintIcon fontSize="small" />, roles: ['SUPERADMIN', 'IT_ADMIN'] },
       { label: 'ตรวจสอบข้อมูลจาก Agent', path: '/assets/agent-drift', icon: <RouterIcon fontSize="small" />, roles: ['SUPERADMIN', 'IT_ADMIN'] },
+      { label: 'เครื่องที่ฝ่ายบุคคลรับฝาก', path: '/assets?custodyHolder=HR_TRR', icon: <AssignmentReturnIcon fontSize="small" />, roles: ['SUPERADMIN', 'IT_ADMIN'] },
     ],
   },
   {

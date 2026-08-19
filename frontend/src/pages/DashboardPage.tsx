@@ -26,6 +26,7 @@ import { WarrantyAlertsCard } from './dashboard/components/WarrantyAlertsCard';
 import { ContractLicenseSummary } from './dashboard/components/ContractLicenseSummary';
 import { ModuleStatusCard } from './dashboard/components/ModuleStatusCard';
 import { ExternalAgentsSummaryCard } from './dashboard/components/ExternalAgentsSummaryCard';
+import { CustodySummaryCard, CustodySummaryEntry } from './dashboard/components/CustodySummaryCard';
 import { CategoryUtilizationCard } from './dashboard/components/CategoryUtilizationCard';
 import { now, pct } from './dashboard/dashboardHelpers';
 
@@ -46,6 +47,7 @@ export default function DashboardPage() {
   const [licenseList, setLicenseList] = useState<any[]>([]);
   const [onlineNow, setOnlineNow] = useState<any[]>([]);
   const [externalAgentsSummary, setExternalAgentsSummary] = useState<any>(null);
+  const [custodySummary, setCustodySummary] = useState<{ data: CustodySummaryEntry[]; total: number }>({ data: [], total: 0 });
   const [moduleStatus, setModuleStatus] = useState<any>(null);
   const [categoryUtilization, setCategoryUtilization] = useState<any[]>([]);
   const [inventoryLowStock, setInventoryLowStock] = useState<any>(null);
@@ -94,6 +96,12 @@ export default function DashboardPage() {
       dashboardAPI.externalAgentsSummary()
         .then(r => setExternalAgentsSummary(r.data?.available ? r.data.data : null))
         .catch(() => setExternalAgentsSummary(null));
+
+      // Devices parked at HR / other drop-off points — the card hides itself
+      // when the count is zero, so a failed call is the same as "nothing there".
+      dashboardAPI.custodySummary()
+        .then(r => setCustodySummary({ data: r.data?.data || [], total: r.data?.total || 0 }))
+        .catch(() => setCustodySummary({ data: [], total: 0 }));
     } else {
       setLoading(false);
     }
@@ -288,10 +296,17 @@ export default function DashboardPage() {
         <ExternalAgentsSummaryCard summary={externalAgentsSummary} />
       </Box>
 
-      {/* ── Row 7: Data Health + Warranty ────────────────────────── */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 1.5, mb: 2 }}>
+      {/* ── Row 7: Data Health + Warranty + Custody ──────────────── */}
+      {/* CustodySummaryCard renders null while nothing is held, so the row
+          stays two-up until HR actually starts checking devices in. */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', lg: custodySummary.total > 0 ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)' }, gap: 1.5, mb: 2 }}>
         <DataHealthCard dataHealth={dataHealth} navigate={navigate} />
         <WarrantyAlertsCard warrantyData={warrantyData} navigate={navigate} />
+        <CustodySummaryCard
+          entries={custodySummary.data}
+          total={custodySummary.total}
+          onNavigate={(code) => navigate(`/assets?custodyHolder=${code}`)}
+        />
       </Box>
 
       {/* ── Row 8: Executive Summary — Contract & License ─────── */}

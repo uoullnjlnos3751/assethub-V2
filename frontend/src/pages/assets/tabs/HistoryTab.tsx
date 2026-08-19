@@ -16,17 +16,21 @@ import PersonIcon from '@mui/icons-material/Person';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import AssignmentReturnIcon from '@mui/icons-material/AssignmentReturn';
+import Inventory2Icon from '@mui/icons-material/Inventory2';
 
 /* ─── History helpers ─────────────────────────────────────────── */
 const HISTORY_LABEL: Record<string, string> = {
   CREATE: 'เพิ่มทรัพย์สินเข้าระบบ', STATUS_CHANGE: 'เปลี่ยนสถานะ',
   OWNER_CHANGE: 'เปลี่ยนผู้ถือครอง', LOCATION_CHANGE: 'เปลี่ยนสถานที่',
   CHECKOUT: 'ส่งมอบอุปกรณ์ Check-out', RETURN: 'คืนอุปกรณ์',
+  GLPI_SYNC: 'ซิงค์จาก GLPI', AGENT_SYNC: 'ซิงค์จาก Agent',
+  CUSTODY_CHANGE: 'เปลี่ยนจุดรับฝาก',
 };
 
 const HISTORY_ICON: Record<string, React.ElementType> = {
   CREATE: AddCircleIcon, STATUS_CHANGE: EditNoteIcon, OWNER_CHANGE: PersonIcon,
   LOCATION_CHANGE: LocationOnIcon, CHECKOUT: ShoppingCartIcon, RETURN: AssignmentReturnIcon,
+  CUSTODY_CHANGE: Inventory2Icon,
 };
 
 /* ─── History tab (MUI Lab Timeline) ──────────────────────────── */

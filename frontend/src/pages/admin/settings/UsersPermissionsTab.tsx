@@ -32,6 +32,7 @@ const CANONICAL_ROLES = [
   { code: 'APPROVER', label: 'ผู้อนุมัติ', desc: 'อนุมัติคำขอยืมและตัดจำหน่าย', live: false },
   { code: 'VIEWER', label: 'ผู้ดูรายงาน', desc: 'อ่านอย่างเดียว ส่งออกได้', live: true },
   { code: 'USER', label: 'พนักงานทั่วไป', desc: 'ดูของตัวเองและแจ้งซ่อม', live: true },
+  { code: 'HR_CUSTODY', label: 'ฝ่ายบุคคล (รับฝากเครื่อง)', desc: 'ค้นและติ๊กเครื่องที่รับฝากไว้เท่านั้น', live: true },
   { code: 'VENDOR', label: 'ผู้ขาย/ผู้รับเหมา', desc: 'เห็นเฉพาะงานที่ได้รับมอบหมาย', live: false },
 ];
 

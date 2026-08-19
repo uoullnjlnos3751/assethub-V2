@@ -30,6 +30,8 @@ const HISTORY_ICON: Record<string, string> = {
   'CHECKOUT': '📤',
   'RETURN': '📥',
   'GLPI_SYNC': '📡',
+  'AGENT_SYNC': '📡',
+  'CUSTODY_CHANGE': '📦',
   'MAINTENANCE': '🔧',
   'IMPORT': '📥',
 };
@@ -42,6 +44,8 @@ const HISTORY_LABEL: Record<string, string> = {
   'CHECKOUT': 'ยืมทรัพย์สิน',
   'RETURN': 'คืนทรัพย์สิน',
   'GLPI_SYNC': 'ซิงค์จาก GLPI',
+  'AGENT_SYNC': 'ซิงค์จาก Agent',
+  'CUSTODY_CHANGE': 'เปลี่ยนจุดรับฝาก',
   'MAINTENANCE': 'บำรุงรักษา',
   'IMPORT': 'นำเข้าจากไฟล์',
 };

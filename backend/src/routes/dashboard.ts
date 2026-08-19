@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { authenticate, authorize } from '../middleware/auth';
+import { enabledHolders } from '../config/custodyHolders';
 
 const router = Router();
 
@@ -238,6 +239,23 @@ router.get('/external-agents-summary', authenticate, authorize('IT_ADMIN', 'SUPE
 
     const data = await response.json();
     res.json({ available: true, data });
+  } catch (err) { next(err); }
+});
+
+// How many devices are sitting at each drop-off point (HR-TRR today). Answers
+// the question IT could not answer before: "how many laptops does HR have?"
+router.get('/custody-summary', authenticate, authorize('IT_ADMIN', 'SUPERADMIN', 'VIEWER'), async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const grouped = await prisma.asset.groupBy({
+      by: ['custodyHolder'],
+      where: { custodyHolder: { not: null } },
+      _count: { _all: true },
+    });
+    const counts = new Map(grouped.map(g => [g.custodyHolder, g._count._all]));
+    res.json({
+      data: enabledHolders().map(h => ({ code: h.code, label: h.label, count: counts.get(h.code) || 0 })),
+      total: grouped.reduce((sum, g) => sum + g._count._all, 0),
+    });
   } catch (err) { next(err); }
 });
 

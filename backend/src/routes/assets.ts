@@ -10,6 +10,7 @@ import {
   fetchAllAgentRecords, fillBlanksFromAgent, mapAgentToAssetSpec, matchAssetForAgent,
 } from '../services/externalAgent';
 import { cleanMasterValue } from '../utils/assetHelpers';
+import { isCustodyRole } from '../config/custodyHolders';
 import multer from 'multer';
 import * as xlsx from 'xlsx';
 import ExcelJS from 'exceljs';
@@ -600,7 +601,7 @@ const ASSET_TYPE_GROUPS: Record<string, string[]> = {
 
 router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { search, status, department, location, type, typeGroup, categoryId, cpu, ram, warrantyStatus, warrantyExpiringInDays, ownerName, exactOwnerName, screenSize, resolution, panelType, printerType, isColor, ipAddress, storage, osType, company, serialNo, purchaseDateFrom, purchaseDateTo, page = '1', limit = '50' } = req.query;
+    const { search, status, department, location, type, typeGroup, categoryId, cpu, ram, warrantyStatus, warrantyExpiringInDays, ownerName, exactOwnerName, screenSize, resolution, panelType, printerType, isColor, ipAddress, storage, osType, company, serialNo, custodyHolder, purchaseDateFrom, purchaseDateTo, page = '1', limit = '50' } = req.query;
     const pageNum = parseInt(page as string);
     const parsedLimit = parseInt(limit as string);
     const limitNum = parsedLimit === 10000 ? 10000 : Math.min(parsedLimit, 100);
@@ -623,6 +624,14 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
     } else if (location) {
       where.location = location as string;
     }
+    // __ANY__ = "held at any drop-off point"; __EMPTY__ = "not held anywhere"
+    if (custodyHolder === '__ANY__') {
+      where.custodyHolder = { not: null };
+    } else if (custodyHolder === '__EMPTY__') {
+      where.custodyHolder = null;
+    } else if (custodyHolder) {
+      where.custodyHolder = custodyHolder as string;
+    }
     if (categoryId) where.categoryId = parseInt(categoryId as string);
     if (company === '__EMPTY__') {
       where.OR = [...(where.OR || []), { company: null }, { company: '' }];
@@ -637,7 +646,13 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
     }
 
     // Apply company visibility mapping for non-admins
-    if (req.user && !['SUPERADMIN', 'IT_ADMIN'].includes(req.user.role)) {
+    if (req.user && isCustodyRole(req.user.role)) {
+      // Custody roles (HR) get their own narrow endpoints under /api/custody.
+      // They must not reach the registry here — and without this branch they
+      // would: their AppUser.company is a real company (TRR), so the mapping
+      // below would happily hand them every TRR asset.
+      where.company = { in: ['__NONE__'] };
+    } else if (req.user && !['SUPERADMIN', 'IT_ADMIN'].includes(req.user.role)) {
       const appUser = await prisma.appUser.findUnique({ where: { id: req.user.userId } });
       if (appUser && appUser.company) {
         const adCompany = await prisma.company.findUnique({ where: { name: appUser.company } });
@@ -824,6 +839,9 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
           requesterName: true,
           budgetCode: true,
           receivedDate: true,
+          custodyHolder: true,
+          custodyNote: true,
+          custodyUpdatedAt: true,
           category: { select: { id: true, name: true, icon: true } },
           consumableDetail: { select: { stockQuantity: true, minimumStock: true } },
         },

@@ -3,6 +3,7 @@ import { Box, Typography, alpha, useTheme } from '@mui/material';
 import { History } from 'lucide-react';
 import { SectionCard } from '../../../components/SectionCard';
 import { calcDepreciation } from './assetFinance';
+import { custodyHolderLabel } from '../../../constants/custodyHolders';
 
 type Tone = 'primary' | 'success' | 'warning' | 'error' | 'muted';
 
@@ -55,6 +56,18 @@ function buildEntries(asset: any, maintenance: any[]): Entry[] {
           at,
           title: `เปลี่ยนสถานะ: ${h.fromStatus || '—'} → ${h.toStatus || '—'}`,
           sub: [fmt(new Date(at)), actor].filter(Boolean).join(' · '),
+          tone: 'warning',
+        });
+        break;
+      case 'CUSTODY_CHANGE':
+        out.push({
+          at,
+          // fromLoc/toLoc carry the holder codes — custody reuses those columns
+          // rather than adding two more to asset_history.
+          title: h.toLoc
+            ? `รับฝากไว้ที่ ${custodyHolderLabel(h.toLoc)}`
+            : `เอาออกจาก ${custodyHolderLabel(h.fromLoc) || 'จุดรับฝาก'}`,
+          sub: [fmt(new Date(at)), actor, h.note || ''].filter(Boolean).join(' · '),
           tone: 'warning',
         });
         break;
