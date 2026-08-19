@@ -57,7 +57,12 @@ export default defineConfig(({ mode }) => {
       __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
     },
     server: {
-      port: 5173,
+      // 5173 is the deployment's port (pm2 serves the built app there), so a
+      // second dev server started alongside it must be able to take another.
+      // Honouring PORT lets the launcher assign one instead of vite silently
+      // sliding to the next free number, which is how a stale server ended up
+      // squatting on 5174 for two days.
+      port: Number(process.env.PORT) || 5173,
       allowedHosts: ['itsm.trrgroup.com', 'itam.trrgroup.com'],
       proxy: {
         '/api': {

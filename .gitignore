@@ -122,3 +122,8 @@ temp-itam-borrow/
 # Playwright deps and captured screenshots (the specs themselves are tracked)
 playwright-tests/node_modules/
 playwright-tests/screenshots/
+
+# Claude Code: launch.json is shared project config and is tracked; the
+# settings.local.json beside it holds per-developer permission grants and
+# machine-specific paths.
+.claude/settings.local.json
