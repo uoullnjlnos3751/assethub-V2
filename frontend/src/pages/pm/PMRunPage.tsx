@@ -21,11 +21,10 @@ import {
   Pagination,
   Snackbar,
   Alert,
-  InputAdornment,
   Checkbox,
   Tooltip,
 } from '@mui/material';
-import { alpha } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import BuildIcon from '@mui/icons-material/Build';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import AssignmentIcon from '@mui/icons-material/Assignment';
@@ -472,6 +471,7 @@ function sortChecklistItems(rawItems: any[]) {
 export default function PMRunPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const theme = useTheme();
   const [searchParams] = useSearchParams();
   const planIdParam = searchParams.get('planId') || '';
 
@@ -951,6 +951,11 @@ export default function PMRunPage() {
   const pending = runs.filter(r => r.status === 'DRAFT').length;
   const inProgress = runs.filter(r => r.status === 'IN_PROGRESS').length;
   const overdueCount = runs.filter(r => r.status !== 'COMPLETED' && r.plan?.endDate && new Date(r.plan.endDate).getTime() < new Date().setHours(0,0,0,0)).length;
+  // Only 8 of the 97 checks completed so far carry a photo. The checklist
+  // answers are filled in properly (18-19 of 19 items every time), so this is
+  // specifically the evidence step being skipped — worth a number of its own
+  // rather than leaving it buried one icon per row.
+  const donePhoto = runs.filter(r => r.status === 'COMPLETED' && r.photoUrl).length;
 
   /* ── Checklist progress ── */
   const checkItems = pmModal.run ? getChecklistItems(pmModal.run) : [];
@@ -958,26 +963,62 @@ export default function PMRunPage() {
   const answeredBool = boolItems.filter((i: any) => answers[i.key] !== undefined).length;
   const checkPct = boolItems.length > 0 ? Math.round(answeredBool / boolItems.length * 100) : 0;
 
-  const stats: { icon: React.ElementType; label: string; val: number; color: 'inherit' | 'success' | 'error' | 'secondary' | 'warning'; isProgress?: boolean }[] = [
+  const stats: { icon: React.ElementType; label: string; val: number; color: 'inherit' | 'success' | 'error' | 'secondary' | 'warning'; isProgress?: boolean; sub?: string }[] = [
     { icon: Inventory2Icon, label: 'ทั้งหมด', val: runs.length, color: 'inherit' },
     { icon: CheckCircleIcon, label: 'เสร็จแล้ว', val: done, color: 'success' },
     ...(overdueCount > 0
       ? [{ icon: WarningAmberIcon, label: 'เลยกำหนด', val: overdueCount, color: 'error' as const }]
       : [{ icon: AutorenewIcon, label: 'กำลังทำ', val: inProgress, color: 'secondary' as const }]),
     { icon: HourglassEmptyIcon, label: 'รอดำเนินการ', val: pending, color: 'warning' },
+    { icon: PhotoCameraIcon, label: 'มีรูปหลักฐาน', val: donePhoto, color: donePhoto < done ? 'warning' : 'success', sub: done > 0 ? 'จาก ' + done + ' งานที่เสร็จ' : undefined },
     { icon: PercentIcon, label: '% เสร็จ', val: runs.length > 0 ? Math.round(done / runs.length * 100) : 0, color: 'success', isProgress: true },
   ];
+
+  const clearFilters = () => {
+    setSearch(''); setFilterStatus(''); setFilterPlan(''); setFilterType('');
+    setFilterStaff(''); setFilterCompany(''); setCurrentPage(1);
+  };
+  const anyFilter = !!(search || filterStatus || filterPlan || filterType || filterStaff || filterCompany);
+
+  /** Counts ignore the filter they belong to, so a chip never zeroes itself out. */
+  const countBy = (fn: (r: any) => boolean) => runs.filter(fn).length;
+
+  const statusChips = [
+    { key: 'DRAFT', label: 'รอดำเนินการ', color: theme.palette.warning.main, n: pending },
+    { key: 'IN_PROGRESS', label: 'กำลังทำ', color: theme.palette.info.main, n: inProgress },
+    { key: 'COMPLETED', label: 'เสร็จแล้ว', color: theme.palette.success.main, n: done },
+    { key: 'OVERDUE', label: 'เกินกำหนด', color: theme.palette.error.main, n: overdueCount },
+  ];
+
+  const chipSx = (active: boolean, color?: string) => ({
+    fontSize: 11, height: 23, fontWeight: active ? 600 : 500, cursor: 'pointer',
+    borderColor: active ? (color || theme.palette.primary.main) : theme.palette.divider,
+    bgcolor: active ? alpha(color || theme.palette.primary.main, 0.1) : 'transparent',
+    color: active ? (color || theme.palette.primary.main) : theme.palette.text.secondary,
+    '& .MuiChip-label': { px: 1 },
+    '&:hover': { borderColor: color || theme.palette.primary.main },
+  });
+
+  const chipRow = (label: string, node: React.ReactNode) => (
+    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, flexWrap: 'wrap' }}>
+      <Typography sx={{
+        flex: '0 0 60px', fontSize: 9.5, fontWeight: 700, color: 'text.disabled',
+        letterSpacing: '.04em', pt: 0.6,
+      }}>{label}</Typography>
+      <Box sx={{ display: 'flex', gap: 0.6, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>{node}</Box>
+    </Box>
+  );
 
   return (
     <Box>
       {/* ── Header ── */}
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5, mb: 2.5 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.25, mb: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
           <Box
             sx={{
-              width: 44,
-              height: 44,
-              borderRadius: 2,
+              width: 36,
+              height: 36,
+              borderRadius: 2.25,
               bgcolor: 'background.paper',
               border: '1px solid',
               borderColor: 'divider',
@@ -990,24 +1031,24 @@ export default function PMRunPage() {
             <BuildIcon color="primary" />
           </Box>
           <Box>
-            <Typography sx={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em' }}>งาน Preventive Maintenance (PM)</Typography>
-            <Typography sx={{ fontSize: 12, color: 'text.secondary', mt: 0.25 }}>ตรวจเช็ค คลีนอุปกรณ์ และลงบันทึกรายงานผล</Typography>
+            <Typography sx={{ fontSize: 16, fontWeight: 800, letterSpacing: '-0.02em' }}>งาน Preventive Maintenance (PM)</Typography>
+            <Typography sx={{ fontSize: 10.5, color: 'text.secondary', mt: 0.2 }}>ตรวจเช็ค คลีนอุปกรณ์ และลงบันทึกรายงานผล</Typography>
           </Box>
         </Box>
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button variant="outlined" startIcon={<FileDownloadIcon />} onClick={handleExport} disabled={exporting || filtered.length === 0}>
+          <Button size="small" variant="outlined" startIcon={<FileDownloadIcon />} onClick={handleExport} disabled={exporting || filtered.length === 0}>
             Export Excel
           </Button>
-          <Button variant="contained" startIcon={<AssignmentIcon />} onClick={() => navigate('/pm/plans')}>
+          <Button size="small" variant="contained" startIcon={<AssignmentIcon />} onClick={() => navigate('/pm/plans')}>
             จัดการแผน
           </Button>
         </Box>
       </Box>
 
       {/* ── Stats ── */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))', gap: 1.5, mb: 2.5 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(126px,1fr))', gap: 1, mb: 1.5 }}>
         {stats.map((s) => (
-          <Card key={s.label} variant="outlined" sx={{ p: '14px 16px', display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Card key={s.label} variant="outlined" sx={{ p: '9px 12px', display: 'flex', alignItems: 'center', gap: 1.25 }}>
             {!s.isProgress && (
               <Box sx={{ color: s.color === 'inherit' ? 'text.primary' : `${s.color}.main`, display: 'flex' }}>
                 <s.icon />
@@ -1024,10 +1065,11 @@ export default function PMRunPage() {
                 </>
               ) : (
                 <>
-                  <Typography sx={{ fontSize: 20, fontWeight: 700, color: s.color === 'inherit' ? 'text.primary' : `${s.color}.main`, lineHeight: 1.1, letterSpacing: '-0.02em' }}>
+                  <Typography sx={{ fontSize: 21, fontWeight: 800, color: s.color === 'inherit' ? 'text.primary' : `${s.color}.main`, lineHeight: 1, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
                     {s.val}
                   </Typography>
-                  <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 0.25 }}>{s.label}</Typography>
+                  <Typography sx={{ fontSize: 10.5, color: 'text.secondary', mt: 0.4 }}>{s.label}</Typography>
+                  {s.sub && <Typography sx={{ fontSize: 9.5, color: 'text.disabled', mt: 0.1 }}>{s.sub}</Typography>}
                 </>
               )}
             </Box>
@@ -1035,62 +1077,65 @@ export default function PMRunPage() {
         ))}
       </Box>
 
-      {/* ── Filter toolbar ── */}
-      <Card variant="outlined" sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap', alignItems: 'center', p: '12px 16px' }}>
-        <Box sx={{ flex: 1, minWidth: 240, display: 'flex', gap: 1 }}>
+      {/* ── Filters ──────────────────────────────────────────────────
+          Status / company / device type are short, high-traffic lists, so
+          they are click-to-toggle chips like the other PM pages. Plan and
+          performer stay as selects: 31 plans would be an unreadable wall of
+          chips. Counts sit on the chips so you can see where the work is
+          before filtering to it. */}
+      <Card variant="outlined" sx={{ p: 1.4, mb: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
           <TextField
             size="small"
-            fullWidth
+            sx={{ flex: 1, minWidth: 220 }}
             placeholder="ค้นหาชื่ออุปกรณ์ / รหัส / ชื่อผู้ใช้ / ยี่ห้อ..."
             value={search}
             onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <QrCodeScannerIcon sx={{ display: 'none' }} />
-                </InputAdornment>
-              ),
-            }}
           />
           <Tooltip title="สแกน QR Code">
-            <IconButton onClick={() => setQrModalOpen(true)}>
-              <QrCodeScannerIcon />
-            </IconButton>
+            <IconButton size="small" onClick={() => setQrModalOpen(true)}><QrCodeScannerIcon fontSize="small" /></IconButton>
           </Tooltip>
-          <Tooltip title="ล้างตัวกรอง">
-            <IconButton onClick={() => { setSearch(''); setFilterStatus(''); setFilterPlan(''); setFilterType(''); setFilterStaff(''); setFilterCompany(''); setCurrentPage(1); }}>
-              <RestartAltIcon />
-            </IconButton>
-          </Tooltip>
-        </Box>
-        <Select size="small" sx={{ minWidth: 130 }} displayEmpty value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1); }}>
-          <MenuItem value="">ทุกสถานะ</MenuItem>
-          <MenuItem value="DRAFT">รอดำเนินการ</MenuItem>
-          <MenuItem value="IN_PROGRESS">กำลังทำ</MenuItem>
-          <MenuItem value="COMPLETED">เสร็จแล้ว</MenuItem>
-          <MenuItem value="OVERDUE">เลยกำหนด</MenuItem>
-        </Select>
-        <Select size="small" sx={{ minWidth: 130 }} displayEmpty value={filterPlan} onChange={e => { setFilterPlan(e.target.value); setCurrentPage(1); }}>
-          <MenuItem value="">ทุกแผน</MenuItem>
-          {Array.from(new Set(plans.map(p => p.deptTask || p.site || `Plan #${p.id}`))).map(name =>
-            <MenuItem key={name} value={name}>{name}</MenuItem>
+          <Select size="small" sx={{ minWidth: 150 }} displayEmpty value={filterPlan}
+            onChange={e => { setFilterPlan(e.target.value); setCurrentPage(1); }}>
+            <MenuItem value="">ทุกแผน PM</MenuItem>
+            {Array.from(new Set(plans.map(p => p.deptTask || p.site || `Plan #${p.id}`))).map(name =>
+              <MenuItem key={name} value={name}>{name}</MenuItem>
+            )}
+          </Select>
+          <Select size="small" sx={{ minWidth: 140 }} displayEmpty value={filterStaff}
+            onChange={e => { setFilterStaff(e.target.value); setCurrentPage(1); }}>
+            <MenuItem value="">ทุกผู้ทำ PM</MenuItem>
+            {uniqueStaff.map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+          </Select>
+          {anyFilter && (
+            <Button size="small" color="error" startIcon={<RestartAltIcon />} onClick={clearFilters}
+              sx={{ fontSize: 10.5, fontWeight: 600 }}>ล้างตัวกรอง</Button>
           )}
-        </Select>
-        <Select size="small" sx={{ minWidth: 150 }} displayEmpty value={filterType} onChange={e => { setFilterType(e.target.value); setCurrentPage(1); }}>
-          <MenuItem value="">ทุกประเภทอุปกรณ์</MenuItem>
-          {uniqueTypes.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
-        </Select>
-        <Select size="small" sx={{ minWidth: 140 }} displayEmpty value={filterStaff} onChange={e => { setFilterStaff(e.target.value); setCurrentPage(1); }}>
-          <MenuItem value="">ทุกผู้ทำ PM</MenuItem>
-          {uniqueStaff.map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)}
-        </Select>
-        <Select size="small" sx={{ minWidth: 140 }} displayEmpty value={filterCompany} onChange={e => { setFilterCompany(e.target.value); setCurrentPage(1); }}>
-          <MenuItem value="">ทุกบริษัท</MenuItem>
-          {uniqueCompanies.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}
-        </Select>
-        <Typography sx={{ fontSize: 12, color: 'text.secondary', whiteSpace: 'nowrap', ml: 'auto' }}>
-          แสดง {filtered.length}/{runs.length} รายการ
-        </Typography>
+          <Typography sx={{ fontSize: 10.5, color: 'text.disabled', whiteSpace: 'nowrap', ml: 'auto', fontVariantNumeric: 'tabular-nums' }}>
+            แสดง {filtered.length}/{runs.length}
+          </Typography>
+        </Box>
+
+        {chipRow('สถานะ', statusChips.map(s => (
+          <Chip key={s.key} variant="outlined" size="small"
+            onClick={() => { setFilterStatus(filterStatus === s.key ? '' : s.key); setCurrentPage(1); }}
+            sx={chipSx(filterStatus === s.key, s.color)}
+            label={<>{s.label} <Box component="span" sx={{ fontSize: 9.5, opacity: 0.7 }}>{s.n}</Box></>} />
+        )))}
+
+        {uniqueCompanies.length > 1 && chipRow('บริษัท', uniqueCompanies.map(c => (
+          <Chip key={c} variant="outlined" size="small"
+            onClick={() => { setFilterCompany(filterCompany === c ? '' : c); setCurrentPage(1); }}
+            sx={chipSx(filterCompany === c)}
+            label={<>{c} <Box component="span" sx={{ fontSize: 9.5, opacity: 0.65 }}>{countBy(r => (r.asset?.company || r.plan?.company) === c)}</Box></>} />
+        )))}
+
+        {uniqueTypes.length > 1 && chipRow('ประเภท', uniqueTypes.map(t => (
+          <Chip key={t} variant="outlined" size="small"
+            onClick={() => { setFilterType(filterType === t ? '' : t); setCurrentPage(1); }}
+            sx={chipSx(filterType === t)}
+            label={<>{t} <Box component="span" sx={{ fontSize: 9.5, opacity: 0.65 }}>{countBy(r => r.asset?.type === t)}</Box></>} />
+        )))}
       </Card>
 
       {/* ── Table ── */}
