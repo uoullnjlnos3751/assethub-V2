@@ -20,7 +20,7 @@ import {
 const fmt = (n: number) => n.toLocaleString('en-US');
 
 export const GUTTER = 178;
-export const META = 84;
+export const META = 94;
 
 export function GanttRow({ children, sx }: { children: React.ReactNode; sx?: object }) {
   return (
@@ -89,7 +89,7 @@ export function GanttAxis({ tl, today }: { tl: Timeline; today: Date }) {
           ))}
         </Box>
       </Box>
-      <Box sx={{ ...headSx, justifyContent: 'flex-end' }}>คืบหน้า</Box>
+      <Box sx={{ ...headSx, justifyContent: 'flex-end' }}>เสร็จ/ทั้งหมด</Box>
     </GanttRow>
   );
 }

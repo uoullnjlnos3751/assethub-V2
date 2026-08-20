@@ -27,6 +27,46 @@ import { buildScheduleReports, exportScheduleCsv, exportScheduleWorkbook } from 
 const fmt = (n: number) => n.toLocaleString('en-US');
 const ROW_H = { company: 40, group: 26, dept: 24 };
 
+/**
+ * "กี่เครื่อง" คือคำถามที่ถูกถามจริง — เปอร์เซ็นต์เป็นแค่วิธีย่อคำตอบ
+ * ตัวเลขจำนวนเครื่องจึงถูกยกขึ้นมาให้อ่านได้จากระยะไกล ส่วนตัวหารและคำ
+ * ประกอบถูกหรี่ลง เพื่อให้สายตาจับตัวเลขที่ต้องใช้ตัดสินใจได้ก่อน
+ */
+function UnitCount({ n, of, pre, post = 'เครื่อง', size = 12.5 }: {
+  n: number; of?: number; pre?: string; post?: string; size?: number;
+}) {
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.4, mt: 0.15 }}>
+      {pre && <Typography sx={{ fontSize: 9.5, color: 'text.disabled' }}>{pre}</Typography>}
+      <Typography sx={{
+        fontSize: size, fontWeight: 800, lineHeight: 1.15, color: 'text.primary',
+        fontVariantNumeric: 'tabular-nums',
+      }}>{fmt(n)}</Typography>
+      {of != null && (
+        <Typography sx={{ fontSize: 10.5, color: 'text.disabled', fontVariantNumeric: 'tabular-nums' }}>
+          / {fmt(of)}
+        </Typography>
+      )}
+      <Typography sx={{ fontSize: 9.5, color: 'text.disabled' }}>{post}</Typography>
+    </Box>
+  );
+}
+
+/** คอลัมน์ขวาของ Gantt — ทำแล้วกี่เครื่อง เด่นกว่าตัวหาร */
+function MetaCount({ done, total, size = 11.5 }: { done: number; total: number; size?: number }) {
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.3 }}>
+      <Typography sx={{
+        fontSize: size, fontWeight: 800, lineHeight: 1.1, color: 'text.primary',
+        fontVariantNumeric: 'tabular-nums',
+      }}>{fmt(done)}</Typography>
+      <Typography sx={{ fontSize: 9.5, color: 'text.disabled', fontVariantNumeric: 'tabular-nums' }}>
+        /{fmt(total)}
+      </Typography>
+    </Box>
+  );
+}
+
 export default function PMSchedulePage() {
   const theme = useTheme();
   const navigate = useNavigate();
@@ -253,18 +293,20 @@ export default function PMSchedulePage() {
               : timeline ? `${thDate(timeline.t0)} – ${thDate(timeline.weekStarts[timeline.weeks - 1])}` : '—',
             c: theme.palette.text.primary },
           { v: `${pct(totals.done, totals.total)}%`, l: 'ความคืบหน้ารวม',
-            s: `${fmt(totals.done)} จาก ${fmt(totals.total)} เครื่อง`, c: colors.DONE },
+            s: <UnitCount n={totals.done} of={totals.total} />, c: colors.DONE },
           { v: fmt(totals.late.length), l: 'แผนที่เกินกำหนด',
-            s: totals.lateUnits ? `ค้างอยู่ ${fmt(totals.lateUnits)} เครื่อง` : 'ไม่มีงานค้าง', c: colors.OVERDUE },
+            s: totals.lateUnits ? <UnitCount n={totals.lateUnits} pre="ค้างอยู่" /> : 'ไม่มีงานค้าง', c: colors.OVERDUE },
           { v: fmt(totals.running.length), l: 'แผนที่กำลังดำเนินการ',
-            s: totals.runUnits ? `เหลือ ${fmt(totals.runUnits)} เครื่อง` : 'ครบแล้ว', c: colors.RUNNING },
+            s: totals.runUnits ? <UnitCount n={totals.runUnits} pre="เหลือ" /> : 'ครบแล้ว', c: colors.RUNNING },
         ].map(k => (
           <Card key={k.l} variant="outlined" sx={{ p: '9px 12px' }}>
             <Typography sx={{ fontSize: 21, fontWeight: 800, lineHeight: 1, letterSpacing: '-.02em', color: k.c, fontVariantNumeric: 'tabular-nums' }}>
               {k.v}
             </Typography>
             <Typography sx={{ fontSize: 10.5, color: 'text.secondary', mt: 0.4 }}>{k.l}</Typography>
-            <Typography sx={{ fontSize: 9.5, color: 'text.disabled', mt: 0.1 }}>{k.s}</Typography>
+            {typeof k.s === 'string'
+              ? <Typography sx={{ fontSize: 9.5, color: 'text.disabled', mt: 0.1 }}>{k.s}</Typography>
+              : k.s}
           </Card>
         ))}
       </Box>
@@ -319,7 +361,14 @@ export default function PMSchedulePage() {
                           subtitle={`${g.plans.length} แผน${late ? ` · เกินกำหนด ${late} แผน` : ''}`}
                         />
                       </GanttTrack>
-                      <Box sx={metaSx}><b>{pct(g.done, g.total)}%</b></Box>
+                      <Box sx={{
+                        ...metaSx, flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center',
+                      }}>
+                        <MetaCount done={g.done} total={g.total} size={12.5} />
+                        <Typography sx={{ fontSize: 9.5, fontWeight: 700, color: 'text.secondary', lineHeight: 1.2 }}>
+                          {pct(g.done, g.total)}%
+                        </Typography>
+                      </Box>
                     </GanttRow>
                   );
                 })}
@@ -363,7 +412,7 @@ export default function PMSchedulePage() {
                           <Typography sx={subSx}>{depts.length} แผนก · {co.plans.length} แผน</Typography>
                         </Box>
                         <GanttTrack tl={timeline} today={today} height={ROW_H.group} />
-                        <Box sx={metaSx}>{fmt(co.done)}/{fmt(co.total)}</Box>
+                        <Box sx={metaSx}><MetaCount done={co.done} total={co.total} /></Box>
                       </GanttRow>
 
                       {open && depts.map(dp => (
@@ -385,7 +434,7 @@ export default function PMSchedulePage() {
                               />
                             ))}
                           </GanttTrack>
-                          <Box sx={metaSx}>{fmt(dp.done)}/{fmt(dp.total)}</Box>
+                          <Box sx={metaSx}><MetaCount done={dp.done} total={dp.total} /></Box>
                         </GanttRow>
                       ))}
                     </React.Fragment>
