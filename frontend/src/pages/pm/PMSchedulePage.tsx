@@ -32,35 +32,37 @@ const ROW_H = { company: 40, group: 26, dept: 24 };
  * ตัวเลขจำนวนเครื่องจึงถูกยกขึ้นมาให้อ่านได้จากระยะไกล ส่วนตัวหารและคำ
  * ประกอบถูกหรี่ลง เพื่อให้สายตาจับตัวเลขที่ต้องใช้ตัดสินใจได้ก่อน
  */
-function UnitCount({ n, of, pre, post = 'เครื่อง', size = 12.5 }: {
-  n: number; of?: number; pre?: string; post?: string; size?: number;
+function UnitCount({ n, of, pre, post = 'เครื่อง', color }: {
+  n: number; of?: number; pre?: string; post?: string; color?: string;
 }) {
   return (
-    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.4, mt: 0.15 }}>
-      {pre && <Typography sx={{ fontSize: 9.5, color: 'text.disabled' }}>{pre}</Typography>}
+    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.45, mt: 0.35, flexWrap: 'wrap' }}>
+      {pre && <Typography sx={{ fontSize: 10.5, color: 'text.secondary' }}>{pre}</Typography>}
       <Typography sx={{
-        fontSize: size, fontWeight: 800, lineHeight: 1.15, color: 'text.primary',
-        fontVariantNumeric: 'tabular-nums',
+        fontSize: 16, fontWeight: 800, lineHeight: 1.1, letterSpacing: '-.01em',
+        color: color ?? 'text.primary', fontVariantNumeric: 'tabular-nums',
       }}>{fmt(n)}</Typography>
       {of != null && (
-        <Typography sx={{ fontSize: 10.5, color: 'text.disabled', fontVariantNumeric: 'tabular-nums' }}>
-          / {fmt(of)}
-        </Typography>
+        <Typography sx={{
+          fontSize: 12.5, fontWeight: 700, color: 'text.secondary', fontVariantNumeric: 'tabular-nums',
+        }}>/ {fmt(of)}</Typography>
       )}
-      <Typography sx={{ fontSize: 9.5, color: 'text.disabled' }}>{post}</Typography>
+      <Typography sx={{ fontSize: 10.5, color: 'text.secondary' }}>{post}</Typography>
     </Box>
   );
 }
 
 /** คอลัมน์ขวาของ Gantt — ทำแล้วกี่เครื่อง เด่นกว่าตัวหาร */
-function MetaCount({ done, total, size = 11.5 }: { done: number; total: number; size?: number }) {
+function MetaCount({ done, total, size = 12.5, color }: {
+  done: number; total: number; size?: number; color?: string;
+}) {
   return (
     <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.3 }}>
       <Typography sx={{
-        fontSize: size, fontWeight: 800, lineHeight: 1.1, color: 'text.primary',
+        fontSize: size, fontWeight: 800, lineHeight: 1.1, color: color ?? 'text.primary',
         fontVariantNumeric: 'tabular-nums',
       }}>{fmt(done)}</Typography>
-      <Typography sx={{ fontSize: 9.5, color: 'text.disabled', fontVariantNumeric: 'tabular-nums' }}>
+      <Typography sx={{ fontSize: 10.5, color: 'text.disabled', fontVariantNumeric: 'tabular-nums' }}>
         /{fmt(total)}
       </Typography>
     </Box>
@@ -293,11 +295,15 @@ export default function PMSchedulePage() {
               : timeline ? `${thDate(timeline.t0)} – ${thDate(timeline.weekStarts[timeline.weeks - 1])}` : '—',
             c: theme.palette.text.primary },
           { v: `${pct(totals.done, totals.total)}%`, l: 'ความคืบหน้ารวม',
-            s: <UnitCount n={totals.done} of={totals.total} />, c: colors.DONE },
+            s: <UnitCount n={totals.done} of={totals.total} color={colors.DONE} />, c: colors.DONE },
           { v: fmt(totals.late.length), l: 'แผนที่เกินกำหนด',
-            s: totals.lateUnits ? <UnitCount n={totals.lateUnits} pre="ค้างอยู่" /> : 'ไม่มีงานค้าง', c: colors.OVERDUE },
+            s: totals.lateUnits
+              ? <UnitCount n={totals.lateUnits} pre="ค้างอยู่" color={colors.OVERDUE} />
+              : 'ไม่มีงานค้าง', c: colors.OVERDUE },
           { v: fmt(totals.running.length), l: 'แผนที่กำลังดำเนินการ',
-            s: totals.runUnits ? <UnitCount n={totals.runUnits} pre="เหลือ" /> : 'ครบแล้ว', c: colors.RUNNING },
+            s: totals.runUnits
+              ? <UnitCount n={totals.runUnits} pre="เหลือ" color={colors.RUNNING} />
+              : 'ครบแล้ว', c: colors.RUNNING },
         ].map(k => (
           <Card key={k.l} variant="outlined" sx={{ p: '9px 12px' }}>
             <Typography sx={{ fontSize: 21, fontWeight: 800, lineHeight: 1, letterSpacing: '-.02em', color: k.c, fontVariantNumeric: 'tabular-nums' }}>
@@ -364,7 +370,7 @@ export default function PMSchedulePage() {
                       <Box sx={{
                         ...metaSx, flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center',
                       }}>
-                        <MetaCount done={g.done} total={g.total} size={12.5} />
+                        <MetaCount done={g.done} total={g.total} size={14} color={colors[st]} />
                         <Typography sx={{ fontSize: 9.5, fontWeight: 700, color: 'text.secondary', lineHeight: 1.2 }}>
                           {pct(g.done, g.total)}%
                         </Typography>
