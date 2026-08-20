@@ -12,6 +12,7 @@ import {
 import { cleanMasterValue } from '../utils/assetHelpers';
 import { isCustodyRole } from '../config/custodyHolders';
 import { reconcileFleet, reconcileRecord } from '../services/agentMonitors';
+import { buildGlpiFields, planGlpiSync } from '../services/glpiSpec';
 import multer from 'multer';
 import * as xlsx from 'xlsx';
 import ExcelJS from 'exceljs';
@@ -2935,7 +2936,9 @@ router.get('/:id/glpi-spec', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), 
     const spec = await fetchGLPISpecBySerial(asset.serialNo);
     if (!spec) throw new AppError('ไม่พบข้อมูลฮาร์ดแวร์ใน GLPI สำหรับ Serial Number นี้', 404);
 
-    res.json(spec);
+    // The comparison is built here rather than in the page so that what the
+    // spec tab marks as a difference is exactly what a sync would write.
+    res.json({ ...spec, fields: buildGlpiFields(asset, spec) });
   } catch (err) { next(err); }
 });
 
@@ -2949,65 +2952,28 @@ router.post('/:id/glpi-sync', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'),
     const spec = await fetchGLPISpecBySerial(asset.serialNo);
     if (!spec) throw new AppError('ไม่พบข้อมูลฮาร์ดแวร์ใน GLPI สำหรับ Serial Number นี้', 404);
 
-    const field = req.body.field as string;
-    const updateDetail: any = {};
-    let note = '';
+    const field = req.body.field as string | undefined;
+    const fields = buildGlpiFields(asset, spec);
+    const { assetData, detailData, changes } = planGlpiSync(fields, field);
 
-    if (field) {
-      if (field === 'name') {
-        await prisma.asset.update({
-          where: { id },
-          data: { assetName: spec.name }
-        });
-        note = `อัปเดตชื่อคอมพิวเตอร์ตาม GLPI เป็น "${spec.name}"`;
-      } else if (field === 'user') {
-        await prisma.asset.update({
-          where: { id },
-          data: { ownerName: spec.user }
-        });
-        note = `อัปเดตผู้ใช้งานตาม GLPI เป็น "${spec.user}"`;
-      } else {
-        if (field === 'cpu') {
-          updateDetail.cpu = spec.cpu;
-          note = `อัปเดต CPU ตาม GLPI เป็น "${spec.cpu}"`;
-        } else if (field === 'ram') {
-          updateDetail.ram = spec.ram;
-          note = `อัปเดต RAM ตาม GLPI เป็น "${spec.ram}"`;
-        } else if (field === 'os') {
-          updateDetail.osVersion = spec.os;
-          note = `อัปเดต OS ตาม GLPI เป็น "${spec.os}"`;
-        } else if (field === 'license') {
-          updateDetail.windowsLicense = spec.license;
-          note = `อัปเดต Windows License ตาม GLPI เป็น "${spec.license}"`;
-        } else if (field === 'msOffice') {
-          updateDetail.officeLicense = spec.msOffice;
-          note = `อัปเดต MS Office ตาม GLPI เป็น "${spec.msOffice}"`;
-        } else if (field === 'antivirus') {
-          updateDetail.antivirusStatus = spec.antivirus;
-          note = `อัปเดต Antivirus ตาม GLPI เป็น "${spec.antivirus}"`;
-        }
-        await upsertAssetDetail(prisma, id, asset.type || '', updateDetail);
-      }
-    } else {
-      // Sync all fields
-      await prisma.asset.update({
-        where: { id },
-        data: { 
-          assetName: spec.name,
-          ownerName: spec.user || asset.ownerName,
-        }
+    if (changes.length === 0) {
+      return res.json({
+        message: field
+          ? 'ค่านี้ตรงกับ GLPI อยู่แล้ว'
+          : 'ไม่มีช่องว่างให้เติม และไม่มีค่าใดที่ GLPI ละเอียดกว่า — ค่าที่ขัดกันต้องกดรับทีละช่อง',
+        updated: 0, fields: [], spec: { ...spec, fields },
       });
-      await upsertAssetDetail(prisma, id, asset.type || '', {
-        cpu: spec.cpu,
-        ram: spec.ram,
-        osVersion: spec.os,
-        windowsLicense: spec.license,
-        snComputer: spec.serial,
-        officeLicense: spec.msOffice,
-        antivirusStatus: spec.antivirus,
-      });
-      note = `อัปเดตรายละเอียดฮาร์ดแวร์ทั้งหมดตาม GLPI (CPU: ${spec.cpu}, RAM: ${spec.ram}, OS: ${spec.os}, Office: ${spec.msOffice || '—'}, AV: ${spec.antivirus || '—'})`;
     }
+
+    if (Object.keys(assetData).length > 0) {
+      await prisma.asset.update({ where: { id }, data: assetData });
+    }
+    if (Object.keys(detailData).length > 0) {
+      // Writes ComputerDetail and mirrors the same values onto Asset.
+      await upsertAssetDetail(prisma, id, asset.type || '', detailData);
+    }
+
+    const note = 'ปรับปรุงตาม GLPI — ' + changes.join(' · ');
 
     // Write a history record
     await prisma.assetHistory.create({
@@ -3019,7 +2985,13 @@ router.post('/:id/glpi-sync', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'),
       },
     });
 
-    res.json({ message: field ? 'อัปเดตฟิลด์เรียบร้อยแล้ว' : 'อัปเดตข้อมูลรายละเอียดฮาร์ดแวร์จาก GLPI เรียบร้อยแล้ว', spec });
+    const fresh = await prisma.asset.findUnique({ where: { id } });
+    res.json({
+      message: 'อัปเดต ' + changes.length + ' ช่องตาม GLPI เรียบร้อยแล้ว',
+      updated: changes.length,
+      fields: changes,
+      spec: { ...spec, fields: buildGlpiFields(fresh, spec) },
+    });
   } catch (err) { next(err); }
 });
 

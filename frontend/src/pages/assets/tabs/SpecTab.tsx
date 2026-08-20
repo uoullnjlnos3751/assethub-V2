@@ -93,33 +93,46 @@ export function SpecTab({ asset, glpiSpec, loadingGLPI, syncingGLPI, onSync, age
   const isNetwork = ['switch', 'router', 'access point', 'firewall', 'modem'].some(k => t.includes(k)) || cat === 'อุปกรณ์เครือข่าย';
   const isPrinter = t.includes('printer') || cat === 'เครื่องพิมพ์';
 
-  const renderComparisonRow = (fieldLabel: string, assetValue: string, glpiValue: string, fieldKey?: string) => {
-    const isMatch = (assetValue || '').trim().toLowerCase() === (glpiValue || '').trim().toLowerCase();
+  /**
+   * One field of the GLPI comparison.
+   *
+   * `state` is decided by the server (services/glpiSpec.ts) rather than by
+   * comparing strings here, because the two used to disagree: the page called
+   * "Dell" against "Dell Inc." a mismatch and offered a sync button that then
+   * wrote nothing. Whatever this row claims is now exactly what a click does.
+   */
+  const GLPI_STATE: Record<string, { label: string; color: 'success' | 'info' | 'primary' | 'warning' }> = {
+    same:   { label: 'ตรงกัน', color: 'success' },
+    fill:   { label: 'เติมช่องว่าง', color: 'info' },
+    better: { label: 'GLPI ละเอียดกว่า', color: 'primary' },
+    diff:   { label: 'ไม่ตรงกัน', color: 'warning' },
+  };
+
+  const renderGlpiField = (f: any) => {
+    const st = GLPI_STATE[f.state] || GLPI_STATE.diff;
     return (
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
-        <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.secondary', width: '25%', fontSize: '0.8rem' }}>{fieldLabel}</Typography>
-        <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', width: '35%', wordBreak: 'break-all', fontSize: '0.8rem' }}>{assetValue || '—'}</Typography>
+      <Box key={f.key} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
+        <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.secondary', width: '25%', fontSize: '0.8rem' }}>{f.label}</Typography>
+        <Typography variant="body2" sx={{ fontWeight: 600, color: f.current ? 'text.primary' : 'text.disabled', width: '35%', wordBreak: 'break-all', fontSize: '0.8rem', fontStyle: f.current ? 'normal' : 'italic' }}>
+          {f.current || '(ว่าง)'}
+        </Typography>
         <Box sx={{ width: '40%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-          {isMatch ? (
-            <Chip label="ตรงกัน" color="success" size="small" variant="outlined" sx={{ height: 18, fontSize: '0.7rem', fontWeight: 600 }} />
-          ) : (
-            <>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
-                <Chip label="ไม่ตรงกัน" color="warning" size="small" variant="outlined" sx={{ height: 18, fontSize: '0.7rem', fontWeight: 600, width: 'fit-content' }} />
-                <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 600, fontSize: '0.7rem' }}>ค่าจริง: {glpiValue || '—'}</Typography>
-              </Box>
-              {fieldKey && onSync && (
-                <IconButton
-                  size="small"
-                  onClick={() => onSync(fieldKey, fieldLabel)}
-                  disabled={syncingGLPI}
-                  sx={{ color: 'primary.main' }}
-                  title={`ปรับปรุงเฉพาะ ${fieldLabel}`}
-                >
-                  <SyncIcon sx={{ fontSize: 16 }} />
-                </IconButton>
-              )}
-            </>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25, minWidth: 0 }}>
+            <Chip label={st.label} color={st.color} size="small" variant="outlined" sx={{ height: 18, fontSize: '0.7rem', fontWeight: 600, width: 'fit-content' }} />
+            {f.state !== 'same' && (
+              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, fontSize: '0.7rem', wordBreak: 'break-all' }}>
+                ค่าจาก GLPI: {f.incoming}
+              </Typography>
+            )}
+            {f.note && f.state !== 'same' && (
+              <Typography variant="caption" sx={{ color: 'warning.main', fontSize: '0.68rem' }}>{f.note}</Typography>
+            )}
+          </Box>
+          {f.state !== 'same' && onSync && (
+            <IconButton size="small" onClick={() => onSync(f.key, f.label)} disabled={syncingGLPI}
+              sx={{ color: 'primary.main', flex: 'none' }} title={`ปรับปรุงเฉพาะ ${f.label}`}>
+              <SyncIcon sx={{ fontSize: 16 }} />
+            </IconButton>
           )}
         </Box>
       </Box>
@@ -167,14 +180,14 @@ export function SpecTab({ asset, glpiSpec, loadingGLPI, syncingGLPI, onSync, age
               </Box>
             ) : (
               <Box>
-                {renderComparisonRow('ชื่อคอมพิวเตอร์', asset.assetName, glpiSpec.name, 'name')}
-                {renderComparisonRow('ผู้ใช้งานหลัก (End User)', asset.ownerName, glpiSpec.user, 'user')}
-                {renderComparisonRow('CPU', asset.cpu, glpiSpec.cpu, 'cpu')}
-                {renderComparisonRow('RAM', asset.ram, glpiSpec.ram, 'ram')}
-                {renderComparisonRow('OS System', asset.osVersion, glpiSpec.os, 'os')}
-                {renderComparisonRow('Windows License', asset.windowsLicense, glpiSpec.license, 'license')}
-                {renderComparisonRow('MS Office', asset.officeLicense, glpiSpec.msOffice, 'msOffice')}
-                {renderComparisonRow('Antivirus', asset.antivirusStatus, glpiSpec.antivirus, 'antivirus')}
+                {/* Fields GLPI says nothing about are left out entirely — a row
+                    reading "ค่าจริง: —" only invited a click that did nothing. */}
+                {(glpiSpec.fields || []).map(renderGlpiField)}
+                {!(glpiSpec.fields || []).length && (
+                  <Typography sx={{ py: 2, textAlign: 'center', color: 'text.disabled', fontSize: '0.78rem' }}>
+                    GLPI ไม่มีข้อมูลสเปคของเครื่องนี้
+                  </Typography>
+                )}
               </Box>
             )}
           </CardContent>

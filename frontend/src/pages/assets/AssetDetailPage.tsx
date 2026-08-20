@@ -168,17 +168,19 @@ export default function AssetDetailPage() {
 
     const confirmMsg = field
       ? `คุณต้องการอัปเดต "${label}" ของทรัพย์สินนี้ตามข้อมูลใน GLPI หรือไม่?`
-      : 'คุณต้องการอัปเดตรายละเอียดฮาร์ดแวร์ทั้งหมดของทรัพย์สินนี้ตามข้อมูลใน GLPI หรือไม่? (ค่าเดิมในระบบจะถูกเขียนทับ)';
+      : 'ปรับปรุงสเปคของเครื่องนี้ตาม GLPI?\n\nจะเติมเฉพาะช่องที่ว่าง และช่องที่ GLPI ให้ข้อมูลละเอียดกว่าเท่านั้น — ค่าที่ขัดกันจะไม่ถูกแตะ ต้องกดรับทีละช่องเอง';
 
     if (!window.confirm(confirmMsg)) return;
 
     setSyncingGLPI(true);
     try {
-      await assetAPI.syncGLPI(parseInt(id), field);
+      const syncRes = await assetAPI.syncGLPI(parseInt(id), field);
       setToast({
         open: true,
-        message: field ? `อัปเดต "${label}" ตาม GLPI เรียบร้อยแล้ว` : 'อัปเดตรายละเอียดฮาร์ดแวร์ตาม GLPI เรียบร้อยแล้ว',
-        severity: 'success'
+        // The server says how many fields it actually wrote — a flat success
+        // message hid the case where nothing changed at all.
+        message: syncRes.data?.message || 'อัปเดตตาม GLPI เรียบร้อยแล้ว',
+        severity: syncRes.data?.updated === 0 ? 'info' : 'success',
       });
       // Reload asset and refetch spec
       const res = await assetAPI.get(parseInt(id));
