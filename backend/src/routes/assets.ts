@@ -972,8 +972,28 @@ router.get('/owners/search-ad', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'
   } catch (err) { next(err); }
 });
 
-router.get('/options/types', authenticate, async (_req: Request, res: Response, next: NextFunction) => {
+router.get('/options/types', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // ?inUse=1 — เฉพาะประเภทที่มีอุปกรณ์อยู่จริง
+    //
+    // The master table carries 48 active types but only 11 of them have ever
+    // been used, so the registry filter offered 37 choices that can only ever
+    // return nothing. Reading the types off the assets also reaches values the
+    // master no longer lists — three assets are typed "IT Equipment", which is
+    // not an active master row, so until now the filter could not select them.
+    //
+    // The create/edit form must never pass this flag: picking a type that has
+    // no assets yet is exactly what registering the first one means.
+    if (req.query.inUse === '1' || req.query.inUse === 'true') {
+      const inUse = await prisma.asset.findMany({
+        where: { type: { not: null } },
+        distinct: ['type'],
+        select: { type: true },
+        orderBy: { type: 'asc' },
+      });
+      return res.json(inUse.map(row => row.type).filter(t => t && t.trim()));
+    }
+
     // Master data only — see the note on /options/locations below.
     const managedTypes = await prisma.deviceType.findMany({
       where: { isActive: true },

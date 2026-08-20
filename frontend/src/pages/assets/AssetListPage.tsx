@@ -151,7 +151,7 @@ export default function AssetListPage() {
 
   useEffect(() => {
     categoryAPI.all().then((res) => setCategories(res.data)).catch(() => setCategories([]));
-    assetAPI.typeOptions().then((res) => setTypeOptions(res.data)).catch(() => setTypeOptions([]));
+    assetAPI.typeOptions(true).then((res) => setTypeOptions(res.data)).catch(() => setTypeOptions([]));
     assetAPI.companyOptions().then((res) => setCompanyOptions(res.data)).catch(() => setCompanyOptions([]));
   }, []);
 

@@ -136,7 +136,8 @@ export const assetAPI = {
   getAssetHistory: (id: number, params?: any) => api.get(`/assets/${id}/history`, { params }),
   getGlobalHistory: (params?: any) => api.get('/assets/global-history', { params }),
   searchOwners: (q: string) => api.get('/assets/owners/search-ad', { params: { q } }),
-  typeOptions: () => api.get('/assets/options/types'),
+  /** inUse: เฉพาะประเภทที่มีอุปกรณ์อยู่จริง — ใช้กับตัวกรอง ไม่ใช่กับฟอร์มสร้าง/แก้ไข */
+  typeOptions: (inUse = false) => api.get('/assets/options/types', inUse ? { params: { inUse: 1 } } : undefined),
   brandOptions: () => api.get('/assets/options/brands'),
   // `company` narrows the list to sites that company holds assets at;
   // omit it for the full curated list.
