@@ -71,16 +71,40 @@ function buildEntries(asset: any, maintenance: any[]): Entry[] {
           tone: 'warning',
         });
         break;
+      // ทั้งสองรายการนี้เขียนทับข้อมูลสเปคของเครื่อง จึงต้องบอกว่าใครสั่ง
+      // เท่ากับรายการอื่น — เดิมเส้นเวลาแสดงแค่วันที่กับหมายเหตุ
       case 'GLPI_SYNC':
         out.push({
           at,
           title: 'ซิงก์ข้อมูลจาก GLPI',
-          sub: [fmt(new Date(at)), h.note || ''].filter(Boolean).join(' · '),
+          sub: [fmt(new Date(at)), actor, h.note || ''].filter(Boolean).join(' · '),
+          tone: 'muted',
+        });
+        break;
+      case 'AGENT_SYNC':
+        out.push({
+          at,
+          title: 'ซิงก์ข้อมูลจาก Agent',
+          sub: [fmt(new Date(at)), actor, h.note || ''].filter(Boolean).join(' · '),
+          tone: 'muted',
+        });
+        break;
+      case 'UPDATE':
+        out.push({
+          at,
+          title: 'แก้ไขข้อมูลทรัพย์สิน',
+          sub: [fmt(new Date(at)), actor, h.note || ''].filter(Boolean).join(' · '),
           tone: 'muted',
         });
         break;
       default:
-        out.push({ at, title: h.actionType, sub: fmt(new Date(at)), tone: 'muted' });
+        // ประเภทที่ยังไม่มี case — อย่างน้อยต้องบอกว่าใครทำ ไม่ใช่โชว์รหัสดิบเปล่า ๆ
+        out.push({
+          at,
+          title: h.actionType,
+          sub: [fmt(new Date(at)), actor, h.note || ''].filter(Boolean).join(' · '),
+          tone: 'muted',
+        });
     }
   }
 
