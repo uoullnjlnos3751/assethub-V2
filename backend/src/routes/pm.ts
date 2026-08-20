@@ -5,6 +5,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { createNotification } from '../services/notification';
 import { fetchGLPISpecBySerial } from '../services/glpi';
+import { nextDeviceCode, resolveDevicePrefix } from '../services/deviceCode';
 import { getCategoryIdByAssetType } from './assets';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -612,54 +613,19 @@ function parseDeviceCode(input: any): string | null {
   return tail;
 }
 
-async function generateAssetCode(tx: any, companyStr: string, isPrinter: boolean = false): Promise<string> {
-  companyStr = String(companyStr || '').toUpperCase().replace(/\s/g, '');
-  let prefix = isPrinter ? 'HQ-TRRT-P' : 'HQ-TRRT-M';
-  let padding = 3;
-  try {
-    const setting = await tx.systemSetting.findUnique({ where: { key: 'COMPANY_PREFIXES' } });
-    if (setting && setting.value) {
-      const prefixes = JSON.parse(setting.value);
-      if (prefixes[companyStr]) {
-        prefix = isPrinter ? prefixes[companyStr].printerPrefix : prefixes[companyStr].monitorPrefix;
-        padding = prefixes[companyStr].padding || 3;
-      } else if (companyStr) {
-        prefix = `${companyStr}-${isPrinter ? 'P' : 'M'}`;
-      }
-    }
-  } catch (err) {
-    console.error('Error loading COMPANY_PREFIXES setting:', err);
-    if (companyStr) {
-      prefix = `${companyStr}-${isPrinter ? 'P' : 'M'}`;
-    }
-  }
+async function generateAssetCode(
+  tx: any,
+  companyStr: string,
+  isPrinter: boolean = false,
+  skip: Iterable<string> = [],
+): Promise<string> {
+  const { prefix } = await resolveDevicePrefix(tx, companyStr, isPrinter);
 
-  // Serialize concurrent code generation for the same prefix within this transaction's
-  // lifetime, otherwise two simultaneous PM submissions can both read the same "last"
-  // asset code and race to insert the same next code, tripping the assetCode unique
-  // constraint. Auto-releases on transaction commit/rollback.
+  // กันสองคำขอที่บันทึกพร้อมกันอ่านเลขล่าสุดตัวเดียวกันแล้วแย่งกันเขียน
+  // ปลดล็อกเองเมื่อ transaction จบ
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${prefix}))`;
 
-  // Codes for a prefix aren't always padded to the same width (legacy data,
-  // manual entry), so `ORDER BY assetCode DESC` is a plain string sort and
-  // can pick the wrong "last" code — e.g. "...M09" sorts above "...M035"
-  // even though 9 < 35 — which then regenerates an already-taken number on
-  // every retry. Pull every matching code and take the actual numeric max.
-  const existingAssets = await tx.asset.findMany({
-    where: { assetCode: { startsWith: prefix } },
-    select: { assetCode: true },
-  });
-
-  let nextNum = 1;
-  for (const a of existingAssets) {
-    const digitMatch = a.assetCode?.match(/(\d+)$/);
-    if (digitMatch) {
-      const n = parseInt(digitMatch[1], 10) + 1;
-      if (n > nextNum) nextNum = n;
-    }
-  }
-
-  return `${prefix}${nextNum.toString().padStart(padding, '0')}`;
+  return nextDeviceCode(tx, companyStr, isPrinter, { skip });
 }
 
 async function processDeviceAnswers(tx: any, run: any, answers: any[], oldAnswers: any[] = []): Promise<any[]> {
@@ -776,7 +742,18 @@ async function processDeviceAnswers(tx: any, run: any, answers: any[], oldAnswer
                   }
                 } else {
                   // ถ้าอ่านค่าที่ส่งมาไม่ได้ ให้คงรหัสเดิมไว้ ห้ามเขียนทับด้วยขยะ
-                  const finalCode = parseDeviceCode(dev.assetCode) ?? existingAsset.assetCode;
+                  // รหัสที่ส่งมาอาจถูกระเบียนอื่นถือไว้แล้ว — assetCode เป็น unique
+                  // ทั้งตาราง การเขียนทับจึงล้มทั้ง transaction (PM run 511 ตายด้วย
+                  // P2002 แบบนี้) ถ้าชนก็คงรหัสเดิมไว้ ดีกว่าทำให้ช่างบันทึกงานไม่ได้
+                  const requestedCode = parseDeviceCode(dev.assetCode);
+                  let finalCode = existingAsset.assetCode;
+                  if (requestedCode && requestedCode !== existingAsset.assetCode) {
+                    const clash = await tx.asset.findFirst({
+                      where: { assetCode: requestedCode, NOT: { id: existingAsset.id } },
+                      select: { id: true },
+                    });
+                    if (!clash) finalCode = requestedCode;
+                  }
 
                   await tx.asset.update({
                     where: { id: existingAsset.id },
@@ -1245,83 +1222,26 @@ router.get('/check-serial', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), a
 
 router.get('/preview-monitor-code', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const companyStr = String(req.query.company || '').toUpperCase().replace(/\s/g, '');
-    const index = parseInt(String(req.query.index || '0'), 10);
-    let prefix = 'HQ-TRRT-M';
-    let padding = 3;
-    try {
-      const setting = await prisma.systemSetting.findUnique({ where: { key: 'COMPANY_PREFIXES' } });
-      if (setting && setting.value) {
-        const prefixes = JSON.parse(setting.value);
-        if (prefixes[companyStr]) {
-          prefix = prefixes[companyStr].monitorPrefix;
-          padding = prefixes[companyStr].padding || 3;
-        } else if (companyStr) {
-          prefix = `${String(req.query.company).toUpperCase()}-M`;
-        }
-      }
-    } catch (err) {
-      if (companyStr) prefix = `${String(req.query.company).toUpperCase()}-M`;
-    }
-
-    // See generateAssetCode()'s comment: inconsistent padding across existing
-    // codes makes a string ORDER BY DESC pick the wrong "last" code, so scan
-    // all matches and take the actual numeric max instead.
-    const existingAssets = await prisma.asset.findMany({
-      where: { assetCode: { startsWith: prefix } },
-      select: { assetCode: true },
+    // เรียกตัวเดียวกับตอนบันทึกจริง (services/deviceCode.ts) — เดิมเป็นโค้ด
+    // คนละชุดที่ลอกกันมาแล้วเพี้ยน: ตรงนี้ประกอบ prefix จาก query ดิบ ๆ ที่ยังมี
+    // เว้นวรรค ('TRR HQ-M') ส่วนตอนบันทึกตัดเว้นวรรคทิ้ง ('TRRHQ-M') ช่างจึงเห็น
+    // เลขหนึ่งแต่ระบบเขียนอีกเลขหนึ่ง
+    const code = await nextDeviceCode(prisma, req.query.company, false, {
+      offset: parseInt(String(req.query.index || '0'), 10) || 0,
     });
-
-    let nextNum = 1;
-    for (const a of existingAssets) {
-      const digitMatch = a.assetCode?.match(/(\d+)$/);
-      if (digitMatch) {
-        const n = parseInt(digitMatch[1], 10) + 1;
-        if (n > nextNum) nextNum = n;
-      }
-    }
-    nextNum += index;
-    const code = `${prefix}${nextNum.toString().padStart(padding, '0')}`;
     res.json({ code });
   } catch (err) { next(err); }
 });
 
 router.get('/preview-printer-code', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const companyStr = String(req.query.company || '').toUpperCase().replace(/\s/g, '');
-    const index = parseInt(String(req.query.index || '0'), 10);
-    let prefix = 'HQ-TRRT-P';
-    let padding = 3;
-    try {
-      const setting = await prisma.systemSetting.findUnique({ where: { key: 'COMPANY_PREFIXES' } });
-      if (setting && setting.value) {
-        const prefixes = JSON.parse(setting.value);
-        if (prefixes[companyStr]) {
-          prefix = prefixes[companyStr].printerPrefix;
-          padding = prefixes[companyStr].padding || 3;
-        } else if (companyStr) {
-          prefix = `${String(req.query.company).toUpperCase()}-P`;
-        }
-      }
-    } catch (err) {
-      if (companyStr) prefix = `${String(req.query.company).toUpperCase()}-P`;
-    }
-
-    const existingAssets = await prisma.asset.findMany({
-      where: { assetCode: { startsWith: prefix } },
-      select: { assetCode: true },
+    // เรียกตัวเดียวกับตอนบันทึกจริง (services/deviceCode.ts) — เดิมเป็นโค้ด
+    // คนละชุดที่ลอกกันมาแล้วเพี้ยน: ตรงนี้ประกอบ prefix จาก query ดิบ ๆ ที่ยังมี
+    // เว้นวรรค ('TRR HQ-M') ส่วนตอนบันทึกตัดเว้นวรรคทิ้ง ('TRRHQ-M') ช่างจึงเห็น
+    // เลขหนึ่งแต่ระบบเขียนอีกเลขหนึ่ง
+    const code = await nextDeviceCode(prisma, req.query.company, true, {
+      offset: parseInt(String(req.query.index || '0'), 10) || 0,
     });
-
-    let nextNum = 1;
-    for (const a of existingAssets) {
-      const digitMatch = a.assetCode?.match(/(\d+)$/);
-      if (digitMatch) {
-        const n = parseInt(digitMatch[1], 10) + 1;
-        if (n > nextNum) nextNum = n;
-      }
-    }
-    nextNum += index;
-    const code = `${prefix}${nextNum.toString().padStart(padding, '0')}`;
     res.json({ code });
   } catch (err) { next(err); }
 });
