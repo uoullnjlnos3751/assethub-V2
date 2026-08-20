@@ -7,7 +7,15 @@ if (!USER_TOKEN || !APP_TOKEN) {
   console.warn('GLPI_USER_TOKEN or GLPI_APP_TOKEN is not set. GLPI integration will not work.');
 }
 
-export async function fetchGLPISpecBySerial(serialNumber: string) {
+/**
+ * ดึงสเปคเครื่องจาก GLPI ด้วย Serial
+ *
+ * `hostCompany` คือบริษัทของเครื่องในทะเบียน ITSM — ต้องส่งเข้ามาเพราะ GLPI
+ * บอกบริษัทไม่ได้เลย: Computer ไม่มีฟิลด์ company และทั้งระบบอยู่ Root Entity
+ * เดียว (entities_id = 0) ก่อนหน้านี้โค้ดอ่าน `computer.company` ที่ไม่มีอยู่จริง
+ * แล้วตกไปใช้ค่าคงที่ 'TRR HQ' ซึ่งไม่ใช่รหัสบริษัทของที่นี่สักตัว
+ */
+export async function fetchGLPISpecBySerial(serialNumber: string, hostCompany?: string | null) {
   const serial = serialNumber?.trim();
   if (!serial) return null;
 
@@ -525,12 +533,19 @@ export async function fetchGLPISpecBySerial(serialNumber: string) {
 
             linkedMonitors.push({
               _assetId: existing ? existing.id : null,
-              assetCode: existing ? (existing.assetName ? `${existing.assetName} / ${existing.assetCode}` : existing.assetCode) : (monitor.name || monitor.otherserial || ''),
+              // ส่งเป็นคนละช่อง ไม่ประกอบเป็น `ชื่อ / รหัส` อีกต่อไป — จอในทะเบียน
+              // 109 จาก 212 ตัวไม่มี assetCode การ interpolate จึงได้คำว่า "null"
+              // ติดมาในสตริง แล้วฝั่งบันทึกตัดเอาท่อนหลังไปเขียนลงฐานข้อมูลตรง ๆ
+              assetName: existing ? existing.assetName : null,
+              assetCode: existing ? existing.assetCode : null,
+              /** ชื่อที่ GLPI ตั้งให้เอง ใช้ได้แค่เป็นข้อมูลประกอบ ไม่ใช่รหัสทรัพย์สิน */
+              glpiName: monitor.name || monitor.otherserial || '',
               brand: mBrand || (existing ? existing.brand : ''),
               model: mModel || (existing ? existing.model : ''),
               serial: mSerial,
               source: 'glpi',
-              company: existing ? existing.company : (computer.company || 'TRR HQ'),
+              // จอที่ยังไม่มีในทะเบียนให้ตกเป็นบริษัทของเครื่องที่มันเสียบอยู่
+              company: existing ? existing.company : (hostCompany || null),
               screenSize: parseFloat(monitor.size) > 0 ? `${parseFloat(monitor.size)}"` : null,
               ports: portsList.length > 0 ? portsList.join(', ') : null,
               hasSpeaker: monitor.have_speaker === 1
@@ -538,77 +553,18 @@ export async function fetchGLPISpecBySerial(serialNumber: string) {
           }
         }
       }
-      if (linkedMonitors.length === 0) {
-        const contactUser = computer.contact ? computer.contact.split('@')[0].trim() : '';
-        if (contactUser) {
-          const searchUrl = new URL(`${GLPI_BASE_URL}/search/Monitor`);
-          searchUrl.searchParams.set('criteria[0][field]', '7'); // contact field
-          searchUrl.searchParams.set('criteria[0][searchtype]', 'contains');
-          searchUrl.searchParams.set('criteria[0][value]', contactUser);
-          searchUrl.searchParams.set('forcedisplay[0]', '2'); // ID
-          searchUrl.searchParams.set('forcedisplay[1]', '5'); // Serial
-          searchUrl.searchParams.set('forcedisplay[2]', '23'); // Manufacturer
-          searchUrl.searchParams.set('forcedisplay[3]', '40'); // Model
-          searchUrl.searchParams.set('forcedisplay[4]', '1'); // Name
-
-          const searchRes = await glpiFetch(searchUrl.toString()) as any;
-          if (searchRes && searchRes.data && Array.isArray(searchRes.data)) {
-            for (const mData of searchRes.data) {
-              const monitorId = mData["2"];
-              const monitor = await glpiFetch(`${GLPI_BASE_URL}/Monitor/${monitorId}?expand_dropdowns=true`) as any;
-
-              const mSerial = (mData["5"] || '').trim();
-              const existing = mSerial
-                ? await prisma.asset.findUnique({
-                    where: { serialNo: mSerial }
-                  })
-                : null;
-
-              let mBrand = mData["23"] || '';
-              let mModel = mData["40"] || mData["1"] || '';
-              let screenSize = null;
-              let ports = null;
-              let hasSpeaker = false;
-
-              if (monitor) {
-                const manufLink = monitor.links?.find((l: any) => l.rel === 'Manufacturer');
-                if (manufLink) {
-                  const manuf = await glpiFetch(manufLink.href) as any;
-                  if (manuf) mBrand = manuf.name || mBrand;
-                }
-                const modelLink = monitor.links?.find((l: any) => l.rel === 'MonitorModel');
-                if (modelLink) {
-                  const mdl = await glpiFetch(modelLink.href) as any;
-                  if (mdl) mModel = mdl.name || mModel;
-                }
-
-                const portsList = [];
-                if (monitor.have_hdmi === 1) portsList.push('HDMI');
-                if (monitor.have_displayport === 1) portsList.push('DisplayPort');
-                if (monitor.have_subd === 1) portsList.push('VGA');
-                if (monitor.have_dvi === 1) portsList.push('DVI');
-
-                screenSize = parseFloat(monitor.size) > 0 ? `${parseFloat(monitor.size)}"` : null;
-                ports = portsList.length > 0 ? portsList.join(', ') : null;
-                hasSpeaker = monitor.have_speaker === 1;
-              }
-
-              linkedMonitors.push({
-                _assetId: existing ? existing.id : null,
-                assetCode: existing ? (existing.assetName ? `${existing.assetName} / ${existing.assetCode}` : existing.assetCode) : (mData["1"] || mData["5"] || ''),
-                brand: mBrand || (existing ? existing.brand : ''),
-                model: mModel || (existing ? existing.model : ''),
-                serial: mSerial,
-                source: 'glpi',
-                company: existing ? existing.company : (computer.company || 'TRR HQ'),
-                screenSize,
-                ports,
-                hasSpeaker
-              });
-            }
-          }
-        }
-      }
+      // เดิมตรงนี้มี fallback: ถ้าไม่พบจอที่ผูกกับเครื่อง ให้เอา contact ของเครื่อง
+      // มาตัดที่ @ แล้วค้นจอที่ช่อง contact "มีคำนั้นอยู่ข้างใน" — ถอดออกแล้ว
+      //
+      // มันเดาผิดเป็นกอบเป็นกำ: HQ-PS-N046 มี contact = "IT@HQ-PS-N046" จึงค้น
+      // ด้วยคำว่า "IT" แล้วแมตช์จอ 60 ตัวจากชื่อไทยที่บังเอิญมี it อยู่ข้างใน
+      // (Thitichaya, krittiya, nittaya) เครื่องที่ GLPI ผูกจอไว้ 0 ตัวเลยได้จอ
+      // ติดมา 20 ตัวจากคนละบริษัท และถ้าช่างกดบันทึก PM จอทั้ง 20 จะโดนเขียนทับ
+      // ทั้งผู้ครอบครอง สถานที่ แผนก และสถานะ ให้กลายเป็นของเครื่องนี้
+      //
+      // Computer_Item คือแหล่งเดียวที่รู้จริงว่าจอเสียบอยู่กับเครื่องไหน ทั้งกอง
+      // มีลิงก์อยู่ 246 เส้นบน 231 เครื่อง สูงสุด 2 จอต่อเครื่อง — ไม่มีจอก็คือ
+      // ไม่มีจอ ปล่อยให้ว่างแล้วให้ช่างกรอกเองถูกกว่าเดา
     } catch (err) {
       console.error('Error fetching linked monitors from GLPI:', err);
     }

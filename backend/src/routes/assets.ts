@@ -2933,7 +2933,7 @@ router.get('/:id/glpi-spec', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), 
     if (!asset) throw new AppError('ไม่พบทรัพย์สิน', 404);
     if (!asset.serialNo) throw new AppError('ทรัพย์สินนี้ไม่มี Serial Number สำหรับดึงข้อมูล', 400);
 
-    const spec = await fetchGLPISpecBySerial(asset.serialNo);
+    const spec = await fetchGLPISpecBySerial(asset.serialNo, asset.company);
     if (!spec) throw new AppError('ไม่พบข้อมูลฮาร์ดแวร์ใน GLPI สำหรับ Serial Number นี้', 404);
 
     // The comparison is built here rather than in the page so that what the
@@ -2949,7 +2949,7 @@ router.post('/:id/glpi-sync', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'),
     if (!asset) throw new AppError('ไม่พบทรัพย์สิน', 404);
     if (!asset.serialNo) throw new AppError('ทรัพย์สินนี้ไม่มี Serial Number สำหรับดึงข้อมูล', 400);
 
-    const spec = await fetchGLPISpecBySerial(asset.serialNo);
+    const spec = await fetchGLPISpecBySerial(asset.serialNo, asset.company);
     if (!spec) throw new AppError('ไม่พบข้อมูลฮาร์ดแวร์ใน GLPI สำหรับ Serial Number นี้', 404);
 
     const field = req.body.field as string | undefined;

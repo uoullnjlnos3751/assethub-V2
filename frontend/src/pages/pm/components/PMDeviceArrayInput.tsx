@@ -232,7 +232,8 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
       if (devices.length === 0) {
         updateParent([{
           [isPrinter ? 'hasPrinter' : 'hasMonitor']: true,
-          company: parentAsset?.company || 'TRR HQ',
+          // จอที่เพิ่มเองต้องตกเป็นบริษัทของเครื่องที่กำลังทำ PM
+          company: parentAsset?.company || '',
           brand: '',
           model: '',
           serialNo: ''
@@ -248,7 +249,8 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
   const addDevice = () => {
     updateParent([...devices, {
       [isPrinter ? 'hasPrinter' : 'hasMonitor']: true,
-      company: parentAsset?.company || 'TRR HQ',
+      // จอที่เพิ่มเองต้องตกเป็นบริษัทของเครื่องที่กำลังทำ PM
+      company: parentAsset?.company || '',
       brand: '',
       model: '',
       serialNo: ''

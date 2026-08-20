@@ -234,11 +234,13 @@ export const PMChecklistModal: React.FC<PMChecklistModalProps> = ({ open, onClos
             const monitorKey = monitorItem.key;
             const monitorData = spec.monitors.map((m: any) => ({
               hasMonitor: true,
-              company: m.company || run.asset?.company || 'TRR HQ',
+              // GLPI บอกบริษัทไม่ได้ จอที่ยังไม่มีในทะเบียนจึงตกเป็นของเครื่องที่ทำ PM อยู่
+              company: m.company || run.asset?.company || '',
               brand: m.brand || '',
               model: m.model || '',
               serialNo: m.serial || '',
-              assetCode: m.assetCode || '',
+              // ใช้รหัสได้เฉพาะจอที่มีระเบียนอยู่แล้ว จอใหม่ต้องปล่อยให้ระบบเจนให้
+              assetCode: m._assetId ? (m.assetCode || '') : '',
               _assetId: m._assetId || null,
               source: 'glpi'
             }));

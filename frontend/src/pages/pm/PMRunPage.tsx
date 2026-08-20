@@ -689,14 +689,15 @@ export default function PMRunPage() {
           .filter((m: any) => !m.serial || !existingSerials.has(String(m.serial).trim().toLowerCase()))
           .map((m: any) => ({
             _assetId: m._assetId || undefined,
-            // Only trust GLPI's assetCode when it's the real code of an
-            // already-registered asset (_assetId set) — for a genuinely new
-            // monitor GLPI has no ITAM code yet and sends its own device name
-            // in this field instead, which must NOT overwrite the auto-
-            // generated running-number preview shown for new devices.
+            // assetCode มาเป็นรหัสจริงของระเบียนแล้ว (หรือ null ถ้ายังไม่มี)
+            // ไม่ใช่สตริง `ชื่อ / รหัส` ที่เคยพ่วงคำว่า null ติดมาอีกต่อไป
+            // จอที่ยังไม่อยู่ในทะเบียนต้องเป็น undefined เพื่อให้ช่องโชว์รหัส
+            // ที่ระบบเจนให้แทน
             assetCode: m._assetId ? (m.assetCode || '') : undefined,
             hasMonitor: true,
-            company: m.company || pmModal.run.asset?.company || 'TRR HQ',
+            // บริษัทของเครื่องที่กำลังทำ PM คือคำตอบที่ถูกเสมอสำหรับจอที่ยังไม่มี
+            // ในทะเบียน — GLPI บอกบริษัทไม่ได้ ส่วนจอที่มีแล้วจะติดบริษัทของตัวเองมา
+            company: m.company || pmModal.run.asset?.company || '',
             brand: m.brand || '',
             model: m.model || '',
             serialNo: m.serial || '',

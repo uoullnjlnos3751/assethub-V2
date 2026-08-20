@@ -595,6 +595,23 @@ router.get('/runs', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (re
   } catch (err) { next(err); }
 });
 
+/**
+ * อ่านรหัสทรัพย์สินที่ช่างกรอก/ระบบส่งมาให้เป็นค่าที่เขียนลงฐานข้อมูลได้
+ *
+ * ค่าที่รับเข้ามาเคยเป็นสตริงประกอบรูปแบบ `ชื่อ / รหัส` ซึ่งเมื่อจอไม่มีรหัส
+ * (109 จาก 212 ตัว) จะได้ `ชื่อ / null` แล้วการตัดเอาท่อนหลังก็เขียนคำว่า
+ * "null" ลงคอลัมน์จริง ๆ ตอนนี้ฝั่ง GLPI ส่งเป็นคนละช่องแล้ว แต่คำตอบ PM ที่
+ * บันทึกไว้ก่อนหน้านี้ยังมีรูปแบบเก่าค้างอยู่ จึงต้องกันไว้ตรงนี้ด้วย
+ */
+function parseDeviceCode(input: any): string | null {
+  const raw = String(input ?? '').trim();
+  if (!raw) return null;
+  const tail = raw.includes('/') ? raw.split('/').pop()!.trim() : raw;
+  if (!tail) return null;
+  if (['null', 'undefined', 'nan', '-'].includes(tail.toLowerCase())) return null;
+  return tail;
+}
+
 async function generateAssetCode(tx: any, companyStr: string, isPrinter: boolean = false): Promise<string> {
   companyStr = String(companyStr || '').toUpperCase().replace(/\s/g, '');
   let prefix = isPrinter ? 'HQ-TRRT-P' : 'HQ-TRRT-M';
@@ -682,11 +699,7 @@ async function processDeviceAnswers(tx: any, run: any, answers: any[], oldAnswer
                       throw new AppError(`กรุณาระบุ Serial No. สำหรับ ${isPrinter ? 'Printer' : 'Monitor'} ให้ครบถ้วนก่อนบันทึก`, 400);
                     }
 
-                    let finalCode = '';
-                    if (dev.assetCode && dev.assetCode.trim() !== '') {
-                      const parts = dev.assetCode.split('/');
-                      finalCode = parts[parts.length - 1].trim();
-                    }
+                    let finalCode = parseDeviceCode(dev.assetCode) ?? '';
 
                     let needsFreshCode = !finalCode || finalCode.includes('X') || finalCode.includes('x') || finalCode.includes('ร่าง');
                     if (!needsFreshCode) {
@@ -762,11 +775,8 @@ async function processDeviceAnswers(tx: any, run: any, answers: any[], oldAnswer
                     newAssetIds.add(newAsset.id);
                   }
                 } else {
-                  let finalCode = existingAsset.assetCode;
-                  if (dev.assetCode && dev.assetCode.trim() !== '') {
-                    const parts = dev.assetCode.split('/');
-                    finalCode = parts[parts.length - 1].trim();
-                  }
+                  // ถ้าอ่านค่าที่ส่งมาไม่ได้ ให้คงรหัสเดิมไว้ ห้ามเขียนทับด้วยขยะ
+                  const finalCode = parseDeviceCode(dev.assetCode) ?? existingAsset.assetCode;
 
                   await tx.asset.update({
                     where: { id: existingAsset.id },
@@ -1155,7 +1165,7 @@ router.get('/runs/:id/glpi-spec', authenticate, authorize('IT_ADMIN', 'SUPERADMI
       throw new AppError('ทรัพย์สินนี้ไม่มี Serial Number สำหรับดึงข้อมูลจาก GLPI', 400);
     }
 
-    const spec = await fetchGLPISpecBySerial(run.asset.serialNo);
+    const spec = await fetchGLPISpecBySerial(run.asset.serialNo, run.asset.company);
     if (!spec) {
       throw new AppError('ไม่พบข้อมูลฮาร์ดแวร์ในระบบ GLPI สำหรับ Serial Number นี้', 404);
     }
