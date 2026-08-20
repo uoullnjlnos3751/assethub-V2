@@ -1,11 +1,8 @@
 import React from 'react';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import DevicesIcon from '@mui/icons-material/Devices';
-import ComputerIcon from '@mui/icons-material/Computer';
-import DesktopWindowsIcon from '@mui/icons-material/DesktopWindows';
 import PrintIcon from '@mui/icons-material/Print';
 import BadgeIcon from '@mui/icons-material/Badge';
-import PhoneAndroidIcon from '@mui/icons-material/PhoneAndroid';
 import RouterIcon from '@mui/icons-material/Router';
 import CableIcon from '@mui/icons-material/Cable';
 import ScienceIcon from '@mui/icons-material/Science';
@@ -83,18 +80,12 @@ export const adminNav: NavEntry[] = [
     icon: <DevicesIcon fontSize="small" />,
     section: 'จัดการทรัพย์สิน',
     children: [
+      // The per-type shortcuts that used to sit here are now built-in views
+      // on the registry page itself — see pages/assets/components/presetViews.ts.
       { label: 'ทะเบียนทั้งหมด', path: '/assets', icon: <DevicesIcon fontSize="small" /> },
-      { label: 'คอมพิวเตอร์', path: '/assets?typeGroup=computers', icon: <ComputerIcon fontSize="small" /> },
-      { label: 'จอภาพ', path: '/assets?typeGroup=monitors', icon: <DesktopWindowsIcon fontSize="small" /> },
-      { label: 'เครื่องพิมพ์', path: '/assets?typeGroup=printers', icon: <PrintIcon fontSize="small" /> },
-      { label: 'อุปกรณ์เครือข่าย', path: '/assets?typeGroup=network', icon: <RouterIcon fontSize="small" /> },
-      { label: 'อุปกรณ์สื่อสาร', path: '/assets?typeGroup=phonesTablets', icon: <PhoneAndroidIcon fontSize="small" /> },
-      { label: 'อุปกรณ์ต่อพ่วง', path: '/assets?typeGroup=devices', icon: <DevicesIcon fontSize="small" /> },
-      { label: 'Rack & Infra', path: '/assets?typeGroup=rack', icon: <HandymanIcon fontSize="small" /> },
       { label: 'นำเข้า/ส่งออก ข้อมูล', path: '/assets/import-export', icon: <ImportExportIcon fontSize="small" />, roles: ['SUPERADMIN', 'IT_ADMIN'] },
       { label: 'พิมพ์ QR สติ๊กเกอร์', path: '/assets/print-qr', icon: <PrintIcon fontSize="small" />, roles: ['SUPERADMIN', 'IT_ADMIN'] },
       { label: 'ตรวจสอบข้อมูลจาก Agent', path: '/assets/agent-drift', icon: <RouterIcon fontSize="small" />, roles: ['SUPERADMIN', 'IT_ADMIN'] },
-      { label: 'เครื่องที่ฝ่ายบุคคลรับฝาก', path: '/assets?custodyHolder=HR_TRR', icon: <AssignmentReturnIcon fontSize="small" />, roles: ['SUPERADMIN', 'IT_ADMIN'] },
     ],
   },
   {
@@ -117,7 +108,6 @@ export const adminNav: NavEntry[] = [
     icon: <ShoppingCartIcon fontSize="small" />,
     section: 'Service Desk',
     children: [
-      { label: 'ของพร้อมยืม', path: '/assets?status=Available', icon: <CheckCircleOutlineIcon fontSize="small" /> },
       { label: 'คำขอทั้งหมด', path: '/borrow/all-requests', icon: <ListAltIcon fontSize="small" /> },
       { label: 'รออนุมัติ', path: '/borrow/approval-queue', icon: <CheckCircleIcon fontSize="small" /> },
       { label: 'ส่งมอบ (Check-out)', path: '/borrow/checkout', icon: <HandymanIcon fontSize="small" /> },

@@ -18,6 +18,7 @@ import {
   InputAdornment,
   InputLabel,
   ListItemText,
+  ListSubheader,
   Menu,
   MenuItem,
   Pagination,
@@ -60,6 +61,7 @@ import EmptyState from '../../components/EmptyState';
 import BulkUpdateDialog from './components/BulkUpdateDialog';
 import AssetCard from './components/AssetCard';
 import { loadSavedViews, saveFilterView, deleteFilterView, SavedFilterView } from './components/savedFilterViews';
+import { PresetView, isPresetActive, presetsFor } from './components/presetViews';
 import AssetQuickViewDrawer from './components/AssetQuickViewDrawer';
 import ColumnPickerDialog from './components/ColumnPickerDialog';
 import ExtendBorrowDialog from './components/ExtendBorrowDialog';
@@ -128,6 +130,14 @@ export default function AssetListPage() {
   // Saved filter views (localStorage, personal — no backend model)
   const [savedViews, setSavedViews] = useState<SavedFilterView[]>(() => loadSavedViews());
   const [savedViewsAnchor, setSavedViewsAnchor] = useState<null | HTMLElement>(null);
+  // The nine sidebar entries that were only ever /assets with one query
+  // parameter now live here instead. See components/presetViews.ts.
+  const presets = presetsFor(user?.role);
+  const applyPreset = (v: PresetView) => {
+    clearAllFilters();
+    setSearchParams(new URLSearchParams(v.params));
+    setSavedViewsAnchor(null);
+  };
   const [saveViewDialogOpen, setSaveViewDialogOpen] = useState(false);
   const [saveViewName, setSaveViewName] = useState('');
 
@@ -543,7 +553,7 @@ export default function AssetListPage() {
             onClick={(e) => setSavedViewsAnchor(e.currentTarget)}
             sx={{ width: isMobile ? '100%' : 'auto', borderRadius: '8px', textTransform: 'none' }}
           >
-            มุมมองของฉัน{savedViews.length > 0 ? ` (${savedViews.length})` : ''}
+            มุมมอง{savedViews.length > 0 ? ` (${savedViews.length})` : ''}
           </Button>
           <Button variant="outlined" startIcon={<RestartAltIcon />} sx={{ width: isMobile ? '100%' : 'auto', borderRadius: '8px', textTransform: 'none' }} onClick={() => { clearAllFilters(); fetchAssets(); }}>ล้าง</Button>
           {isAdmin && rowSelectionModel.length > 0 && (
@@ -599,8 +609,19 @@ export default function AssetListPage() {
         </Box>
       </Popover>
 
-      <Menu anchorEl={savedViewsAnchor} open={Boolean(savedViewsAnchor)} onClose={() => setSavedViewsAnchor(null)}>
-        <MenuItem onClick={() => { setSavedViewsAnchor(null); setSaveViewDialogOpen(true); }}>
+      <Menu anchorEl={savedViewsAnchor} open={Boolean(savedViewsAnchor)} onClose={() => setSavedViewsAnchor(null)}
+        slotProps={{ paper: { sx: { minWidth: 240 } } }}>
+        <ListSubheader sx={{ fontSize: 10, fontWeight: 700, letterSpacing: '.05em', lineHeight: 2.4 }}>
+          มุมมองมาตรฐาน
+        </ListSubheader>
+        {presets.map((v) => (
+          <MenuItem key={v.key} selected={isPresetActive(v, searchParams)} onClick={() => applyPreset(v)}
+            sx={{ fontSize: 13 }}>
+            {v.label}
+          </MenuItem>
+        ))}
+        <Divider />
+        <MenuItem onClick={() => { setSavedViewsAnchor(null); setSaveViewDialogOpen(true); }} sx={{ fontSize: 13 }}>
           <BookmarkAddIcon fontSize="small" sx={{ mr: 1, color: 'primary.main' }} /> บันทึกตัวกรองปัจจุบัน...
         </MenuItem>
         {savedViews.length > 0 && <Divider />}
