@@ -203,7 +203,12 @@ function PlanFormFields({
         <Typography sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary', mb: 0.5 }}>ประเภทอุปกรณ์ (Device Type)</Typography>
         <Select fullWidth size="small" displayEmpty value={form.deviceType} onChange={(e) => onChange({ deviceType: e.target.value })}>
           <MenuItem value="">ทุกประเภท (All Types)</MenuItem>
-          {typeOptions.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+          {/* รายการมีเฉพาะประเภทที่มีเครื่องอยู่จริง — แผนที่เล็งประเภทที่ไม่มีเครื่อง
+              เลยจะได้เป้าหมาย 0 เสมอ · ประเภทเดิมของแผนที่กำลังแก้ไขถูกคงไว้ให้เลือกได้
+              เสมอ ไม่งั้นช่องจะว่างเปล่าตอนเปิดแผนเก่าที่ประเภทเลิกใช้ไปแล้ว */}
+          {(form.deviceType && form.deviceType !== '__ALL__' && !typeOptions.includes(form.deviceType)
+            ? [form.deviceType, ...typeOptions] : typeOptions
+          ).map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
         </Select>
       </Box>
 
@@ -371,7 +376,7 @@ export default function PMPlanListPage() {
       assetAPI.departmentOptions(),
       assetAPI.locationOptions(),
       assetAPI.companyOptions(),
-      assetAPI.typeOptions(),
+      assetAPI.typeOptions(true),
       pmAPI.leads(),
       pmAPI.planGaps({ year: filterYear }),
     ]).then(([p, t, d, l, c, ty, ld, gp]) => {
