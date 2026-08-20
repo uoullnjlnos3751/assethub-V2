@@ -7,9 +7,10 @@ import {
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import { RadioTower, Wand2, TriangleAlert } from 'lucide-react';
+import { RadioTower, Wand2, TriangleAlert, Monitor as MonitorIcon } from 'lucide-react';
 import { assetAPI } from '../../services/api';
 import { SectionCard } from '../../components/SectionCard';
+import { MonitorCard, MonitorLinkList, MonitorRow, bucketColors } from './components/MonitorReconcile';
 
 interface DriftField { field: string; label: string; value?: string; current?: string; incoming?: string }
 interface Machine {
@@ -71,6 +72,47 @@ export default function AgentDriftPage() {
     }
   };
 
+  /* ── Monitors ─────────────────────────────────────────────────────────
+     Loaded on demand rather than with the page: the fleet scan is one
+     upstream call per host, so it should only run when someone opens the
+     tab that needs it. */
+  const [tab, setTab] = React.useState<'specs' | 'monitors'>('specs');
+  const [monRows, setMonRows] = React.useState<MonitorRow[] | null>(null);
+  const [monLoading, setMonLoading] = React.useState(false);
+  const [monBucket, setMonBucket] = React.useState<'FIX' | 'CREATE' | 'LINK' | 'OK' | 'MANUAL'>('FIX');
+
+  const loadMonitors = React.useCallback(() => {
+    setMonLoading(true);
+    assetAPI.agentMonitors()
+      .then(res => setMonRows(res.data?.rows || []))
+      .catch(() => setMonRows([]))
+      .finally(() => setMonLoading(false));
+  }, []);
+
+  React.useEffect(() => {
+    if (tab === 'monitors' && monRows === null && !monLoading) loadMonitors();
+  }, [tab, monRows, monLoading, loadMonitors]);
+
+  const monCounts = React.useMemo(() => {
+    const r = monRows || [];
+    return {
+      FIX: r.filter(x => x.bucket === 'FIX').length,
+      CREATE: r.filter(x => x.bucket === 'CREATE').length,
+      LINK: r.filter(x => x.linkable).length,
+      OK: r.filter(x => x.bucket === 'OK').length,
+      MANUAL: r.filter(x => x.bucket === 'MANUAL').length,
+    };
+  }, [monRows]);
+
+  const monColors = bucketColors(theme);
+  const MON_TABS: { k: 'FIX' | 'CREATE' | 'LINK' | 'OK' | 'MANUAL'; label: string; c: string }[] = [
+    { k: 'FIX', label: 'ต้องซ่อมข้อมูล', c: monColors.FIX },
+    { k: 'CREATE', label: 'ยังไม่มีในทะเบียน', c: monColors.CREATE },
+    { k: 'LINK', label: 'ผูกจอกับเครื่อง', c: monColors.LINK },
+    { k: 'OK', label: 'ตรงกันแล้ว', c: monColors.OK },
+    { k: 'MANUAL', label: 'ทำมือเท่านั้น', c: monColors.MANUAL },
+  ];
+
   if (loading) {
     return <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress /></Box>;
   }
@@ -89,7 +131,22 @@ export default function AgentDriftPage() {
         </Button>
       </Box>
 
-      {!available ? (
+      <Box sx={{ display: 'flex', gap: 0.75, mb: 2, flexWrap: 'wrap' }}>
+        {([['specs', 'สเปกเครื่อง'], ['monitors', 'จอภาพ']] as const).map(([k, label]) => (
+          <Button key={k} size="small" variant={tab === k ? 'contained' : 'outlined'}
+            onClick={() => setTab(k)}
+            sx={{ borderRadius: '9px', textTransform: 'none', fontWeight: 600, fontSize: 11.5 }}>
+            {label}
+          </Button>
+        ))}
+      </Box>
+
+      {tab === 'monitors' ? (
+        <MonitorsPanel
+          rows={monRows} loading={monLoading} bucket={monBucket} setBucket={setMonBucket}
+          counts={monCounts} tabs={MON_TABS} reload={loadMonitors} navigate={navigate} theme={theme}
+        />
+      ) : !available ? (
         <Alert severity="warning">
           ยังเชื่อมต่อระบบ Agent ไม่ได้ — ตรวจสอบการตั้งค่าที่ ตั้งค่า › เชื่อมต่อระบบภายนอก
         </Alert>
@@ -270,5 +327,106 @@ export default function AgentDriftPage() {
         <Alert severity={toast.severity} onClose={() => setToast({ ...toast, open: false })} sx={{ width: '100%' }}>{toast.message}</Alert>
       </Snackbar>
     </Box>
+  );
+}
+
+/**
+ * The fleet monitor view. Split out so the page component stays about the
+ * spec drift it was already doing, and because the buckets need their own
+ * small amount of state.
+ */
+function MonitorsPanel({ rows, loading, bucket, setBucket, counts, tabs, reload, navigate, theme }: {
+  rows: MonitorRow[] | null;
+  loading: boolean;
+  bucket: 'FIX' | 'CREATE' | 'LINK' | 'OK' | 'MANUAL';
+  setBucket: (b: any) => void;
+  counts: Record<string, number>;
+  tabs: { k: any; label: string; c: string }[];
+  reload: () => void;
+  navigate: (to: string) => void;
+  theme: any;
+}) {
+  if (loading || rows === null) {
+    return (
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, py: 6 }}>
+        <CircularProgress size={18} />
+        <Typography sx={{ fontSize: 12.5, color: 'text.secondary' }}>
+          กำลังอ่านข้อมูลจอจาก Agent ทีละเครื่อง…
+        </Typography>
+      </Box>
+    );
+  }
+  if (!rows.length) {
+    return <Alert severity="warning">ยังไม่ได้ข้อมูลจอจาก Agent — ตรวจสอบการเชื่อมต่อที่ ตั้งค่า › เชื่อมต่อระบบภายนอก</Alert>;
+  }
+
+  const shown = bucket === 'LINK' ? rows.filter(r => r.linkable) : rows.filter(r => r.bucket === bucket);
+
+  return (
+    <>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(4, 1fr)' }, gap: 1, mb: 1.5 }}>
+        {[
+          { label: 'จอนอกที่ Agent เห็น', value: rows.length, color: theme.palette.text.primary },
+          { label: 'ต้องซ่อมข้อมูล', value: counts.FIX, color: bucketColors(theme).FIX },
+          { label: 'ยังไม่มีในทะเบียน', value: counts.CREATE, color: bucketColors(theme).CREATE },
+          { label: 'ผูกกับเครื่องได้', value: counts.LINK, color: bucketColors(theme).LINK },
+        ].map(s => (
+          <Box key={s.label} sx={{
+            p: '9px 12px', borderRadius: '10px',
+            bgcolor: theme.palette.background.paper, border: `1px solid ${theme.palette.divider}`,
+          }}>
+            <Typography sx={{ fontSize: 21, fontWeight: 800, color: s.color, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+              {s.value}
+            </Typography>
+            <Typography sx={{ fontSize: 10.5, color: 'text.secondary', mt: 0.4 }}>{s.label}</Typography>
+          </Box>
+        ))}
+      </Box>
+
+      <Box sx={{ display: 'flex', gap: 0.6, mb: 1.5, flexWrap: 'wrap' }}>
+        {tabs.map(t => (
+          <Button key={t.k} size="small" variant={bucket === t.k ? 'contained' : 'outlined'}
+            onClick={() => setBucket(t.k)}
+            sx={{
+              borderRadius: '9px', textTransform: 'none', fontWeight: 600, fontSize: 11,
+              ...(bucket === t.k
+                ? { bgcolor: t.c, '&:hover': { bgcolor: t.c, filter: 'brightness(1.08)' } }
+                : { borderColor: 'divider', color: 'text.secondary' }),
+            }}>
+            {t.label} ({counts[t.k] ?? 0})
+          </Button>
+        ))}
+      </Box>
+
+      <SectionCard title={tabs.find(t => t.k === bucket)?.label || ''} icon={MonitorIcon}>
+        {bucket === 'LINK' ? (
+          <MonitorLinkList rows={rows} onDone={reload} />
+        ) : !shown.length ? (
+          <Typography sx={{ py: 3, textAlign: 'center', color: 'text.disabled', fontSize: 11.5 }}>
+            ไม่มีรายการในกลุ่มนี้
+          </Typography>
+        ) : (
+          shown.map(r => (
+            <MonitorCard key={`${r.host}-${r.monitor.serial || r.monitor.name}`} row={r} onDone={reload}
+              onCreate={(row) => navigate(
+                `/assets/new?type=${encodeURIComponent('Monitor มาตรฐาน')}` +
+                `&serialNo=${encodeURIComponent(row.monitor.serial || '')}` +
+                `&brand=${encodeURIComponent(row.monitor.manufacturer || '')}` +
+                `&model=${encodeURIComponent(row.monitor.name || '')}`,
+              )} />
+          ))
+        )}
+        {bucket === 'MANUAL' && (
+          <Typography sx={{
+            mt: 1.25, fontSize: 10.5, color: 'text.secondary', p: '7px 10px',
+            bgcolor: theme.palette.action.hover, borderRadius: '7px',
+            borderLeft: `2px solid ${bucketColors(theme).MANUAL}`,
+          }}>
+            จอเหล่านี้ไม่ส่ง serial มา (EDID อ่านไม่ได้ หรือเป็นจอเก่า) — serial คือกุญแจเดียวที่ใช้จับคู่ได้
+            จึงตรวจอัตโนมัติไม่ได้ แสดงไว้เพื่อไม่ให้ตกหล่น
+          </Typography>
+        )}
+      </SectionCard>
+    </>
   );
 }

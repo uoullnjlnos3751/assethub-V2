@@ -11,6 +11,7 @@ import {
 } from '../services/externalAgent';
 import { cleanMasterValue } from '../utils/assetHelpers';
 import { isCustodyRole } from '../config/custodyHolders';
+import { reconcileFleet, reconcileRecord } from '../services/agentMonitors';
 import multer from 'multer';
 import * as xlsx from 'xlsx';
 import ExcelJS from 'exceljs';
@@ -2314,6 +2315,111 @@ router.post('/:id/agent-sync', authenticate, authorize('IT_ADMIN', 'SUPERADMIN')
 // Fleet-wide view of how far the registry has drifted from what the agent sees.
 // Registered under /agent/... rather than /:id/... so it cannot be shadowed by
 // the numeric-id routes above.
+
+// ── External monitors reported by the agent ─────────────────────────────
+//
+// Three endpoints, no new page: the fleet list feeds a tab on the existing
+// agent-drift screen, the per-asset one feeds the spec tab that already lists
+// a machine's monitors read-only, and the two writes are what those views act
+// with.
+
+// Every machine the agent covers. Slow — one upstream call per host — so it is
+// only ever requested by an explicit page load, never polled.
+router.get('/agent/monitors', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const rows = await reconcileFleet(prisma);
+    res.json({
+      available: rows.length > 0,
+      rows,
+      summary: {
+        total: rows.length,
+        fix: rows.filter(r => r.bucket === 'FIX').length,
+        ok: rows.filter(r => r.bucket === 'OK').length,
+        create: rows.filter(r => r.bucket === 'CREATE').length,
+        manual: rows.filter(r => r.bucket === 'MANUAL').length,
+        linkable: rows.filter(r => r.linkable).length,
+      },
+    });
+  } catch (err) { next(err); }
+});
+
+// The monitors attached to one machine, for its spec tab.
+router.get('/:id/agent-monitors', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const asset = await prisma.asset.findUnique({
+      where: { id: parseInt(req.params.id) },
+      select: { assetName: true, serialNo: true },
+    });
+    if (!asset) throw new AppError('ไม่พบทรัพย์สิน', 404);
+    const record = await fetchAgentRecord(asset.assetName);
+    if (!record) return res.json({ available: false, rows: [] });
+    res.json({ available: true, rows: await reconcileRecord(prisma, record) });
+  } catch (err) { next(err); }
+});
+
+// Apply the picked fields to one monitor. Only the keys named in `fields` are
+// touched, so a reviewer who accepted the brand but not the owner gets exactly
+// that.
+router.post('/:id/monitor-sync', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const incoming = (req.body?.fields ?? {}) as Record<string, string>;
+    const ALLOWED = ['brand', 'model', 'ownerName', 'location', 'departmentId', 'assetName', 'assetCode'];
+
+    const asset = await prisma.asset.findUnique({ where: { id } });
+    if (!asset) throw new AppError('ไม่พบทรัพย์สิน', 404);
+
+    const data: any = {};
+    const changes: string[] = [];
+    for (const key of ALLOWED) {
+      const value = incoming[key];
+      if (typeof value !== 'string' || value.trim() === '') continue;
+      const before = (asset as any)[key];
+      if (String(before ?? '') === value.trim()) continue;
+      data[key] = value.trim();
+      changes.push(key + ': ' + (before ?? '(ว่าง)') + ' → ' + value.trim());
+    }
+    if (!changes.length) return res.json({ message: 'ไม่มีการเปลี่ยนแปลง', asset });
+
+    const updated = await prisma.asset.update({ where: { id }, data });
+    await prisma.assetHistory.create({
+      data: {
+        assetId: id,
+        actionType: 'AGENT_SYNC',
+        note: 'ซิงก์ข้อมูลจอจาก Agent — ' + changes.join(' · '),
+        actorUserId: req.user!.userId,
+      },
+    });
+    res.json({ message: 'อัปเดต ' + changes.length + ' ช่องเรียบร้อย', asset: updated });
+  } catch (err) { next(err); }
+});
+
+// Join a monitor to the machine it is plugged into. AssetLink has existed all
+// along and held nothing; the agent knows the pairing for certain.
+router.post('/agent/monitor-link', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const pairs = (req.body?.pairs ?? []) as { parentId: number; childId: number }[];
+    if (!Array.isArray(pairs) || pairs.length === 0) throw new AppError('ไม่มีคู่ที่จะผูก', 400);
+
+    let linked = 0, skipped = 0;
+    for (const pair of pairs) {
+      const parentId = Number(pair.parentId), childId = Number(pair.childId);
+      if (!parentId || !childId || parentId === childId) { skipped++; continue; }
+      const exists = await prisma.assetLink.findFirst({ where: { parentId, childId } });
+      if (exists) { skipped++; continue; }
+      await prisma.assetLink.create({
+        data: { parentId, childId, linkType: 'MONITOR', note: 'ผูกจากข้อมูล Agent' },
+      });
+      await prisma.assetHistory.create({
+        data: { assetId: childId, actionType: 'AGENT_SYNC',
+                note: 'ผูกจอเข้ากับเครื่อง (จากข้อมูล Agent)', actorUserId: req.user!.userId },
+      });
+      linked++;
+    }
+    res.json({ message: 'ผูก ' + linked + ' คู่' + (skipped ? ' (ข้าม ' + skipped + ')' : ''), linked, skipped });
+  } catch (err) { next(err); }
+});
+
 router.get('/agent/drift', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const records = await fetchAllAgentRecords();

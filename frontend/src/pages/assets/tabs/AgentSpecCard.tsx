@@ -8,6 +8,14 @@ import {
 import SyncIcon from '@mui/icons-material/Sync';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SearchIcon from '@mui/icons-material/Search';
+import { useNavigate } from 'react-router-dom';
+import { assetAPI } from '../../../services/api';
+import { MonitorCard, MonitorRow, bucketColors } from '../components/MonitorReconcile';
+
+/** ป้ายผลการเทียบจอกับทะเบียน — ให้ตรงกับ bucket ใน services/agentMonitors.ts */
+const MON_STATUS: Record<string, string> = {
+  FIX: 'ต้องซ่อมข้อมูล', CREATE: 'ยังไม่มีในทะเบียน', OK: 'ตรงกัน', MANUAL: 'ไม่มี S/N',
+};
 
 /** Fields the backend's mapAgentToAssetSpec can write, in display order. */
 const FIELD_LABELS: { key: string; label: string }[] = [
@@ -80,6 +88,30 @@ export function AgentSpecCard({ agent, spec, asset, syncing, onSync }: {
     if (!q) return software;
     return software.filter(s => String(s.name || '').toLowerCase().includes(q));
   }, [software, softwareQuery]);
+
+  /* ── Reconciling the attached monitors ───────────────────────────────
+     The table below has always listed what the agent sees. What it could
+     not say is whether any of it matches the registry, so a wrong brand or
+     a stray character in an IT code sat here in plain sight for months.
+     The comparison is fetched only when someone opens the section. */
+  const navigate = useNavigate();
+  const [monRows, setMonRows] = useState<MonitorRow[] | null>(null);
+  const [monLoading, setMonLoading] = useState(false);
+  const [openSerial, setOpenSerial] = useState<string | null>(null);
+  const monColors = bucketColors(theme);
+
+  const loadMonitorCheck = () => {
+    if (monRows !== null || monLoading || !asset?.id) return;
+    setMonLoading(true);
+    assetAPI.assetAgentMonitors(asset.id)
+      .then(res => setMonRows(res.data?.rows || []))
+      .catch(() => setMonRows([]))
+      .finally(() => setMonLoading(false));
+  };
+
+  /** The reconcile row for one monitor, matched on the only stable key it has. */
+  const checkFor = (serial: any): MonitorRow | undefined =>
+    serial ? (monRows || []).find(r => r.monitor.serial === serial) : undefined;
 
   const disks = agent?.disks || [];
   const monitors = agent?.monitors || [];
@@ -192,7 +224,8 @@ export function AgentSpecCard({ agent, spec, asset, syncing, onSync }: {
         )}
 
         {monitors.length > 0 && (
-          <Accordion disableGutters elevation={0} sx={{ mt: 1.5, bgcolor: 'transparent', '&:before': { display: 'none' } }}>
+          <Accordion disableGutters elevation={0} onChange={(_, expanded) => expanded && loadMonitorCheck()}
+            sx={{ mt: 1.5, bgcolor: 'transparent', '&:before': { display: 'none' } }}>
             <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ fontSize: 18 }} />} sx={{ minHeight: 0, px: 0, '& .MuiAccordionSummary-content': { my: 1 } }}>
               <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>จอที่ต่ออยู่ ({monitors.length})</Typography>
             </AccordionSummary>
@@ -205,17 +238,58 @@ export function AgentSpecCard({ agent, spec, asset, syncing, onSync }: {
                     <TableCell sx={{ fontSize: '0.7rem' }}>Serial</TableCell>
                     <TableCell sx={{ fontSize: '0.7rem' }}>พอร์ต</TableCell>
                     <TableCell sx={{ fontSize: '0.7rem' }}>ปี</TableCell>
+                    <TableCell sx={{ fontSize: '0.7rem' }} align="right">ทะเบียน</TableCell>
                   </TableRow></TableHead>
                   <TableBody>
-                    {monitors.map((m: any, i: number) => (
-                      <TableRow key={i}>
-                        <TableCell sx={{ fontSize: '0.75rem' }}>{m.name || '—'}</TableCell>
-                        <TableCell sx={{ fontSize: '0.75rem' }}>{m.type === 'Internal' ? 'จอในตัว' : 'จอนอก'}</TableCell>
-                        <TableCell sx={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>{m.serial || '—'}</TableCell>
-                        <TableCell sx={{ fontSize: '0.75rem' }}>{m.port || '—'}</TableCell>
-                        <TableCell sx={{ fontSize: '0.75rem' }}>{m.year || '—'}</TableCell>
-                      </TableRow>
-                    ))}
+                    {monitors.map((m: any, i: number) => {
+                      const check = checkFor(m.serial);
+                      const open = !!check && openSerial === m.serial;
+                      return (
+                        <React.Fragment key={i}>
+                          <TableRow>
+                            <TableCell sx={{ fontSize: '0.75rem' }}>{m.name || '—'}</TableCell>
+                            <TableCell sx={{ fontSize: '0.75rem' }}>{m.type === 'Internal' ? 'จอในตัว' : 'จอนอก'}</TableCell>
+                            <TableCell sx={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>{m.serial || '—'}</TableCell>
+                            <TableCell sx={{ fontSize: '0.75rem' }}>{m.port || '—'}</TableCell>
+                            <TableCell sx={{ fontSize: '0.75rem' }}>{m.year || '—'}</TableCell>
+                            <TableCell align="right" sx={{ py: 0.3 }}>
+                              {/* จอในตัวไม่ใช่ทรัพย์สินแยก จึงไม่มีอะไรให้เทียบ */}
+                              {m.type === 'Internal' ? (
+                                <Typography sx={{ fontSize: '0.7rem', color: 'text.disabled' }}>—</Typography>
+                              ) : monLoading ? (
+                                <CircularProgress size={13} />
+                              ) : !check ? (
+                                <Typography sx={{ fontSize: '0.7rem', color: 'text.disabled' }}>—</Typography>
+                              ) : check.bucket === 'FIX' || check.bucket === 'CREATE' ? (
+                                <Button size="small" onClick={() => setOpenSerial(open ? null : m.serial)}
+                                  sx={{ fontSize: 10, py: 0.1, minWidth: 0, fontWeight: 700, textTransform: 'none',
+                                        color: monColors[check.bucket] }}>
+                                  {MON_STATUS[check.bucket]}
+                                </Button>
+                              ) : (
+                                <Chip size="small" label={MON_STATUS[check.bucket]}
+                                  sx={{ height: 17, fontSize: 9, fontWeight: 700,
+                                        bgcolor: alpha(monColors[check.bucket], 0.14), color: monColors[check.bucket] }} />
+                              )}
+                            </TableCell>
+                          </TableRow>
+                          {open && check && (
+                            <TableRow>
+                              <TableCell colSpan={6} sx={{ py: 1, borderBottom: 0, bgcolor: 'transparent' }}>
+                                <MonitorCard row={check} compact
+                                  onDone={() => { setMonRows(null); setOpenSerial(null); }}
+                                  onCreate={(row) => navigate(
+                                    `/assets/new?type=${encodeURIComponent('Monitor มาตรฐาน')}` +
+                                    `&serialNo=${encodeURIComponent(row.monitor.serial || '')}` +
+                                    `&brand=${encodeURIComponent(row.monitor.manufacturer || '')}` +
+                                    `&model=${encodeURIComponent(row.monitor.name || '')}`,
+                                  )} />
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </TableContainer>

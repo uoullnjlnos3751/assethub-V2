@@ -127,6 +127,11 @@ export const assetAPI = {
   externalAgent: (id: number) => api.get(`/assets/${id}/external-agent`),
   agentSync: (id: number, field?: string) => api.post(`/assets/${id}/agent-sync`, { field }),
   agentDrift: () => api.get('/assets/agent/drift'),
+  // External monitors the agent reports — see backend/src/services/agentMonitors.ts.
+  agentMonitors: () => api.get('/assets/agent/monitors'),
+  assetAgentMonitors: (id: number) => api.get(`/assets/${id}/agent-monitors`),
+  monitorSync: (id: number, fields: Record<string, string>) => api.post(`/assets/${id}/monitor-sync`, { fields }),
+  monitorLink: (pairs: { parentId: number; childId: number }[]) => api.post('/assets/agent/monitor-link', { pairs }),
   agentFillBlanks: (assetIds?: number[]) => api.post('/assets/agent/fill-blanks', { assetIds }),
   getAssetHistory: (id: number, params?: any) => api.get(`/assets/${id}/history`, { params }),
   getGlobalHistory: (params?: any) => api.get('/assets/global-history', { params }),
