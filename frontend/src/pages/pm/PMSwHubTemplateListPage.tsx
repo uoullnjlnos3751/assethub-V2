@@ -10,6 +10,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ChecklistIcon from '@mui/icons-material/Checklist';
 import ToggleOnIcon from '@mui/icons-material/ToggleOn';
+import BarChartIcon from '@mui/icons-material/BarChart';
 import { pmSwHubTemplateService, PMSwHubTemplate } from '../../services/pmSwHub';
 import { Modal } from './components/Modal';
 
@@ -62,7 +63,12 @@ export default function PMSwHubTemplateListPage() {
           </Typography>
           <Typography sx={{ mt: 0.5, color: 'text.secondary', fontSize: 13 }}>สร้างและจัดการรายการตรวจสอบ PM แบบ Customize</Typography>
         </Box>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setShowCreateModal(true)}>สร้าง Template ใหม่</Button>
+        {/* หน้านี้เคยไม่มีทางกลับเลย — เข้าถึงได้ทางเมนูข้างทางเดียว
+            พอเมนูเหลือทางเข้าเดียวที่หน้าภาพรวม จึงต้องมีปุ่มกลับ */}
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          <Button variant="outlined" startIcon={<BarChartIcon />} onClick={() => navigate('/pm/sw-hub')}>Dashboard</Button>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setShowCreateModal(true)}>สร้าง Template ใหม่</Button>
+        </Box>
       </Box>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 2 }}>

@@ -35,6 +35,7 @@ import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import GavelIcon from '@mui/icons-material/Gavel';
 import KeyIcon from '@mui/icons-material/Key';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
+import DeviceHubIcon from '@mui/icons-material/DeviceHub';
 
 export interface NavItem {
   label: string;
@@ -122,18 +123,16 @@ export const adminNav: NavEntry[] = [
     icon: <BuildCircleIcon fontSize="small" />,
     section: 'งานซ่อมบำรุง',
     children: [
-      { label: 'อุปกรณ์ IT', isHeader: true },
       { label: 'ภาพรวม PM', path: '/pm', icon: <DashboardIcon fontSize="small" /> },
       { label: 'กำหนดการ PM', path: '/pm/schedule', icon: <CalendarTodayIcon fontSize="small" /> },
       { label: 'แผน PM', path: '/pm/plans', icon: <AssignmentIcon fontSize="small" /> },
       { label: 'ทำ PM ทรัพย์สิน', path: '/pm/runs', icon: <PlayArrowIcon fontSize="small" /> },
       { label: 'แผนผังชั้น PM', path: '/pm/floorplan', icon: <LocationOnIcon fontSize="small" /> },
       { label: 'Checklist Template', path: '/pm/templates', icon: <DescriptionIcon fontSize="small" /> },
-      { label: 'ตู้ Switch/Hub', isHeader: true },
-      { label: 'ภาพรวม Hub Room', path: '/pm/sw-hub', icon: <DashboardIcon fontSize="small" /> },
-      { label: 'แผน Hub Room', path: '/pm/sw-hub/plans', icon: <AssignmentIcon fontSize="small" /> },
-      { label: 'ตรวจ Hub Room', path: '/pm/sw-hub/new', icon: <PlayArrowIcon fontSize="small" /> },
-      { label: 'Template Hub Room', path: '/pm/sw-hub/template', icon: <DescriptionIcon fontSize="small" /> },
+      // ตู้ Switch/Hub เคยกาง 4 รายการที่ชื่อซ้ำกับด้านบนทุกบรรทัด (ภาพรวม/แผน/ตรวจ/Template)
+      // ทั้งที่ทั้งกองมีการตรวจแค่ 6 ครั้ง ครั้งล่าสุด มิ.ย. 2569 — และหน้าทั้งสี่ลิงก์ถึงกัน
+      // เองอยู่แล้วโดยมีหน้าภาพรวมเป็นศูนย์กลาง เมนูจึงเหลือทางเข้าเดียว
+      { label: 'ตู้ Switch/Hub', path: '/pm/sw-hub', icon: <DeviceHubIcon fontSize="small" /> },
     ],
   },
   {
