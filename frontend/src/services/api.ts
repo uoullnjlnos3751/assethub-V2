@@ -131,6 +131,8 @@ export const assetAPI = {
   agentDrift: () => api.get('/assets/agent/drift'),
   // External monitors the agent reports — see backend/src/services/agentMonitors.ts.
   agentMonitors: () => api.get('/assets/agent/monitors'),
+  /** สุขภาพเครื่องทั้งกองจาก Agent — ความเสี่ยง แผนเปลี่ยนเครื่อง License */
+  agentHealth: () => api.get('/assets/agent/health'),
   assetAgentMonitors: (id: number) => api.get(`/assets/${id}/agent-monitors`),
   monitorSync: (id: number, fields: Record<string, string>) => api.post(`/assets/${id}/monitor-sync`, { fields }),
   monitorLink: (pairs: { parentId: number; childId: number }[]) => api.post('/assets/agent/monitor-link', { pairs }),

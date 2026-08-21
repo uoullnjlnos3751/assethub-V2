@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box, Typography, Button, Chip, CircularProgress, Alert, Snackbar,
+  Box, Card, Typography, Button, Chip, CircularProgress, Alert, Snackbar,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Accordion, AccordionSummary, AccordionDetails, alpha, useTheme,
 } from '@mui/material';
@@ -76,7 +76,24 @@ export default function AgentDriftPage() {
      Loaded on demand rather than with the page: the fleet scan is one
      upstream call per host, so it should only run when someone opens the
      tab that needs it. */
-  const [tab, setTab] = React.useState<'specs' | 'monitors'>('specs');
+  const [tab, setTab] = React.useState<'specs' | 'monitors' | 'health'>('specs');
+
+  /* ── สุขภาพเครื่องทั้งกอง ─────────────────────────────────────────
+     สแกนทีละเครื่องกับ Agent จึงช้า โหลดเมื่อเปิดแท็บเท่านั้น */
+  const [health, setHealth] = React.useState<any>(null);
+  const [healthLoading, setHealthLoading] = React.useState(false);
+
+  const loadHealth = React.useCallback(() => {
+    setHealthLoading(true);
+    assetAPI.agentHealth()
+      .then(res => setHealth(res.data))
+      .catch(() => setHealth(null))
+      .finally(() => setHealthLoading(false));
+  }, []);
+
+  React.useEffect(() => {
+    if (tab === 'health' && health === null && !healthLoading) loadHealth();
+  }, [tab, health, healthLoading, loadHealth]);
   const [monRows, setMonRows] = React.useState<MonitorRow[] | null>(null);
   const [monLoading, setMonLoading] = React.useState(false);
   const [monBucket, setMonBucket] = React.useState<'FIX' | 'CREATE' | 'LINK' | 'OK' | 'MANUAL'>('FIX');
@@ -132,7 +149,7 @@ export default function AgentDriftPage() {
       </Box>
 
       <Box sx={{ display: 'flex', gap: 0.75, mb: 2, flexWrap: 'wrap' }}>
-        {([['specs', 'สเปกเครื่อง'], ['monitors', 'จอภาพ']] as const).map(([k, label]) => (
+        {([['specs', 'สเปกเครื่อง'], ['monitors', 'จอภาพ'], ['health', 'สุขภาพเครื่อง']] as const).map(([k, label]) => (
           <Button key={k} size="small" variant={tab === k ? 'contained' : 'outlined'}
             onClick={() => setTab(k)}
             sx={{ borderRadius: '9px', textTransform: 'none', fontWeight: 600, fontSize: 11.5 }}>
@@ -141,7 +158,9 @@ export default function AgentDriftPage() {
         ))}
       </Box>
 
-      {tab === 'monitors' ? (
+      {tab === 'health' ? (
+        <HealthPanel data={health} loading={healthLoading} reload={loadHealth} theme={theme} navigate={navigate} />
+      ) : tab === 'monitors' ? (
         <MonitorsPanel
           rows={monRows} loading={monLoading} bucket={monBucket} setBucket={setMonBucket}
           counts={monCounts} tabs={MON_TABS} reload={loadMonitors} navigate={navigate} theme={theme}
@@ -428,5 +447,141 @@ function MonitorsPanel({ rows, loading, bucket, setBucket, counts, tabs, reload,
         )}
       </SectionCard>
     </>
+  );
+}
+
+/**
+ * สุขภาพเครื่องทั้งกองจากมุมของ Agent
+ *
+ * รวมสี่คำถามที่เคยต้องเปิดดูทีละเครื่อง: ควรดูแลเครื่องไหนก่อน · เครื่องไหนใกล้
+ * ถึงเวลาเปลี่ยน · License ที่ใช้จริงเป็นแบบไหน · เครื่องไหนหยุดรายงาน
+ */
+function HealthPanel({ data, loading, reload, theme, navigate }: {
+  data: any; loading: boolean; reload: () => void; theme: any; navigate: (p: string) => void;
+}) {
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, justifyContent: 'center', py: 6 }}>
+        <CircularProgress size={18} />
+        <Typography sx={{ fontSize: 12 }}>กำลังสแกนเครื่องทั้งกอง — ใช้เวลาสักครู่</Typography>
+      </Box>
+    );
+  }
+  if (!data) {
+    return (
+      <Alert severity="warning" action={<Button size="small" onClick={reload}>ลองใหม่</Button>}>
+        อ่านข้อมูลสุขภาพเครื่องจาก Agent ไม่สำเร็จ
+      </Alert>
+    );
+  }
+
+  const s = data.summary;
+  const machines: any[] = data.machines || [];
+
+  const tiles = [
+    { v: s.total, l: 'เครื่องที่ Agent ดูแล', sub: `ออนไลน์ ${s.online}`, c: theme.palette.text.primary },
+    { v: s.withCritical, l: 'มีเรื่องต้องแก้ด่วน', sub: 'ระดับ critical', c: theme.palette.error.main },
+    { v: s.refreshCandidates, l: 'ควรพิจารณาเปลี่ยน', sub: 'OS ≥ 4 ปี · แบต < 50% · RAM < 8 GB', c: theme.palette.warning.main },
+    { v: s.stale, l: 'หยุดรายงาน', sub: 'เกิน 14 วัน', c: s.stale ? theme.palette.error.main : theme.palette.success.main },
+  ];
+
+  const counters: { label: string; n: number; tone: 'error' | 'warning' | 'info' }[] = [
+    { label: 'ไม่มี Antivirus', n: s.noAntivirus, tone: 'error' },
+    { label: 'ยังไม่ Activate', n: s.notActivated, tone: 'error' },
+    { label: 'แบตต่ำกว่า 80%', n: s.batteryBelow80, tone: 'warning' },
+    { label: 'ดิสก์เหลือ < 15%', n: s.diskBelow15, tone: 'warning' },
+    { label: 'Windows Update ค้าง', n: s.updateOutdated, tone: 'warning' },
+    { label: 'ยังไม่มีในทะเบียน', n: s.unregistered, tone: 'info' },
+  ];
+
+  const breakdown = (title: string, map: Record<string, number>) => (
+    <Box key={title} sx={{ flex: '1 1 200px', minWidth: 0 }}>
+      <Typography sx={{ fontSize: 10.5, fontWeight: 700, color: 'text.secondary', mb: 0.5 }}>{title}</Typography>
+      {Object.entries(map).sort((a, b) => b[1] - a[1]).map(([k, n]) => (
+        <Box key={k} sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, py: 0.15 }}>
+          <Typography sx={{ fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{k}</Typography>
+          <Typography sx={{ fontSize: 11, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{n}</Typography>
+        </Box>
+      ))}
+    </Box>
+  );
+
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 1 }}>
+        {tiles.map(t => (
+          <Card key={t.l} variant="outlined" sx={{ p: '9px 12px' }}>
+            <Typography sx={{ fontSize: 21, fontWeight: 800, lineHeight: 1, color: t.c, fontVariantNumeric: 'tabular-nums' }}>{t.v}</Typography>
+            <Typography sx={{ fontSize: 10.5, color: 'text.secondary', mt: 0.4 }}>{t.l}</Typography>
+            <Typography sx={{ fontSize: 9.5, color: 'text.disabled', mt: 0.1 }}>{t.sub}</Typography>
+          </Card>
+        ))}
+      </Box>
+
+      <Card variant="outlined" sx={{ p: 1.4, display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+        {counters.map(c => (
+          <Chip key={c.label} size="small" variant="outlined"
+            label={<>{c.label} <Box component="span" sx={{ fontWeight: 800 }}>{c.n}</Box></>}
+            sx={{
+              fontSize: 10.5,
+              borderColor: c.n ? theme.palette[c.tone].main : theme.palette.divider,
+              color: c.n ? theme.palette[c.tone].main : theme.palette.text.disabled,
+            }} />
+        ))}
+      </Card>
+
+      <SectionCard title="เรียงตามความเสี่ยง" icon={TriangleAlert}>
+        <Typography sx={{ fontSize: 10.5, color: 'text.disabled', mb: 1 }}>
+          คะแนน = critical×10 + warn×3 + info×1 — เครื่องบนสุดคือเครื่องที่ควรได้รับการดูแลก่อน
+        </Typography>
+        <TableContainer sx={{ maxHeight: 460 }}>
+          <Table size="small" stickyHeader>
+            <TableHead>
+              <TableRow>
+                {['คะแนน', 'เครื่อง', 'บริษัท', 'ผู้ครอบครอง', 'อายุ OS', 'แบต', 'เรื่องที่พบ'].map(x => (
+                  <TableCell key={x} sx={{ fontSize: 10, fontWeight: 700 }}>{x}</TableCell>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {machines.filter(m => m.riskScore > 0).map(m => (
+                <TableRow key={m.hostname} hover
+                  sx={{ cursor: m.assetId ? 'pointer' : 'default' }}
+                  onClick={() => m.assetId && navigate(`/assets/${m.assetId}`)}>
+                  <TableCell sx={{ fontSize: 12, fontWeight: 800, color: m.critical ? 'error.main' : 'warning.main', fontVariantNumeric: 'tabular-nums' }}>
+                    {m.riskScore}
+                  </TableCell>
+                  <TableCell sx={{ fontSize: 11.5, fontWeight: 600 }}>
+                    {m.hostname}
+                    {!m.assetId && <Chip size="small" label="ไม่มีในทะเบียน" sx={{ ml: 0.5, height: 15, fontSize: 8.5 }} />}
+                  </TableCell>
+                  <TableCell sx={{ fontSize: 11 }}>{m.company || '—'}</TableCell>
+                  <TableCell sx={{ fontSize: 11, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.ownerName || '—'}</TableCell>
+                  <TableCell sx={{ fontSize: 11, fontVariantNumeric: 'tabular-nums' }}>{m.osAgeYears !== null ? `${m.osAgeYears} ปี` : '—'}</TableCell>
+                  <TableCell sx={{ fontSize: 11, fontWeight: m.batteryPct !== null && m.batteryPct < 50 ? 800 : 400, color: m.batteryPct !== null && m.batteryPct < 50 ? 'error.main' : 'text.primary', fontVariantNumeric: 'tabular-nums' }}>
+                    {m.batteryPct !== null ? `${m.batteryPct}%` : '—'}
+                  </TableCell>
+                  <TableCell sx={{ fontSize: 10 }}>
+                    {(m.findings || []).slice(0, 3).map((f: any) => f.label).join(' · ')}
+                    {(m.findings || []).length > 3 ? ` · +${m.findings.length - 3}` : ''}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </SectionCard>
+
+      <SectionCard title="License ที่ใช้จริง และเวอร์ชัน Agent" icon={RadioTower}>
+        <Typography sx={{ fontSize: 10.5, color: 'text.disabled', mb: 1 }}>
+          อ่านจากเครื่องจริง ใช้เทียบกับ License ที่ซื้อไว้ในเมนู License &amp; สัญญา
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 2.5, flexWrap: 'wrap' }}>
+          {breakdown('Windows', s.winChannels)}
+          {breakdown('Microsoft Office', s.officeLicenses)}
+          {breakdown('เวอร์ชัน Agent', s.agentVersions)}
+        </Box>
+      </SectionCard>
+    </Box>
   );
 }

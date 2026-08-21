@@ -13,6 +13,7 @@ import { cleanMasterValue } from '../utils/assetHelpers';
 import { isCustodyRole } from '../config/custodyHolders';
 import { reconcileFleet, reconcileRecord } from '../services/agentMonitors';
 import { buildGlpiFields, planGlpiSync } from '../services/glpiSpec';
+import { buildFleetHealth } from '../services/agentFleetHealth';
 import multer from 'multer';
 import * as xlsx from 'xlsx';
 import ExcelJS from 'exceljs';
@@ -2445,6 +2446,14 @@ router.post('/agent/monitor-link', authenticate, authorize('IT_ADMIN', 'SUPERADM
 //
 // มีปุ่มดึงจาก GLPI อยู่แล้วในฟอร์มเดียวกัน แต่ Agent ให้ยี่ห้อ/รุ่น/ดิสก์/GPU ครบกว่า
 // และรู้จักเครื่องที่ยังไม่ได้เข้า GLPI — โดยเฉพาะเครื่องใหม่ที่เพิ่งลง Agent เสร็จ
+// สุขภาพเครื่องทั้งกองจาก Agent — จัดลำดับความเสี่ยง วางแผนเปลี่ยนเครื่อง
+// ดู License ที่ใช้จริง และหาเครื่องที่หยุดรายงาน ทั้งหมดจากการสแกนรอบเดียว
+router.get('/agent/health', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    res.json(await buildFleetHealth(prisma));
+  } catch (err) { next(err); }
+});
+
 router.get('/agent/lookup', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const serial = String(req.query.serial ?? '').trim();
