@@ -127,3 +127,22 @@ playwright-tests/screenshots/
 # settings.local.json beside it holds per-developer permission grants and
 # machine-specific paths.
 .claude/settings.local.json
+
+# ── Data exported out of the live system ──────────────────────────────────
+# Database exports and asset spreadsheets pulled for one-off analysis. They
+# hold real employee names, serial numbers and the full asset register, and
+# this repository is public — one `git add .` would publish them for good,
+# and removing them afterwards means rewriting history. The *.sql / *.dump
+# rules above cover pg_dump output; these cover the JSON and CSV equivalents.
+/assethub-backup-*.json
+/assets-*.csv
+/__parsed_check.json
+
+# Copies of dist/ taken before a risky deploy. The `dist/` rule near the top
+# does not catch these — the timestamp suffix makes each one its own path.
+dist.backup_*/
+
+# Company documents attached to the design handoff (work instructions, forms).
+# The handoff notes themselves are ordinary docs and may be committed; the
+# attachments are internal paperwork and should not go to a public repo.
+design_handoff_itam/uploads/
