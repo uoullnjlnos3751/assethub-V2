@@ -83,7 +83,8 @@ export default function ProcurementPanel({ data, loading, company, theme }: Prop
           เอกสารนี้สรุปจากเครื่องที่ <b>ตรวจ PM แล้ว {c.pmCompleted} จาก {c.totalAssets} เครื่อง ({c.pmPercent}%)</b>
           {c.pmPercent < 100 && ' — ยังตรวจไม่ครบทั้งบริษัท อาจมีเครื่องเข้าเกณฑ์เพิ่มเมื่อตรวจครบ'}
           <br />
-          หัวข้อแบตเตอรี่ครอบคลุมเฉพาะเครื่องที่ติดตั้งระบบ Agent <b>{c.withAgent} เครื่อง</b>
+          หัวข้อแบตเตอรี่อ่านค่าได้จาก <b>{c.withBattery ?? 0} เครื่อง</b>
+          {' '}(บริษัทนี้ติดตั้งระบบ Agent แล้ว {c.withAgent} เครื่อง — เครื่องตั้งโต๊ะไม่มีแบตเตอรี่ให้อ่าน)
           {c.withAgent === 0 && ' — บริษัทนี้ยังไม่มีเครื่องใดติดตั้ง จึงยังไม่มีข้อมูลแบตเตอรี่'}
         </Typography>
       </Box>

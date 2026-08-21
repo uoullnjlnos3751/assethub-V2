@@ -1,5 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
 import { fetchAllAgentRecords } from './externalAgent';
+import { agentNum } from './agentPmCheck';
 
 /**
  * สรุปผล PM เป็นข้อเสนอให้หน่วยงานเอาไปขออนุมัติ
@@ -48,8 +49,10 @@ export interface ProcurementReport {
     totalAssets: number;
     pmCompleted: number;
     pmPercent: number;
-    /** เครื่องที่มีข้อมูลแบตจาก Agent — บอกตรง ๆ ว่าหัวข้อแบตครอบคลุมแค่ไหน */
+    /** เครื่องที่ Agent เห็น */
     withAgent: number;
+    /** เครื่องที่อ่านค่าแบตได้จริง — เครื่องตั้งโต๊ะไม่มีแบตให้อ่าน จึงน้อยกว่า withAgent */
+    withBattery: number;
   };
   addRam: ProposalItem[];
   replaceBattery: ProposalItem[];
@@ -111,13 +114,15 @@ export async function buildProcurementReport(
   // แบตเตอรี่มีเฉพาะเครื่องที่ติดตั้ง Agent — ส่วนที่เหลือไม่ได้แปลว่าแบตดี
   // แค่ไม่มีข้อมูล จึงต้องรายงานความครอบคลุมไว้ด้วย
   const battery = new Map<string, number>();
+  const seenByAgent = new Set<string>();
   try {
     for (const rec of await fetchAllAgentRecords()) {
-      const pct = Number((rec as any)?.battery_health_pct);
-      if (!Number.isFinite(pct)) continue;
-      for (const k of [low((rec as any)?.serial_number), low((rec as any)?.hostname)]) {
-        if (k) battery.set(k, pct);
-      }
+      const keys = [low((rec as any)?.serial_number), low((rec as any)?.hostname)].filter(Boolean);
+      for (const k of keys) seenByAgent.add(k);
+      // เครื่องตั้งโต๊ะส่ง battery_health_pct มาเป็น null — ต้องข้าม ไม่ใช่อ่านเป็น 0%
+      const pct = agentNum((rec as any)?.battery_health_pct);
+      if (pct === null) continue;
+      for (const k of keys) battery.set(k, pct);
     }
   } catch {
     /* Agent ล่มก็ยังออกรายงานได้ แค่ไม่มีหัวข้อแบต */
@@ -129,6 +134,7 @@ export async function buildProcurementReport(
   const ramDistribution: Record<string, number> = {};
   let lowRamNotFlagged = 0;
   let withAgent = 0;
+  let withBattery = 0;
 
   for (const a of assets) {
     const ram = gb(a.ram);
@@ -136,7 +142,8 @@ export async function buildProcurementReport(
     ramDistribution[bucket] = (ramDistribution[bucket] || 0) + 1;
 
     const batt = battery.get(low(a.serialNo)) ?? battery.get(low(a.assetName));
-    if (batt !== undefined) withAgent++;
+    if (seenByAgent.has(low(a.serialNo)) || seenByAgent.has(low(a.assetName))) withAgent++;
+    if (batt !== undefined) withBattery++;
 
     const slow = latestSpeed.get(a.id)?.slow === true;
     const base = {
@@ -178,6 +185,7 @@ export async function buildProcurementReport(
       pmCompleted,
       pmPercent: assets.length ? Math.round((pmCompleted / assets.length) * 100) : 0,
       withAgent,
+      withBattery,
     },
     addRam,
     replaceBattery,

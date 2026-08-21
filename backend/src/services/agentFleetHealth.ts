@@ -1,6 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
 import { fetchAllAgentRecords } from './externalAgent';
-import { buildAgentPmCheck, AgentFinding } from './agentPmCheck';
+import { buildAgentPmCheck, agentNum, AgentFinding } from './agentPmCheck';
 
 /**
  * สุขภาพของเครื่องทั้งกองจากมุมของ Agent
@@ -126,6 +126,10 @@ export async function buildFleetHealth(prisma: PrismaClient): Promise<FleetHealt
 
     const asset = bySerial.get(low((rec as any).serial_number)) ?? byName.get(low(rec.hostname)) ?? null;
     const osAgeDays = daysSince((rec as any).os_install_date);
+    // เครื่องตั้งโต๊ะกับ VM ส่งค่าแบตมาเป็น null ต้องคงความเป็น null ไว้
+    // ไม่ใช่แปลงเป็น 0 แล้วนับว่าแบตเสื่อม (ดู agentNum)
+    const ramGb = agentNum((rec as any).ram_total_gb);
+    const batteryPct = agentNum((rec as any).battery_health_pct);
 
     machines.push({
       hostname: String(rec.hostname),
@@ -143,8 +147,8 @@ export async function buildFleetHealth(prisma: PrismaClient): Promise<FleetHealt
       osName: str((rec as any).os_name),
       osInstallDate: str((rec as any).os_install_date),
       osAgeYears: osAgeDays === null ? null : Math.round((osAgeDays / 365.25) * 10) / 10,
-      ramGb: Number.isFinite(Number((rec as any).ram_total_gb)) ? Math.round(Number((rec as any).ram_total_gb)) : null,
-      batteryPct: Number.isFinite(Number((rec as any).battery_health_pct)) ? Number((rec as any).battery_health_pct) : null,
+      ramGb: ramGb === null ? null : Math.round(ramGb),
+      batteryPct,
       winChannel: str((rec as any).win_license_channel),
       winActivated: Number((rec as any).win_activated) === 1,
       officeLicense: str((rec as any).office_license_type),

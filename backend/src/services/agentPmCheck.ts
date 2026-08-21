@@ -46,11 +46,19 @@ export interface AgentPmCheck {
   printers: AgentPrinter[];
 }
 
-const num = (v: any): number | null => {
+/**
+ * ตัวเลขจาก Agent ที่ "ไม่มีข้อมูล" ต้องได้ null ไม่ใช่ 0
+ *
+ * Number(null) กับ Number('') คืน 0 และผ่าน Number.isFinite ทั้งคู่ เครื่อง PC
+ * ที่ไม่มีแบตจึงเคยถูกอ่านเป็น "แบตเหลือ 0%" แล้วโผล่ในรายการเสนอเปลี่ยนแบต
+ * export ไว้ให้ที่อื่นเรียกใช้ จะได้ไม่มีใครเขียนเกณฑ์ชุดที่สองขึ้นมาอีก
+ */
+export const agentNum = (v: any): number | null => {
   if (v === null || v === undefined || v === '') return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 };
+const num = agentNum;
 const str = (v: any): string => String(v ?? '').trim();
 const yes = (v: any) => Number(v) === 1;
 
