@@ -123,6 +123,8 @@ export const assetAPI = {
   deleteDocument: (assetId: number, docId: number) => api.delete(`/assets/${assetId}/documents/${docId}`),
   getGLPISpec: (id: number) => api.get(`/assets/${id}/glpi-spec`),
   queryGLPISpec: (serial: string) => api.get(`/assets/glpi-spec`, { params: { serial } }),
+  /** ค้นเครื่องจาก Agent เพื่อเติมฟอร์มตอนสร้างทรัพย์สิน */
+  agentLookup: (params: { serial?: string; hostname?: string }) => api.get(`/assets/agent/lookup`, { params }),
   syncGLPI: (id: number, field?: string) => api.post(`/assets/${id}/glpi-sync`, { field }),
   externalAgent: (id: number) => api.get(`/assets/${id}/external-agent`),
   agentSync: (id: number, field?: string) => api.post(`/assets/${id}/agent-sync`, { field }),

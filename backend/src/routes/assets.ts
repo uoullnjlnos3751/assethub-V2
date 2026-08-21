@@ -2441,6 +2441,40 @@ router.post('/agent/monitor-link', authenticate, authorize('IT_ADMIN', 'SUPERADM
   } catch (err) { next(err); }
 });
 
+// ค้นเครื่องจาก Agent ด้วย Serial หรือชื่อเครื่อง สำหรับเติมฟอร์มตอนสร้างทรัพย์สิน
+//
+// มีปุ่มดึงจาก GLPI อยู่แล้วในฟอร์มเดียวกัน แต่ Agent ให้ยี่ห้อ/รุ่น/ดิสก์/GPU ครบกว่า
+// และรู้จักเครื่องที่ยังไม่ได้เข้า GLPI — โดยเฉพาะเครื่องใหม่ที่เพิ่งลง Agent เสร็จ
+router.get('/agent/lookup', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const serial = String(req.query.serial ?? '').trim();
+    const hostname = String(req.query.hostname ?? '').trim();
+    if (!serial && !hostname) throw new AppError('ต้องระบุ Serial หรือชื่อเครื่องอย่างน้อยหนึ่งอย่าง', 400);
+
+    let record: any = hostname ? await fetchAgentRecord(hostname) : null;
+    if (!record && serial) {
+      const key = serial.toLowerCase();
+      const hit = (await fetchAllAgentRecords())
+        .find((r: any) => String(r?.serial_number ?? '').trim().toLowerCase() === key);
+      if (hit?.hostname) record = await fetchAgentRecord(hit.hostname);
+    }
+    if (!record) throw new AppError('ไม่พบเครื่องนี้ในระบบ Agent', 404);
+
+    // mapAgentToAssetSpec คืนเฉพาะช่องที่ตรงกับคอลัมน์ของ Asset อยู่แล้ว
+    // ส่วนชื่อ/ผู้ใช้/บริษัท ส่งแยกเพราะฟอร์มตัดสินใจเองว่าจะเติมช่องไหน
+    res.json({
+      hostname: record.hostname ?? null,
+      serial: record.serial_number ?? null,
+      loggedUser: record.logged_user ?? null,
+      company: record.company ?? null,
+      deviceType: record.device_type ?? null,
+      online: !!record.online,
+      lastSeen: record.last_seen ?? null,
+      spec: mapAgentToAssetSpec(record),
+    });
+  } catch (err) { next(err); }
+});
+
 router.get('/agent/drift', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const records = await fetchAllAgentRecords();

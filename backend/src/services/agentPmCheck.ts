@@ -155,6 +155,12 @@ export function buildAgentPmCheck(rec: any): AgentPmCheck {
   const batt = num(rec.battery_health_pct);
   if (batt !== null) {
     const model = str(rec.battery_model);
+    answers.push({
+      key: 'battery_health',
+      value: batt >= BATTERY_WARN ? 'yes' : 'no',
+      note: `สุขภาพแบตเตอรี่ ${batt}%${model ? ` · ${model}` : ''}` +
+            (batt < BATTERY_CRITICAL ? ' — ควรเสนอเปลี่ยน' : batt < BATTERY_WARN ? ' — เริ่มเสื่อม' : ''),
+    });
     if (batt < BATTERY_CRITICAL) {
       add('battery', 'critical', `แบตเตอรี่เสื่อมหนัก ${batt}%`, `ควรเสนอเปลี่ยน${model ? ` · ${model}` : ''}`);
     } else if (batt < BATTERY_WARN) {
@@ -162,16 +168,28 @@ export function buildAgentPmCheck(rec: any): AgentPmCheck {
     }
   }
 
-  // พื้นที่ดิสก์ — ข้อ 9 บอกให้ "Disk Clean up" แต่ไม่เคยบอกว่าเครื่องไหนต้องทำ
+  // พื้นที่ดิสก์ — ข้อ "ทำความสะอาด/Disk Clean up" ไม่เคยบอกว่าเครื่องไหนต้องทำ
+  const diskParts: string[] = [];
+  let tightest: number | null = null;
   for (const d of (rec.disks || [])) {
     const total = num(d?.total_gb), free = num(d?.free_gb);
     if (!total || free === null || total <= 0) continue;
     const ratio = free / total;
+    const drive = str(d.drive) || '?';
+    diskParts.push(`${drive} ${Math.round(free)}/${Math.round(total)} GB (${Math.round(ratio * 100)}%)`);
+    if (tightest === null || ratio < tightest) tightest = ratio;
     if (ratio >= DISK_FREE_WARN) continue;
-    add(`disk_${str(d.drive) || 'x'}`,
+    add(`disk_${drive}`,
         ratio < DISK_FREE_CRITICAL ? 'critical' : 'warn',
-        `ดิสก์ ${str(d.drive) || ''} เหลือ ${Math.round(free)} GB จาก ${Math.round(total)} GB`,
+        `ดิสก์ ${drive} เหลือ ${Math.round(free)} GB จาก ${Math.round(total)} GB`,
         `${Math.round(ratio * 100)}% — ต้อง Disk Clean up`);
+  }
+  if (tightest !== null) {
+    answers.push({
+      key: 'disk_space',
+      value: tightest >= DISK_FREE_WARN ? 'yes' : 'no',
+      note: diskParts.join(' · ') + (tightest < DISK_FREE_WARN ? ' — ต้อง Disk Clean up' : ''),
+    });
   }
 
   // สุขภาพดิสก์จาก SMART
@@ -183,9 +201,19 @@ export function buildAgentPmCheck(rec: any): AgentPmCheck {
 
   // Windows Update
   const wu = str(rec.wu_status);
-  if (wu && /outdated|fail|error/i.test(wu)) {
-    add('windows_update', 'warn', `Windows Update: ${wu}`,
-        str(rec.wu_last_install) ? `ติดตั้งล่าสุด ${str(rec.wu_last_install)}` : 'ไม่ทราบวันติดตั้งล่าสุด');
+  const wuLast = str(rec.wu_last_install);
+  if (wu) {
+    const stale = /outdated|fail|error/i.test(wu);
+    answers.push({
+      key: 'windows_update',
+      value: stale ? 'no' : 'yes',
+      note: `สถานะ ${wu}${wuLast ? ` · ติดตั้งล่าสุด ${wuLast}` : ''}` +
+            (yes(rec.wu_reboot_required) ? ' · ค้างรอ restart' : ''),
+    });
+    if (stale) {
+      add('windows_update', 'warn', `Windows Update: ${wu}`,
+          wuLast ? `ติดตั้งล่าสุด ${wuLast}` : 'ไม่ทราบวันติดตั้งล่าสุด');
+    }
   }
   if (yes(rec.wu_reboot_required)) {
     add('wu_reboot', 'warn', 'ค้างรอ restart จาก Windows Update', 'อัปเดตจะยังไม่มีผลจนกว่าจะรีสตาร์ท');

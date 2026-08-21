@@ -133,6 +133,9 @@ export default function AssetFormPage() {
   const [glpiSpec, setGlpiSpec] = useState<Record<string, any> | null>(null);
   const [fetchingGLPI, setFetchingGLPI] = useState(false);
   const [glpiError, setGlpiError] = useState('');
+  // Agent เป็นอีกแหล่งคู่กับ GLPI — ให้ยี่ห้อ/รุ่น/ดิสก์/GPU ครบกว่า และรู้จัก
+  // เครื่องใหม่ที่เพิ่งลง Agent เสร็จแต่ยังไม่ได้เข้า GLPI
+  const [fetchingAgent, setFetchingAgent] = useState(false);
 
   // Owner Search AD
   const [ownerSearchQuery, setOwnerSearchQuery] = useState('');
@@ -180,6 +183,49 @@ export default function AssetFormPage() {
       showToast(errMsg, '#e11d48');
     } finally {
       setFetchingGLPI(false);
+    }
+  };
+
+  const handleFetchFromAgent = async () => {
+    const serial = form.serialNo?.trim();
+    const hostname = form.assetName?.trim();
+    if (!serial && !hostname) {
+      showToast('กรอก Serial Number หรือชื่อเครื่องก่อน แล้วค่อยกดดึงจาก Agent', '#e11d48');
+      return;
+    }
+    setFetchingAgent(true);
+    try {
+      const res = await assetAPI.agentLookup({ serial, hostname });
+      const { spec, hostname: host, serial: sn, loggedUser, company, online } = res.data || {};
+
+      // เติมเฉพาะช่องที่ Agent มีค่าให้ ช่องที่กรอกไว้แล้วจะถูกทับ
+      // (กำลังสร้างระเบียนใหม่ ค่าจากเครื่องจริงย่อมถูกกว่าที่พิมพ์ค้างไว้)
+      const LABELS: Record<string, string> = {
+        brand: 'ยี่ห้อ', model: 'รุ่น', cpu: 'CPU', ram: 'RAM', ramSlot1: 'RAM Slot 1',
+        ramSlot2: 'RAM Slot 2', gpu: 'GPU', osType: 'OS Type', osVersion: 'OS Version',
+        officeLicense: 'MS Office', antivirusStatus: 'Antivirus', domainName: 'Domain Name',
+        snComputer: 'S/N Computer', storage1: 'Storage 1', storage2: 'Storage 2',
+      };
+      let filled = 0;
+      Object.entries(spec || {}).forEach(([k, v]) => {
+        if (v === null || v === undefined || v === '') return;
+        setFormField(k, LABELS[k] || k, String(v));
+        filled++;
+      });
+      if (host && !form.assetName?.trim()) { setFormField('assetName', 'ชื่อทรัพย์สิน', host); filled++; }
+      if (sn && !form.serialNo?.trim()) { setFormField('serialNo', 'Serial Number', String(sn)); filled++; }
+      // ชื่อล็อกอินไม่ใช่ชื่อ-นามสกุล จึงเติมให้เฉพาะตอนที่ยังว่าง
+      if (loggedUser && !form.ownerName?.trim()) {
+        setFormField('ownerName', 'ผู้ใช้งานหลัก', String(loggedUser).split(String.fromCharCode(92)).pop() || '');
+        filled++;
+      }
+      if (company && !form.company?.trim()) { setFormField('company', 'บริษัท', String(company)); filled++; }
+
+      showToast(`🤖 เติมข้อมูลจาก Agent ${filled} ช่อง — ${host || sn}${online ? ' (ออนไลน์)' : ''}`, '#10b981');
+    } catch (err: any) {
+      showToast(err.response?.data?.message || err.response?.data?.error || 'ไม่พบเครื่องนี้ในระบบ Agent', '#e11d48');
+    } finally {
+      setFetchingAgent(false);
     }
   };
 
@@ -814,6 +860,19 @@ export default function AssetFormPage() {
                       }}
                     >
                       {fetchingGLPI ? 'กำลังดึงสเปค...' : 'ดึงสเปคจาก GLPI'}
+                    </Button>
+                  )}
+                  {isComputer && (
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      color="secondary"
+                      disabled={fetchingAgent}
+                      onClick={handleFetchFromAgent}
+                      startIcon={fetchingAgent ? <CircularProgress size={12} /> : <span>🤖</span>}
+                      sx={{ textTransform: 'none', fontWeight: 600, fontSize: '0.75rem', py: 0.5, borderRadius: '8px' }}
+                    >
+                      {fetchingAgent ? 'กำลังดึง...' : 'ดึงจาก Agent'}
                     </Button>
                   )}
                   {glpiSpec && (
