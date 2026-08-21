@@ -1,15 +1,8 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box,
-  Typography,
-  Button,
-  IconButton,
-  TextField,
-  Select,
-  MenuItem,
-  Paper,
-  CircularProgress,
+  Box, Typography, Button, IconButton, TextField, Select, MenuItem,
+  Paper, CircularProgress, Chip, Tooltip, alpha, useTheme,
 } from '@mui/material';
 import MapIcon from '@mui/icons-material/Map';
 import AddIcon from '@mui/icons-material/Add';
@@ -18,141 +11,167 @@ import EditLocationAltIcon from '@mui/icons-material/EditLocationAlt';
 import SettingsIcon from '@mui/icons-material/Settings';
 import CloseIcon from '@mui/icons-material/Close';
 import BusinessIcon from '@mui/icons-material/Business';
-import TouchAppIcon from '@mui/icons-material/TouchApp';
-import { pmAPI, floorPlanAPI, assetAPI } from '../../services/api';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import { floorPlanAPI, assetAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { Modal } from './components/Modal';
+import { DeviceIcon, SeatIcon, KIND_LABEL, DeviceKind } from './components/DeviceIcons';
 
-// --- Types ---
-interface FloorPlan {
-  id: number;
-  name: string;
-  floor: string;
-  building: string | null;
-  company: string | null;
-  imageUrl: string;
-  isActive: boolean;
-  pins?: FloorPlanPin[];
-  _count?: { pins: number };
+/**
+ * แผนผังชั้น — ปักที่นั่งของคน อุปกรณ์ตามไปเอง
+ *
+ * แบบเดิมปักหมุดทีละเครื่อง ซึ่งใช้จริงไม่ได้: ต้นทุนโตตามจำนวนอุปกรณ์ (733 ชิ้น)
+ * ไม่ใช่จำนวนที่นั่ง (365 คน) และหมุดจะชี้ผิดทันทีที่เปลี่ยนเครื่องให้พนักงาน
+ * ทั้งระบบจึงมีหมุดอยู่จุดเดียวตั้งแต่สร้างฟีเจอร์มา
+ *
+ * ตอนนี้ที่นั่งผูกกับชื่อผู้ครอบครอง แล้วอุปกรณ์ทุกชิ้นของคนนั้นตามมาเอง —
+ * ส่งมอบเครื่องใหม่แล้วแผนผังอัปเดตเองโดยไม่ต้องเปิดหน้านี้
+ *
+ * เครื่องพิมพ์กับอุปกรณ์เครือข่ายยังปักเองเหมือนเดิม เพราะเป็นของใช้ร่วมกัน
+ * ไม่ได้เป็นของใคร (เครื่องพิมพ์มีผู้ครอบครองแค่ 5%)
+ */
+
+type PMStatus = 'COMPLETED' | 'IN_PROGRESS' | 'DRAFT' | 'OVERDUE' | 'NO_PM';
+
+const STATUS: Record<PMStatus, { color: string; label: string }> = {
+  COMPLETED:   { color: '#1c873b', label: 'PM เสร็จแล้ว' },
+  IN_PROGRESS: { color: '#8946cc', label: 'กำลังทำ' },
+  DRAFT:       { color: '#d97706', label: 'รอทำ' },
+  OVERDUE:     { color: '#ff3b30', label: 'เลยกำหนด' },
+  NO_PM:       { color: '#86868b', label: 'ไม่มีแผน PM' },
+};
+
+interface LiveDevice {
+  assetId: number; assetName: string | null; assetCode: string | null;
+  type: string | null; kind: DeviceKind; pmStatus: PMStatus; pmDate: string | null; viaLink: boolean;
 }
-
-interface FloorPlanPin {
-  id: number;
-  assetId: number;
-  x: number;
-  y: number;
-  label?: string;
-  asset?: {
-    id: number;
-    assetCode: string;
-    assetName: string;
-    type: string;
-    ownerName: string;
-    departmentId: string;
+interface LiveSeat {
+  id: number; x: number; y: number; label: string | null;
+  ownerName: string | null; departmentId: string | null; note: string | null;
+  devices: LiveDevice[]; status: PMStatus; looksLikeStorage: boolean;
+}
+interface LiveSpot {
+  id: number; x: number; y: number; label: string | null; assetId: number;
+  assetName: string | null; assetCode: string | null; type: string | null;
+  kind: DeviceKind; ownerName: string | null; departmentId: string | null;
+  pmStatus: PMStatus; pmDate: string | null;
+}
+interface LivePlan {
+  plan: { id: number; name: string; floor: string; building: string | null; company: string | null; imageUrl: string };
+  year: number;
+  seats: LiveSeat[];
+  spots: LiveSpot[];
+  summary: {
+    seats: number; seatsDone: number; seatsUnplaced: number;
+    devices: number; devicesDone: number; spots: number; byKind: Record<string, number>;
   };
 }
-
-interface PMRun {
-  id: number;
-  assetId: number;
-  status: 'COMPLETED' | 'IN_PROGRESS' | 'DRAFT';
-  plan?: { endDate: string };
+interface PlanRow {
+  id: number; name: string; floor: string; building: string | null;
+  company: string | null; imageUrl: string; isActive: boolean;
+}
+interface OwnerRow {
+  ownerName: string; departmentId: string | null; company: string | null;
+  devices: number; computers: number; looksLikeStorage: boolean;
 }
 
-const STATUS_CONFIG: Record<string, { color: string; label: string }> = {
-  COMPLETED: { color: '#1c873b', label: 'เสร็จแล้ว' },
-  IN_PROGRESS: { color: '#8946cc', label: 'กำลังทำ' },
-  DRAFT: { color: '#d97706', label: 'รอทำ' },
-  OVERDUE: { color: '#ff3b30', label: 'เลยกำหนด' },
-  NO_PM: { color: '#86868b', label: 'ไม่มีแผน PM' },
-};
+/** ชื่อยาว ๆ บนแผนผังทับกันจนอ่านไม่ออก ตัดเหลือชื่อต้นกับอักษรแรกของนามสกุล */
+function shortName(full: string | null | undefined): string {
+  const s = String(full ?? '').trim();
+  if (!s) return '—';
+  const parts = s.split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 14);
+  return `${parts[0]} ${parts[1][0]}.`.slice(0, 16);
+}
+
+const thYear = (ad: number) => ad + 543;
 
 export default function PMFloorPlanPage() {
   const navigate = useNavigate();
+  const theme = useTheme();
   const { user } = useAuth();
   const isAdmin = user?.role === 'IT_ADMIN' || user?.role === 'SUPERADMIN';
 
   const [loading, setLoading] = useState(true);
-  const [plans, setPlans] = useState<FloorPlan[]>([]);
+  const [plans, setPlans] = useState<PlanRow[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
+  const [live, setLive] = useState<LivePlan | null>(null);
+  const [year, setYear] = useState<number>(new Date().getFullYear());
 
-  // Current plan full data
-  const [currentPlan, setCurrentPlan] = useState<FloorPlan | null>(null);
-  const [runs, setRuns] = useState<PMRun[]>([]);
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear() + 543);
-
-  // Edit Mode
+  // โหมดแก้ไข: ที่นั่งกับอุปกรณ์ส่วนกลางแก้คนละชุด แต่บันทึกพร้อมกัน
   const [isEditMode, setIsEditMode] = useState(false);
-  const [draftPins, setDraftPins] = useState<FloorPlanPin[]>([]);
-  const [isSavingPins, setIsSavingPins] = useState(false);
+  const [editTab, setEditTab] = useState<'seat' | 'spot'>('seat');
+  const [draftSeats, setDraftSeats] = useState<LiveSeat[]>([]);
+  const [draftSpots, setDraftSpots] = useState<LiveSpot[]>([]);
+  const [saving, setSaving] = useState(false);
 
-  // Modal for Create/Edit Floor Plan
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({ id: 0, name: '', floor: '', building: '', company: '' });
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [isSavingPlan, setIsSavingPlan] = useState(false);
+  const [savingPlan, setSavingPlan] = useState(false);
 
-  // Asset search for adding pins
-  const [searchAsset, setSearchAsset] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
+  const [search, setSearch] = useState('');
+  const [owners, setOwners] = useState<OwnerRow[]>([]);
+  const [assets, setAssets] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
 
-  // Drag state
   const imgRef = useRef<HTMLImageElement>(null);
-  const [draggingPinIndex, setDraggingPinIndex] = useState<number | null>(null);
+  const [dragging, setDragging] = useState<{ kind: 'seat' | 'spot'; index: number } | null>(null);
+  const [selected, setSelected] = useState<{ kind: 'seat' | 'spot'; id: number } | null>(null);
 
-  // Tooltip
-  const [hoveredPin, setHoveredPin] = useState<FloorPlanPin | null>(null);
-  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const apiUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : '';
 
-  // 1. Fetch floor plans list
-  const fetchPlans = async () => {
+  const fetchPlans = useCallback(async () => {
     try {
       const res = await floorPlanAPI.getAll();
       setPlans(res.data);
-      if (res.data.length > 0 && !selectedPlanId) {
-        setSelectedPlanId(res.data[0].id);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  useEffect(() => {
-    fetchPlans();
+      setSelectedPlanId(prev => prev ?? (res.data.length ? res.data[0].id : null));
+    } catch (err) { console.error(err); }
   }, []);
 
-  // 2. Fetch selected plan details & PM runs for the year
+  useEffect(() => { fetchPlans(); }, [fetchPlans]);
+
+  const fetchLive = useCallback(async (planId: number, y: number) => {
+    setLoading(true);
+    try {
+      const res = await floorPlanAPI.live(planId, y);
+      setLive(res.data);
+      setDraftSeats(res.data.seats || []);
+      setDraftSpots(res.data.spots || []);
+    } catch (err) {
+      console.error(err);
+      setLive(null);
+    } finally { setLoading(false); }
+  }, []);
+
   useEffect(() => {
-    if (!selectedPlanId) return;
+    if (!selectedPlanId) { setLoading(false); return; }
+    fetchLive(selectedPlanId, year);
+  }, [selectedPlanId, year, fetchLive]);
 
-    let isMounted = true;
-    const fetchData = async () => {
-      setLoading(true);
+  // ค้นหาคน (แท็บที่นั่ง) หรือค้นหาทรัพย์สิน (แท็บอุปกรณ์ส่วนกลาง)
+  useEffect(() => {
+    if (!isEditMode) return;
+    const t = setTimeout(async () => {
+      if (search.trim().length < 2) { setOwners([]); setAssets([]); return; }
+      setSearching(true);
       try {
-        const [planRes, runsRes] = await Promise.all([
-          floorPlanAPI.getById(selectedPlanId),
-          pmAPI.runs({ year: selectedYear - 543, limit: 10000 })
-        ]);
-        if (isMounted) {
-          setCurrentPlan(planRes.data);
-          setDraftPins(planRes.data.pins || []);
-          setRuns(runsRes.data?.data || runsRes.data || []); // Handle paginated or direct array
+        if (editTab === 'seat') {
+          const res = await floorPlanAPI.owners(search.trim(), live?.plan.company || undefined);
+          setOwners(res.data || []);
+        } else {
+          const res = await assetAPI.list({ search: search.trim(), limit: 12 });
+          setAssets(res.data?.data || []);
         }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-    fetchData();
-    return () => { isMounted = false; };
-  }, [selectedPlanId, selectedYear]);
+      } catch (err) { console.error(err); }
+      finally { setSearching(false); }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [search, editTab, isEditMode, live?.plan.company]);
 
-  // Handle Plan Save (Create/Update)
   const handleSavePlan = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSavingPlan(true);
+    setSavingPlan(true);
     try {
       const fd = new FormData();
       fd.append('name', formData.name);
@@ -160,157 +179,108 @@ export default function PMFloorPlanPage() {
       fd.append('building', formData.building);
       fd.append('company', formData.company);
       if (imageFile) fd.append('image', imageFile);
-
-      if (formData.id) {
-        await floorPlanAPI.update(formData.id, fd as any);
-      } else {
-        await floorPlanAPI.create(fd as any);
-      }
+      if (formData.id) await floorPlanAPI.update(formData.id, fd as any);
+      else await floorPlanAPI.create(fd as any);
       setIsModalOpen(false);
       await fetchPlans();
+      if (formData.id && selectedPlanId) await fetchLive(selectedPlanId, year);
     } catch (err) {
       alert('เกิดข้อผิดพลาดในการบันทึกแปลน');
-      console.error(err);
-    } finally {
-      setIsSavingPlan(false);
-    }
+    } finally { setSavingPlan(false); }
   };
 
   const handleDeletePlan = async () => {
-    if (!formData.id || !confirm('ยืนยันการลบแผนผังชั้นนี้?')) return;
+    if (!formData.id || !confirm('ยืนยันการลบแผนผังชั้นนี้? ที่นั่งและจุดอุปกรณ์ทั้งหมดบนแปลนจะถูกลบไปด้วย')) return;
     try {
       await floorPlanAPI.delete(formData.id);
       setIsModalOpen(false);
       setSelectedPlanId(null);
+      setLive(null);
       await fetchPlans();
-    } catch (err) {
-      alert('เกิดข้อผิดพลาดในการลบ');
-    }
+    } catch { alert('เกิดข้อผิดพลาดในการลบ'); }
   };
 
-  // Asset Search
-  useEffect(() => {
-    const timer = setTimeout(async () => {
-      if (!searchAsset || searchAsset.length < 3) {
-        setSearchResults([]);
-        return;
-      }
-      setIsSearching(true);
-      try {
-        const res = await assetAPI.list({ search: searchAsset, limit: 10 });
-        setSearchResults(res.data.data || []);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [searchAsset]);
-
-  const handleAddPin = (asset: any) => {
-    if (draftPins.some(p => p.assetId === asset.id)) {
-      alert('มีเครื่องนี้ในแผนผังนี้แล้ว');
+  const addSeat = (o: OwnerRow) => {
+    if (draftSeats.some(s => (s.ownerName || '').toLowerCase() === o.ownerName.toLowerCase())) {
+      alert(`"${o.ownerName}" มีที่นั่งบนแปลนนี้แล้ว`);
       return;
     }
-    setDraftPins([...draftPins, {
-      id: 0,
-      assetId: asset.id,
-      x: 50, // drop in center by default
-      y: 50,
-      asset: {
-        id: asset.id,
-        assetCode: asset.assetCode,
-        assetName: asset.assetName,
-        type: asset.type,
-        ownerName: asset.ownerName,
-        departmentId: asset.departmentId
-      }
+    setDraftSeats(prev => [...prev, {
+      id: 0, x: 50, y: 50, label: null, ownerName: o.ownerName,
+      departmentId: o.departmentId, note: null,
+      devices: [], status: 'NO_PM', looksLikeStorage: o.looksLikeStorage,
     }]);
-    setSearchAsset('');
-    setSearchResults([]);
+    setSearch(''); setOwners([]);
   };
 
-  const handleRemovePin = (index: number) => {
-    setDraftPins(prev => prev.filter((_, i) => i !== index));
+  const addSpot = (a: any) => {
+    if (draftSpots.some(s => s.assetId === a.id)) { alert('มีอุปกรณ์นี้บนแปลนแล้ว'); return; }
+    setDraftSpots(prev => [...prev, {
+      id: 0, x: 50, y: 50, label: null, assetId: a.id,
+      assetName: a.assetName, assetCode: a.assetCode, type: a.type,
+      kind: 'other', ownerName: a.ownerName, departmentId: a.departmentId,
+      pmStatus: 'NO_PM', pmDate: null,
+    }]);
+    setSearch(''); setAssets([]);
   };
 
-  const handleSavePins = async () => {
-    if (!currentPlan) return;
-    setIsSavingPins(true);
+  const handleSave = async () => {
+    if (!live) return;
+    setSaving(true);
     try {
-      await floorPlanAPI.updatePins(currentPlan.id, draftPins.map(p => ({
-        assetId: p.assetId,
-        x: p.x,
-        y: p.y
+      await floorPlanAPI.updateSeats(live.plan.id, draftSeats.map(s => ({
+        x: s.x, y: s.y, label: s.label, ownerName: s.ownerName, departmentId: s.departmentId, note: s.note,
+      })), year);
+      await floorPlanAPI.updatePins(live.plan.id, draftSpots.map(s => ({
+        assetId: s.assetId, x: s.x, y: s.y, label: s.label,
       })));
-      alert('บันทึกตำแหน่งสำเร็จ');
       setIsEditMode(false);
-      // Reload current plan
-      const res = await floorPlanAPI.getById(currentPlan.id);
-      setCurrentPlan(res.data);
-      setDraftPins(res.data.pins || []);
-    } catch (err) {
-      alert('เกิดข้อผิดพลาดในการบันทึกตำแหน่ง');
-    } finally {
-      setIsSavingPins(false);
-    }
+      await fetchLive(live.plan.id, year);
+    } catch (err: any) {
+      alert(err?.response?.data?.error || 'เกิดข้อผิดพลาดในการบันทึกตำแหน่ง');
+    } finally { setSaving(false); }
   };
 
-  // Drag and Drop Logic
-  const handleDragStart = (e: React.DragEvent, index: number) => {
-    if (!isEditMode) {
-      e.preventDefault();
-      return;
-    }
-    setDraggingPinIndex(index);
-    // Transparent drag image
+  // ── ลากวางบนแปลน ────────────────────────────────────────────────────────
+  const onDragStart = (e: React.DragEvent, kind: 'seat' | 'spot', index: number) => {
+    if (!isEditMode) { e.preventDefault(); return; }
+    setDragging({ kind, index });
     const img = new Image();
     img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
     e.dataTransfer.setDragImage(img, 0, 0);
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const onDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    if (draggingPinIndex === null || !imgRef.current) return;
-
-    const rect = imgRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-
-    // clamp
-    const cx = Math.max(0, Math.min(100, x));
-    const cy = Math.max(0, Math.min(100, y));
-
-    setDraftPins(prev => {
+    if (!dragging || !imgRef.current) return;
+    const r = imgRef.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(100, ((e.clientX - r.left) / r.width) * 100));
+    const y = Math.max(0, Math.min(100, ((e.clientY - r.top) / r.height) * 100));
+    const setter = dragging.kind === 'seat' ? setDraftSeats : setDraftSpots;
+    (setter as any)((prev: any[]) => {
       const next = [...prev];
-      next[draggingPinIndex] = { ...next[draggingPinIndex], x: cx, y: cy };
+      next[dragging.index] = { ...next[dragging.index], x, y };
       return next;
     });
   };
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDraggingPinIndex(null);
-  };
+  const seatsShown = isEditMode ? draftSeats : (live?.seats || []);
+  const spotsShown = isEditMode ? draftSpots : (live?.spots || []);
+  const s = live?.summary;
 
-  const getPMStatus = (assetId: number) => {
-    const run = runs.find(r => r.assetId === assetId);
-    if (!run) return 'NO_PM';
-    if (run.status === 'COMPLETED') return 'COMPLETED';
-    if (run.status === 'IN_PROGRESS') return 'IN_PROGRESS';
+  const kindTotals = useMemo(() => {
+    const b = s?.byKind || {};
+    return (Object.keys(KIND_LABEL) as DeviceKind[])
+      .map(k => ({ kind: k, n: b[k] || 0 }))
+      .filter(x => x.n > 0);
+  }, [s]);
 
-    const isOverdue = run.plan?.endDate && new Date(run.plan.endDate).getTime() < new Date().setHours(0,0,0,0);
-    return isOverdue ? 'OVERDUE' : 'DRAFT';
-  };
-
-  // --- Render Helpers ---
-  const pinsToRender = isEditMode ? draftPins : (currentPlan?.pins || []);
-  const apiUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : '';
+  const selectedSeat = selected?.kind === 'seat' ? seatsShown.find(x => x.id === selected.id) : undefined;
+  const selectedSpot = selected?.kind === 'spot' ? spotsShown.find(x => x.id === selected.id) : undefined;
 
   return (
     <Box>
-      {/* Header */}
+      {/* ── หัวเรื่อง ── */}
       <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5, mb: 2.5 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.75 }}>
           <Box sx={{ width: 48, height: 48, borderRadius: 3, background: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 2 }}>
@@ -318,17 +288,15 @@ export default function PMFloorPlanPage() {
           </Box>
           <Box>
             <Typography sx={{ fontSize: 20, fontWeight: 700 }}>แผนผังชั้น (Floor Plan)</Typography>
-            <Typography sx={{ fontSize: 12, color: 'text.secondary', mt: 0.25 }}>ดูพิกัดเครื่องและสถานะ PM แบบ Real-time</Typography>
+            <Typography sx={{ fontSize: 12, color: 'text.secondary', mt: 0.25 }}>
+              ปักที่นั่งของคน อุปกรณ์ตามไปเองจากผู้ครอบครอง
+            </Typography>
           </Box>
         </Box>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
           {isAdmin && (
-            <Button
-              variant="contained"
-              color="success"
-              startIcon={<AddIcon />}
-              onClick={() => { setFormData({ id: 0, name: '', floor: '', building: '', company: '' }); setImageFile(null); setIsModalOpen(true); }}
-            >
+            <Button variant="contained" color="success" startIcon={<AddIcon />}
+              onClick={() => { setFormData({ id: 0, name: '', floor: '', building: '', company: '' }); setImageFile(null); setIsModalOpen(true); }}>
               เพิ่มแผนผังใหม่
             </Button>
           )}
@@ -336,49 +304,45 @@ export default function PMFloorPlanPage() {
         </Box>
       </Box>
 
-      {/* Controls */}
-      <Paper variant="outlined" sx={{ p: '16px 20px', mb: 2.5, display: 'flex', gap: 2.5, alignItems: 'center', flexWrap: 'wrap' }}>
+      {/* ── แถบควบคุม ── */}
+      <Paper variant="outlined" sx={{ p: '14px 20px', mb: 2, display: 'flex', gap: 2.5, alignItems: 'center', flexWrap: 'wrap' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Typography sx={{ fontSize: 13, fontWeight: 600 }}>เลือกแปลน:</Typography>
           <Select size="small" value={selectedPlanId || ''} onChange={e => setSelectedPlanId(Number(e.target.value))} sx={{ minWidth: 200 }}>
-            {plans.map(p => (
-              <MenuItem key={p.id} value={p.id}>{p.name} {p.building ? `(${p.building})` : ''}</MenuItem>
-            ))}
+            {plans.map(p => <MenuItem key={p.id} value={p.id}>{p.name} {p.building ? `(${p.building})` : ''}</MenuItem>)}
           </Select>
         </Box>
-
         <Box sx={{ width: '1px', height: 24, bgcolor: 'divider' }} />
-
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Typography sx={{ fontSize: 13, fontWeight: 600 }}>ปี PM:</Typography>
-          <Select size="small" value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))}>
+          <Select size="small" value={year} onChange={e => setYear(Number(e.target.value))}>
             {[...Array(5)].map((_, i) => {
-              const y = new Date().getFullYear() + 543 - 2 + i;
-              return <MenuItem key={y} value={y}>{y}</MenuItem>;
+              const y = new Date().getFullYear() - 2 + i;
+              return <MenuItem key={y} value={y}>{thYear(y)}</MenuItem>;
             })}
           </Select>
         </Box>
-
         <Box sx={{ flex: 1 }} />
-
-        {isAdmin && currentPlan && (
+        {isAdmin && live && (
           <Box sx={{ display: 'flex', gap: 1 }}>
             {isEditMode ? (
               <>
-                <Button variant="outlined" onClick={() => { setIsEditMode(false); setDraftPins(currentPlan.pins || []); }}>ยกเลิก</Button>
-                <Button variant="contained" onClick={handleSavePins} disabled={isSavingPins}>
-                  {isSavingPins ? 'กำลังบันทึก...' : 'บันทึกตำแหน่ง'}
+                <Button variant="outlined" onClick={() => {
+                  setIsEditMode(false); setSelected(null);
+                  setDraftSeats(live.seats); setDraftSpots(live.spots);
+                }}>ยกเลิก</Button>
+                <Button variant="contained" onClick={handleSave} disabled={saving}>
+                  {saving ? 'กำลังบันทึก...' : 'บันทึกตำแหน่ง'}
                 </Button>
               </>
             ) : (
               <>
-                <Button variant="outlined" startIcon={<EditLocationAltIcon />} onClick={() => setIsEditMode(true)}>จัดการตำแหน่ง Pin</Button>
-                <Button
-                  variant="outlined"
-                  color="inherit"
-                  startIcon={<SettingsIcon />}
-                  onClick={() => { setFormData({ id: currentPlan.id, name: currentPlan.name, floor: currentPlan.floor, building: currentPlan.building || '', company: currentPlan.company || '' }); setIsModalOpen(true); }}
-                >
+                <Button variant="outlined" startIcon={<EditLocationAltIcon />}
+                  onClick={() => { setIsEditMode(true); setSelected(null); setSearch(''); }}>
+                  จัดผังที่นั่ง
+                </Button>
+                <Button variant="outlined" color="inherit" startIcon={<SettingsIcon />}
+                  onClick={() => { setFormData({ id: live.plan.id, name: live.plan.name, floor: live.plan.floor, building: live.plan.building || '', company: live.plan.company || '' }); setIsModalOpen(true); }}>
                   ตั้งค่าแปลน
                 </Button>
               </>
@@ -387,121 +351,256 @@ export default function PMFloorPlanPage() {
         )}
       </Paper>
 
-      {/* Main Map Area */}
-      <Box sx={{ display: 'flex', gap: 2.5, alignItems: 'flex-start' }}>
-
-        {/* Left Sidebar: Edit Mode Tools */}
-        {isEditMode && (
-          <Paper variant="outlined" sx={{ width: 300, p: 2, flexShrink: 0 }}>
-            <Typography sx={{ fontSize: 14, fontWeight: 700, mb: 2 }}>เพิ่มจุดอุปกรณ์บนแปลน</Typography>
-            <Box sx={{ position: 'relative' }}>
-              <TextField
-                fullWidth
-                size="small"
-                placeholder="ค้นหารหัส หรือชื่อผู้ใช้ (3 อักษร+)..."
-                value={searchAsset}
-                onChange={e => setSearchAsset(e.target.value)}
-                InputProps={{ endAdornment: isSearching ? <CircularProgress size={14} /> : undefined }}
-              />
+      {/* ── สรุป + คำอธิบายสัญลักษณ์ ── */}
+      {live && !loading && (
+        <Paper variant="outlined" sx={{ p: '12px 20px', mb: 2, display: 'flex', gap: 3, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Box sx={{ display: 'flex', gap: 2.5, alignItems: 'baseline' }}>
+            <Box>
+              <Typography component="span" sx={{ fontSize: 20, fontWeight: 800 }}>{s!.seatsDone}</Typography>
+              <Typography component="span" sx={{ fontSize: 13, color: 'text.secondary' }}> / {s!.seats} ที่นั่ง PM ครบ</Typography>
             </Box>
-
-            {searchResults.length > 0 && (
-              <Box sx={{ mt: 1, maxHeight: 200, overflowY: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 1.5 }}>
-                {searchResults.map(a => (
-                  <Box
-                    key={a.id}
-                    onClick={() => handleAddPin(a)}
-                    sx={{ p: '8px 12px', borderBottom: '1px solid', borderColor: 'divider', cursor: 'pointer', fontSize: 12, '&:hover': { bgcolor: 'action.hover' }, '&:last-of-type': { borderBottom: 'none' } }}
-                  >
-                    <Box sx={{ fontWeight: 600, color: 'primary.main' }}>{a.assetCode}</Box>
-                    <Box sx={{ color: 'text.secondary' }}>{a.assetName}</Box>
-                  </Box>
-                ))}
-              </Box>
+            <Box>
+              <Typography component="span" sx={{ fontSize: 20, fontWeight: 800 }}>{s!.devicesDone}</Typography>
+              <Typography component="span" sx={{ fontSize: 13, color: 'text.secondary' }}> / {s!.devices} อุปกรณ์</Typography>
+            </Box>
+            {s!.spots > 0 && (
+              <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>+ ส่วนกลาง {s!.spots} จุด</Typography>
             )}
+          </Box>
 
-            <Typography sx={{ fontSize: 14, fontWeight: 700, mt: 3, mb: 1.5 }}>อุปกรณ์บนแปลน ({draftPins.length})</Typography>
-            <Box sx={{ maxHeight: 400, overflowY: 'auto' }}>
-              {draftPins.map((p, i) => (
-                <Box key={p.assetId} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: '8px 10px', bgcolor: 'action.hover', borderRadius: 1.5, mb: 1, fontSize: 12 }}>
-                  <Box>
-                    <Box sx={{ fontWeight: 600 }}>{p.asset?.assetCode}</Box>
-                    <Box sx={{ color: 'text.secondary', fontSize: 10 }}>{p.asset?.ownerName || p.asset?.assetName}</Box>
-                  </Box>
-                  <IconButton size="small" color="error" onClick={() => handleRemovePin(i)}><CloseIcon sx={{ fontSize: 16 }} /></IconButton>
-                </Box>
+          <Box sx={{ width: '1px', height: 24, bgcolor: 'divider' }} />
+
+          <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
+            {kindTotals.map(({ kind, n }) => (
+              <Box key={kind} sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary' }}>
+                <DeviceIcon kind={kind} size={15} />
+                <Typography sx={{ fontSize: 12 }}>{KIND_LABEL[kind]} {n}</Typography>
+              </Box>
+            ))}
+          </Box>
+
+          <Box sx={{ flex: 1 }} />
+
+          <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'center', flexWrap: 'wrap' }}>
+            {(Object.keys(STATUS) as PMStatus[]).map(k => (
+              <Box key={k} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Box sx={{ width: 9, height: 9, borderRadius: '50%', bgcolor: STATUS[k].color }} />
+                <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>{STATUS[k].label}</Typography>
+              </Box>
+            ))}
+          </Box>
+
+          {s!.seatsUnplaced > 0 && (
+            <Tooltip title="ที่นั่งเหล่านี้ปักไว้แล้วแต่ไม่พบอุปกรณ์ของเจ้าของ — ชื่ออาจสะกดไม่ตรงกับในทะเบียน หรือเจ้าของย้ายออกไปแล้ว">
+              <Chip size="small" icon={<WarningAmberIcon />} color="warning" variant="outlined"
+                label={`${s!.seatsUnplaced} ที่นั่งไม่พบอุปกรณ์`} sx={{ fontSize: 11 }} />
+            </Tooltip>
+          )}
+        </Paper>
+      )}
+
+      <Box sx={{ display: 'flex', gap: 2.5, alignItems: 'flex-start' }}>
+        {/* ── แถบเครื่องมือโหมดแก้ไข ── */}
+        {isEditMode && (
+          <Paper variant="outlined" sx={{ width: 310, p: 2, flexShrink: 0 }}>
+            <Box sx={{ display: 'flex', gap: 0.75, mb: 2 }}>
+              {([['seat', 'ที่นั่ง (คน)'], ['spot', 'อุปกรณ์ส่วนกลาง']] as const).map(([k, label]) => (
+                <Button key={k} size="small" fullWidth
+                  variant={editTab === k ? 'contained' : 'outlined'}
+                  onClick={() => { setEditTab(k); setSearch(''); setOwners([]); setAssets([]); }}
+                  sx={{ fontSize: 12 }}>
+                  {label}
+                </Button>
               ))}
             </Box>
-            <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 2 }}>
-              * ลาก Pin บนรูปเพื่อเปลี่ยนตำแหน่ง<br />
-              * ข้อมูลจะถูกบันทึกเมื่อกด "บันทึกตำแหน่ง"
+
+            {editTab === 'seat' ? (
+              <>
+                <TextField fullWidth size="small" placeholder="ค้นชื่อพนักงาน (2 อักษร+)..."
+                  value={search} onChange={e => setSearch(e.target.value)}
+                  InputProps={{ endAdornment: searching ? <CircularProgress size={14} /> : undefined }} />
+                <Typography sx={{ fontSize: 10.5, color: 'text.secondary', mt: 0.75, lineHeight: 1.6 }}>
+                  เลือกคน ไม่ต้องเลือกเครื่อง — อุปกรณ์ทุกชิ้นของคนนั้นจะขึ้นตามมาเอง
+                  และเปลี่ยนตามทะเบียนโดยไม่ต้องกลับมาแก้แผนผัง
+                </Typography>
+
+                {owners.length > 0 && (
+                  <Box sx={{ mt: 1.25, maxHeight: 230, overflowY: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 1.5 }}>
+                    {owners.map(o => (
+                      <Box key={o.ownerName} onClick={() => addSeat(o)}
+                        sx={{ p: '8px 12px', borderBottom: '1px solid', borderColor: 'divider', cursor: 'pointer', fontSize: 12, '&:hover': { bgcolor: 'action.hover' }, '&:last-of-type': { borderBottom: 'none' } }}>
+                        <Box sx={{ fontWeight: 600 }}>{o.ownerName}</Box>
+                        <Box sx={{ color: 'text.secondary', fontSize: 10.5 }}>
+                          {o.departmentId || '—'} · อุปกรณ์ {o.devices} ชิ้น
+                          {o.looksLikeStorage && (
+                            <Box component="span" sx={{ color: 'warning.main', fontWeight: 700 }}> · น่าจะเป็นจุดเก็บ ไม่ใช่คน</Box>
+                          )}
+                        </Box>
+                      </Box>
+                    ))}
+                  </Box>
+                )}
+
+                <Typography sx={{ fontSize: 13, fontWeight: 700, mt: 2.5, mb: 1 }}>ที่นั่งบนแปลน ({draftSeats.length})</Typography>
+                <Box sx={{ maxHeight: 300, overflowY: 'auto' }}>
+                  {draftSeats.map((seat, i) => (
+                    <Box key={`${seat.ownerName}-${i}`}
+                      sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: '7px 10px', bgcolor: 'action.hover', borderRadius: 1.5, mb: 0.75, fontSize: 12 }}>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Box sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{seat.ownerName}</Box>
+                        <Box sx={{ color: 'text.secondary', fontSize: 10 }}>
+                          {seat.departmentId || '—'} · {seat.devices.length ? `${seat.devices.length} ชิ้น` : 'ยังไม่พบอุปกรณ์'}
+                        </Box>
+                      </Box>
+                      <IconButton size="small" color="error" onClick={() => setDraftSeats(p => p.filter((_, j) => j !== i))}>
+                        <CloseIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Box>
+                  ))}
+                </Box>
+              </>
+            ) : (
+              <>
+                <TextField fullWidth size="small" placeholder="ค้นเครื่องพิมพ์ / อุปกรณ์ส่วนกลาง..."
+                  value={search} onChange={e => setSearch(e.target.value)}
+                  InputProps={{ endAdornment: searching ? <CircularProgress size={14} /> : undefined }} />
+                <Typography sx={{ fontSize: 10.5, color: 'text.secondary', mt: 0.75, lineHeight: 1.6 }}>
+                  ใช้กับของที่ไม่ได้เป็นของใครคนเดียว — เครื่องพิมพ์ สวิตช์ เครื่องส่วนกลาง
+                  ของที่มีเจ้าของให้ปักเป็นที่นั่งแทน
+                </Typography>
+
+                {assets.length > 0 && (
+                  <Box sx={{ mt: 1.25, maxHeight: 230, overflowY: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 1.5 }}>
+                    {assets.map(a => (
+                      <Box key={a.id} onClick={() => addSpot(a)}
+                        sx={{ p: '8px 12px', borderBottom: '1px solid', borderColor: 'divider', cursor: 'pointer', fontSize: 12, '&:hover': { bgcolor: 'action.hover' }, '&:last-of-type': { borderBottom: 'none' } }}>
+                        <Box sx={{ fontWeight: 600 }}>{a.assetName || a.assetCode || `#${a.id}`}</Box>
+                        <Box sx={{ color: 'text.secondary', fontSize: 10.5 }}>{a.type} · {a.departmentId || '—'}</Box>
+                      </Box>
+                    ))}
+                  </Box>
+                )}
+
+                <Typography sx={{ fontSize: 13, fontWeight: 700, mt: 2.5, mb: 1 }}>จุดส่วนกลาง ({draftSpots.length})</Typography>
+                <Box sx={{ maxHeight: 300, overflowY: 'auto' }}>
+                  {draftSpots.map((sp, i) => (
+                    <Box key={sp.assetId}
+                      sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: '7px 10px', bgcolor: 'action.hover', borderRadius: 1.5, mb: 0.75, fontSize: 12 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+                        <DeviceIcon kind={sp.kind} size={15} />
+                        <Box sx={{ minWidth: 0 }}>
+                          <Box sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {sp.assetName || sp.assetCode}
+                          </Box>
+                          <Box sx={{ color: 'text.secondary', fontSize: 10 }}>{sp.type}</Box>
+                        </Box>
+                      </Box>
+                      <IconButton size="small" color="error" onClick={() => setDraftSpots(p => p.filter((_, j) => j !== i))}>
+                        <CloseIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Box>
+                  ))}
+                </Box>
+              </>
+            )}
+
+            <Typography sx={{ fontSize: 10.5, color: 'text.secondary', mt: 2, lineHeight: 1.7 }}>
+              ลากป้ายบนแปลนเพื่อย้ายตำแหน่ง · ตำแหน่งจะบันทึกเมื่อกด "บันทึกตำแหน่ง"
             </Typography>
           </Paper>
         )}
 
-        {/* Map Container */}
+        {/* ── แผนผัง ── */}
         <Paper variant="outlined" sx={{ flex: 1, overflow: 'hidden', position: 'relative', minHeight: 600 }}>
           {loading ? (
             <Box sx={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, color: 'text.secondary' }}>
               <CircularProgress />
               <Typography sx={{ fontSize: 14, fontWeight: 500 }}>กำลังโหลด...</Typography>
             </Box>
-          ) : currentPlan ? (
-            <Box
-              sx={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'action.hover' }}
-              onDragOver={handleDragOver}
-              onDrop={handleDrop}
-            >
+          ) : live ? (
+            <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'action.hover', p: 2 }}
+              onDragOver={onDragOver} onDrop={e => { e.preventDefault(); setDragging(null); }}>
               <Box sx={{ position: 'relative', display: 'inline-block' }}>
-                <Box
-                  component="img"
-                  ref={imgRef}
-                  src={currentPlan.imageUrl.startsWith('http') ? currentPlan.imageUrl : `${apiUrl}${currentPlan.imageUrl}`}
-                  alt={currentPlan.name}
-                  draggable={false}
-                  sx={{ display: 'block', maxWidth: '100%', maxHeight: '800px', objectFit: 'contain', border: '1px solid', borderColor: 'divider', borderRadius: 1.5, boxShadow: 1 }}
-                />
+                <Box component="img" ref={imgRef} draggable={false}
+                  src={live.plan.imageUrl.startsWith('http') ? live.plan.imageUrl : `${apiUrl}${live.plan.imageUrl}`}
+                  alt={live.plan.name}
+                  sx={{ display: 'block', maxWidth: '100%', maxHeight: 780, objectFit: 'contain', border: '1px solid', borderColor: 'divider', borderRadius: 1.5, boxShadow: 1 }} />
 
-                {/* Pins */}
-                {pinsToRender.map((pin, i) => {
-                  const status = getPMStatus(pin.assetId);
-                  const cfg = STATUS_CONFIG[status];
-                  // Modern Pin SVG with drop shadow inside SVG
-                  const pinSvg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 36" fill="${encodeURIComponent(cfg.color)}"><path d="M12 0C5.373 0 0 5.373 0 12c0 8.5 12 24 12 24s12-15.5 12-24C24 5.373 18.627 0 12 0zm0 17c-2.761 0-5-2.239-5-5s2.239-5 5-5 5 2.239 5 5-2.239 5-5 5z"/><circle cx="12" cy="12" r="4" fill="%23ffffff"/></svg>`;
-
+                {/* ที่นั่ง */}
+                {seatsShown.map((seat, i) => {
+                  const cfg = STATUS[seat.status];
+                  const isSel = selected?.kind === 'seat' && selected.id === seat.id;
                   return (
-                    <Box
-                      key={pin.assetId}
-                      sx={{
-                        position: 'absolute', width: 28, height: 38, ml: '-14px', mt: '-38px',
-                        cursor: isEditMode ? 'grab' : 'pointer', transition: 'transform 0.2s',
-                        filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))', zIndex: 10,
-                        '&:hover': { transform: 'scale(1.15) translateY(-2px)', zIndex: 20 },
-                        '&:active': isEditMode ? { cursor: 'grabbing' } : undefined,
-                        left: `${pin.x}%`, top: `${pin.y}%`,
-                      }}
+                    <Box key={`seat-${seat.id || i}-${seat.ownerName}`}
                       draggable={isEditMode}
-                      onDragStart={(e) => handleDragStart(e, i)}
-                      onMouseEnter={(e) => {
-                        if (!isEditMode) {
-                          setHoveredPin(pin);
-                          setTooltipPos({ x: e.clientX + 15, y: e.clientY - 20 });
-                        }
-                      }}
-                      onMouseMove={(e) => {
-                        if (!isEditMode) setTooltipPos({ x: e.clientX + 15, y: e.clientY - 20 });
-                      }}
-                      onMouseLeave={() => setHoveredPin(null)}
-                      onClick={() => {
-                        if (!isEditMode && pin.asset?.assetCode) {
-                          navigate(`/pm/runs?search=${encodeURIComponent(pin.asset?.assetCode)}`);
-                        }
-                      }}
-                    >
-                      <Box component="img" src={pinSvg} alt="pin" draggable={false} sx={{ width: 28, height: 38 }} />
-                      {/* Asset Code label under pin */}
-                      <Box sx={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', bgcolor: 'rgba(255,255,255,0.9)', color: '#1d1d1f', px: 0.5, py: 0.25, borderRadius: 0.5, fontSize: 9, fontWeight: 700, border: '1px solid #e5e5ea', whiteSpace: 'nowrap', pointerEvents: 'none', boxShadow: 1 }}>
-                        {pin.asset?.assetCode}
+                      onDragStart={e => onDragStart(e, 'seat', i)}
+                      onClick={() => setSelected(isSel ? null : { kind: 'seat', id: seat.id })}
+                      sx={{
+                        position: 'absolute', left: `${seat.x}%`, top: `${seat.y}%`,
+                        transform: 'translate(-50%, -50%)',
+                        cursor: isEditMode ? 'grab' : 'pointer',
+                        zIndex: isSel ? 30 : 10,
+                        '&:hover': { zIndex: 25 },
+                        '&:active': isEditMode ? { cursor: 'grabbing' } : undefined,
+                      }}>
+                      <Box sx={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25,
+                        bgcolor: 'background.paper',
+                        border: `2px solid ${cfg.color}`,
+                        borderRadius: '9px', px: 0.75, py: 0.4,
+                        boxShadow: isSel ? `0 0 0 3px ${alpha(cfg.color, 0.35)}, 0 4px 10px rgba(0,0,0,.28)` : '0 2px 6px rgba(0,0,0,.24)',
+                        transition: 'box-shadow .15s, transform .15s',
+                        '&:hover': { transform: 'scale(1.06)' },
+                      }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4 }}>
+                          <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: cfg.color, flexShrink: 0 }} />
+                          <Typography sx={{ fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap', lineHeight: 1.3 }}>
+                            {shortName(seat.ownerName)}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', gap: 0.4, alignItems: 'center', color: 'text.secondary' }}>
+                          {seat.devices.length === 0 ? (
+                            <SeatIcon size={12} />
+                          ) : seat.devices.slice(0, 4).map(d => (
+                            <Box key={d.assetId} sx={{ color: STATUS[d.pmStatus].color, display: 'flex' }}>
+                              <DeviceIcon kind={d.kind} size={12} />
+                            </Box>
+                          ))}
+                          {seat.devices.length > 4 && (
+                            <Typography sx={{ fontSize: 8.5, fontWeight: 700 }}>+{seat.devices.length - 4}</Typography>
+                          )}
+                        </Box>
+                      </Box>
+                    </Box>
+                  );
+                })}
+
+                {/* อุปกรณ์ส่วนกลาง */}
+                {spotsShown.map((sp, i) => {
+                  const cfg = STATUS[sp.pmStatus];
+                  const isSel = selected?.kind === 'spot' && selected.id === sp.id;
+                  return (
+                    <Box key={`spot-${sp.assetId}`}
+                      draggable={isEditMode}
+                      onDragStart={e => onDragStart(e, 'spot', i)}
+                      onClick={() => setSelected(isSel ? null : { kind: 'spot', id: sp.id })}
+                      sx={{
+                        position: 'absolute', left: `${sp.x}%`, top: `${sp.y}%`,
+                        transform: 'translate(-50%, -50%)',
+                        cursor: isEditMode ? 'grab' : 'pointer',
+                        zIndex: isSel ? 30 : 11,
+                        '&:hover': { zIndex: 25 },
+                      }}>
+                      <Box sx={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        width: 30, height: 30, borderRadius: '50%',
+                        bgcolor: 'background.paper', color: cfg.color,
+                        border: `2px solid ${cfg.color}`,
+                        boxShadow: isSel ? `0 0 0 3px ${alpha(cfg.color, 0.35)}, 0 4px 10px rgba(0,0,0,.28)` : '0 2px 6px rgba(0,0,0,.24)',
+                        transition: 'transform .15s',
+                        '&:hover': { transform: 'scale(1.1)' },
+                      }}>
+                        <DeviceIcon kind={sp.kind} size={16} />
                       </Box>
                     </Box>
                   );
@@ -518,100 +617,88 @@ export default function PMFloorPlanPage() {
             </Box>
           )}
         </Paper>
+
+        {/* ── รายละเอียดจุดที่เลือก ── */}
+        {(selectedSeat || selectedSpot) && !isEditMode && (
+          <Paper variant="outlined" sx={{ width: 300, p: 2, flexShrink: 0 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
+              <Box>
+                <Typography sx={{ fontSize: 15, fontWeight: 700 }}>
+                  {selectedSeat ? selectedSeat.ownerName : (selectedSpot!.assetName || selectedSpot!.assetCode)}
+                </Typography>
+                <Typography sx={{ fontSize: 11.5, color: 'text.secondary' }}>
+                  {selectedSeat
+                    ? `${selectedSeat.departmentId || '—'} · ที่นั่ง`
+                    : `${selectedSpot!.type} · อุปกรณ์ส่วนกลาง`}
+                </Typography>
+              </Box>
+              <IconButton size="small" onClick={() => setSelected(null)}><CloseIcon sx={{ fontSize: 17 }} /></IconButton>
+            </Box>
+
+            {selectedSeat?.looksLikeStorage && (
+              <Box sx={{ p: '8px 10px', mb: 1.5, borderRadius: 1.5, bgcolor: alpha(theme.palette.warning.main, 0.1), border: `1px solid ${alpha(theme.palette.warning.main, 0.35)}` }}>
+                <Typography sx={{ fontSize: 10.5, lineHeight: 1.7 }}>
+                  ชื่อนี้ผูกกับอุปกรณ์ {selectedSeat.devices.length} ชิ้น ซึ่งมากกว่าโต๊ะทำงานปกติ —
+                  น่าจะเป็นป้ายจุดเก็บของ ไม่ใช่ชื่อคน ควรแก้ผู้ครอบครองในทะเบียนให้ตรงกับความจริง
+                </Typography>
+              </Box>
+            )}
+
+            {selectedSeat && selectedSeat.devices.length === 0 && (
+              <Box sx={{ p: '8px 10px', mb: 1.5, borderRadius: 1.5, bgcolor: alpha(theme.palette.warning.main, 0.1), border: `1px solid ${alpha(theme.palette.warning.main, 0.35)}` }}>
+                <Typography sx={{ fontSize: 10.5, lineHeight: 1.7 }}>
+                  ไม่พบอุปกรณ์ของคนนี้ในทะเบียน — ชื่ออาจสะกดไม่ตรงกับช่องผู้ครอบครอง
+                  หรือเจ้าของย้ายออกไปแล้ว
+                </Typography>
+              </Box>
+            )}
+
+            {(selectedSeat ? selectedSeat.devices : [{
+              assetId: selectedSpot!.assetId, assetName: selectedSpot!.assetName, assetCode: selectedSpot!.assetCode,
+              type: selectedSpot!.type, kind: selectedSpot!.kind, pmStatus: selectedSpot!.pmStatus,
+              pmDate: selectedSpot!.pmDate, viaLink: false,
+            } as LiveDevice]).map(d => (
+              <Box key={d.assetId} onClick={() => navigate(`/assets/${d.assetId}`)}
+                sx={{ display: 'flex', gap: 1.25, alignItems: 'flex-start', p: '9px 10px', mb: 0.75, borderRadius: 1.5, cursor: 'pointer', border: '1px solid', borderColor: 'divider', '&:hover': { bgcolor: 'action.hover' } }}>
+                <Box sx={{ color: STATUS[d.pmStatus].color, mt: 0.25 }}><DeviceIcon kind={d.kind} size={17} /></Box>
+                <Box sx={{ minWidth: 0, flex: 1 }}>
+                  <Typography sx={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {d.assetName || d.assetCode || `#${d.assetId}`}
+                  </Typography>
+                  <Typography sx={{ fontSize: 10.5, color: 'text.secondary' }}>
+                    {KIND_LABEL[d.kind]}
+                    {d.viaLink && ' · พบตอนทำ PM'}
+                  </Typography>
+                  <Typography sx={{ fontSize: 10.5, color: STATUS[d.pmStatus].color, fontWeight: 600, mt: 0.25 }}>
+                    {STATUS[d.pmStatus].label}
+                    {d.pmDate && ` · ${new Date(d.pmDate).toLocaleDateString('th-TH')}`}
+                  </Typography>
+                </Box>
+              </Box>
+            ))}
+          </Paper>
+        )}
       </Box>
 
-      {/* Legend Footer */}
-      {!isEditMode && currentPlan && (
-        <Box sx={{ display: 'flex', gap: 2, mt: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
-          {Object.entries(STATUS_CONFIG).map(([k, cfg]) => (
-            <Box key={k} sx={{ display: 'flex', alignItems: 'center', gap: 0.75, fontSize: 12, fontWeight: 600, color: 'text.secondary' }}>
-              <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: cfg.color }} />
-              {cfg.label}
-            </Box>
-          ))}
-        </Box>
-      )}
-
-      {/* Tooltip */}
-      {hoveredPin && !isEditMode && (
-        <Paper
-          elevation={8}
-          sx={{
-            position: 'fixed', zIndex: 9999, bgcolor: 'rgba(29,29,31,0.95)', backdropFilter: 'blur(12px)',
-            color: '#fff', p: '14px 18px', borderRadius: 3.5, fontSize: 12, pointerEvents: 'none', minWidth: 200,
-            left: tooltipPos.x, top: tooltipPos.y,
-          }}
-        >
-          <Typography sx={{ fontWeight: 700, fontSize: 14, mb: 1, color: '#fff' }}>
-            {hoveredPin.asset?.assetCode}
-          </Typography>
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 10px', fontSize: 11, color: '#d2d2d7' }}>
-            <span>ชื่อ:</span><span style={{ color: '#fff' }}>{hoveredPin.asset?.assetName}</span>
-            <span>ผู้ใช้:</span><span style={{ color: '#fff' }}>{hoveredPin.asset?.ownerName || '—'}</span>
-            <span>แผนก:</span><span style={{ color: '#fff' }}>{hoveredPin.asset?.departmentId || '—'}</span>
-            <span>สถานะ:</span>
-            <span style={{ color: STATUS_CONFIG[getPMStatus(hoveredPin.assetId)].color, fontWeight: 700 }}>
-              {STATUS_CONFIG[getPMStatus(hoveredPin.assetId)].label}
-            </span>
+      {/* ── ตั้งค่าแปลน ── */}
+      <Modal open={isModalOpen} onClose={() => setIsModalOpen(false)} title={formData.id ? 'แก้ไขแผนผังชั้น' : 'เพิ่มแผนผังชั้นใหม่'}>
+        <Box component="form" onSubmit={handleSavePlan} sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+          <TextField label="ชื่อแปลน" size="small" required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
+          <TextField label="ชั้น" size="small" required value={formData.floor} onChange={e => setFormData({ ...formData, floor: e.target.value })} />
+          <TextField label="อาคาร" size="small" value={formData.building} onChange={e => setFormData({ ...formData, building: e.target.value })} />
+          <TextField label="บริษัท" size="small" value={formData.company} onChange={e => setFormData({ ...formData, company: e.target.value })}
+            helperText="ใช้กรองรายชื่อพนักงานตอนปักที่นั่ง" />
+          <Box>
+            <Typography sx={{ fontSize: 12, fontWeight: 600, mb: 0.5 }}>
+              รูปแปลน {formData.id ? '(เว้นว่างไว้ถ้าไม่เปลี่ยน)' : '(จำเป็น)'}
+            </Typography>
+            <input type="file" accept="image/*" required={!formData.id} onChange={e => setImageFile(e.target.files?.[0] || null)} />
           </Box>
-          <Box sx={{ mt: 1.25, pt: 1, borderTop: '1px solid rgba(255,255,255,0.1)', fontSize: 10, color: 'rgba(255,255,255,0.6)', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-            <TouchAppIcon sx={{ fontSize: 12 }} /> คลิกเพื่อเปิดรายการ PM
-          </Box>
-        </Paper>
-      )}
-
-      {/* Form Modal */}
-      <Modal open={isModalOpen} onClose={() => setIsModalOpen(false)} title={formData.id ? 'แก้ไขแผนผัง' : 'เพิ่มแผนผังใหม่'}>
-        <Box component="form" onSubmit={handleSavePlan} sx={{ p: '16px 20px' }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, width: 400, maxWidth: '100%' }}>
-            <TextField
-              required
-              size="small"
-              label="ชื่อแผนผัง"
-              value={formData.name}
-              onChange={e => setFormData({ ...formData, name: e.target.value })}
-              placeholder="เช่น ชั้น 22 เพลินจิต"
-            />
-            <Box sx={{ display: 'flex', gap: 1.5 }}>
-              <TextField
-                required
-                fullWidth
-                size="small"
-                label="ชั้น"
-                value={formData.floor}
-                onChange={e => setFormData({ ...formData, floor: e.target.value })}
-                placeholder="22"
-              />
-              <TextField
-                fullWidth
-                size="small"
-                label="อาคาร"
-                value={formData.building}
-                onChange={e => setFormData({ ...formData, building: e.target.value })}
-                placeholder="อาคารเพลินจิต"
-              />
-            </Box>
-            <TextField
-              size="small"
-              label="บริษัท"
-              value={formData.company}
-              onChange={e => setFormData({ ...formData, company: e.target.value })}
-              placeholder="เช่น TRRHQ"
-            />
-            <Box>
-              <Typography sx={{ fontSize: 13, fontWeight: 600, mb: 0.75 }}>
-                รูปแปลนชั้น (PNG/JPG) {formData.id ? '(เลือกใหม่หากต้องการเปลี่ยน)' : '*'}
-              </Typography>
-              <input type="file" accept="image/*" required={!formData.id} onChange={e => setImageFile(e.target.files?.[0] || null)} style={{ fontSize: 13 }} />
-            </Box>
-            <Box sx={{ display: 'flex', gap: 1.5, mt: 1.5 }}>
-              <Button type="submit" variant="contained" color="success" fullWidth disabled={isSavingPlan}>
-                {isSavingPlan ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}
-              </Button>
-              {formData.id > 0 && (
-                <Button type="button" variant="outlined" color="error" onClick={handleDeletePlan}>ลบแปลนนี้</Button>
-              )}
-            </Box>
+          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', mt: 1 }}>
+            {formData.id > 0 && <Button color="error" onClick={handleDeletePlan}>ลบแปลนนี้</Button>}
+            <Box sx={{ flex: 1 }} />
+            <Button onClick={() => setIsModalOpen(false)}>ยกเลิก</Button>
+            <Button type="submit" variant="contained" disabled={savingPlan}>{savingPlan ? 'กำลังบันทึก...' : 'บันทึก'}</Button>
           </Box>
         </Box>
       </Modal>

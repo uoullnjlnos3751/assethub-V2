@@ -1423,6 +1423,7 @@ model FloorPlan {
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
   pins      FloorPlanPin[]
+  seats     FloorPlanSeat[]
 
   @@map("floor_plans")
 }
@@ -1440,4 +1441,25 @@ model FloorPlanPin {
 
   @@unique([floorPlanId, assetId])
   @@map("floor_plan_pins")
+}
+
+/// ที่นั่งของคนบนแผนผัง อุปกรณ์ตามมาเองผ่าน ownerName ไม่ต้องปักทีละเครื่อง
+model FloorPlanSeat {
+  id           Int       @id @default(autoincrement())
+  floorPlanId  Int
+  floorPlan    FloorPlan @relation(fields: [floorPlanId], references: [id], onDelete: Cascade)
+  x            Float
+  y            Float
+  /// รหัสที่นั่งตามที่หน้างานเรียก เช่น "22-A-05"
+  label        String?
+  /// ตรงกับ Asset.ownerName — กุญแจที่ทำให้อุปกรณ์ตามคนไป
+  ownerName    String?
+  departmentId String?
+  note         String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt @default(now())
+
+  @@index([floorPlanId])
+  @@index([ownerName])
+  @@map("floor_plan_seats")
 }

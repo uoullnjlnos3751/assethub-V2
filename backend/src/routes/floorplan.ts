@@ -5,6 +5,7 @@ import multer from 'multer';
 import path from 'path';
 import crypto from 'crypto';
 import fs from 'fs';
+import { buildLiveFloorPlan, listSeatOwners } from '../services/floorPlanLive';
 
 const router = express.Router();
 
@@ -45,6 +46,79 @@ router.get('/', async (req, res) => {
     res.json(plans);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch floor plans' });
+  }
+});
+
+/**
+ * แผนผังพร้อมอุปกรณ์ที่ประกอบจากข้อมูลจริง ณ ตอนเปิดดู
+ *
+ * ต้องมาก่อน "/:id" ไม่งั้น express จะจับ "owners" เป็น id แล้วตอบ 404
+ */
+router.get('/owners', async (req, res) => {
+  try {
+    const q = String(req.query.q ?? '').trim();
+    const company = String(req.query.company ?? '').trim() || undefined;
+    res.json(await listSeatOwners(prisma, q, company));
+  } catch (error) {
+    console.error('List seat owners error:', error);
+    res.status(500).json({ error: 'Failed to list owners' });
+  }
+});
+
+router.get('/:id/live', async (req, res) => {
+  try {
+    const parsedYear = Number(req.query.year);
+    const year = Number.isInteger(parsedYear) ? parsedYear : new Date().getFullYear();
+    const data = await buildLiveFloorPlan(prisma, Number(req.params.id), year);
+    if (!data) return res.status(404).json({ error: 'Floor plan not found' });
+    res.json(data);
+  } catch (error) {
+    console.error('Live floor plan error:', error);
+    res.status(500).json({ error: 'Failed to build floor plan' });
+  }
+});
+
+/**
+ * บันทึกที่นั่งทั้งแปลนในครั้งเดียว
+ *
+ * แทนที่ทั้งชุดเหมือนที่ /pins ทำ เพราะหน้าจอแก้ไขทั้งแปลนแล้วค่อยกดบันทึก
+ * ครั้งเดียว การส่งเฉพาะส่วนที่เปลี่ยนจะทำให้ทั้งสองฝั่งต้องตามสถานะกันเอง
+ */
+router.put('/:id/seats', authorize('IT_ADMIN', 'SUPERADMIN'), async (req, res) => {
+  try {
+    const planId = Number(req.params.id);
+    const { seats } = req.body as { seats?: any[] };
+    const rows = Array.isArray(seats) ? seats : [];
+
+    // คนหนึ่งคนนั่งได้ที่เดียวต่อหนึ่งแปลน — ฐานข้อมูลมี unique index กันไว้อยู่แล้ว
+    // แต่ตอบ 400 ให้ชัดดีกว่าปล่อยให้ล้มเป็น 500 ที่อ่านไม่ออก
+    const owners = rows.map(r => String(r?.ownerName ?? '').trim().toLowerCase()).filter(Boolean);
+    const dup = owners.find((o, i) => owners.indexOf(o) !== i);
+    if (dup) return res.status(400).json({ error: `มีที่นั่งของ "${dup}" ซ้ำกันในแปลนนี้` });
+
+    await prisma.$transaction(async (tx) => {
+      await tx.floorPlanSeat.deleteMany({ where: { floorPlanId: planId } });
+      if (rows.length) {
+        await tx.floorPlanSeat.createMany({
+          data: rows.map(r => ({
+            floorPlanId: planId,
+            x: Number(r.x) || 0,
+            y: Number(r.y) || 0,
+            label: String(r.label ?? '').trim() || null,
+            ownerName: String(r.ownerName ?? '').trim() || null,
+            departmentId: String(r.departmentId ?? '').trim() || null,
+            note: String(r.note ?? '').trim() || null,
+          })),
+        });
+      }
+    });
+
+    const parsedYear = Number(req.query.year);
+    const year = Number.isInteger(parsedYear) ? parsedYear : new Date().getFullYear();
+    res.json(await buildLiveFloorPlan(prisma, planId, year));
+  } catch (error) {
+    console.error('Update seats error:', error);
+    res.status(500).json({ error: 'Failed to update seats' });
   }
 });
 

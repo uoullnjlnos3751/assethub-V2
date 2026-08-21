@@ -311,6 +311,12 @@ export const floorPlanAPI = {
   update: (id: number, data: FormData) => api.put(`/floorplans/${id}`, data, { headers: { 'Content-Type': 'multipart/form-data' } }),
   delete: (id: number) => api.delete(`/floorplans/${id}`),
   updatePins: (id: number, pins: any[]) => api.put(`/floorplans/${id}/pins`, { pins }),
+  /** แผนผังที่ประกอบอุปกรณ์จากผู้ครอบครองแล้ว พร้อมสถานะ PM ที่คำนวณฝั่ง server */
+  live: (id: number, year: number) => api.get(`/floorplans/${id}/live`, { params: { year } }),
+  /** รายชื่อผู้ครอบครองไว้เลือกตอนปักที่นั่ง — เลือกคน ไม่ใช่เครื่อง */
+  owners: (q: string, company?: string) => api.get('/floorplans/owners', { params: { q, company } }),
+  updateSeats: (id: number, seats: any[], year: number) =>
+    api.put(`/floorplans/${id}/seats`, { seats }, { params: { year } }),
 };
 
 // Admin
