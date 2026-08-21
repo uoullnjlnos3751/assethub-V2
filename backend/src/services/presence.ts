@@ -1,4 +1,5 @@
 import { AuthUser } from '../middleware/auth';
+import { resolveHostByIp } from './loginAudit';
 
 interface PresenceEntry {
   userId: number;
@@ -8,6 +9,10 @@ interface PresenceEntry {
   avatarUrl?: string | null;
   path: string;
   lastSeen: number;
+  /** ที่อยู่ที่ heartbeat ล่าสุดส่งมาจาก */
+  ip?: string | null;
+  /** ชื่อเครื่องที่แปลจาก ip — เติมทีหลังแบบไม่บล็อก heartbeat */
+  hostname?: string | null;
 }
 
 // In-memory only — presence is inherently ephemeral (single backend
@@ -16,7 +21,11 @@ interface PresenceEntry {
 const store = new Map<number, PresenceEntry>();
 const ONLINE_WINDOW_MS = 90_000;
 
-export function touch(user: AuthUser, path: string): void {
+export function touch(user: AuthUser, path: string, ip?: string | null): void {
+  const prev = store.get(user.userId);
+  // ที่อยู่เดิม = ชื่อเครื่องเดิม ไม่ต้องแปลใหม่ทุก heartbeat (ทุก ~25 วินาที)
+  const sameIp = !!ip && prev?.ip === ip;
+
   store.set(user.userId, {
     userId: user.userId,
     displayName: user.displayName,
@@ -25,7 +34,18 @@ export function touch(user: AuthUser, path: string): void {
     avatarUrl: user.avatarUrl,
     path,
     lastSeen: Date.now(),
+    ip: ip ?? prev?.ip ?? null,
+    hostname: sameIp ? prev?.hostname ?? null : null,
   });
+
+  // แปล ip เป็นชื่อเครื่องแบบไม่ให้ heartbeat ต้องรอ — แผนที่ ip ถูกแคชไว้แล้ว
+  // ปกติจึงเสร็จทันที ส่วนรอบที่แคชหมดอายุก็แค่ได้ชื่อเครื่องช้าไปหนึ่งจังหวะ
+  if (ip && !sameIp) {
+    void resolveHostByIp(ip).then((host) => {
+      const cur = store.get(user.userId);
+      if (cur && cur.ip === ip) cur.hostname = host;
+    }).catch(() => { /* ไม่รู้ชื่อเครื่องดีกว่าทำให้ presence พัง */ });
+  }
 }
 
 export function listOnline(): PresenceEntry[] {

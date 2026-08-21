@@ -12,6 +12,16 @@ interface OnlinePerson {
   avatarUrl?: string | null;
   activity: string;
   zone: 'borrow' | 'pm' | 'inventory' | null;
+  /** เครื่องที่คนนี้กำลังใช้อยู่ — null เมื่อเข้าจากนอกเครือข่ายหรือเครื่องที่ Agent ไม่ดูแล */
+  hostname?: string | null;
+  ip?: string | null;
+}
+
+/** ข้อความ tooltip ของ avatar — ใส่เครื่องเข้าไปด้วยเมื่อรู้ว่าเป็นเครื่องไหน */
+function personTitle(p: OnlinePerson): string {
+  const where = p.hostname || (p.ip ? `IP ${p.ip}` : null);
+  return [p.displayName || p.adUsername, p.activity, where && `💻 ${where}`]
+    .filter(Boolean).join(' · ');
 }
 
 interface Desk {
@@ -51,7 +61,7 @@ function DeskBay({ desk, people, accent }: { desk: Desk; people: OnlinePerson[];
         {occupied ? people.map((p, i) => {
           const initial = (p.displayName || p.adUsername || '?').charAt(0).toUpperCase();
           return (
-            <Box key={p.userId} sx={{ position: 'relative', animation: `deskFloat 3s ease-in-out ${i * 0.4}s infinite` }} title={`${p.displayName || p.adUsername} · ${p.activity}`}>
+            <Box key={p.userId} sx={{ position: 'relative', animation: `deskFloat 3s ease-in-out ${i * 0.4}s infinite` }} title={personTitle(p)}>
               <Avatar src={p.avatarUrl || undefined} sx={{ width: 26, height: 26, fontSize: '0.65rem', fontWeight: 700, bgcolor: accent, border: `2px solid ${theme.palette.background.paper}` }}>
                 {!p.avatarUrl && initial}
               </Avatar>
@@ -174,7 +184,7 @@ export function OpsRoomCard({
                 {others.map((p, i) => {
                   const initial = (p.displayName || p.adUsername || '?').charAt(0).toUpperCase();
                   return (
-                    <Avatar key={p.userId} src={p.avatarUrl || undefined} title={`${p.displayName || p.adUsername} · ${p.activity}`} sx={{
+                    <Avatar key={p.userId} src={p.avatarUrl || undefined} title={personTitle(p)} sx={{
                       width: 24, height: 24, fontSize: '0.6rem', fontWeight: 700,
                       bgcolor: theme.palette.text.disabled,
                       animation: `deskFloat 3s ease-in-out ${i * 0.4}s infinite`,
@@ -183,6 +193,43 @@ export function OpsRoomCard({
                     </Avatar>
                   );
                 })}
+              </Box>
+            </Box>
+          )}
+
+          {/* ใครอยู่ที่เครื่องไหน — รูปคนอย่างเดียวบอกได้แค่ว่ามีคนออนไลน์
+              ชื่อเครื่องต้องอ่านได้โดยไม่ต้องเอาเมาส์ไปจ่อทีละคน */}
+          {onlineNow.length > 0 && (
+            <Box sx={{ mt: 1.25, pt: 1.25, borderTop: `1px solid ${theme.palette.divider}` }}>
+              <Box sx={{
+                display: 'grid', gridTemplateColumns: 'minmax(0,1.1fr) minmax(0,1.2fr) minmax(0,1fr)',
+                gap: '2px 10px', alignItems: 'center',
+              }}>
+                {(['ผู้ใช้งาน', 'กำลังทำ', 'เครื่อง'] as const).map(head => (
+                  <Typography key={head} sx={{
+                    fontSize: 9, fontWeight: 700, letterSpacing: '.05em',
+                    color: theme.palette.text.disabled, textTransform: 'uppercase', pb: 0.25,
+                  }}>{head}</Typography>
+                ))}
+
+                {onlineNow.map(p => (
+                  <React.Fragment key={p.userId}>
+                    <Typography sx={{ fontSize: 11, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {p.displayName || p.adUsername}
+                    </Typography>
+                    <Typography sx={{ fontSize: 10.5, color: 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {p.activity}
+                    </Typography>
+                    <Typography sx={{
+                      fontSize: 10.5, fontWeight: p.hostname ? 700 : 400,
+                      color: p.hostname ? 'text.primary' : 'text.disabled',
+                      fontVariantNumeric: 'tabular-nums',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }} title={p.ip || undefined}>
+                      {p.hostname || (p.ip ? p.ip : 'ไม่ทราบเครื่อง')}
+                    </Typography>
+                  </React.Fragment>
+                ))}
               </Box>
             </Box>
           )}
