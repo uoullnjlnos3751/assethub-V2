@@ -502,6 +502,13 @@ export default function PMRunPage() {
   const [fetchingGLPI, setFetchingGLPI] = useState(false);
   const [glpiSpec, setGlpiSpec] = useState<any>(null);
   const [glpiSpecApplied, setGlpiSpecApplied] = useState(false);
+
+  /* ── สิ่งที่ Agent ตรวจเจอ ────────────────────────────────────────
+     แยกจาก GLPI คนละปุ่ม เพราะเป็นคนละแหล่ง และ Agent ตอบเรื่องที่ GLPI
+     ตอบไม่ได้ (แบตเตอรี่ ดิสก์ Windows Update) */
+  const [agentCheck, setAgentCheck] = useState<any>(null);
+  const [fetchingAgent, setFetchingAgent] = useState(false);
+  const [agentApplied, setAgentApplied] = useState(false);
   const [noteModal, setNoteModal] = useState<{ open: boolean; run: any; value: string }>({ open: false, run: null, value: '' });
   const [savingNote, setSavingNote] = useState(false);
 
@@ -642,6 +649,40 @@ export default function PMRunPage() {
     }
   };
 
+  const fetchAgentCheck = async (runId: number) => {
+    setFetchingAgent(true);
+    try {
+      const res = await pmAPI.agentCheck(runId);
+      setAgentCheck(res.data);
+      if (!res.data?.available) {
+        showToast('🤖 เครื่องนี้ยังไม่มีข้อมูลจาก Agent (ยังไม่ได้ติดตั้ง หรือยังไม่ได้รายงานเข้ามา)');
+      } else {
+        const crit = (res.data.findings || []).filter((f: any) => f.severity === 'critical').length;
+        showToast(crit
+          ? `🤖 Agent ตรวจเจอเรื่องต้องแก้ ${crit} เรื่อง — ดูในการ์ดด้านล่าง`
+          : '🤖 ดึงข้อมูลจาก Agent สำเร็จ');
+      }
+    } catch (err: any) {
+      showToast(`❌ ดึงข้อมูล Agent ไม่สำเร็จ: ${err.response?.data?.error || err.message}`);
+    } finally {
+      setFetchingAgent(false);
+    }
+  };
+
+  // เติมเฉพาะข้อที่ Agent ตอบได้ พร้อมหมายเหตุที่บอกว่าตอบจากอะไร ช่างแก้ทับได้
+  // เสมอ — ข้อที่ต้องเดินไปดู (ทำความสะอาด UPS สภาพเครื่อง) ไม่ถูกแตะ
+  const applyAgentAnswers = () => {
+    if (!agentCheck?.answers?.length) return;
+    const next = { ...answers };
+    for (const a of agentCheck.answers) {
+      next[a.key] = a.value;
+      if (a.note) next[`${a.key}_note`] = a.note;
+    }
+    setAnswers(next);
+    setAgentApplied(true);
+    showToast(`✅ เติมคำตอบจาก Agent ${agentCheck.answers.length} ข้อแล้ว — ตรวจทานได้ก่อนบันทึก`);
+  };
+
   // Applies the previously-fetched GLPI spec into the checklist answers.
   // Kept as a separate, explicit step (rather than doing this inside
   // fetchGLPI) so a technician can review the scanned data before it
@@ -726,6 +767,8 @@ export default function PMRunPage() {
     }
 
     setGlpiSpec(null); // Reset GLPI Spec
+    setAgentCheck(null);
+    setAgentApplied(false);
 
     // 1. Load from DB first
     let pre: Record<string, any> = {};
@@ -1376,10 +1419,18 @@ export default function PMRunPage() {
                     </Box>
                   ))}
                 </Box>
-                {pmModal.run.asset?.serialNo && !isReadOnly && (
-                  <Button size="small" variant="outlined" startIcon={<SyncAltIcon />} onClick={() => fetchGLPI(pmModal.run.id)} disabled={fetchingGLPI}>
-                    {fetchingGLPI ? 'กำลังดึงข้อมูล...' : 'ดึงสเปคจาก GLPI'}
-                  </Button>
+                {!isReadOnly && (
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    {pmModal.run.asset?.serialNo && (
+                      <Button size="small" variant="outlined" startIcon={<SyncAltIcon />} onClick={() => fetchGLPI(pmModal.run.id)} disabled={fetchingGLPI}>
+                        {fetchingGLPI ? 'กำลังดึงข้อมูล...' : 'ดึงสเปคจาก GLPI'}
+                      </Button>
+                    )}
+                    <Button size="small" variant="outlined" color="secondary" startIcon={<SyncAltIcon />}
+                      onClick={() => fetchAgentCheck(pmModal.run.id)} disabled={fetchingAgent}>
+                      {fetchingAgent ? 'กำลังตรวจ...' : '🤖 ตรวจจาก Agent'}
+                    </Button>
+                  </Box>
                 )}
               </Box>
 
@@ -1437,6 +1488,77 @@ export default function PMRunPage() {
                 </Box>
               </Box>
 
+              {/* ── สิ่งที่ Agent ตรวจเจอ ─────────────────────────────────
+                  วางไว้เหนือ checklist เพราะเป็นเรื่องที่ต้องรู้ก่อนเริ่มตรวจ
+                  และหลายข้อ (แบตเสื่อม ดิสก์เต็ม) มองด้วยตาไม่เห็น */}
+              {agentCheck && (
+                <Box sx={{ px: 3, pt: 2 }}>
+                  <Box sx={{
+                    borderRadius: '12px', overflow: 'hidden',
+                    border: '1px solid', borderColor: 'divider',
+                  }}>
+                    <Box sx={{
+                      display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap',
+                      p: '8px 14px', bgcolor: 'action.hover', borderBottom: '1px solid', borderColor: 'divider',
+                    }}>
+                      <Typography sx={{ fontSize: 12.5, fontWeight: 800 }}>🤖 สิ่งที่ Agent ตรวจเจอ</Typography>
+                      {agentCheck.available && (
+                        <Typography sx={{ fontSize: 10, color: 'text.secondary' }}>
+                          {agentCheck.hostname}
+                          {agentCheck.online ? ' · ออนไลน์' : agentCheck.lastSeen ? ` · รายงานล่าสุด ${String(agentCheck.lastSeen).slice(0, 16).replace('T', ' ')}` : ''}
+                        </Typography>
+                      )}
+                      <Box sx={{ flex: 1 }} />
+                      {agentCheck.available && agentCheck.answers?.length > 0 && !isReadOnly && (
+                        <Button size="small" variant={agentApplied ? 'outlined' : 'contained'} color="secondary"
+                          onClick={applyAgentAnswers}
+                          sx={{ fontSize: 10.5, py: 0.25, textTransform: 'none' }}>
+                          {agentApplied ? `เติมแล้ว (กดซ้ำได้)` : `เติมคำตอบ ${agentCheck.answers.length} ข้อ`}
+                        </Button>
+                      )}
+                    </Box>
+
+                    <Box sx={{ p: '10px 14px' }}>
+                      {!agentCheck.available ? (
+                        <Typography sx={{ fontSize: 11.5, color: 'text.disabled' }}>
+                          เครื่องนี้ยังไม่มีข้อมูลจาก Agent — อาจยังไม่ได้ติดตั้ง หรือยังไม่ได้รายงานเข้ามา
+                        </Typography>
+                      ) : (
+                        <>
+                          {agentCheck.findings?.length === 0 && (
+                            <Typography sx={{ fontSize: 11.5, color: 'success.main', fontWeight: 600 }}>
+                              ✅ ไม่พบเรื่องผิดปกติจากข้อมูล Agent
+                            </Typography>
+                          )}
+                          {(agentCheck.findings || []).map((f: any) => {
+                            const tone = f.severity === 'critical' ? 'error' : f.severity === 'warn' ? 'warning' : 'info';
+                            return (
+                              <Box key={f.key} sx={{ display: 'flex', gap: 1, alignItems: 'baseline', py: 0.5 }}>
+                                <Box sx={{
+                                  flex: 'none', mt: 0.5, width: 7, height: 7, borderRadius: '50%',
+                                  bgcolor: (t: any) => t.palette[tone].main,
+                                }} />
+                                <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: `${tone}.main` }}>
+                                  {f.label}
+                                </Typography>
+                                <Typography sx={{ fontSize: 10.5, color: 'text.secondary' }}>{f.detail}</Typography>
+                              </Box>
+                            );
+                          })}
+
+                          {/* เครื่องพิมพ์: โชว์เฉย ๆ ไม่เติมลงฟอร์ม เพราะตัวที่ใช้ร่วมกัน
+                              ทั้งออฟฟิศจะกลายเป็นทรัพย์สินซ้ำบนทุกเครื่องที่ map ไว้ */}
+                          {agentCheck.printers?.length > 0 && (
+                            <Typography sx={{ fontSize: 10.5, color: 'text.secondary', mt: 0.75, pt: 0.75, borderTop: '1px dashed', borderColor: 'divider' }}>
+                              🖨️ เครื่องพิมพ์ที่ต่อ USB: {agentCheck.printers.map((x: any) => `${x.name} (${x.port})`).join(' · ')}
+                            </Typography>
+                          )}
+                        </>
+                      )}
+                    </Box>
+                  </Box>
+                </Box>
+              )}
               {/* Checklist Scrollable Body */}
               <Box sx={{ p: '16px 24px', overflowY: 'auto', flex: 1, bgcolor: 'action.hover' }}>
                 {glpiSpec && (

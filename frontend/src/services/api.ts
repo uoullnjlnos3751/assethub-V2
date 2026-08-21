@@ -270,6 +270,8 @@ export const pmAPI = {
   previewPrinterCode: (company: string, index: number) => api.get('/pm/preview-printer-code', { params: { company, index } }),
   bulkPerformRun: (data: { runIds: number[]; answers: any[] }) => api.post('/pm/runs/bulk-perform', data),
   getGLPISpec: (runId: number) => api.get(`/pm/runs/${runId}/glpi-spec`),
+  /** สิ่งที่ Agent ตรวจเจอสำหรับ PM — อ่านอย่างเดียว ไม่เขียนอะไร */
+  agentCheck: (runId: number) => api.get(`/pm/runs/${runId}/agent-check`),
   // Ad-hoc PM
   adhocSearch: (q: string) => api.get('/pm/runs/adhoc-search', { params: { q } }),
   adhocCheck: (assetId: number) => api.get(`/pm/runs/adhoc-check/${assetId}`),

@@ -6,6 +6,8 @@ import { AppError } from '../middleware/errorHandler';
 import { createNotification } from '../services/notification';
 import { fetchGLPISpecBySerial } from '../services/glpi';
 import { nextDeviceCode, resolveDevicePrefix } from '../services/deviceCode';
+import { fetchAgentRecord, fetchAllAgentRecords } from '../services/externalAgent';
+import { buildAgentPmCheck } from '../services/agentPmCheck';
 import { getCategoryIdByAssetType } from './assets';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -1151,6 +1153,37 @@ router.post('/runs/bulk-perform', authenticate, authorize('IT_ADMIN', 'SUPERADMI
 
     const updated = await prisma.pMRun.findMany({ where: { id: { in: validRuns.map((r) => r.id) } }, include: RUN_INCLUDE });
     res.json({ message: `บันทึกผล PM แบบกลุ่มสำเร็จทั้งหมด ${validRuns.length} รายการ`, runs: updated });
+  } catch (err) { next(err); }
+});
+
+// ── สิ่งที่ Agent ตรวจเจอ สำหรับหน้าทำ PM ─────────────────────────────
+//
+// อ่านอย่างเดียว ไม่เขียนอะไรทั้งสิ้น — ช่างเป็นคนตัดสินว่าจะรับคำตอบที่ Agent
+// เสนอหรือไม่ ส่วน findings เป็นข้อมูลประกอบการตรวจ ไม่ถูกบันทึกเป็นคำตอบ
+router.get('/runs/:id/agent-check', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const run = await prisma.pMRun.findUnique({
+      where: { id: parseInt(req.params.id) },
+      include: { asset: { select: { assetName: true, serialNo: true, snComputer: true } } },
+    });
+    if (!run) throw new AppError('ไม่พบรายการ PM', 404);
+    const asset = run.asset;
+    if (!asset) throw new AppError('รายการ PM นี้ไม่มีทรัพย์สินผูกอยู่', 400);
+
+    // ลองด้วยชื่อเครื่องก่อนเพราะเป็นคีย์ที่ Agent ใช้ ถ้าไม่เจอค่อยไล่หาจาก Serial
+    // (ชื่อในทะเบียนกับ hostname จริงไม่ตรงกันได้ — เพิ่งแก้ไป 142 เครื่อง)
+    let record: any = asset.assetName ? await fetchAgentRecord(asset.assetName) : null;
+    if (!record) {
+      const wanted = [asset.serialNo, asset.snComputer]
+        .map(s => String(s ?? '').trim().toLowerCase()).filter(Boolean);
+      if (wanted.length) {
+        const hit = (await fetchAllAgentRecords())
+          .find((r: any) => wanted.includes(String(r?.serial_number ?? '').trim().toLowerCase()));
+        if (hit?.hostname) record = await fetchAgentRecord(hit.hostname);
+      }
+    }
+
+    res.json(buildAgentPmCheck(record));
   } catch (err) { next(err); }
 });
 
