@@ -446,12 +446,26 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
                     />
                   </Box>
 
-                  <FormControl size="small" fullWidth disabled={readOnly}>
-                    <InputLabel>บริษัท (Company)</InputLabel>
-                    <Select label="บริษัท (Company)" value={d.company} onChange={e => updateField(idx, 'company', e.target.value)}>
-                      {companies.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}
-                    </Select>
-                  </FormControl>
+                  <Box>
+                    <FormControl size="small" fullWidth disabled={readOnly}>
+                      <InputLabel>บริษัท (Company)</InputLabel>
+                      <Select label="บริษัท (Company)" value={d.company} onChange={e => updateField(idx, 'company', e.target.value)}>
+                        {companies.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+                      </Select>
+                    </FormControl>
+                    {/* อุปกรณ์ที่ลงทะเบียนไว้คนละบริษัทกับเครื่องที่มันเสียบอยู่ = มีคนย้ายของ
+                        ข้ามบริษัทแล้วทะเบียนยังไม่ตาม เตือนให้ช่างตัดสิน ไม่เปลี่ยนให้เอง
+                        เพราะระบบไม่รู้ว่าย้ายจริงหรือแค่ยืมมาใช้ชั่วคราว */}
+                    {d._assetId && parentAsset?.company && d.company && d.company !== parentAsset.company && (
+                      <Typography variant="caption" sx={{
+                        display: 'block', mt: 0.5, lineHeight: 1.5,
+                        color: theme.palette.warning.main, fontWeight: 600,
+                      }}>
+                        ⚠ ทะเบียนบันทึกไว้เป็นของ <b>{d.company}</b> แต่เครื่องที่ทำ PM อยู่เป็นของ <b>{parentAsset.company}</b>
+                        {' '}— ถ้าย้ายมาจริงให้เปลี่ยนบริษัทเป็น {parentAsset.company} ถ้าแค่ยืมใช้ให้ปล่อยไว้
+                      </Typography>
+                    )}
+                  </Box>
 
                   <Box>
                     <Typography variant="caption" sx={{ display: 'block', color: theme.palette.text.secondary, mb: 0.5 }}>

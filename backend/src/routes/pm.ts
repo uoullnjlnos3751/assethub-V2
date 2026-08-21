@@ -816,6 +816,13 @@ async function processDeviceAnswers(tx: any, run: any, answers: any[], oldAnswer
                       ownerName: null,
                     }
                   });
+                  // ถอดสายใน CMDB ด้วย ไม่งั้นแท็บ 'อุปกรณ์ที่เชื่อมโยง' จะยังโชว์จอ
+                  // ที่ช่างเพิ่งบอกว่าไม่ได้ต่ออยู่แล้ว
+                  if (run.assetId) {
+                    await tx.assetLink.deleteMany({
+                      where: { parentId: run.assetId, childId: Number(oldDev._assetId) },
+                    });
+                  }
                   console.log(`Unlinked device ${oldDev._assetId} from PM run ${run.id}`);
                 }
               }
@@ -823,7 +830,25 @@ async function processDeviceAnswers(tx: any, run: any, answers: any[], oldAnswer
               console.error('Error parsing old devices for unlinking:', e);
             }
           }
+
+          // ── ผูกอุปกรณ์เข้ากับเครื่องใน CMDB ───────────────────────────
+          // ช่างเพิ่งยืนยันด้วยตาว่าจอ/เครื่องพิมพ์ตัวไหนต่ออยู่กับเครื่องนี้ ซึ่งเป็น
+          // หลักฐานที่ดีที่สุดที่ระบบจะได้ ก่อนหน้านี้ความรู้นั้นถูกเก็บเป็น JSON ใน
+          // คำตอบ checklist อย่างเดียว แท็บ 'อุปกรณ์ที่เชื่อมโยง' จึงว่างทุกเครื่อง
+          // (asset_links ทั้งตารางมี 0 แถว)
+          if (run.assetId && newAssetIds.size > 0) {
+            const linkType = itemTypeUpper === 'PRINTER_ARRAY' ? 'PRINTER' : 'MONITOR';
+            for (const childId of newAssetIds) {
+              if (childId === run.assetId) continue;   // กันเครื่องผูกกับตัวเอง
+              await tx.assetLink.upsert({
+                where: { parentId_childId: { parentId: run.assetId, childId } },
+                create: { parentId: run.assetId, childId, linkType, note: 'ยืนยันจากการทำ PM' },
+                update: { linkType },
+              });
+            }
+          }
         }
+
 
         processedAnswers.push({
           runId: run.id,
