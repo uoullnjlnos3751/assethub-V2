@@ -3,6 +3,7 @@ import { AuthService } from '../services/auth.service';
 import { AppError } from '../middleware/errorHandler';
 import { setAuthCookie, clearAuthCookie } from '../middleware/auth';
 import type { LoginInput } from '../types';
+import { loginContext, recordLogin } from '../services/loginAudit';
 
 export class AuthController {
   static async checkExpiry(req: Request<{}, {}, LoginInput>, res: Response, next: NextFunction) {
@@ -16,9 +17,15 @@ export class AuthController {
   }
 
   static async login(req: Request<{}, {}, LoginInput>, res: Response, next: NextFunction) {
+    const { username } = req.body;
+    const ctx = loginContext(req);
     try {
-      const { username, password } = req.body;
+      const { password } = req.body;
       const result = await AuthService.login(username, password);
+
+      // บันทึกว่าเข้ามาจากเครื่องไหน — ทำหลังล็อกอินผ่านแล้วและไม่ await ให้ช้า
+      // ไปกว่าที่จำเป็น การเขียนประวัติล้มเหลวจะไม่กระทบการเข้าใช้งาน
+      void recordLogin({ ...ctx, username, success: true, userId: result.user?.id });
       // The browser SPA no longer reads result.token — it authenticates via
       // this httpOnly cookie instead, so a stolen XSS payload can't read the
       // token out of JS-accessible storage. The token stays in the JSON body
@@ -26,7 +33,14 @@ export class AuthController {
       // authenticates with a Bearer header instead of a cookie.
       setAuthCookie(req, res, result.token);
       res.json(result);
-    } catch (err) {
+    } catch (err: any) {
+      // เก็บที่ล้มเหลวด้วย ไม่งั้นจะมองไม่เห็นการไล่เดารหัสผ่าน
+      void recordLogin({
+        ...ctx,
+        username,
+        success: false,
+        reason: String(err?.message || 'ล็อกอินไม่สำเร็จ').slice(0, 300),
+      });
       next(err);
     }
   }

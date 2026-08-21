@@ -22,8 +22,15 @@ model AppUser {
   authType           AuthType            @default(AD)
   passwordHash       String?
   lastLoginAt        DateTime?
+  // บันทึกไว้ตอนล็อกอินสำเร็จ — ก่อนหน้านี้ระบบไม่เก็บอะไรเกี่ยวกับเครื่องเลย
+  // จึงตอบไม่ได้ว่าใครเข้าใช้งานจากที่ไหน ทั้งที่ nginx ส่ง X-Real-IP มาให้อยู่แล้ว
+  lastLoginIp        String?
+  lastLoginAgent     String?
+  /// ชื่อเครื่องที่แปลจาก IP ด้วยข้อมูล Agent — null ถ้าจับคู่ไม่ได้
+  lastLoginHost      String?
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
+  loginLogs          LoginLog[]
   assetHistory       AssetHistory[]      @relation("ActorUser")
   assetHistoryOwner  AssetHistory[]      @relation("OwnerUser")
   borrowApprovals    BorrowApproval[]
@@ -220,6 +227,32 @@ model MonitorDetail {
   curved      Boolean?
 
   @@map("monitor_details")
+}
+
+/// ประวัติการเข้าใช้งาน — เก็บทั้งที่สำเร็จและล้มเหลว เพื่อให้ตามได้ว่าใครเข้าจากไหน
+/// และมีใครพยายามเดารหัสผ่านหรือเปล่า
+model LoginLog {
+  id         Int      @id @default(autoincrement())
+  /// null เมื่อล็อกอินล้มเหลวด้วยชื่อผู้ใช้ที่ไม่มีในระบบ
+  userId     Int?
+  /// ชื่อผู้ใช้ที่พิมพ์เข้ามาจริง เก็บแยกจาก userId เพราะกรณีล้มเหลวอาจไม่มี user
+  username   String
+  success    Boolean
+  /// เหตุผลที่ล้มเหลว เช่น รหัสผ่านผิด บัญชีถูกปิด
+  reason     String?
+  ip         String?
+  userAgent  String?
+  /// ชื่อเครื่องที่แปลจาก IP ด้วยข้อมูล Agent
+  hostname   String?
+  authType   String?
+  createdAt  DateTime @default(now())
+
+  user       AppUser? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+  @@index([ip])
+  @@map("login_logs")
 }
 
 model DeviceDetail {

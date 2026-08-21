@@ -188,6 +188,10 @@ export class AuthService {
         isActive: true,
         authType: true,
         lastLoginAt: true,
+        // ตอบคำถาม "บัญชีนี้เข้าใช้งานล่าสุดจากเครื่องไหน" ได้ตั้งแต่หน้าโปรไฟล์
+        lastLoginIp: true,
+        lastLoginHost: true,
+        lastLoginAgent: true,
         createdAt: true,
       },
     });

@@ -605,6 +605,33 @@ router.get('/notification-logs', authenticate, authorize('SUPERADMIN'), async (r
 });
 
 // ── Backup & Restore ──
+
+// ── ประวัติการเข้าใช้งานทั้งระบบ ────────────────────────────────────
+// เห็นได้ว่าบัญชีไหนเข้าจากเครื่องไหน และมีการเดารหัสผ่านหรือเปล่า
+// ?failedOnly=1 กรองเฉพาะที่ล้มเหลว · ?username= กรองรายบัญชี
+router.get('/login-logs', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const limit = Math.min(parseInt(String(req.query.limit ?? '100'), 10) || 100, 500);
+    const where: any = {};
+    if (req.query.failedOnly === '1' || req.query.failedOnly === 'true') where.success = false;
+    if (req.query.username) where.username = { contains: String(req.query.username), mode: 'insensitive' };
+
+    const [rows, total, failed24h] = await Promise.all([
+      prisma.loginLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        include: { user: { select: { id: true, displayName: true, role: true } } },
+      }),
+      prisma.loginLog.count({ where }),
+      prisma.loginLog.count({
+        where: { success: false, createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+      }),
+    ]);
+
+    res.json({ data: rows, total, failedLast24h: failed24h });
+  } catch (err) { next(err); }
+});
 router.get('/backup', authenticate, authorize('SUPERADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const [assets, categories, companies, vendors, locations, statuses, deviceTypes] = await Promise.all([

@@ -22,6 +22,21 @@ router.get('/me', authenticate, AuthController.me);
 // ── Logout ── (clears the httpOnly session cookie; see AuthController.logout)
 router.post('/logout', AuthController.logout);
 
+// ประวัติการเข้าใช้งานของตัวเอง — ผู้ใช้ทุกคนดูของตัวเองได้ ไม่ต้องเป็นแอดมิน
+// เพราะเป็นข้อมูลของเขาเอง และช่วยให้เจ้าตัวเห็นเองว่ามีใครเข้าบัญชีแปลก ๆ ไหม
+router.get('/login-history', authenticate, async (req, res, next) => {
+  try {
+    const limit = Math.min(parseInt(String(req.query.limit ?? '20'), 10) || 20, 100);
+    const rows = await prisma.loginLog.findMany({
+      where: { userId: req.user!.userId },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: { id: true, success: true, reason: true, ip: true, hostname: true, userAgent: true, authType: true, createdAt: true },
+    });
+    res.json({ data: rows });
+  } catch (err) { next(err); }
+});
+
 // ── Change Password (Local users only) ──
 router.post('/change-password', authenticate, async (req, res, next) => {
   try {
