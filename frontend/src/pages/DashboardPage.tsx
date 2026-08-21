@@ -261,6 +261,7 @@ export default function DashboardPage() {
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '7fr 5fr' }, gap: 1.5, mb: 2 }}>
         <OpsRoomCard
           onlineNow={onlineNow}
+          currentUserId={user?.id}
           borrowActive={borrowActive} borrowPending={borrowPending}
           pmDone={pmDone} pmTotal={pmTotal} pmPct={pmPct}
           lowStockCount={inventoryLowStock?.lowStockCount || 0}

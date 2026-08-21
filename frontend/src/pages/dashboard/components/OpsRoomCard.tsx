@@ -90,7 +90,7 @@ function DeskBay({ desk, people, accent }: { desk: Desk; people: OnlinePerson[];
 
 export function OpsRoomCard({
   onlineNow, borrowActive, borrowPending, pmDone, pmTotal, pmPct, lowStockCount,
-  assetsTotal, openWork, overSla, closedToday, onNavigateReports,
+  assetsTotal, openWork, overSla, closedToday, onNavigateReports, currentUserId,
 }: {
   onlineNow: OnlinePerson[];
   borrowActive: number; borrowPending: number;
@@ -98,6 +98,8 @@ export function OpsRoomCard({
   lowStockCount: number;
   assetsTotal: number; openWork: number; overSla: number; closedToday: number;
   onNavigateReports: () => void;
+  /** id ของคนที่กำลังเปิดหน้านี้ ใช้ไฮไลต์แถวของตัวเอง */
+  currentUserId?: number;
 }) {
   const theme = useTheme();
 
@@ -108,6 +110,7 @@ export function OpsRoomCard({
   ];
 
   const others = onlineNow.filter(p => !p.zone);
+  const me = currentUserId ? onlineNow.find(p => p.userId === currentUserId) : undefined;
 
   return (
     <Box sx={{
@@ -123,6 +126,31 @@ export function OpsRoomCard({
     }}>
       <SectionCard title="ห้องปฏิบัติการ IT (สด)" icon={Users}>
         <Box sx={{ minHeight: 480, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+
+          {/* ตอบคำถาม "ตอนนี้ฉันอยู่เครื่องไหน" ทันทีที่เปิดหน้า ไม่ต้องไปไล่หา
+              ชื่อตัวเองในตารางข้างล่างที่ปนกับคนอื่น */}
+          {me && (
+            <Box sx={{
+              display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap',
+              p: '8px 12px', borderRadius: '10px',
+              bgcolor: alpha(theme.palette.primary.main, 0.08),
+              border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`,
+            }}>
+              <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>คุณกำลังใช้งานจาก</Typography>
+              <Typography sx={{
+                fontSize: 14, fontWeight: 800, lineHeight: 1.2,
+                color: me.hostname ? theme.palette.primary.main : 'text.disabled',
+                fontStyle: me.hostname ? 'normal' : 'italic',
+              }}>
+                {me.hostname || 'ไม่ทราบเครื่อง'}
+              </Typography>
+              {!me.hostname && (
+                <Typography sx={{ fontSize: 9.5, color: 'text.disabled' }}>
+                  (เครื่องนี้ยังไม่ได้ลง Agent หรือยังไม่ได้รายงานเข้ามา)
+                </Typography>
+              )}
+            </Box>
+          )}
 
           <MonitoringWallPanel
             assetsTotal={assetsTotal}
@@ -212,10 +240,22 @@ export function OpsRoomCard({
                   }}>{head}</Typography>
                 ))}
 
-                {onlineNow.map(p => (
+                {onlineNow.map(p => {
+                  const isMe = !!currentUserId && p.userId === currentUserId;
+                  return (
                   <React.Fragment key={p.userId}>
-                    <Typography sx={{ fontSize: 11, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <Typography sx={{
+                      fontSize: 11, fontWeight: isMe ? 800 : 600, overflow: 'hidden',
+                      textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      color: isMe ? theme.palette.primary.main : 'text.primary',
+                    }}>
                       {p.displayName || p.adUsername}
+                      {isMe && (
+                        <Box component="span" sx={{
+                          ml: 0.5, px: 0.5, py: '1px', borderRadius: '4px', fontSize: 8.5, fontWeight: 700,
+                          bgcolor: alpha(theme.palette.primary.main, 0.15), color: theme.palette.primary.main,
+                        }}>คุณ</Box>
+                      )}
                     </Typography>
                     <Typography sx={{ fontSize: 10.5, color: 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {p.activity}
@@ -229,7 +269,8 @@ export function OpsRoomCard({
                       {p.hostname || (p.ip ? p.ip : 'ไม่ทราบเครื่อง')}
                     </Typography>
                   </React.Fragment>
-                ))}
+                  );
+                })}
               </Box>
             </Box>
           )}
