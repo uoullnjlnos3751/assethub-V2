@@ -276,6 +276,9 @@ export const pmAPI = {
   getGLPISpec: (runId: number) => api.get(`/pm/runs/${runId}/glpi-spec`),
   /** สิ่งที่ Agent ตรวจเจอสำหรับ PM — อ่านอย่างเดียว ไม่เขียนอะไร */
   agentCheck: (runId: number) => api.get(`/pm/runs/${runId}/agent-check`),
+  /** สรุปผล PM เป็นข้อเสนอจัดซื้อรายบริษัท */
+  procurementReport: (company: string, year: number) =>
+    api.get(`/pm/procurement-report`, { params: { company, year } }),
   // Ad-hoc PM
   adhocSearch: (q: string) => api.get('/pm/runs/adhoc-search', { params: { q } }),
   adhocCheck: (assetId: number) => api.get(`/pm/runs/adhoc-check/${assetId}`),

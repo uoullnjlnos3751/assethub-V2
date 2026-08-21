@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Box, Typography, Card, CardContent, Grid, CircularProgress, Chip, MenuItem, Select, FormControl, Button, TextField, InputLabel, alpha, useTheme } from '@mui/material';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
-import { dashboardAPI, pmAPI } from '../../services/api';
+import { dashboardAPI, pmAPI, assetAPI } from '../../services/api';
 import { Wrench, CheckCircle2, Clock, ArrowRight, FolderOpen, Building2, Download, Search, Filter, FileText, Star, AlertTriangle, ShieldAlert, Check } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import ReportHeaderTabs from './ReportHeaderTabs';
+import ProcurementPanel from './components/ProcurementPanel';
 import * as XLSX from 'xlsx';
 import { PieChart as ReChartsPieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
 
@@ -24,6 +25,30 @@ export default function ReportPMPage() {
   const [searchAsset, setSearchAsset] = useState('');
   const [searchPerformer, setSearchPerformer] = useState('');
   const [exportingPDF, setExportingPDF] = useState(false);
+
+  /* ── ข้อเสนอจัดซื้อ ────────────────────────────────────────────────
+     คนละเอกสารกับความคืบหน้า PM และคนละคนอ่าน: ความคืบหน้าเป็นเรื่องของ IT
+     ส่วนข้อเสนอเป็นสิ่งที่หน่วยงานเอาไปยื่นผู้บริหาร */
+  const [view, setView] = useState<'progress' | 'proposal'>('progress');
+  const [proposalCompany, setProposalCompany] = useState('');
+  const [proposal, setProposal] = useState<any>(null);
+  const [proposalLoading, setProposalLoading] = useState(false);
+  const [companyList, setCompanyList] = useState<string[]>([]);
+
+  useEffect(() => {
+    assetAPI.companyOptions()
+      .then(r => setCompanyList((r.data || []).map((x: any) => (typeof x === 'string' ? x : x.name || x))))
+      .catch(() => setCompanyList([]));
+  }, []);
+
+  useEffect(() => {
+    if (view !== 'proposal' || !proposalCompany) return;
+    setProposalLoading(true);
+    pmAPI.procurementReport(proposalCompany, year)
+      .then(r => setProposal(r.data))
+      .catch(() => setProposal(null))
+      .finally(() => setProposalLoading(false));
+  }, [view, proposalCompany, year]);
 
   const handleExportPDF = async () => {
     try {
@@ -283,6 +308,29 @@ export default function ReportPMPage() {
         </Box>
       </Box>
 
+      <Box sx={{ display: 'flex', gap: 0.75, mb: 2, flexWrap: 'wrap', alignItems: 'center' }} className="no-print">
+        {([['progress', 'ความคืบหน้า PM'], ['proposal', 'ข้อเสนอจัดซื้อ']] as const).map(([k, label]) => (
+          <Button key={k} size="small" variant={view === k ? 'contained' : 'outlined'}
+            onClick={() => setView(k)}
+            sx={{ borderRadius: '9px', textTransform: 'none', fontWeight: 600, fontSize: 12 }}>
+            {label}
+          </Button>
+        ))}
+        {view === 'proposal' && (
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel id="proposal-company">บริษัทที่จะออกเอกสาร</InputLabel>
+            <Select labelId="proposal-company" label="บริษัทที่จะออกเอกสาร"
+              value={proposalCompany} onChange={(e) => setProposalCompany(e.target.value)}>
+              {companyList.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+            </Select>
+          </FormControl>
+        )}
+      </Box>
+
+      {view === 'proposal' ? (
+        <ProcurementPanel data={proposal} loading={proposalLoading} company={proposalCompany} theme={theme} />
+      ) : (
+        <>
       <Box id="report-content" sx={{ bgcolor: 'background.paper', borderRadius: 4, p: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: `1px solid ${theme.palette.divider}` }}>
         {/* Summary cards */}
         <Grid container spacing={2.5} sx={{ mb: 4 }}>
@@ -780,6 +828,8 @@ export default function ReportPMPage() {
           />
         </CardContent>
       </Card>
+        </>
+      )}
     </Box>
   );
 }

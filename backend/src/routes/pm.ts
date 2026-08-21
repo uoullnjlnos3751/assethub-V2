@@ -8,6 +8,7 @@ import { fetchGLPISpecBySerial } from '../services/glpi';
 import { nextDeviceCode, resolveDevicePrefix } from '../services/deviceCode';
 import { fetchAgentRecord, fetchAllAgentRecords } from '../services/externalAgent';
 import { buildAgentPmCheck } from '../services/agentPmCheck';
+import { buildProcurementReport } from '../services/pmProcurement';
 import { getCategoryIdByAssetType } from './assets';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -1153,6 +1154,17 @@ router.post('/runs/bulk-perform', authenticate, authorize('IT_ADMIN', 'SUPERADMI
 
     const updated = await prisma.pMRun.findMany({ where: { id: { in: validRuns.map((r) => r.id) } }, include: RUN_INCLUDE });
     res.json({ message: `บันทึกผล PM แบบกลุ่มสำเร็จทั้งหมด ${validRuns.length} รายการ`, runs: updated });
+  } catch (err) { next(err); }
+});
+
+// สรุปผล PM เป็นข้อเสนอให้หน่วยงานเอาไปขออนุมัติจัดซื้อ
+// ออกได้ตลอดเวลา ไม่ต้องรอ PM ครบ — แต่แสดง % ความครบไว้บนหัวเอกสารเสมอ
+router.get('/procurement-report', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const company = String(req.query.company ?? '').trim();
+    if (!company) throw new AppError('ต้องระบุบริษัท', 400);
+    const year = parseInt(String(req.query.year ?? '')) || new Date().getFullYear();
+    res.json(await buildProcurementReport(prisma, company, year));
   } catch (err) { next(err); }
 });
 
