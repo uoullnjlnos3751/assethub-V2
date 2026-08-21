@@ -1,5 +1,5 @@
 import { AuthUser } from '../middleware/auth';
-import { resolveHostByIp } from './loginAudit';
+import { resolveHost } from './loginAudit';
 
 interface PresenceEntry {
   userId: number;
@@ -38,12 +38,15 @@ export function touch(user: AuthUser, path: string, ip?: string | null): void {
     hostname: sameIp ? prev?.hostname ?? null : null,
   });
 
-  // แปล ip เป็นชื่อเครื่องแบบไม่ให้ heartbeat ต้องรอ — แผนที่ ip ถูกแคชไว้แล้ว
-  // ปกติจึงเสร็จทันที ส่วนรอบที่แคชหมดอายุก็แค่ได้ชื่อเครื่องช้าไปหนึ่งจังหวะ
-  if (ip && !sameIp) {
-    void resolveHostByIp(ip).then((host) => {
+  // หาเครื่องแบบไม่ให้ heartbeat ต้องรอ — ข้อมูล Agent ถูกแคชไว้แล้วจึงเสร็จทันที
+  // ส่วนรอบที่แคชหมดอายุก็แค่ได้ชื่อเครื่องช้าไปหนึ่งจังหวะ
+  //
+  // ที่นี่ ip ระบุเครื่องไม่ได้ (Docker กลืน IP ต้นทาง) จึงต้องส่งชื่อผู้ใช้ไปด้วย
+  // เพื่อให้ resolveHost ถอยไปถามว่าบัญชีนี้ล็อกอิน Windows อยู่เครื่องไหน
+  if (!sameIp || !prev?.hostname) {
+    void resolveHost(ip, user.adUsername).then((host) => {
       const cur = store.get(user.userId);
-      if (cur && cur.ip === ip) cur.hostname = host;
+      if (cur) cur.hostname = host;
     }).catch(() => { /* ไม่รู้ชื่อเครื่องดีกว่าทำให้ presence พัง */ });
   }
 }
