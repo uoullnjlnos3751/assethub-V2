@@ -1424,6 +1424,7 @@ model FloorPlan {
   updatedAt DateTime       @updatedAt
   pins      FloorPlanPin[]
   seats     FloorPlanSeat[]
+  zones     FloorPlanZone[]
 
   @@map("floor_plans")
 }
@@ -1456,10 +1457,40 @@ model FloorPlanSeat {
   ownerName    String?
   departmentId String?
   note         String?
+  /// โซนที่ที่นั่งนี้เกาะอยู่ ถ้าเป็น null คือหมุดอิสระที่ยังไม่เข้าตาราง
+  zoneId       Int?
+  zone         FloorPlanZone? @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  /// ลำดับช่องโต๊ะในโซน นับจาก 0 เรียงซ้ายไปขวาบนลงล่าง
+  deskIndex    Int?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt @default(now())
 
   @@index([floorPlanId])
   @@index([ownerName])
   @@map("floor_plan_seats")
+}
+
+/// โซนแผนกบนแปลน ประกาศตารางโต๊ะของตัวเอง ระบบสร้างช่องให้ตาม cols x rows
+model FloorPlanZone {
+  id          Int             @id @default(autoincrement())
+  floorPlanId Int
+  floorPlan   FloorPlan       @relation(fields: [floorPlanId], references: [id], onDelete: Cascade)
+  /// รหัสแผนกตามทะเบียน ใช้ตั้งรหัสโต๊ะ เช่น ACC-07
+  code        String
+  name        String?
+  color       String?
+  x           Float
+  y           Float
+  w           Float
+  h           Float
+  cols        Int             @default(1)
+  rows        Int             @default(1)
+  sortOrder   Int             @default(0)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt @default(now())
+  seats       FloorPlanSeat[]
+
+  @@unique([floorPlanId, code])
+  @@index([floorPlanId])
+  @@map("floor_plan_zones")
 }

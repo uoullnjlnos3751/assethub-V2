@@ -76,11 +76,43 @@ export interface LiveDevice {
   viaLink: boolean;
 }
 
+export interface LiveDesk {
+  /** รหัสที่พูดออกเสียงได้ เช่น ACC-07 */
+  code: string;
+  index: number;
+  cx: number;
+  cy: number;
+  w: number;
+  h: number;
+  /** ที่นั่งที่ครองโต๊ะนี้ ถ้าว่างเป็น null */
+  seatId: number | null;
+}
+
+export interface LiveZone {
+  id: number;
+  code: string;
+  name: string | null;
+  color: string | null;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  cols: number;
+  rows: number;
+  desks: LiveDesk[];
+  occupied: number;
+}
+
 export interface LiveSeat {
   id: number;
   x: number;
   y: number;
   label: string | null;
+  /** โซนที่เกาะอยู่ ถ้า null คือหมุดอิสระ */
+  zoneId: number | null;
+  deskIndex: number | null;
+  /** รหัสโต๊ะที่คำนวณจากโซน เช่น ACC-07 */
+  deskCode: string | null;
   ownerName: string | null;
   departmentId: string | null;
   note: string | null;
@@ -107,8 +139,14 @@ export interface LiveSpot {
 }
 
 export interface LiveFloorPlan {
-  plan: { id: number; name: string; floor: string; building: string | null; company: string | null; imageUrl: string };
+  plan: {
+    id: number; name: string; floor: string; building: string | null;
+    company: string | null; imageUrl: string;
+    /** อัตราส่วนรูป ใช้คำนวณระบบพิกัดฝั่งหน้าจอ */
+    imageWidth: number | null; imageHeight: number | null;
+  };
   year: number;
+  zones: LiveZone[];
   seats: LiveSeat[];
   spots: LiveSpot[];
   summary: {
@@ -119,8 +157,43 @@ export interface LiveFloorPlan {
     devicesDone: number;
     spots: number;
     byKind: Record<string, number>;
+    /** ช่องโต๊ะทั้งหมดกับที่ยังว่าง — คำถามที่แผนผังแบบเดิมตอบไม่ได้ */
+    desks: number;
+    desksFree: number;
+    /** ที่นั่งที่ยังไม่ได้เข้าตาราง ยังลอยอยู่บนพิกัดดิบ */
+    seatsUnsnapped: number;
   };
 }
+
+/**
+ * ตำแหน่งช่องโต๊ะในโซน
+ *
+ * ระบบสร้างเองจาก cols x rows ไม่มีใครต้องวางทีละจุด และเพราะทุกช่องมาจาก
+ * สูตรเดียวกัน ระยะห่างจึงเท่ากันหมดโดยไม่ต้องจัด
+ *
+ * แกน Y ของรูปสั้นกว่าแกน X (รูปกว้างกว่าสูง) การคิดความสูงเป็น % ของรูปตรง ๆ
+ * จะได้ช่องที่สัดส่วนเพี้ยน ตัวเรียกจึงส่ง aspect เข้ามาเพื่อแปลงหน่วยให้ตรงกัน
+ */
+export function deskGeometry(z: { x: number; y: number; w: number; h: number; cols: number; rows: number }) {
+  const cols = Math.max(1, z.cols), rows = Math.max(1, z.rows);
+  const cw = z.w / cols, ch = z.h / rows;
+  const out: { index: number; cx: number; cy: number; w: number; h: number }[] = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      out.push({
+        index: r * cols + c,
+        cx: z.x + (c + 0.5) * cw,
+        cy: z.y + (r + 0.5) * ch,
+        w: cw * 0.9,
+        h: ch * 0.82,
+      });
+    }
+  }
+  return out;
+}
+
+export const deskCode = (zoneCode: string, index: number) =>
+  `${zoneCode}-${String(index + 1).padStart(2, '0')}`;
 
 const norm = (v: any) => String(v ?? '').trim().toLowerCase();
 
@@ -177,6 +250,7 @@ export async function buildLiveFloorPlan(
   const plan = await prisma.floorPlan.findUnique({
     where: { id: planId },
     include: {
+      zones: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] },
       seats: { orderBy: { id: 'asc' } },
       pins: {
         include: {
@@ -235,6 +309,17 @@ export async function buildLiveFloorPlan(
   const statusOf = (id: number) => pm.get(id)?.status ?? 'NO_PM';
   const dateOf = (id: number) => pm.get(id)?.date ?? null;
 
+  /* ที่นั่งที่เกาะโต๊ะอยู่ ให้ตำแหน่งมาจากตารางของโซน ไม่ใช่ x,y ที่เก็บไว้ —
+     ขยับกรอบโซนหรือเปลี่ยนจำนวนแถว ทุกที่นั่งในโซนจึงขยับตามเองทั้งชุด */
+  const zoneById = new Map(plan.zones.map(z => [z.id, z]));
+  const deskPos = new Map<string, { cx: number; cy: number }>();
+  for (const z of plan.zones) {
+    for (const d of deskGeometry(z)) deskPos.set(`${z.id}:${d.index}`, { cx: d.cx, cy: d.cy });
+  }
+  const resolved = (s: { x: number; y: number; zoneId: number | null; deskIndex: number | null }) =>
+    (s.zoneId !== null && s.deskIndex !== null && deskPos.get(`${s.zoneId}:${s.deskIndex}`))
+    || { cx: s.x, cy: s.y };
+
   const seats: LiveSeat[] = plan.seats.map(s => {
     const own = byOwner.get(norm(s.ownerName)) ?? [];
     const devices: LiveDevice[] = [];
@@ -263,8 +348,12 @@ export async function buildLiveFloorPlan(
     devices.sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind)
       || String(a.assetName).localeCompare(String(b.assetName)));
 
+    const pos = resolved(s);
+    const z = s.zoneId !== null ? zoneById.get(s.zoneId) : undefined;
     return {
-      id: s.id, x: s.x, y: s.y, label: s.label,
+      id: s.id, x: pos.cx, y: pos.cy, label: s.label,
+      zoneId: s.zoneId, deskIndex: s.deskIndex,
+      deskCode: z && s.deskIndex !== null ? deskCode(z.code, s.deskIndex) : null,
       ownerName: s.ownerName, departmentId: s.departmentId ?? own[0]?.departmentId ?? null,
       note: s.note,
       devices,
@@ -286,6 +375,27 @@ export async function buildLiveFloorPlan(
     pmDate: dateOf(p.assetId),
   }));
 
+  const seatByDesk = new Map<string, number>();
+  for (const s of plan.seats) {
+    if (s.zoneId !== null && s.deskIndex !== null) seatByDesk.set(`${s.zoneId}:${s.deskIndex}`, s.id);
+  }
+  const zones: LiveZone[] = plan.zones.map(z => {
+    const desks: LiveDesk[] = deskGeometry(z).map(d => ({
+      code: deskCode(z.code, d.index),
+      index: d.index,
+      cx: d.cx, cy: d.cy, w: d.w, h: d.h,
+      seatId: seatByDesk.get(`${z.id}:${d.index}`) ?? null,
+    }));
+    return {
+      id: z.id, code: z.code, name: z.name, color: z.color,
+      x: z.x, y: z.y, w: z.w, h: z.h, cols: z.cols, rows: z.rows,
+      desks,
+      occupied: desks.filter(d => d.seatId !== null).length,
+    };
+  });
+  const deskTotal = zones.reduce((n, z) => n + z.desks.length, 0);
+  const deskFree = zones.reduce((n, z) => n + z.desks.filter(d => d.seatId === null).length, 0);
+
   const byKind: Record<string, number> = {};
   for (const d of [...seats.flatMap(s => s.devices), ...spots]) {
     byKind[d.kind] = (byKind[d.kind] || 0) + 1;
@@ -296,8 +406,10 @@ export async function buildLiveFloorPlan(
     plan: {
       id: plan.id, name: plan.name, floor: plan.floor,
       building: plan.building, company: plan.company, imageUrl: plan.imageUrl,
+      imageWidth: null, imageHeight: null,
     },
     year,
+    zones,
     seats,
     spots,
     summary: {
@@ -309,6 +421,9 @@ export async function buildLiveFloorPlan(
       devicesDone: devicesAll.filter(d => d.pmStatus === 'COMPLETED').length,
       spots: spots.length,
       byKind,
+      desks: deskTotal,
+      desksFree: deskFree,
+      seatsUnsnapped: plan.seats.filter(s => s.zoneId === null || s.deskIndex === null).length,
     },
   };
 }

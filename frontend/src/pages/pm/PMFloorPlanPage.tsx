@@ -47,8 +47,17 @@ interface LiveDevice {
 }
 interface LiveSeat {
   id: number; x: number; y: number; label: string | null;
+  zoneId: number | null; deskIndex: number | null; deskCode: string | null;
   ownerName: string | null; departmentId: string | null; note: string | null;
   devices: LiveDevice[]; status: PMStatus; looksLikeStorage: boolean;
+}
+interface LiveDesk {
+  code: string; index: number; cx: number; cy: number; w: number; h: number; seatId: number | null;
+}
+interface LiveZone {
+  id: number; code: string; name: string | null; color: string | null;
+  x: number; y: number; w: number; h: number; cols: number; rows: number;
+  desks: LiveDesk[]; occupied: number;
 }
 interface LiveSpot {
   id: number; x: number; y: number; label: string | null; assetId: number;
@@ -59,11 +68,13 @@ interface LiveSpot {
 interface LivePlan {
   plan: { id: number; name: string; floor: string; building: string | null; company: string | null; imageUrl: string };
   year: number;
+  zones: LiveZone[];
   seats: LiveSeat[];
   spots: LiveSpot[];
   summary: {
     seats: number; seatsDone: number; seatsUnplaced: number;
     devices: number; devicesDone: number; spots: number; byKind: Record<string, number>;
+    desks: number; desksFree: number; seatsUnsnapped: number;
   };
 }
 interface PlanRow {
@@ -108,6 +119,12 @@ export default function PMFloorPlanPage() {
   const [draftSeats, setDraftSeats] = useState<LiveSeat[]>([]);
   const [draftSpots, setDraftSpots] = useState<LiveSpot[]>([]);
   const [saving, setSaving] = useState(false);
+
+  // ชั้นที่เปิด/ปิดได้ — แบบ CAD เป็นเอกสารก่อสร้าง หมึกส่วนใหญ่เป็นเส้นบอกระยะ
+  // กับสัญลักษณ์ไฟฟ้าที่งาน IT ไม่ได้ใช้ จึงหรี่ลงเป็นชั้นอ้างอิง
+  const [showZones, setShowZones] = useState(true);
+  const [showFreeDesks, setShowFreeDesks] = useState(true);
+  const [dimPlan, setDimPlan] = useState(true);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({ id: 0, name: '', floor: '', building: '', company: '' });
@@ -239,7 +256,12 @@ export default function PMFloorPlanPage() {
     setArmed({ ownerName: name, departmentId: dept, looksLikeStorage: storage });
   };
 
-  /** วางที่นั่งลงตรงจุดที่คลิกบนแปลน */
+  /**
+   * วางที่นั่งนอกโซน — ใช้กับคนที่นั่งในที่ที่ยังไม่มีโซนครอบ เช่น ห้องผู้บริหาร
+   *
+   * ปกติควรกดลงช่องโต๊ะในโซน (placeOnDesk) เพราะช่องโต๊ะกันซ้อนให้เอง
+   * ทางนี้เป็นทางออกสำรอง ที่นั่งจะลอยอยู่บนพิกัดดิบและซ้อนกันได้ถ้าวางใกล้กันมาก
+   */
   const placeArmedAt = (e: React.MouseEvent) => {
     if (!isEditMode || !armed || !imgRef.current) return;
     const r = imgRef.current.getBoundingClientRect();
@@ -248,8 +270,9 @@ export default function PMFloorPlanPage() {
     // คลิกนอกรูปไม่ควรวางที่นั่งไว้ที่ขอบ
     if (x < 0 || x > 100 || y < 0 || y > 100) return;
     setDraftSeats(prev => [...prev, {
-      id: 0, x, y, label: null, ownerName: armed.ownerName,
-      departmentId: armed.departmentId, note: null,
+      id: 0, x, y, label: null,
+      zoneId: null, deskIndex: null, deskCode: null,
+      ownerName: armed.ownerName, departmentId: armed.departmentId, note: null,
       devices: [], status: 'NO_PM', looksLikeStorage: armed.looksLikeStorage,
     }]);
     setArmed(null);
@@ -274,6 +297,7 @@ export default function PMFloorPlanPage() {
     try {
       await floorPlanAPI.updateSeats(live.plan.id, draftSeats.map(s => ({
         x: s.x, y: s.y, label: s.label, ownerName: s.ownerName, departmentId: s.departmentId, note: s.note,
+        zoneId: s.zoneId, deskIndex: s.deskIndex,
       })), year);
       await floorPlanAPI.updatePins(live.plan.id, draftSpots.map(s => ({
         assetId: s.assetId, x: s.x, y: s.y, label: s.label,
@@ -303,9 +327,41 @@ export default function PMFloorPlanPage() {
     const setter = dragging.kind === 'seat' ? setDraftSeats : setDraftSpots;
     (setter as any)((prev: any[]) => {
       const next = [...prev];
-      next[dragging.index] = { ...next[dragging.index], x, y };
+      // ลากที่นั่งที่เกาะโต๊ะอยู่ = ถอดออกจากโต๊ะ ไม่งั้น server จะดึงกลับเข้าช่องเดิม
+      // ตอนบันทึก แล้วการลากจะดูเหมือนไม่ทำงาน
+      const detach = dragging.kind === 'seat' ? { zoneId: null, deskIndex: null, deskCode: null } : {};
+      next[dragging.index] = { ...next[dragging.index], ...detach, x, y };
       return next;
     });
+  };
+
+  const zones = live?.zones || [];
+
+  /* โต๊ะว่าง = ช่องที่ไม่มีที่นั่งในฉบับร่าง ไม่ใช่ค่า seatId ที่ server ส่งมา
+     ไม่งั้นวางคนลงไปแล้วช่องยังขึ้นว่าง จนกว่าจะกดบันทึก */
+  const occupiedDesks = useMemo(() => {
+    const m = new Map<string, LiveSeat>();
+    for (const s of (isEditMode ? draftSeats : (live?.seats || []))) {
+      if (s.zoneId !== null && s.deskIndex !== null) m.set(`${s.zoneId}:${s.deskIndex}`, s);
+    }
+    return m;
+  }, [isEditMode, draftSeats, live]);
+
+  /** นับจากฉบับร่าง ไม่ใช่ค่าที่ server ส่งมา ตัวเลขบนป้ายโซนจึงขยับทันทีที่วาง */
+  const occupiedIn = (z: LiveZone) =>
+    z.desks.filter(d => occupiedDesks.has(`${z.id}:${d.index}`)).length;
+
+  /** วางคนที่เลือกไว้ลงช่องโต๊ะ — ตำแหน่งมาจากตารางของโซน ไม่ใช่จุดที่เมาส์อยู่ */
+  const placeOnDesk = (z: LiveZone, d: LiveDesk) => {
+    if (!armed) return;
+    if (occupiedDesks.has(`${z.id}:${d.index}`)) { alert(`โต๊ะ ${d.code} มีคนนั่งอยู่แล้ว`); return; }
+    setDraftSeats(prev => [...prev, {
+      id: 0, x: d.cx, y: d.cy, label: null,
+      zoneId: z.id, deskIndex: d.index, deskCode: d.code,
+      ownerName: armed.ownerName, departmentId: armed.departmentId, note: null,
+      devices: [], status: 'NO_PM', looksLikeStorage: armed.looksLikeStorage,
+    }]);
+    setArmed(null);
   };
 
   const seatsShown = isEditMode ? draftSeats : (live?.seats || []);
@@ -473,6 +529,32 @@ export default function PMFloorPlanPage() {
               </Box>
             ))}
           </Box>
+
+          <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center' }}>
+            {([
+              ['โซน', showZones, setShowZones],
+              ['โต๊ะว่าง', showFreeDesks, setShowFreeDesks],
+              ['หรี่แบบ', dimPlan, setDimPlan],
+            ] as const).map(([label, on, set]) => (
+              <Chip key={label} size="small" label={label} clickable
+                color={on ? 'primary' : 'default'} variant={on ? 'filled' : 'outlined'}
+                onClick={() => (set as any)((v: boolean) => !v)}
+                sx={{ fontSize: 10.5, height: 22 }} />
+            ))}
+          </Box>
+
+          {s!.desks > 0 && (
+            <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
+              โต๊ะว่าง {s!.desksFree}/{s!.desks}
+            </Typography>
+          )}
+
+          {s!.seatsUnsnapped > 0 && (
+            <Tooltip title="ที่นั่งเหล่านี้ยังไม่ได้อยู่ในช่องโต๊ะของโซนใด — ลากไปวางบนโต๊ะว่างเพื่อเข้าตาราง">
+              <Chip size="small" color="default" variant="outlined"
+                label={`${s!.seatsUnsnapped} ที่นั่งนอกตาราง`} sx={{ fontSize: 11 }} />
+            </Tooltip>
+          )}
 
           {s!.seatsUnplaced > 0 && (
             <Tooltip title="ที่นั่งเหล่านี้ปักไว้แล้วแต่ไม่พบอุปกรณ์ของเจ้าของ — ชื่ออาจสะกดไม่ตรงกับในทะเบียน หรือเจ้าของย้ายออกไปแล้ว">
@@ -691,7 +773,67 @@ export default function PMFloorPlanPage() {
                 <Box component="img" ref={imgRef} draggable={false}
                   src={live.plan.imageUrl.startsWith('http') ? live.plan.imageUrl : `${apiUrl}${live.plan.imageUrl}`}
                   alt={live.plan.name}
-                  sx={{ display: 'block', maxWidth: '100%', maxHeight: 780, objectFit: 'contain', border: '1px solid', borderColor: 'divider', borderRadius: 1.5, boxShadow: 1 }} />
+                  sx={{
+                    display: 'block', maxWidth: '100%', maxHeight: 780, objectFit: 'contain',
+                    border: '1px solid', borderColor: 'divider', borderRadius: 1.5, boxShadow: 1,
+                    // แบบ CAD เป็นเอกสารก่อสร้าง หมึกส่วนใหญ่เป็นเส้นบอกระยะกับสัญลักษณ์
+                    // ไฟฟ้าที่งาน IT ไม่ได้ใช้ หรี่ลงเพื่อให้ชั้นข้อมูลเป็นตัวเอก
+                    opacity: dimPlan ? 0.28 : 1,
+                    filter: dimPlan ? 'grayscale(1) contrast(0.72)' : 'none',
+                    transition: 'opacity .2s, filter .2s',
+                  }} />
+
+                {/* โซนแผนก + ช่องโต๊ะ */}
+                {showZones && zones.map(z => {
+                  const col = z.color || theme.palette.primary.main;
+                  return (
+                    <React.Fragment key={`zone-${z.id}`}>
+                      <Box sx={{
+                        position: 'absolute', left: `${z.x}%`, top: `${z.y}%`,
+                        width: `${z.w}%`, height: `${z.h}%`,
+                        border: `1.5px solid ${alpha(col, 0.55)}`,
+                        bgcolor: alpha(col, 0.06), borderRadius: '5px',
+                        pointerEvents: 'none', zIndex: 1,
+                      }} />
+                      <Box sx={{
+                        position: 'absolute', left: `${z.x}%`, top: `${z.y}%`,
+                        transform: 'translate(3px, 3px)',
+                        bgcolor: col, color: '#fff', px: 0.6, py: '1px',
+                        borderRadius: '4px', fontSize: 9.5, fontWeight: 800,
+                        lineHeight: 1.5, pointerEvents: 'none', zIndex: 2, whiteSpace: 'nowrap',
+                      }}>
+                        {z.code} {occupiedIn(z)}/{z.desks.length}
+                      </Box>
+
+                      {z.desks.map(d => {
+                        const taken = occupiedDesks.has(`${z.id}:${d.index}`);
+                        if (taken) return null;
+                        const clickable = isEditMode && !!armed;
+                        if (!showFreeDesks && !clickable) return null;
+                        return (
+                          <Tooltip key={`desk-${z.id}-${d.index}`} title={`${d.code} · โต๊ะว่าง`} arrow>
+                            <Box
+                              onClick={e => { e.stopPropagation(); if (clickable) placeOnDesk(z, d); }}
+                              sx={{
+                                position: 'absolute', left: `${d.cx}%`, top: `${d.cy}%`,
+                                width: `${d.w}%`, height: `${d.h}%`,
+                                transform: 'translate(-50%, -50%)',
+                                border: `1px dashed ${alpha(theme.palette.text.disabled, 0.75)}`,
+                                bgcolor: clickable ? alpha(theme.palette.primary.main, 0.1) : alpha('#fff', 0.35),
+                                borderRadius: '4px', zIndex: 2,
+                                cursor: clickable ? 'pointer' : 'default',
+                                pointerEvents: clickable ? 'auto' : 'none',
+                                '&:hover': clickable ? {
+                                  bgcolor: alpha(theme.palette.primary.main, 0.28),
+                                  borderColor: theme.palette.primary.main,
+                                } : undefined,
+                              }} />
+                          </Tooltip>
+                        );
+                      })}
+                    </React.Fragment>
+                  );
+                })}
 
                 {/* ที่นั่ง */}
                 {seatsShown.map((seat, i) => {
@@ -795,7 +937,7 @@ export default function PMFloorPlanPage() {
                 </Typography>
                 <Typography sx={{ fontSize: 11.5, color: 'text.secondary' }}>
                   {selectedSeat
-                    ? `${selectedSeat.departmentId || '—'} · ที่นั่ง`
+                    ? `${selectedSeat.departmentId || '—'} · ${selectedSeat.deskCode ? `โต๊ะ ${selectedSeat.deskCode}` : 'ที่นั่งนอกตาราง'}`
                     : `${selectedSpot!.type} · อุปกรณ์ส่วนกลาง`}
                 </Typography>
               </Box>
