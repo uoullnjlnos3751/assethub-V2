@@ -54,10 +54,17 @@ interface LiveSeat {
 interface LiveDesk {
   code: string; index: number; cx: number; cy: number; w: number; h: number; seatId: number | null;
 }
+type ZoneKind = 'DESKS' | 'ROOM';
 interface LiveZone {
   id: number; code: string; name: string | null; color: string | null;
+  kind: ZoneKind;
   x: number; y: number; w: number; h: number; cols: number; rows: number;
   desks: LiveDesk[]; occupied: number;
+}
+interface TemplateRow {
+  id: number; name: string; description: string | null; company: string | null;
+  aspect: number | null; zoneCount: number; deskCount: number;
+  createdBy: string | null; updatedAt: string;
 }
 interface LiveSpot {
   id: number; x: number; y: number; label: string | null; assetId: number;
@@ -66,7 +73,10 @@ interface LiveSpot {
   pmStatus: PMStatus; pmDate: string | null;
 }
 interface LivePlan {
-  plan: { id: number; name: string; floor: string; building: string | null; company: string | null; imageUrl: string };
+  plan: {
+    id: number; name: string; floor: string; building: string | null;
+    company: string | null; imageUrl: string | null; aspect: number | null;
+  };
   year: number;
   zones: LiveZone[];
   seats: LiveSeat[];
@@ -79,7 +89,7 @@ interface LivePlan {
 }
 interface PlanRow {
   id: number; name: string; floor: string; building: string | null;
-  company: string | null; imageUrl: string; isActive: boolean;
+  company: string | null; imageUrl: string | null; isActive: boolean;
 }
 interface OwnerRow {
   ownerName: string; departmentId: string | null; company: string | null;
@@ -101,6 +111,10 @@ function shortName(full: string | null | undefined): string {
 
 const thYear = (ad: number) => ad + 543;
 
+/** สีให้โซนที่วาดใหม่ ไล่วนไปเรื่อย ๆ เพื่อให้โซนติดกันไม่ได้สีเดียวกัน */
+const ZONE_COLORS = ['#2563eb', '#dc2626', '#15803d', '#a16207', '#db2777',
+                     '#0891b2', '#ea580c', '#7c3aed', '#0284c7', '#b45309'];
+
 export default function PMFloorPlanPage() {
   const navigate = useNavigate();
   const theme = useTheme();
@@ -115,19 +129,29 @@ export default function PMFloorPlanPage() {
 
   // โหมดแก้ไข: ที่นั่งกับอุปกรณ์ส่วนกลางแก้คนละชุด แต่บันทึกพร้อมกัน
   const [isEditMode, setIsEditMode] = useState(false);
-  const [editTab, setEditTab] = useState<'seat' | 'spot'>('seat');
+  const [editTab, setEditTab] = useState<'seat' | 'spot' | 'zone'>('seat');
   const [draftSeats, setDraftSeats] = useState<LiveSeat[]>([]);
   const [draftSpots, setDraftSpots] = useState<LiveSpot[]>([]);
   const [saving, setSaving] = useState(false);
 
   // ชั้นที่เปิด/ปิดได้ — แบบ CAD เป็นเอกสารก่อสร้าง หมึกส่วนใหญ่เป็นเส้นบอกระยะ
   // กับสัญลักษณ์ไฟฟ้าที่งาน IT ไม่ได้ใช้ จึงหรี่ลงเป็นชั้นอ้างอิง
+  // ผังที่แก้อยู่ ยังไม่บันทึก
+  const [draftZones, setDraftZones] = useState<LiveZone[]>([]);
+  const [drawing, setDrawing] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+  const [zoneDrag, setZoneDrag] = useState<{ id: number; mode: 'move' | 'resize'; ox: number; oy: number } | null>(null);
+  const [templates, setTemplates] = useState<TemplateRow[]>([]);
+
   const [showZones, setShowZones] = useState(true);
   const [showFreeDesks, setShowFreeDesks] = useState(true);
   const [dimPlan, setDimPlan] = useState(true);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({ id: 0, name: '', floor: '', building: '', company: '' });
+  const [formData, setFormData] = useState({
+    id: 0, name: '', floor: '', building: '', company: '',
+    // ผังวาดเองไม่มีรูป ต้องรู้สัดส่วนผืนวาด · 1.6 คือ 16:10 ซึ่งใกล้กับผังชั้นทั่วไป
+    mode: 'image' as 'image' | 'blank', aspect: 1.6, templateId: 0,
+  });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [savingPlan, setSavingPlan] = useState(false);
 
@@ -143,7 +167,8 @@ export default function PMFloorPlanPage() {
   // คนที่เลือกไว้แล้วรอคลิกบนแปลนเพื่อกำหนดตำแหน่ง
   const [armed, setArmed] = useState<{ ownerName: string; departmentId: string | null; looksLikeStorage: boolean } | null>(null);
 
-  const imgRef = useRef<HTMLImageElement>(null);
+  /** ผืนวาด — เป็นตัวกำหนดระบบพิกัด ไม่ใช่รูป เพราะผังที่วาดเองไม่มีรูป */
+  const surfaceRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState<{ kind: 'seat' | 'spot'; index: number } | null>(null);
   const [selected, setSelected] = useState<{ kind: 'seat' | 'spot'; id: number } | null>(null);
 
@@ -164,6 +189,7 @@ export default function PMFloorPlanPage() {
     try {
       const res = await floorPlanAPI.live(planId, y);
       setLive(res.data);
+      setDraftZones(res.data.zones || []);
       setDraftSeats(res.data.seats || []);
       setDraftSpots(res.data.spots || []);
     } catch (err) {
@@ -210,6 +236,33 @@ export default function PMFloorPlanPage() {
     return () => { alive = false; };
   }, [isEditMode, live?.plan.id, year, live]);
 
+  useEffect(() => {
+    if (!isModalOpen) return;
+    floorPlanAPI.templates()
+      .then(r => setTemplates(r.data || []))
+      .catch(err => console.error(err));
+  }, [isModalOpen]);
+
+  const handleSaveTemplate = async () => {
+    if (!live) return;
+    const name = prompt('ตั้งชื่อเทมเพลต (ชื่อซ้ำจะเขียนทับของเดิม)',
+      `${live.plan.building || live.plan.company || 'ผัง'} ชั้นแบบ ${live.plan.floor}`);
+    if (!name?.trim()) return;
+    try {
+      // ต้องบันทึกผังลงชั้นก่อน เพราะเทมเพลตอ่านจากฐานข้อมูล ไม่ใช่จากฉบับร่างบนจอ
+      await floorPlanAPI.updateZones(live.plan.id, draftZones.map(z => ({
+        id: z.id > 0 ? z.id : null,
+        code: z.code, name: z.name, color: z.color, kind: z.kind,
+        x: z.x, y: z.y, w: z.w, h: z.h, cols: z.cols, rows: z.rows,
+      })), year);
+      const res = await floorPlanAPI.saveTemplate(live.plan.id, { name: name.trim() });
+      await fetchLive(live.plan.id, year);
+      alert(`บันทึกเทมเพลต "${res.data.name}" แล้ว — ใช้ได้ตอนสร้างแปลนใหม่`);
+    } catch (err: any) {
+      alert(err?.response?.data?.error || 'บันทึกเทมเพลตไม่สำเร็จ');
+    }
+  };
+
   const handleSavePlan = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingPlan(true);
@@ -219,7 +272,9 @@ export default function PMFloorPlanPage() {
       fd.append('floor', formData.floor);
       fd.append('building', formData.building);
       fd.append('company', formData.company);
-      if (imageFile) fd.append('image', imageFile);
+      fd.append('aspect', String(formData.aspect));
+      if (formData.mode === 'image' && imageFile) fd.append('image', imageFile);
+      if (!formData.id && formData.templateId) fd.append('templateId', String(formData.templateId));
       if (formData.id) await floorPlanAPI.update(formData.id, fd as any);
       else await floorPlanAPI.create(fd as any);
       setIsModalOpen(false);
@@ -239,6 +294,16 @@ export default function PMFloorPlanPage() {
       setLive(null);
       await fetchPlans();
     } catch { alert('เกิดข้อผิดพลาดในการลบ'); }
+  };
+
+  /** แปลงตำแหน่งเมาส์เป็น % ของผืนวาด คืน null เมื่อคลิกนอกผืน */
+  const pctAt = (e: { clientX: number; clientY: number }) => {
+    const el = surfaceRef.current;
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    const x = ((e.clientX - r.left) / r.width) * 100;
+    const y = ((e.clientY - r.top) / r.height) * 100;
+    return (x < 0 || x > 100 || y < 0 || y > 100) ? null : { x, y };
   };
 
   const alreadySeated = (name: string) =>
@@ -263,8 +328,8 @@ export default function PMFloorPlanPage() {
    * ทางนี้เป็นทางออกสำรอง ที่นั่งจะลอยอยู่บนพิกัดดิบและซ้อนกันได้ถ้าวางใกล้กันมาก
    */
   const placeArmedAt = (e: React.MouseEvent) => {
-    if (!isEditMode || !armed || !imgRef.current) return;
-    const r = imgRef.current.getBoundingClientRect();
+    if (!isEditMode || !armed || !surfaceRef.current) return;
+    const r = surfaceRef.current.getBoundingClientRect();
     const x = ((e.clientX - r.left) / r.width) * 100;
     const y = ((e.clientY - r.top) / r.height) * 100;
     // คลิกนอกรูปไม่ควรวางที่นั่งไว้ที่ขอบ
@@ -276,6 +341,64 @@ export default function PMFloorPlanPage() {
       devices: [], status: 'NO_PM', looksLikeStorage: armed.looksLikeStorage,
     }]);
     setArmed(null);
+  };
+
+  /* ── แก้ผัง ─────────────────────────────────────────────────────────── */
+
+  const zoneEditing = isEditMode && editTab === 'zone';
+
+  /** ลากกรอบบนผืนวาดเพื่อสร้างโซนใหม่ */
+  const startDraw = (e: React.MouseEvent) => {
+    if (!zoneEditing || zoneDrag) return;
+    const p = pctAt(e);
+    if (!p) return;
+    setDrawing({ x0: p.x, y0: p.y, x1: p.x, y1: p.y });
+  };
+
+  const moveDraw = (e: React.MouseEvent) => {
+    const p = pctAt(e);
+    if (!p) return;
+    if (drawing) { setDrawing(d => d && { ...d, x1: p.x, y1: p.y }); return; }
+    if (!zoneDrag) return;
+    setDraftZones(prev => prev.map(z => {
+      if (z.id !== zoneDrag.id) return z;
+      if (zoneDrag.mode === 'move') {
+        // หนีบไว้ในผืน ไม่งั้นลากโซนออกนอกจอแล้วหาไม่เจอ
+        return { ...z,
+          x: Math.max(0, Math.min(100 - z.w, p.x - zoneDrag.ox)),
+          y: Math.max(0, Math.min(100 - z.h, p.y - zoneDrag.oy)) };
+      }
+      return { ...z, w: Math.max(2, Math.min(100 - z.x, p.x - z.x)), h: Math.max(2, Math.min(100 - z.y, p.y - z.y)) };
+    }));
+  };
+
+  const endDraw = () => {
+    setZoneDrag(null);
+    if (!drawing) return;
+    const x = Math.min(drawing.x0, drawing.x1), y = Math.min(drawing.y0, drawing.y1);
+    const w = Math.abs(drawing.x1 - drawing.x0), h = Math.abs(drawing.y1 - drawing.y0);
+    setDrawing(null);
+    // ลากสั้น ๆ มักเป็นการคลิกพลาด ไม่ใช่ตั้งใจสร้างโซน
+    if (w < 2 || h < 2) return;
+    const n = draftZones.length;
+    setDraftZones(prev => [...prev, {
+      // id ติดลบคือโซนใหม่ที่ยังไม่มีในฐานข้อมูล ใช้แยกจากของที่บันทึกแล้ว
+      id: -(Date.now() % 1e9) - n,
+      code: `Z${n + 1}`, name: null, color: ZONE_COLORS[n % ZONE_COLORS.length],
+      kind: 'DESKS', x, y, w, h, cols: 3, rows: 3, desks: [], occupied: 0,
+    }]);
+  };
+
+  const patchZone = (id: number, patch: Partial<LiveZone>) =>
+    setDraftZones(prev => prev.map(z => (z.id === id ? { ...z, ...patch } : z)));
+
+  const removeZone = (id: number) => {
+    const z = draftZones.find(x => x.id === id);
+    const seated = draftSeats.filter(s => s.zoneId === id).length;
+    if (seated && !confirm(`โซน ${z?.code} มีคนนั่งอยู่ ${seated} คน — ลบแล้วคนเหล่านั้นจะหลุดออกจากตาราง (ไม่หายไป) ยืนยันไหม`)) return;
+    setDraftZones(prev => prev.filter(x => x.id !== id));
+    setDraftSeats(prev => prev.map(s =>
+      s.zoneId === id ? { ...s, zoneId: null, deskIndex: null, deskCode: null } : s));
   };
 
   const addSpot = (a: any) => {
@@ -295,9 +418,25 @@ export default function PMFloorPlanPage() {
     if (!live) return;
     setSaving(true);
     try {
+      /* ผังต้องบันทึกก่อนที่นั่ง เพราะ server คำนวณตำแหน่งที่นั่งจากตารางของโซน
+         ถ้าบันทึกกลับลำดับ ที่นั่งจะถูกวางบนผังเก่าแล้วเพี้ยนทันทีที่ผังเปลี่ยน */
+      const zoneRes = await floorPlanAPI.updateZones(live.plan.id, draftZones.map(z => ({
+        // โซนใหม่ยังไม่มี id จริง ส่ง null ให้ server สร้างให้
+        id: z.id > 0 ? z.id : null,
+        code: z.code, name: z.name, color: z.color, kind: z.kind,
+        x: z.x, y: z.y, w: z.w, h: z.h, cols: z.cols, rows: z.rows,
+      })), year);
+
+      /* id ของโซนที่เพิ่งสร้างเปลี่ยนไปแล้ว ที่นั่งที่ชี้ id ชั่วคราวติดลบต้อง
+         ย้ายมาชี้ id จริง มิฉะนั้นจะหลุดออกจากตารางทั้งที่ผู้ใช้วางไว้แล้ว */
+      const byCode = new Map<string, number>(
+        ((zoneRes.data?.zones || []) as LiveZone[]).map(z => [z.code, z.id]));
+      const codeOf = new Map<number, string>(draftZones.map(z => [z.id, z.code]));
+
       await floorPlanAPI.updateSeats(live.plan.id, draftSeats.map(s => ({
         x: s.x, y: s.y, label: s.label, ownerName: s.ownerName, departmentId: s.departmentId, note: s.note,
-        zoneId: s.zoneId, deskIndex: s.deskIndex,
+        zoneId: s.zoneId === null ? null : (byCode.get(codeOf.get(s.zoneId) ?? '') ?? null),
+        deskIndex: s.deskIndex,
       })), year);
       await floorPlanAPI.updatePins(live.plan.id, draftSpots.map(s => ({
         assetId: s.assetId, x: s.x, y: s.y, label: s.label,
@@ -320,8 +459,8 @@ export default function PMFloorPlanPage() {
 
   const onDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    if (!dragging || !imgRef.current) return;
-    const r = imgRef.current.getBoundingClientRect();
+    if (!dragging || !surfaceRef.current) return;
+    const r = surfaceRef.current.getBoundingClientRect();
     const x = Math.max(0, Math.min(100, ((e.clientX - r.left) / r.width) * 100));
     const y = Math.max(0, Math.min(100, ((e.clientY - r.top) / r.height) * 100));
     const setter = dragging.kind === 'seat' ? setDraftSeats : setDraftSpots;
@@ -335,7 +474,7 @@ export default function PMFloorPlanPage() {
     });
   };
 
-  const zones = live?.zones || [];
+  const zones = isEditMode ? draftZones : (live?.zones || []);
 
   /* โต๊ะว่าง = ช่องที่ไม่มีที่นั่งในฉบับร่าง ไม่ใช่ค่า seatId ที่ server ส่งมา
      ไม่งั้นวางคนลงไปแล้วช่องยังขึ้นว่าง จนกว่าจะกดบันทึก */
@@ -436,7 +575,7 @@ export default function PMFloorPlanPage() {
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
           {isAdmin && (
             <Button variant="contained" color="success" startIcon={<AddIcon />}
-              onClick={() => { setFormData({ id: 0, name: '', floor: '', building: '', company: '' }); setImageFile(null); setIsModalOpen(true); }}>
+              onClick={() => { setFormData({ id: 0, name: '', floor: '', building: '', company: '', mode: 'image', aspect: 1.6, templateId: 0 }); setImageFile(null); setIsModalOpen(true); }}>
               เพิ่มแผนผังใหม่
             </Button>
           )}
@@ -469,7 +608,8 @@ export default function PMFloorPlanPage() {
               <>
                 <Button variant="outlined" onClick={() => {
                   setIsEditMode(false); setSelected(null); setArmed(null); setSearch('');
-                  setDraftSeats(live.seats); setDraftSpots(live.spots);
+                  setDrawing(null); setZoneDrag(null);
+                  setDraftZones(live.zones); setDraftSeats(live.seats); setDraftSpots(live.spots);
                 }}>ยกเลิก</Button>
                 <Button variant="contained" onClick={handleSave} disabled={saving}>
                   {saving ? 'กำลังบันทึก...' : 'บันทึกตำแหน่ง'}
@@ -482,7 +622,7 @@ export default function PMFloorPlanPage() {
                   จัดผังที่นั่ง
                 </Button>
                 <Button variant="outlined" color="inherit" startIcon={<SettingsIcon />}
-                  onClick={() => { setFormData({ id: live.plan.id, name: live.plan.name, floor: live.plan.floor, building: live.plan.building || '', company: live.plan.company || '' }); setIsModalOpen(true); }}>
+                  onClick={() => { setFormData({ id: live.plan.id, name: live.plan.name, floor: live.plan.floor, building: live.plan.building || '', company: live.plan.company || '', mode: live.plan.imageUrl ? 'image' : 'blank', aspect: live.plan.aspect ?? 1.6, templateId: 0 }); setIsModalOpen(true); }}>
                   ตั้งค่าแปลน
                 </Button>
               </>
@@ -586,7 +726,7 @@ export default function PMFloorPlanPage() {
         {isEditMode && (
           <Paper variant="outlined" sx={{ width: 310, p: 2, flexShrink: 0 }}>
             <Box sx={{ display: 'flex', gap: 0.75, mb: 2 }}>
-              {([['seat', 'ที่นั่ง (คน)'], ['spot', 'อุปกรณ์ส่วนกลาง']] as const).map(([k, label]) => (
+              {([['seat', 'ที่นั่ง'], ['spot', 'ส่วนกลาง'], ['zone', 'ผังโซน']] as const).map(([k, label]) => (
                 <Button key={k} size="small" fullWidth
                   variant={editTab === k ? 'contained' : 'outlined'}
                   onClick={() => { setEditTab(k); setSearch(''); setOwners([]); setAssets([]); }}
@@ -596,7 +736,71 @@ export default function PMFloorPlanPage() {
               ))}
             </Box>
 
-            {editTab === 'seat' ? (
+            {editTab === 'zone' ? (
+              <>
+                <Typography sx={{ fontSize: 10.5, color: 'text.secondary', lineHeight: 1.7, mb: 1.5 }}>
+                  ลากกรอบบนแปลนเพื่อสร้างโซนใหม่ · ลากตัวโซนเพื่อย้าย · ลากจุดมุมล่างขวาเพื่อปรับขนาด<br />
+                  ตั้ง <b>คอลัมน์ × แถว</b> ให้ตรงกับจำนวนโต๊ะจริงในโซนนั้น
+                </Typography>
+
+                <Box sx={{ display: 'flex', gap: 0.75, mb: 1.5 }}>
+                  <Button size="small" variant="outlined" fullWidth sx={{ fontSize: 11 }}
+                    onClick={handleSaveTemplate} disabled={!draftZones.length}>
+                    บันทึกเป็นเทมเพลต
+                  </Button>
+                </Box>
+
+                <Box sx={{ maxHeight: 460, overflowY: 'auto' }}>
+                  {draftZones.length === 0 && (
+                    <Typography sx={{ p: 2, fontSize: 11, color: 'text.secondary', textAlign: 'center' }}>
+                      ยังไม่มีโซน — ลากกรอบบนแปลนเพื่อเริ่ม
+                    </Typography>
+                  )}
+                  {draftZones.map(z => (
+                    <Box key={z.id} sx={{
+                      p: 1, mb: 1, borderRadius: 1.5, border: '1px solid',
+                      borderColor: alpha(z.color || theme.palette.primary.main, 0.5),
+                      bgcolor: alpha(z.color || theme.palette.primary.main, 0.05),
+                    }}>
+                      <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center', mb: 0.75 }}>
+                        <TextField size="small" value={z.code} label="รหัส"
+                          onChange={e => patchZone(z.id, { code: e.target.value.toUpperCase() })}
+                          sx={{ width: 88, '& input': { fontSize: 12, fontWeight: 700, py: 0.6 } }} />
+                        <TextField size="small" value={z.name ?? ''} label="ชื่อ" fullWidth
+                          onChange={e => patchZone(z.id, { name: e.target.value })}
+                          sx={{ '& input': { fontSize: 12, py: 0.6 } }} />
+                        <IconButton size="small" color="error" onClick={() => removeZone(z.id)}>
+                          <CloseIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </Box>
+                      <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center' }}>
+                        <Select size="small" value={z.kind}
+                          onChange={e => patchZone(z.id, { kind: e.target.value as ZoneKind })}
+                          sx={{ fontSize: 11.5, flex: 1, '& .MuiSelect-select': { py: 0.6 } }}>
+                          <MenuItem value="DESKS" sx={{ fontSize: 12 }}>โซนโต๊ะทำงาน</MenuItem>
+                          <MenuItem value="ROOM" sx={{ fontSize: 12 }}>ห้อง / จุดสังเกต</MenuItem>
+                        </Select>
+                        {z.kind === 'DESKS' && (
+                          <>
+                            <TextField size="small" type="number" label="คอลัมน์" value={z.cols}
+                              onChange={e => patchZone(z.id, { cols: Math.max(1, Math.min(20, Number(e.target.value) || 1)) })}
+                              sx={{ width: 76, '& input': { fontSize: 12, py: 0.6 } }} />
+                            <TextField size="small" type="number" label="แถว" value={z.rows}
+                              onChange={e => patchZone(z.id, { rows: Math.max(1, Math.min(20, Number(e.target.value) || 1)) })}
+                              sx={{ width: 66, '& input': { fontSize: 12, py: 0.6 } }} />
+                          </>
+                        )}
+                      </Box>
+                      {z.kind === 'DESKS' && (
+                        <Typography sx={{ fontSize: 10, color: 'text.secondary', mt: 0.5 }}>
+                          {z.cols * z.rows} โต๊ะ · {z.code}-01 ถึง {z.code}-{String(z.cols * z.rows).padStart(2, '0')}
+                        </Typography>
+                      )}
+                    </Box>
+                  ))}
+                </Box>
+              </>
+            ) : editTab === 'seat' ? (
               <>
                 <TextField fullWidth size="small" placeholder="กรองชื่อในรายการ / ค้นคนนอกบริษัทนี้..."
                   value={search} onChange={e => setSearch(e.target.value)}
@@ -769,32 +973,66 @@ export default function PMFloorPlanPage() {
               }}
               onClick={placeArmedAt}
               onDragOver={onDragOver} onDrop={e => { e.preventDefault(); setDragging(null); }}>
-              <Box sx={{ position: 'relative', display: 'inline-block' }}>
-                <Box component="img" ref={imgRef} draggable={false}
-                  src={live.plan.imageUrl.startsWith('http') ? live.plan.imageUrl : `${apiUrl}${live.plan.imageUrl}`}
-                  alt={live.plan.name}
-                  sx={{
-                    display: 'block', maxWidth: '100%', maxHeight: 780, objectFit: 'contain',
-                    border: '1px solid', borderColor: 'divider', borderRadius: 1.5, boxShadow: 1,
-                    // แบบ CAD เป็นเอกสารก่อสร้าง หมึกส่วนใหญ่เป็นเส้นบอกระยะกับสัญลักษณ์
-                    // ไฟฟ้าที่งาน IT ไม่ได้ใช้ หรี่ลงเพื่อให้ชั้นข้อมูลเป็นตัวเอก
-                    opacity: dimPlan ? 0.28 : 1,
-                    filter: dimPlan ? 'grayscale(1) contrast(0.72)' : 'none',
-                    transition: 'opacity .2s, filter .2s',
+              <Box
+                ref={surfaceRef}
+                onMouseDown={startDraw}
+                onMouseMove={moveDraw}
+                onMouseUp={endDraw}
+                onMouseLeave={endDraw}
+                sx={{
+                  position: 'relative', display: 'block',
+                  border: '1px solid', borderColor: 'divider', borderRadius: 1.5, boxShadow: 1,
+                  overflow: 'hidden', bgcolor: 'background.paper',
+                  cursor: zoneEditing ? 'crosshair' : undefined,
+                  // ผังที่มีรูปยึดขนาดตามรูป ส่วนผังที่วาดเองยึดตามสัดส่วนที่ตั้งไว้
+                  ...(live.plan.imageUrl
+                    ? { width: 'fit-content', maxWidth: '100%' }
+                    : { width: '100%', aspectRatio: String(live.plan.aspect ?? 1.6), maxHeight: 780 }),
+                }}>
+                {live.plan.imageUrl ? (
+                  <Box component="img" draggable={false}
+                    src={live.plan.imageUrl.startsWith('http') ? live.plan.imageUrl : `${apiUrl}${live.plan.imageUrl}`}
+                    alt={live.plan.name}
+                    sx={{
+                      display: 'block', maxWidth: '100%', maxHeight: 780, objectFit: 'contain',
+                      // แบบ CAD เป็นเอกสารก่อสร้าง หมึกส่วนใหญ่เป็นเส้นบอกระยะกับสัญลักษณ์
+                      // ไฟฟ้าที่งาน IT ไม่ได้ใช้ หรี่ลงเพื่อให้ชั้นข้อมูลเป็นตัวเอก
+                      opacity: dimPlan ? 0.28 : 1,
+                      filter: dimPlan ? 'grayscale(1) contrast(0.72)' : 'none',
+                      transition: 'opacity .2s, filter .2s',
+                    }} />
+                ) : (
+                  // ผืนว่างพร้อมตารางอ้างอิง ให้กะระยะตอนวาดโซนได้
+                  <Box sx={{
+                    position: 'absolute', inset: 0,
+                    backgroundImage: `linear-gradient(${alpha(theme.palette.text.disabled, 0.18)} 1px, transparent 1px),
+                                      linear-gradient(90deg, ${alpha(theme.palette.text.disabled, 0.18)} 1px, transparent 1px)`,
+                    backgroundSize: '5% 5%',
                   }} />
+                )}
 
                 {/* โซนแผนก + ช่องโต๊ะ */}
                 {showZones && zones.map(z => {
                   const col = z.color || theme.palette.primary.main;
+                  const isRoom = z.kind === 'ROOM';
                   return (
                     <React.Fragment key={`zone-${z.id}`}>
-                      <Box sx={{
-                        position: 'absolute', left: `${z.x}%`, top: `${z.y}%`,
-                        width: `${z.w}%`, height: `${z.h}%`,
-                        border: `1.5px solid ${alpha(col, 0.55)}`,
-                        bgcolor: alpha(col, 0.06), borderRadius: '5px',
-                        pointerEvents: 'none', zIndex: 1,
-                      }} />
+                      <Box
+                        onMouseDown={e => {
+                          if (!zoneEditing) return;
+                          e.stopPropagation();
+                          const p = pctAt(e);
+                          if (p) setZoneDrag({ id: z.id, mode: 'move', ox: p.x - z.x, oy: p.y - z.y });
+                        }}
+                        sx={{
+                          position: 'absolute', left: `${z.x}%`, top: `${z.y}%`,
+                          width: `${z.w}%`, height: `${z.h}%`,
+                          border: `1.5px ${isRoom ? 'dashed' : 'solid'} ${alpha(col, isRoom ? 0.75 : 0.55)}`,
+                          bgcolor: alpha(col, isRoom ? 0.1 : 0.06), borderRadius: '5px',
+                          pointerEvents: zoneEditing ? 'auto' : 'none',
+                          cursor: zoneEditing ? 'move' : undefined,
+                          zIndex: 1,
+                        }} />
                       <Box sx={{
                         position: 'absolute', left: `${z.x}%`, top: `${z.y}%`,
                         transform: 'translate(3px, 3px)',
@@ -802,8 +1040,26 @@ export default function PMFloorPlanPage() {
                         borderRadius: '4px', fontSize: 9.5, fontWeight: 800,
                         lineHeight: 1.5, pointerEvents: 'none', zIndex: 2, whiteSpace: 'nowrap',
                       }}>
-                        {z.code} {occupiedIn(z)}/{z.desks.length}
+                        {z.code}{isRoom ? '' : ` ${occupiedIn(z)}/${z.desks.length}`}
                       </Box>
+                      {isRoom && z.name && (
+                        <Box sx={{
+                          position: 'absolute', left: `${z.x + z.w / 2}%`, top: `${z.y + z.h / 2}%`,
+                          transform: 'translate(-50%,-50%)', pointerEvents: 'none', zIndex: 2,
+                          fontSize: 11, fontWeight: 700, color: alpha(col, 0.95), whiteSpace: 'nowrap',
+                        }}>{z.name}</Box>
+                      )}
+                      {zoneEditing && (
+                        // มุมล่างขวาไว้ลากปรับขนาด
+                        <Box
+                          onMouseDown={e => { e.stopPropagation(); setZoneDrag({ id: z.id, mode: 'resize', ox: 0, oy: 0 }); }}
+                          sx={{
+                            position: 'absolute', left: `${z.x + z.w}%`, top: `${z.y + z.h}%`,
+                            transform: 'translate(-50%,-50%)', width: 12, height: 12,
+                            bgcolor: '#fff', border: `2px solid ${col}`, borderRadius: '3px',
+                            cursor: 'nwse-resize', zIndex: 6,
+                          }} />
+                      )}
 
                       {z.desks.map(d => {
                         const taken = occupiedDesks.has(`${z.id}:${d.index}`);
@@ -846,6 +1102,19 @@ export default function PMFloorPlanPage() {
                     </React.Fragment>
                   );
                 })}
+
+                {drawing && (
+                  <Box sx={{
+                    position: 'absolute',
+                    left: `${Math.min(drawing.x0, drawing.x1)}%`,
+                    top: `${Math.min(drawing.y0, drawing.y1)}%`,
+                    width: `${Math.abs(drawing.x1 - drawing.x0)}%`,
+                    height: `${Math.abs(drawing.y1 - drawing.y0)}%`,
+                    border: `2px dashed ${theme.palette.primary.main}`,
+                    bgcolor: alpha(theme.palette.primary.main, 0.12),
+                    borderRadius: '5px', pointerEvents: 'none', zIndex: 7,
+                  }} />
+                )}
 
                 {/* ที่นั่ง */}
                 {seatsShown.map((seat, i) => {
@@ -1010,11 +1279,63 @@ export default function PMFloorPlanPage() {
           <TextField label="บริษัท" size="small" value={formData.company} onChange={e => setFormData({ ...formData, company: e.target.value })}
             helperText="ใช้กรองรายชื่อพนักงานตอนปักที่นั่ง" />
           <Box>
-            <Typography sx={{ fontSize: 12, fontWeight: 600, mb: 0.5 }}>
-              รูปแปลน {formData.id ? '(เว้นว่างไว้ถ้าไม่เปลี่ยน)' : '(จำเป็น)'}
-            </Typography>
-            <input type="file" accept="image/*" required={!formData.id} onChange={e => setImageFile(e.target.files?.[0] || null)} />
+            <Typography sx={{ fontSize: 12, fontWeight: 700, mb: 0.75 }}>พื้นหลังแปลน</Typography>
+            <Box sx={{ display: 'flex', gap: 1, mb: 1.25 }}>
+              {([['image', 'ใช้รูปแบบแปลน'], ['blank', 'วาดเอง (ไม่ใช้รูป)']] as const).map(([m, label]) => (
+                <Button key={m} size="small" fullWidth sx={{ fontSize: 12 }}
+                  variant={formData.mode === m ? 'contained' : 'outlined'}
+                  onClick={() => setFormData({ ...formData, mode: m })}>
+                  {label}
+                </Button>
+              ))}
+            </Box>
+
+            {formData.mode === 'image' ? (
+              <>
+                <input type="file" accept="image/*" onChange={e => setImageFile(e.target.files?.[0] || null)} />
+                <Typography sx={{ fontSize: 10.5, color: 'text.secondary', mt: 0.5 }}>
+                  {formData.id ? 'เว้นว่างไว้ถ้าไม่เปลี่ยนรูป' : 'ไฟล์รูปจากแบบ CAD หรือสไลด์ก็ได้'}
+                </Typography>
+              </>
+            ) : (
+              <>
+                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                  <Typography sx={{ fontSize: 12 }}>สัดส่วนผืนวาด</Typography>
+                  <Select size="small" value={formData.aspect}
+                    onChange={e => setFormData({ ...formData, aspect: Number(e.target.value) })}
+                    sx={{ fontSize: 12, minWidth: 160 }}>
+                    <MenuItem value={1.6} sx={{ fontSize: 12 }}>16 : 10 (ทั่วไป)</MenuItem>
+                    <MenuItem value={1.78} sx={{ fontSize: 12 }}>16 : 9 (ชั้นยาว)</MenuItem>
+                    <MenuItem value={1.22} sx={{ fontSize: 12 }}>เกือบจัตุรัส</MenuItem>
+                    <MenuItem value={1} sx={{ fontSize: 12 }}>จัตุรัส</MenuItem>
+                  </Select>
+                </Box>
+                <Typography sx={{ fontSize: 10.5, color: 'text.secondary', mt: 0.5, lineHeight: 1.7 }}>
+                  ไม่ต้องเหมือนแบบสถาปนิก — ขอแค่วางโซนแผนกกับจุดสังเกต (ลิฟต์ บันได ห้องประชุม)
+                  ให้คนเดินหน้างานรู้ว่าตัวเองอยู่ตรงไหนก็พอ
+                </Typography>
+              </>
+            )}
           </Box>
+
+          {!formData.id && templates.length > 0 && (
+            <Box>
+              <Typography sx={{ fontSize: 12, fontWeight: 700, mb: 0.5 }}>เริ่มจากเทมเพลต</Typography>
+              <Select size="small" fullWidth value={formData.templateId}
+                onChange={e => setFormData({ ...formData, templateId: Number(e.target.value) })}
+                sx={{ fontSize: 12.5 }}>
+                <MenuItem value={0} sx={{ fontSize: 12.5 }}>ไม่ใช้ — เริ่มจากผังเปล่า</MenuItem>
+                {templates.map(t => (
+                  <MenuItem key={t.id} value={t.id} sx={{ fontSize: 12.5 }}>
+                    {t.name} · {t.zoneCount} โซน {t.deskCount} โต๊ะ
+                  </MenuItem>
+                ))}
+              </Select>
+              <Typography sx={{ fontSize: 10.5, color: 'text.secondary', mt: 0.5 }}>
+                ลอกเฉพาะผัง ไม่ลอกคน — ชั้นในตึกเดียวกันมักวางเหมือนกัน
+              </Typography>
+            </Box>
+          )}
           <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', mt: 1 }}>
             {formData.id > 0 && <Button color="error" onClick={handleDeletePlan}>ลบแปลนนี้</Button>}
             <Box sx={{ flex: 1 }} />

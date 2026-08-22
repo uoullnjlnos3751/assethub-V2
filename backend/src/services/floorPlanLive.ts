@@ -88,11 +88,21 @@ export interface LiveDesk {
   seatId: number | null;
 }
 
+/**
+ * โซนสองชนิด
+ *
+ * DESKS มีตารางโต๊ะให้คนนั่ง ส่วน ROOM ไม่มีโต๊ะเลย เป็นแค่หมุดหมายให้คนดูแผนผัง
+ * รู้ว่าตัวเองอยู่ตรงไหน — ห้องประชุม ลิฟต์ บันได ห้องน้ำ ทางเข้า ซึ่งเป็นสิ่งเดียว
+ * ที่รูป CAD ให้มาแล้วมีค่าจริงต่อการเดินหน้างาน วาดเองได้จึงไม่ต้องรอไฟล์
+ */
+export type ZoneKind = 'DESKS' | 'ROOM';
+
 export interface LiveZone {
   id: number;
   code: string;
   name: string | null;
   color: string | null;
+  kind: ZoneKind;
   x: number;
   y: number;
   w: number;
@@ -141,9 +151,11 @@ export interface LiveSpot {
 export interface LiveFloorPlan {
   plan: {
     id: number; name: string; floor: string; building: string | null;
-    company: string | null; imageUrl: string;
-    /** อัตราส่วนรูป ใช้คำนวณระบบพิกัดฝั่งหน้าจอ */
-    imageWidth: number | null; imageHeight: number | null;
+    company: string | null;
+    /** ไม่มีรูปคือผังที่วาดเอง หน้าจอวาดผืนว่างแทน */
+    imageUrl: string | null;
+    /** สัดส่วนผืนวาดเมื่อไม่มีรูป */
+    aspect: number | null;
   };
   year: number;
   zones: LiveZone[];
@@ -314,6 +326,7 @@ export async function buildLiveFloorPlan(
   const zoneById = new Map(plan.zones.map(z => [z.id, z]));
   const deskPos = new Map<string, { cx: number; cy: number }>();
   for (const z of plan.zones) {
+    if (z.kind !== 'DESKS') continue;
     for (const d of deskGeometry(z)) deskPos.set(`${z.id}:${d.index}`, { cx: d.cx, cy: d.cy });
   }
   const resolved = (s: { x: number; y: number; zoneId: number | null; deskIndex: number | null }) =>
@@ -380,7 +393,7 @@ export async function buildLiveFloorPlan(
     if (s.zoneId !== null && s.deskIndex !== null) seatByDesk.set(`${s.zoneId}:${s.deskIndex}`, s.id);
   }
   const zones: LiveZone[] = plan.zones.map(z => {
-    const desks: LiveDesk[] = deskGeometry(z).map(d => ({
+    const desks: LiveDesk[] = (z.kind === 'DESKS' ? deskGeometry(z) : []).map(d => ({
       code: deskCode(z.code, d.index),
       index: d.index,
       cx: d.cx, cy: d.cy, w: d.w, h: d.h,
@@ -388,6 +401,7 @@ export async function buildLiveFloorPlan(
     }));
     return {
       id: z.id, code: z.code, name: z.name, color: z.color,
+      kind: (z.kind === 'ROOM' ? 'ROOM' : 'DESKS') as ZoneKind,
       x: z.x, y: z.y, w: z.w, h: z.h, cols: z.cols, rows: z.rows,
       desks,
       occupied: desks.filter(d => d.seatId !== null).length,
@@ -405,8 +419,10 @@ export async function buildLiveFloorPlan(
   return {
     plan: {
       id: plan.id, name: plan.name, floor: plan.floor,
-      building: plan.building, company: plan.company, imageUrl: plan.imageUrl,
-      imageWidth: null, imageHeight: null,
+      building: plan.building, company: plan.company,
+      imageUrl: plan.imageUrl,
+      // ผังที่วาดเองไม่มีรูปให้อ่านสัดส่วน ใช้ค่าที่ตั้งไว้ ไม่งั้นตกลงที่ 16:10
+      aspect: plan.imageUrl ? null : (plan.aspect ?? 1.6),
     },
     year,
     zones,

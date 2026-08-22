@@ -319,6 +319,16 @@ export const floorPlanAPI = {
   candidates: (id: number, year: number) => api.get(`/floorplans/${id}/candidates`, { params: { year } }),
   updateSeats: (id: number, seats: any[], year: number) =>
     api.put(`/floorplans/${id}/seats`, { seats }, { params: { year } }),
+  /** โซนแผนกและตารางโต๊ะ — บันทึกทั้งชุดในครั้งเดียว */
+  updateZones: (id: number, zones: any[], year: number) =>
+    api.put(`/floorplans/${id}/zones`, { zones }, { params: { year } }),
+  /** ผังที่เก็บไว้ใช้ซ้ำกับชั้นอื่น */
+  templates: () => api.get('/floorplans/templates/list'),
+  saveTemplate: (id: number, data: { name: string; description?: string }) =>
+    api.post(`/floorplans/${id}/save-template`, data),
+  applyTemplate: (id: number, templateId: number, year: number) =>
+    api.post(`/floorplans/${id}/apply-template`, { templateId }, { params: { year } }),
+  deleteTemplate: (tid: number) => api.delete(`/floorplans/templates/${tid}`),
 };
 
 // Admin

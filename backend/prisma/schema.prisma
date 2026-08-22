@@ -1418,7 +1418,10 @@ model FloorPlan {
   floor     String
   building  String?
   company   String?
-  imageUrl  String
+  /// ไม่มีก็ได้ — ผังที่วาดเองใช้ผืนว่างแทน
+  imageUrl  String?
+  /// สัดส่วนผืนวาด (กว้าง/สูง) ใช้เมื่อไม่มีรูป
+  aspect    Float?
   isActive  Boolean        @default(true)
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
@@ -1470,6 +1473,22 @@ model FloorPlanSeat {
   @@map("floor_plan_seats")
 }
 
+/// ชุดโซนที่เก็บไว้ใช้ซ้ำกับชั้นอื่น — ชั้นในตึกเดียวกันมักวางผังเหมือนกัน
+model FloorPlanTemplate {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  company     String?
+  aspect      Float?
+  /// ภาพนิ่งของโซน ณ เวลาที่บันทึก แก้โซนบนชั้นจริงทีหลังต้องไม่กระทบเทมเพลต
+  zones       Json
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt @default(now())
+
+  @@map("floor_plan_templates")
+}
+
 /// โซนแผนกบนแปลน ประกาศตารางโต๊ะของตัวเอง ระบบสร้างช่องให้ตาม cols x rows
 model FloorPlanZone {
   id          Int             @id @default(autoincrement())
@@ -1479,6 +1498,8 @@ model FloorPlanZone {
   code        String
   name        String?
   color       String?
+  /// DESKS = มีตารางโต๊ะให้คนนั่ง · ROOM = หมุดหมายอย่างห้องประชุม ลิฟต์ บันได
+  kind        String          @default("DESKS")
   x           Float
   y           Float
   w           Float

@@ -109,6 +109,7 @@ router.put('/:id/zones', authorize('IT_ADMIN', 'SUPERADMIN'), async (req, res) =
           code: String(r.code).trim().toUpperCase(),
           name: String(r.name ?? '').trim() || null,
           color: String(r.color ?? '').trim() || null,
+          kind: r.kind === 'ROOM' ? 'ROOM' : 'DESKS',
           x: num(r.x, 0, 100, 0),
           y: num(r.y, 0, 100, 0),
           w: num(r.w, 0.5, 100, 10),
@@ -133,16 +134,20 @@ router.put('/:id/zones', authorize('IT_ADMIN', 'SUPERADMIN'), async (req, res) =
       if (gone.length) await tx.floorPlanZone.deleteMany({ where: { id: { in: gone } } });
 
       // ย่อตารางลงแล้วที่นั่งที่อยู่ช่องท้าย ๆ จะชี้ไปยังโต๊ะที่ไม่มีอยู่แล้ว
+      // เปลี่ยนโซนเป็น ROOM ก็เช่นกัน เพราะ ROOM ไม่มีโต๊ะเลย
       // ปล่อยให้หลุดกลับเป็นหมุดอิสระ ดีกว่าหายไปเฉย ๆ
       for (const z of await tx.floorPlanZone.findMany({ where: { floorPlanId: planId } })) {
         await tx.floorPlanSeat.updateMany({
-          where: { zoneId: z.id, deskIndex: { gte: z.cols * z.rows } },
+          where: {
+            zoneId: z.id,
+            ...(z.kind === 'DESKS' ? { deskIndex: { gte: z.cols * z.rows } } : {}),
+          },
           data: { zoneId: null, deskIndex: null },
         });
       }
 
       // ที่นั่งที่ยังเกาะโต๊ะอยู่ ต้องขยับตามกรอบโซนที่เพิ่งเปลี่ยน
-      for (const z of await tx.floorPlanZone.findMany({ where: { floorPlanId: planId } })) {
+      for (const z of await tx.floorPlanZone.findMany({ where: { floorPlanId: planId, kind: 'DESKS' } })) {
         const geo = deskGeometry(z);
         for (const s of await tx.floorPlanSeat.findMany({ where: { zoneId: z.id } })) {
           const d = s.deskIndex === null ? undefined : geo[s.deskIndex];
@@ -157,6 +162,120 @@ router.put('/:id/zones', authorize('IT_ADMIN', 'SUPERADMIN'), async (req, res) =
   } catch (error) {
     console.error('Update zones error:', error);
     res.status(500).json({ error: 'Failed to update zones' });
+  }
+});
+
+/**
+ * ลอกชุดโซนจากเทมเพลตลงบนแปลน
+ *
+ * ทับของเดิมทั้งชุด เพราะการใช้เทมเพลตคือการบอกว่า "เอาผังนี้" ไม่ใช่ "ผสมกับของเดิม"
+ * ที่นั่งที่เคยเกาะโซนเก่าจะหลุดเป็นหมุดอิสระผ่าน FK ไม่ได้หายไป
+ */
+async function applyTemplate(db: typeof prisma, planId: number, templateId: number) {
+  const t = await db.floorPlanTemplate.findUnique({ where: { id: templateId } });
+  if (!t) throw new Error('ไม่พบเทมเพลต');
+  const rows = Array.isArray(t.zones) ? (t.zones as any[]) : [];
+  await db.$transaction(async (tx) => {
+    await tx.floorPlanZone.deleteMany({ where: { floorPlanId: planId } });
+    for (const [i, z] of rows.entries()) {
+      await tx.floorPlanZone.create({
+        data: {
+          floorPlanId: planId,
+          code: String(z.code ?? `Z${i + 1}`).trim().toUpperCase(),
+          name: z.name ?? null,
+          color: z.color ?? null,
+          kind: z.kind === 'ROOM' ? 'ROOM' : 'DESKS',
+          x: Number(z.x) || 0, y: Number(z.y) || 0,
+          w: Number(z.w) || 10, h: Number(z.h) || 10,
+          cols: Math.max(1, Math.round(Number(z.cols) || 1)),
+          rows: Math.max(1, Math.round(Number(z.rows) || 1)),
+          sortOrder: i,
+        },
+      });
+    }
+    if (t.aspect) {
+      const plan = await tx.floorPlan.findUnique({ where: { id: planId }, select: { imageUrl: true } });
+      if (!plan?.imageUrl) await tx.floorPlan.update({ where: { id: planId }, data: { aspect: t.aspect } });
+    }
+  });
+}
+
+/** เทมเพลตทั้งหมด พร้อมจำนวนโซนและโต๊ะ เพื่อให้เลือกได้โดยไม่ต้องเปิดดู */
+router.get('/templates/list', async (_req, res) => {
+  try {
+    const list = await prisma.floorPlanTemplate.findMany({ orderBy: { name: 'asc' } });
+    res.json(list.map(t => {
+      const zones = Array.isArray(t.zones) ? (t.zones as any[]) : [];
+      return {
+        id: t.id, name: t.name, description: t.description, company: t.company, aspect: t.aspect,
+        zoneCount: zones.length,
+        deskCount: zones.reduce((n, z) => n + (z?.kind === 'ROOM' ? 0 : (Number(z?.cols) || 0) * (Number(z?.rows) || 0)), 0),
+        createdBy: t.createdBy, updatedAt: t.updatedAt,
+      };
+    }));
+  } catch (error) {
+    console.error('List templates error:', error);
+    res.status(500).json({ error: 'Failed to list templates' });
+  }
+});
+
+/** บันทึกชุดโซนของแปลนนี้เป็นเทมเพลต — เก็บเฉพาะผัง ไม่เก็บคน */
+router.post('/:id/save-template', authorize('IT_ADMIN', 'SUPERADMIN'), async (req: any, res) => {
+  try {
+    const name = String(req.body?.name ?? '').trim();
+    if (!name) return res.status(400).json({ error: 'ต้องตั้งชื่อเทมเพลต' });
+
+    const plan = await prisma.floorPlan.findUnique({
+      where: { id: Number(req.params.id) },
+      include: { zones: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] } },
+    });
+    if (!plan) return res.status(404).json({ error: 'ไม่พบแปลน' });
+    if (!plan.zones.length) return res.status(400).json({ error: 'แปลนนี้ยังไม่มีโซนให้บันทึก' });
+
+    // เก็บเฉพาะรูปทรงของผัง ที่นั่งเป็นของชั้นนั้น ๆ ไม่ใช่ของเทมเพลต
+    const zones = plan.zones.map(z => ({
+      code: z.code, name: z.name, color: z.color, kind: z.kind,
+      x: z.x, y: z.y, w: z.w, h: z.h, cols: z.cols, rows: z.rows,
+    }));
+
+    const data = {
+      name,
+      description: String(req.body?.description ?? '').trim() || null,
+      company: plan.company,
+      aspect: plan.aspect,
+      zones,
+      createdBy: req.user?.displayName || req.user?.username || null,
+    };
+    const saved = await prisma.floorPlanTemplate.upsert({
+      where: { name }, create: data, update: data,
+    });
+    res.status(201).json(saved);
+  } catch (error) {
+    console.error('Save template error:', error);
+    res.status(500).json({ error: 'Failed to save template' });
+  }
+});
+
+/** ใช้เทมเพลตกับแปลนที่มีอยู่แล้ว */
+router.post('/:id/apply-template', authorize('IT_ADMIN', 'SUPERADMIN'), async (req, res) => {
+  try {
+    const planId = Number(req.params.id);
+    await applyTemplate(prisma, planId, Number(req.body?.templateId));
+    const parsedYear = Number(req.query.year);
+    const year = Number.isInteger(parsedYear) ? parsedYear : new Date().getFullYear();
+    res.json(await buildLiveFloorPlan(prisma, planId, year));
+  } catch (error: any) {
+    console.error('Apply template error:', error);
+    res.status(500).json({ error: error?.message || 'Failed to apply template' });
+  }
+});
+
+router.delete('/templates/:tid', authorize('IT_ADMIN', 'SUPERADMIN'), async (req, res) => {
+  try {
+    await prisma.floorPlanTemplate.delete({ where: { id: Number(req.params.tid) } });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete template' });
   }
 });
 
@@ -270,24 +389,37 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create new floor plan
+/**
+ * สร้างแปลนใหม่ — รูปไม่บังคับอีกต่อไป
+ *
+ * เดิมบังคับต้องแนบรูป การเปิดชั้นใหม่จึงต้องรอไฟล์จากฝ่ายอาคาร และทั้งระบบ
+ * ค้างอยู่ที่แปลนเดียว ผังที่วาดเองใช้ผืนว่างกับสัดส่วนที่กำหนดแทน
+ *
+ * templateId เลือกได้ เพื่อลอกชุดโซนจากชั้นที่เคยจัดไว้แล้วมาเป็นจุดตั้งต้น
+ */
 router.post('/', authorize('IT_ADMIN', 'SUPERADMIN'), upload.single('image'), async (req, res) => {
   try {
-    const { name, floor, building, company } = req.body;
-    if (!req.file) return res.status(400).json({ error: 'Image is required' });
+    const { name, floor, building, company, aspect, templateId } = req.body;
+    if (!String(name ?? '').trim()) return res.status(400).json({ error: 'ต้องมีชื่อแปลน' });
 
-    const imageUrl = `/uploads/floorplans/${req.file.filename}`;
-
+    const ratio = Number(aspect);
     const plan = await prisma.floorPlan.create({
       data: {
-        name,
-        floor,
+        name: String(name).trim(),
+        floor: String(floor ?? '').trim(),
         building: building || null,
         company: company || null,
-        imageUrl,
+        imageUrl: req.file ? `/uploads/floorplans/${req.file.filename}` : null,
+        aspect: req.file ? null : (Number.isFinite(ratio) && ratio > 0.2 && ratio < 5 ? ratio : 1.6),
       }
     });
+
+    if (templateId) {
+      await applyTemplate(prisma, plan.id, Number(templateId));
+    }
     res.status(201).json(plan);
   } catch (error) {
+    console.error('Create floor plan error:', error);
     res.status(500).json({ error: 'Failed to create floor plan' });
   }
 });
@@ -303,6 +435,8 @@ router.put('/:id', authorize('IT_ADMIN', 'SUPERADMIN'), upload.single('image'), 
     if (building !== undefined) updateData.building = building;
     if (company !== undefined) updateData.company = company;
     if (isActive !== undefined) updateData.isActive = isActive === 'true' || isActive === true;
+    const ratio = Number(req.body.aspect);
+    if (Number.isFinite(ratio) && ratio > 0.2 && ratio < 5) updateData.aspect = ratio;
 
     if (req.file) {
       updateData.imageUrl = `/uploads/floorplans/${req.file.filename}`;
