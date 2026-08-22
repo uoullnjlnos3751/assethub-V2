@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>โครงสร้างแผนผังชั้น 22 — ข้อเสนอ</title>
+<style>
+  :root { --bg:#f4f6f8; --surface:#fff; --ink:#16181d; --ink2:#5c6270; --line:#dde2e9; }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:18px 22px 30px; background:var(--bg); color:var(--ink);
+         font-family:"Segoe UI",system-ui,sans-serif; max-width:1460px; }
+  h1 { font-size:19px; margin:0 0 3px; }
+  h2 { font-size:14px; margin:22px 0 8px; }
+  h2 small { font-weight:400; color:var(--ink2); font-size:12px; margin-left:8px; }
+  .sub { font-size:12.5px; color:var(--ink2); line-height:1.7; }
+  .toolbar { display:flex; gap:14px; align-items:center; flex-wrap:wrap;
+             background:var(--surface); border:1px solid var(--line);
+             border-radius:10px; padding:10px 16px; margin:12px 0; }
+  .toolbar label { font-size:12.5px; display:flex; align-items:center; gap:6px; cursor:pointer; }
+  .sep { width:1px; height:20px; background:var(--line); }
+  .legend { display:flex; gap:14px; margin-left:auto; font-size:11.5px; color:var(--ink2); }
+  .legend i { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:5px; }
+  .stage { position:relative; background:var(--surface); border:1px solid var(--line);
+           border-radius:12px; overflow:hidden; line-height:0; }
+  .stage img { display:block; }
+  .stage img.dim { opacity:.15; filter:grayscale(1) contrast(.65); }
+  .full img { width:100%; }
+  svg.layer { position:absolute; inset:0; width:100%; height:100%; }
+  .crop { padding-bottom:41.3%; }
+  .crop img { position:absolute; }
+  .zoneRect { fill-opacity:.06; stroke-width:.16; }
+  .chipTx { font:700 .95px "Segoe UI",sans-serif; fill:#fff; }
+  .zoneCount { font:600 .95px "Segoe UI",sans-serif; fill:#6b7280; text-anchor:end; }
+  .deskEmpty { fill:#fff; fill-opacity:.5; stroke:#98a1ae; stroke-width:.09; stroke-dasharray:.32 .28; }
+  .deskName { font:700 .74px "Segoe UI",sans-serif; text-anchor:middle; }
+  .deskId  { font:600 .5px "Segoe UI",sans-serif; text-anchor:middle; fill:#8a919d; }
+  .note { background:var(--surface); border:1px solid var(--line); border-left:3px solid #2563eb;
+          border-radius:8px; padding:11px 15px; font-size:12.5px; line-height:1.8; margin-top:14px; }
+  .note b { color:#1d4ed8; }
+</style>
+</head>
+<body>
+
+<h1>โครงสร้างแผนผังชั้น 22 — ข้อเสนอ</h1>
+<!--
+  หน้านี้เป็นเอกสารข้อเสนอ ไม่ใช่ส่วนหนึ่งของแอป
+
+  วิธีเปิด: ก็อปไฟล์นี้ไปวางใน frontend/dist/ แล้วเปิดผ่าน origin เดียวกับแอป
+  (เช่น http://localhost:5173/floorplan-structure-proposal.html) เพราะต้องใช้
+  cookie ของ session ในการดึงรูปแปลนกับรายชื่อจาก API
+
+  ค่าที่ต้องแก้ถ้าย้ายไปใช้กับแปลนอื่น: ZONES, PRINTERS, รหัสแปลนใน fetch()
+  และชื่อไฟล์รูปใน <img src>
+-->
+<div class="sub" id="sub">
+  แบบ CAD เป็น <b>ชั้นอ้างอิงที่หรี่ลง</b> · โซนแผนกและช่องโต๊ะเป็น <b>ข้อมูล</b> ไม่ใช่ภาพ ·
+  ไอคอนเกาะช่องโต๊ะเสมอ จึงซ้อนกันไม่ได้
+</div>
+
+<div class="toolbar">
+  <label><input type="checkbox" id="cad" checked> แบบ CAD</label>
+  <label><input type="checkbox" id="dim" checked> หรี่แบบลง</label>
+  <span class="sep"></span>
+  <label><input type="checkbox" id="zones" checked> โซนแผนก</label>
+  <label><input type="checkbox" id="grid" checked> ช่องโต๊ะว่าง</label>
+  <label><input type="checkbox" id="ids"> รหัสโต๊ะ</label>
+  <label><input type="checkbox" id="people" checked> คน + อุปกรณ์</label>
+  <div class="legend">
+    <span><i style="background:#1c873b"></i>PM เสร็จ</span>
+    <span><i style="background:#d97706"></i>รอทำ</span>
+    <span><i style="background:#ff3b30"></i>เลยกำหนด</span>
+    <span><i style="background:#9aa1ad"></i>ไม่มีแผน</span>
+  </div>
+</div>
+
+<h2>ภาพรวมทั้งชั้น<small>โซนตรงกับสีที่ทีมออกแบบระบายไว้บนแบบอยู่แล้ว</small></h2>
+<div class="stage full">
+  <img id="planA" src="/uploads/floorplans/22floor-cropped-20260822.png" class="dim" alt="แปลนชั้น 22">
+  <svg class="layer" id="layerA" viewBox="0 0 100 81.98"></svg>
+</div>
+
+<h2>ซูมโซน ACC · FIN · LAW · HR<small>ระยะที่ช่างใช้จริงตอนเดินหน้างาน</small></h2>
+<div class="stage crop" id="cropStage">
+  <img id="planB" src="/uploads/floorplans/22floor-cropped-20260822.png" class="dim" alt="ซูมแปลน">
+  <svg class="layer" id="layerB"></svg>
+</div>
+
+<div class="note">
+  <b>สิ่งที่ได้จากโครงสร้างนี้</b><br>
+  หนึ่งโต๊ะรับได้คนเดียว ไอคอนจึงซ้อนกันไม่ได้เลย และทุกจุดมีขนาดเท่ากันเพราะอยู่บนตารางเดียวกัน<br>
+  เรียกตำแหน่งเป็นชื่อได้ <b>ACC-07</b> แทนการชี้ว่า “จุดแถวบนซ้าย”<br>
+  ตอบคำถามใหม่ได้ เช่น แผนกไหนเหลือโต๊ะว่างกี่ที่ · โต๊ะไหนมีคนแต่ไม่มีเครื่องในทะเบียน<br>
+  เปลี่ยนไฟล์ CAD ใหม่ โซนกับโต๊ะไม่หาย เพราะเป็นข้อมูลคนละชั้นกับรูป
+</div>
+
+<script>
+/* รูป 3019x2475 (ตัดขอบดำของสไลด์ออกแล้ว) -> สูง 81.98 หน่วยเมื่อกว้าง 100 หน่วย
+   เก็บค่าโซนเป็น % ของรูปเพื่อให้อ่านง่าย แล้วแปลงแกน Y ตอนวาด */
+const H = 81.98;
+const Y = pct => pct * H / 100;
+
+const ZONES = [
+  { code:'PUR', th:'จัดซื้อ', color:'#2563eb', x:16.19,  y:12.0, w:5.36,  h:22.1, cols:2, rows:5 },
+  { code:'IT',  th:'ไอที',    color:'#b45309', x:21.79,  y:12.0, w:17.98, h:22.1, cols:4, rows:5 },
+  { code:'SAL', th:'ขาย',     color:'#0891b2', x:40.01,  y:12.0, w:4.76,  h:22.1, cols:2, rows:5 },
+  { code:'ACC', th:'บัญชี',   color:'#dc2626', x:45.01,  y:12.0, w:8.57,  h:22.1, cols:3, rows:5 },
+  { code:'FIN', th:'การเงิน', color:'#a16207', x:53.94,  y:12.0, w:9.05,  h:16.0, cols:3, rows:4 },
+  { code:'LAW', th:'กฎหมาย',  color:'#db2777', x:63.35,  y:17.8, w:7.50,  h:10.2, cols:2, rows:3 },
+  { code:'HR',  th:'บุคคล',   color:'#ea580c', x:71.09,  y:17.8, w:8.22,  h:10.2, cols:3, rows:3 },
+  { code:'PLN', th:'วางแผน',  color:'#15803d', x:4.05,  y:71.5, w:24.41, h:13.1, cols:5, rows:3 },
+  { code:'LSG', th:'Leasing', color:'#0284c7', x:4.05,  y:60.1, w:9.53,  h:5.6,  cols:3, rows:1 },
+];
+
+const PRINTERS = [[36.3,36.5,'PR-01'],[60.7,36.5,'PR-02'],[15.5,88.0,'PR-03']];
+
+function desksOf(z) {
+  const out = [], cw = z.w / z.cols, ch = Y(z.h) / z.rows;
+  for (let r = 0; r < z.rows; r++)
+    for (let c = 0; c < z.cols; c++)
+      out.push({
+        id: `${z.code}-${String(r * z.cols + c + 1).padStart(2,'0')}`,
+        cx: z.x + (c + .5) * cw,
+        cy: Y(z.y) + (r + .5) * ch,
+        w: Math.min(cw * .9, 4.6),
+        h: Math.min(ch * .8, 2.7),
+      });
+  return out;
+}
+
+const ICON = {
+  notebook:'M4 5h16v10H4z M2 18h20l-1.5-3H3.5z',
+  monitor:'M2.5 4h19v12h-19z M12 16v3 M8 19h8',
+  printer:'M7 9V3h10v6 M3 9h18v7H3z M7 14h10v7H7z',
+};
+const STATUS = { done:'#1c873b', wait:'#d97706', late:'#ff3b30', none:'#9aa1ad' };
+const NS = 'http://www.w3.org/2000/svg';
+const el = (n, a = {}) => { const e = document.createElementNS(NS, n);
+  for (const k in a) e.setAttribute(k, a[k]); return e; };
+const short = s => { const p = String(s).trim().split(/\s+/);
+  return p.length > 1 ? `${p[0]} ${p[1][0]}.` : p[0].slice(0,11); };
+
+/**
+ * วาดชั้นข้อมูลลงบน svg ที่ให้มา
+ *
+ * ขนาดตัวอักษรและไอคอนคิดจาก "พิกเซลจริง" ไม่ใช่หน่วย viewBox เพราะมุมมองซูม
+ * ใช้ viewBox แคบกว่า ตัวเลขหน่วยเดียวกันจึงโตขึ้นตามการซูมและล้นกรอบโต๊ะ
+ * คิดจากพิกเซลแล้วทุกมุมมองจะเห็นตัวหนังสือขนาดเท่ากันเสมอ
+ */
+function render(svg, NAMES, vbWidth) {
+  const pxPerUnit = (svg.clientWidth || 1400) / vbWidth;
+  const u = px => px / pxPerUnit;               // พิกเซลที่อยากได้ -> หน่วย viewBox
+  const FONT_NAME = u(11), FONT_ID = u(8), FONT_CHIP = u(11), ICON_PX = 13;
+
+  const g = { zone: el('g'), grid: el('g'), id: el('g'), people: el('g') };
+  svg.append(g.zone, g.grid, g.id, g.people);
+  let placed = 0, capacity = 0;
+
+  ZONES.forEach(z => {
+    const desks = desksOf(z);
+    const people = (NAMES[z.code] || []).slice(0, desks.length);
+    capacity += desks.length; placed += people.length;
+
+    g.zone.append(el('rect', { class:'zoneRect', x:z.x, y:Y(z.y), width:z.w, height:Y(z.h),
+      rx:u(5), fill:z.color, stroke:z.color, 'stroke-width':u(1.6) }));
+
+    /* ป้ายโซนเป็นชิปในมุมบนซ้ายของโซนเอง — วางไว้ข้างนอกจะชนกันเอง เพราะโซน
+       แถวบนติดกันหมดและชื่อไทยยาวกว่าความกว้างของโซน */
+    const cw = u(z.code.length * 8 + 12), chh = u(15);
+    g.zone.append(el('rect', { x:z.x + u(2), y:Y(z.y) + u(2), width:cw, height:chh,
+      rx:u(3), fill:z.color }));
+    const tx = el('text', { x:z.x + u(2) + cw/2, y:Y(z.y) + u(2) + chh*0.74,
+      'text-anchor':'middle', fill:'#fff',
+      style:`font:700 ${FONT_CHIP}px "Segoe UI",sans-serif` });
+    tx.textContent = z.code; g.zone.append(tx);
+
+    const ct = el('text', { x:z.x + z.w - u(3), y:Y(z.y) + u(2) + chh*0.74,
+      'text-anchor':'end', fill:'#6b7280',
+      style:`font:600 ${u(10)}px "Segoe UI",sans-serif` });
+    ct.textContent = `${people.length}/${desks.length}`; g.zone.append(ct);
+
+    /* ชื่อบนโต๊ะอ่านไม่ออกถ้าโต๊ะแคบกว่านี้ ระยะภาพรวมจึงเหลือแค่สีกับไอคอน
+       ซึ่งยังตอบได้ว่าโซนไหนค้าง ส่วนชื่อไปโผล่ตอนซูม */
+    const deskPx = desks.length ? desks[0].w * pxPerUnit : 0;
+    const showName = deskPx >= 62;
+
+    desks.forEach((d, i) => {
+      const p = people[i];
+      if (!p) g.grid.append(el('rect', { class:'deskEmpty', x:d.cx - d.w/2, y:d.cy - d.h/2,
+        width:d.w, height:d.h, rx:u(4), 'stroke-width':u(1), 'stroke-dasharray':`${u(3)} ${u(2.5)}` }));
+
+      const t = el('text', { x:d.cx, y:d.cy + d.h/2 + u(7.5), 'text-anchor':'middle',
+        fill:'#8a919d', style:`font:600 ${FONT_ID}px "Segoe UI",sans-serif` });
+      t.textContent = d.id; g.id.append(t);
+      if (!p) return;
+
+      /* สถานะสมมุติเพื่อให้เห็นว่าสีทำงานอย่างไร ของจริงมาจากรอบ PM */
+      const st = !p.p ? 'none' : (i % 7 === 0 ? 'late' : i % 3 === 0 ? 'wait' : 'done');
+      const col = STATUS[st], gg = el('g');
+      gg.append(el('rect', { x:d.cx - d.w/2, y:d.cy - d.h/2, width:d.w, height:d.h, rx:u(4),
+        fill:'#fff', stroke:col, 'stroke-width':u(1.6) }));
+      /* แถบสีซ้ายมือ อ่านสถานะออกแม้ย่อจนตัวหนังสือหาย */
+      gg.append(el('rect', { x:d.cx - d.w/2, y:d.cy - d.h/2, width:u(4), height:d.h,
+        rx:u(2), fill:col }));
+
+      const iconY = showName ? d.cy + u(4) : d.cy;
+      if (showName) {
+        const nm = el('text', { x:d.cx + u(2), y:d.cy - u(2), 'text-anchor':'middle',
+          fill:'#16181d', textLength:d.w - u(8), lengthAdjust:'spacingAndGlyphs',
+          style:`font:700 ${FONT_NAME}px "Segoe UI",sans-serif` });
+        nm.textContent = short(p.n); gg.append(nm);
+      }
+
+      const kinds = ['notebook'];
+      if (p.d >= 2) kinds.push('monitor');
+      if (p.d >= 3) kinds.push('monitor');
+      const sz = u(ICON_PX), gap = u(3);
+      const tot = kinds.length * sz + (kinds.length - 1) * gap;
+      kinds.forEach((kk, j) => gg.append(el('path', {
+        d: ICON[kk],
+        transform:`translate(${d.cx + u(2) - tot/2 + j*(sz+gap)} ${iconY - sz/2}) scale(${sz/24})`,
+        fill:'none', stroke:col, 'stroke-width':2.4,
+        'stroke-linecap':'round', 'stroke-linejoin':'round' })));
+      g.people.append(gg);
+    });
+  });
+
+  PRINTERS.forEach(([x, yp, id]) => {
+    const y = Y(yp), gg = el('g'), r = u(11);
+    gg.append(el('circle', { cx:x, cy:y, r, fill:'#fff', stroke:'#0f766e', 'stroke-width':u(1.6) }));
+    const sz = u(13);
+    gg.append(el('path', { d:ICON.printer,
+      transform:`translate(${x - sz/2} ${y - sz/2}) scale(${sz/24})`,
+      fill:'none', stroke:'#0f766e', 'stroke-width':2.4,
+      'stroke-linecap':'round', 'stroke-linejoin':'round' }));
+    const t = el('text', { x, y:y + r + u(8), 'text-anchor':'middle', fill:'#8a919d',
+      style:`font:600 ${FONT_ID}px "Segoe UI",sans-serif` });
+    t.textContent = id; gg.append(t);
+    g.people.append(gg);
+  });
+
+  return { g, placed, capacity };
+}
+
+/* ดึงรายชื่อจาก endpoint จริงของระบบ ไม่ใช่ไฟล์ตัวอย่าง — ตัวเลขในหน้านี้จึงตรงกับ
+   ที่หน้าแผนผังจะเห็นจริงเมื่อสร้างโครงสร้างนี้ขึ้นมา */
+fetch('/api/floorplans/1/candidates?year=2026', { credentials: 'include' })
+  .then(r => r.json())
+  .then(res => {
+    const NAMES = {};
+    for (const c of (res.candidates || [])) {
+      (NAMES[c.departmentId] ||= []).push({ n: c.ownerName, d: c.devices, p: c.pmPlanned });
+    }
+    return NAMES;
+  })
+  .then(NAMES => {
+  const A = render(document.getElementById('layerA'), NAMES, 100);
+
+  /* มุมมองซูม: ครอบเฉพาะโซนขวาบน แล้วเลื่อน/ขยายรูปให้ตรงกับ viewBox เดียวกัน */
+  const CROP = { x: 43.6, y: Y(10.6), w: 37.4, h: Y(25.4) };
+  const svgB = document.getElementById('layerB');
+  svgB.setAttribute('viewBox', `${CROP.x} ${CROP.y} ${CROP.w} ${CROP.h}`);
+  const imgB = document.getElementById('planB');
+  imgB.style.width = `${100 / CROP.w * 100}%`;
+  imgB.style.left  = `${-CROP.x / CROP.w * 100}%`;
+  imgB.style.top   = `${-CROP.y / CROP.h * 100}%`;
+  document.getElementById('cropStage').style.paddingBottom = `${CROP.h / CROP.w * 100}%`;
+  const B = render(svgB, NAMES, CROP.w);
+
+  const bind = (id, ...nodes) => {
+    const cb = document.getElementById(id);
+    const apply = () => nodes.forEach(n => n.style.display = cb.checked ? '' : 'none');
+    cb.addEventListener('change', apply); apply();
+  };
+  bind('zones',  A.g.zone,   B.g.zone);
+  bind('grid',   A.g.grid,   B.g.grid);
+  bind('ids',    A.g.id,     B.g.id);
+  bind('people', A.g.people, B.g.people);
+
+  const imgs = [document.getElementById('planA'), imgB];
+  document.getElementById('cad').addEventListener('change',
+    e => imgs.forEach(i => i.style.visibility = e.target.checked ? 'visible' : 'hidden'));
+  document.getElementById('dim').addEventListener('change',
+    e => imgs.forEach(i => i.classList.toggle('dim', e.target.checked)));
+
+  document.getElementById('sub').insertAdjacentHTML('beforeend',
+    `<br>ตัวอย่างนี้ใช้ชื่อคนจริง <b>${A.placed} คน</b> ลงบนช่องโต๊ะ <b>${A.capacity} ช่อง</b> ใน <b>${ZONES.length} โซน</b>`);
+});
+</script>
+</body>
+</html>

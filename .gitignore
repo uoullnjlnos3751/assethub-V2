@@ -146,3 +146,9 @@ dist.backup_*/
 # The handoff notes themselves are ordinary docs and may be committed; the
 # attachments are internal paperwork and should not go to a public repo.
 design_handoff_itam/uploads/
+
+# แบบแปลนอาคารที่วางไว้ที่รากโปรเจกต์เพื่อใช้อ้างอิงชั่วคราว — เป็นเอกสารของอาคาร
+# ไม่ใช่ของโปรเจกต์ และ repo นี้เป็นสาธารณะ รูปแปลนที่ใช้งานจริงอยู่ใน
+# backend/uploads/floorplans/ ซึ่ง ignore ไว้แล้วด้านบน
+/*.pdf
+/*.dwg
