@@ -315,6 +315,8 @@ export const floorPlanAPI = {
   live: (id: number, year: number) => api.get(`/floorplans/${id}/live`, { params: { year } }),
   /** รายชื่อผู้ครอบครองไว้เลือกตอนปักที่นั่ง — เลือกคน ไม่ใช่เครื่อง */
   owners: (q: string, company?: string) => api.get('/floorplans/owners', { params: { q, company } }),
+  /** คนที่ควรอยู่บนแปลนนี้ เตรียมไว้ให้กดวางเลย ไม่ต้องค้นทีละชื่อ */
+  candidates: (id: number, year: number) => api.get(`/floorplans/${id}/candidates`, { params: { year } }),
   updateSeats: (id: number, seats: any[], year: number) =>
     api.put(`/floorplans/${id}/seats`, { seats }, { params: { year } }),
 };

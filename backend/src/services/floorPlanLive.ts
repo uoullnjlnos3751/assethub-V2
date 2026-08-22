@@ -369,3 +369,92 @@ export async function listSeatOwners(prisma: PrismaClient, q: string, company?: 
     .slice(0, 50)
     .map(e => ({ ...e, looksLikeStorage: e.devices >= STORAGE_HINT_DEVICES }));
 }
+
+/**
+ * คนที่ควรอยู่บนแปลนนี้ เตรียมไว้ให้เลือกวางเลยโดยไม่ต้องค้นทีละชื่อ
+ *
+ * ข้อจำกัดที่ต้องพูดตรง ๆ: แผน PM ไม่ได้เก็บ "ชั้น" ไว้ ช่อง site ของแผนทั้ง 32 แผน
+ * มีค่าเป็น "HQ" กับ "คลังพระประแดง" ซึ่งเป็นสถานที่ ไม่ใช่ชั้น ระบบจึงบอกไม่ได้
+ * ว่าใครนั่งชั้น 22 ชั้น 23 จากข้อมูลที่มี
+ *
+ * สิ่งที่แผน PM บอกได้จริงคือ *บริษัท* กับ *แผนก* และแปลนก็ถูกแบ่งโซนตามแผนก
+ * อยู่แล้ว จึงดึงคนตามบริษัทของแปลนมาจัดกลุ่มตามแผนกให้ แล้วให้คนวางเลือกว่า
+ * แผนกไหนอยู่ชั้นนี้ — วางครั้งเดียวจบ ครั้งต่อไปที่นั่งอยู่บนแปลนแล้ว
+ */
+export interface FloorCandidate {
+  ownerName: string;
+  departmentId: string;
+  devices: number;
+  /** อยู่ในแผน PM ของปีนี้ — กลุ่มนี้คือคนที่ต้องเดินไปหาอยู่แล้ว ควรวางก่อน */
+  pmPlanned: boolean;
+  /** ปักที่นั่งบนแปลนนี้ไปแล้ว */
+  placed: boolean;
+  looksLikeStorage: boolean;
+}
+
+export async function listFloorCandidates(
+  prisma: PrismaClient,
+  planId: number,
+  year: number,
+): Promise<{ companies: string[]; candidates: FloorCandidate[] }> {
+  const plan = await prisma.floorPlan.findUnique({
+    where: { id: planId },
+    select: { company: true, seats: { select: { ownerName: true } } },
+  });
+  if (!plan) return { companies: [], candidates: [] };
+
+  const companies = await resolveCompanies(prisma, plan.company ?? undefined);
+  const placed = new Set(plan.seats.map(s => norm(s.ownerName)).filter(Boolean));
+
+  const assets = await prisma.asset.findMany({
+    where: {
+      NOT: { status: 'Retired' },
+      ownerName: { not: null },
+      ...(companies.length ? { company: { in: companies } } : {}),
+    },
+    select: { id: true, ownerName: true, departmentId: true, type: true },
+  });
+
+  // เครื่องที่มีรอบ PM ในปีนี้ ใช้ชี้ว่าเจ้าของอยู่ในแผนแล้วหรือยัง
+  const planned = new Set(
+    (await prisma.pMRun.findMany({
+      where: { year, assetId: { in: assets.map(a => a.id) } },
+      select: { assetId: true },
+    })).map(r => r.assetId),
+  );
+
+  const map = new Map<string, FloorCandidate>();
+  for (const a of assets) {
+    const name = String(a.ownerName ?? '').trim();
+    if (!name) continue;
+    const k = name.toLowerCase();
+    if (!map.has(k)) {
+      map.set(k, {
+        ownerName: name,
+        departmentId: a.departmentId || 'ไม่ระบุแผนก',
+        devices: 0,
+        pmPlanned: false,
+        placed: placed.has(k),
+        looksLikeStorage: false,
+      });
+    }
+    const e = map.get(k)!;
+    e.devices++;
+    if (planned.has(a.id)) e.pmPlanned = true;
+    if (e.departmentId === 'ไม่ระบุแผนก' && a.departmentId) e.departmentId = a.departmentId;
+  }
+
+  const candidates = [...map.values()].map(c => ({
+    ...c,
+    looksLikeStorage: c.devices >= STORAGE_HINT_DEVICES,
+  }));
+
+  // ยังไม่วางมาก่อน แล้วคนที่อยู่ในแผน PM มาก่อน — สองอย่างนี้คือลำดับที่คนทำงานสนใจ
+  candidates.sort((a, b) =>
+    Number(a.placed) - Number(b.placed)
+    || Number(b.pmPlanned) - Number(a.pmPlanned)
+    || a.departmentId.localeCompare(b.departmentId)
+    || a.ownerName.localeCompare(b.ownerName));
+
+  return { companies, candidates };
+}

@@ -5,7 +5,7 @@ import multer from 'multer';
 import path from 'path';
 import crypto from 'crypto';
 import fs from 'fs';
-import { buildLiveFloorPlan, listSeatOwners } from '../services/floorPlanLive';
+import { buildLiveFloorPlan, listSeatOwners, listFloorCandidates } from '../services/floorPlanLive';
 
 const router = express.Router();
 
@@ -75,6 +75,18 @@ router.get('/:id/live', async (req, res) => {
   } catch (error) {
     console.error('Live floor plan error:', error);
     res.status(500).json({ error: 'Failed to build floor plan' });
+  }
+});
+
+/** คนที่ควรอยู่บนแปลนนี้ เตรียมไว้ให้กดวางเลยโดยไม่ต้องค้นทีละชื่อ */
+router.get('/:id/candidates', async (req, res) => {
+  try {
+    const parsedYear = Number(req.query.year);
+    const year = Number.isInteger(parsedYear) ? parsedYear : new Date().getFullYear();
+    res.json(await listFloorCandidates(prisma, Number(req.params.id), year));
+  } catch (error) {
+    console.error('Floor candidates error:', error);
+    res.status(500).json({ error: 'Failed to list candidates' });
   }
 });
 

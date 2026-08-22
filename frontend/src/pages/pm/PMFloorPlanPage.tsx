@@ -74,6 +74,10 @@ interface OwnerRow {
   ownerName: string; departmentId: string | null; company: string | null;
   devices: number; computers: number; looksLikeStorage: boolean;
 }
+interface Candidate {
+  ownerName: string; departmentId: string; devices: number;
+  pmPlanned: boolean; placed: boolean; looksLikeStorage: boolean;
+}
 
 /** ชื่อยาว ๆ บนแผนผังทับกันจนอ่านไม่ออก ตัดเหลือชื่อต้นกับอักษรแรกของนามสกุล */
 function shortName(full: string | null | undefined): string {
@@ -114,6 +118,13 @@ export default function PMFloorPlanPage() {
   const [owners, setOwners] = useState<OwnerRow[]>([]);
   const [assets, setAssets] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
+
+  // รายชื่อที่เตรียมไว้ให้กดวางเลย ไม่ต้องค้นทีละชื่อ
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [deptFilter, setDeptFilter] = useState<string>('');
+  const [plannedOnly, setPlannedOnly] = useState(true);
+  // คนที่เลือกไว้แล้วรอคลิกบนแปลนเพื่อกำหนดตำแหน่ง
+  const [armed, setArmed] = useState<{ ownerName: string; departmentId: string | null; looksLikeStorage: boolean } | null>(null);
 
   const imgRef = useRef<HTMLImageElement>(null);
   const [dragging, setDragging] = useState<{ kind: 'seat' | 'spot'; index: number } | null>(null);
@@ -157,8 +168,11 @@ export default function PMFloorPlanPage() {
       setSearching(true);
       try {
         if (editTab === 'seat') {
-          const res = await floorPlanAPI.owners(search.trim(), live?.plan.company || undefined);
-          setOwners(res.data || []);
+          // รายการหลักกรองในเครื่องอยู่แล้ว ยิง API เฉพาะตอนหาไม่เจอ เพื่อเผื่อคน
+          // ที่อยู่คนละบริษัทกับแปลน (เช่น ย้ายมานั่งชั่วคราว)
+          const res = await floorPlanAPI.owners(search.trim());
+          const known = new Set(candidates.map(c => c.ownerName.toLowerCase()));
+          setOwners((res.data || []).filter((o: OwnerRow) => !known.has(o.ownerName.toLowerCase())));
         } else {
           const res = await assetAPI.list({ search: search.trim(), limit: 12 });
           setAssets(res.data?.data || []);
@@ -167,7 +181,17 @@ export default function PMFloorPlanPage() {
       finally { setSearching(false); }
     }, 400);
     return () => clearTimeout(t);
-  }, [search, editTab, isEditMode, live?.plan.company]);
+  }, [search, editTab, isEditMode, candidates]);
+
+  // โหลดรายชื่อผู้สมัครเมื่อเข้าโหมดจัดผัง — ให้เห็นทั้งชั้นทีเดียวแทนการค้นทีละคน
+  useEffect(() => {
+    if (!isEditMode || !live) { setCandidates([]); return; }
+    let alive = true;
+    floorPlanAPI.candidates(live.plan.id, year)
+      .then(res => { if (alive) setCandidates(res.data?.candidates || []); })
+      .catch(err => console.error(err));
+    return () => { alive = false; };
+  }, [isEditMode, live?.plan.id, year, live]);
 
   const handleSavePlan = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -200,23 +224,43 @@ export default function PMFloorPlanPage() {
     } catch { alert('เกิดข้อผิดพลาดในการลบ'); }
   };
 
-  const addSeat = (o: OwnerRow) => {
-    if (draftSeats.some(s => (s.ownerName || '').toLowerCase() === o.ownerName.toLowerCase())) {
-      alert(`"${o.ownerName}" มีที่นั่งบนแปลนนี้แล้ว`);
-      return;
-    }
+  const alreadySeated = (name: string) =>
+    draftSeats.some(s => (s.ownerName || '').toLowerCase() === name.toLowerCase());
+
+  /**
+   * เลือกคนไว้ก่อน แล้วค่อยคลิกบนแปลนเพื่อบอกว่านั่งตรงไหน
+   *
+   * ของเดิมเพิ่มที่นั่งลงกลางแปลนที่ (50,50) ทุกครั้ง คนที่เพิ่มทีหลังจึงไปทับ
+   * คนก่อนหน้าจนมองไม่เห็นและคลิกไม่โดน ดูเหมือน "กดเพิ่มแล้วไม่มีอะไรขึ้น"
+   * ทั้งที่เพิ่มสำเร็จ — เลือกก่อนแล้วคลิกวางจึงไม่มีทางซ้อนกันเอง
+   */
+  const armSeat = (name: string, dept: string | null, storage: boolean) => {
+    if (alreadySeated(name)) { alert(`"${name}" มีที่นั่งบนแปลนนี้แล้ว`); return; }
+    setArmed({ ownerName: name, departmentId: dept, looksLikeStorage: storage });
+  };
+
+  /** วางที่นั่งลงตรงจุดที่คลิกบนแปลน */
+  const placeArmedAt = (e: React.MouseEvent) => {
+    if (!isEditMode || !armed || !imgRef.current) return;
+    const r = imgRef.current.getBoundingClientRect();
+    const x = ((e.clientX - r.left) / r.width) * 100;
+    const y = ((e.clientY - r.top) / r.height) * 100;
+    // คลิกนอกรูปไม่ควรวางที่นั่งไว้ที่ขอบ
+    if (x < 0 || x > 100 || y < 0 || y > 100) return;
     setDraftSeats(prev => [...prev, {
-      id: 0, x: 50, y: 50, label: null, ownerName: o.ownerName,
-      departmentId: o.departmentId, note: null,
-      devices: [], status: 'NO_PM', looksLikeStorage: o.looksLikeStorage,
+      id: 0, x, y, label: null, ownerName: armed.ownerName,
+      departmentId: armed.departmentId, note: null,
+      devices: [], status: 'NO_PM', looksLikeStorage: armed.looksLikeStorage,
     }]);
-    setSearch(''); setOwners([]);
+    setArmed(null);
   };
 
   const addSpot = (a: any) => {
     if (draftSpots.some(s => s.assetId === a.id)) { alert('มีอุปกรณ์นี้บนแปลนแล้ว'); return; }
+    // จุดส่วนกลางเพิ่มทีละไม่กี่จุด เยื้องกันไว้กันซ้อน แล้วลากไปวางเอง
+    const n = draftSpots.length;
     setDraftSpots(prev => [...prev, {
-      id: 0, x: 50, y: 50, label: null, assetId: a.id,
+      id: 0, x: 45 + (n % 5) * 2.5, y: 45 + Math.floor(n / 5) * 4, label: null, assetId: a.id,
       assetName: a.assetName, assetCode: a.assetCode, type: a.type,
       kind: 'other', ownerName: a.ownerName, departmentId: a.departmentId,
       pmStatus: 'NO_PM', pmDate: null,
@@ -267,6 +311,46 @@ export default function PMFloorPlanPage() {
   const seatsShown = isEditMode ? draftSeats : (live?.seats || []);
   const spotsShown = isEditMode ? draftSpots : (live?.spots || []);
   const s = live?.summary;
+
+  /**
+   * ใครถูกวางแล้วต้องอ่านจากฉบับร่างที่กำลังแก้ ไม่ใช่จากค่าที่ server ส่งมา
+   *
+   * ค่าจาก server เป็นสถานะ ณ ตอนโหลด ถ้าเอาที่นั่งออกจากร่างแล้วยังไม่บันทึก
+   * รายชื่อจะยังขึ้นว่า "วางแล้ว" และกดวางซ้ำไม่ได้จนกว่าจะรีเฟรชทั้งหน้า
+   */
+  const seatedNames = useMemo(
+    () => new Set(draftSeats.map(s => String(s.ownerName ?? '').trim().toLowerCase()).filter(Boolean)),
+    [draftSeats],
+  );
+
+  // รายชื่อที่ยังไม่ได้วาง จัดกลุ่มตามแผนก — แผนกคือสิ่งที่แปลนแบ่งโซนไว้จริง
+  const deptGroups = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const c of candidates) {
+      if (plannedOnly && !c.pmPlanned) continue;
+      if (seatedNames.has(c.ownerName.toLowerCase())) continue;
+      m.set(c.departmentId, (m.get(c.departmentId) || 0) + 1);
+    }
+    // แผนกที่เลือกอยู่ต้องไม่หายไปตอนวางครบ ไม่งั้นตัวกรองค้างโดยไม่มีปุ่มให้กดออก
+    if (deptFilter && !m.has(deptFilter)) m.set(deptFilter, 0);
+    return [...m.entries()]
+      .map(([dept, remaining]) => ({ dept, remaining }))
+      .sort((a, b) => b.remaining - a.remaining || a.dept.localeCompare(b.dept));
+  }, [candidates, plannedOnly, seatedNames, deptFilter]);
+
+  const trayList = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return candidates
+      .filter(c => {
+        if (plannedOnly && !c.pmPlanned) return false;
+        if (deptFilter && c.departmentId !== deptFilter) return false;
+        if (q && !c.ownerName.toLowerCase().includes(q)) return false;
+        return true;
+      })
+      .map(c => ({ ...c, placed: seatedNames.has(c.ownerName.toLowerCase()) }))
+      // คนที่ยังไม่ได้วางขึ้นก่อนเสมอ คนที่วางแล้วไหลลงไปท้ายรายการ
+      .sort((a, b) => Number(a.placed) - Number(b.placed));
+  }, [candidates, plannedOnly, deptFilter, search, seatedNames]);
 
   const kindTotals = useMemo(() => {
     const b = s?.byKind || {};
@@ -328,7 +412,7 @@ export default function PMFloorPlanPage() {
             {isEditMode ? (
               <>
                 <Button variant="outlined" onClick={() => {
-                  setIsEditMode(false); setSelected(null);
+                  setIsEditMode(false); setSelected(null); setArmed(null); setSearch('');
                   setDraftSeats(live.seats); setDraftSpots(live.spots);
                 }}>ยกเลิก</Button>
                 <Button variant="contained" onClick={handleSave} disabled={saving}>
@@ -399,6 +483,22 @@ export default function PMFloorPlanPage() {
         </Paper>
       )}
 
+      {armed && (
+        <Paper variant="outlined" sx={{
+          p: '10px 16px', mb: 2, display: 'flex', alignItems: 'center', gap: 1.5,
+          borderColor: 'primary.main', bgcolor: alpha(theme.palette.primary.main, 0.07),
+        }}>
+          <Typography sx={{ fontSize: 13, fontWeight: 700 }}>
+            คลิกบนแผนผังเพื่อวางที่นั่งของ {armed.ownerName}
+          </Typography>
+          <Typography sx={{ fontSize: 11.5, color: 'text.secondary' }}>
+            {armed.departmentId || 'ไม่ระบุแผนก'}
+          </Typography>
+          <Box sx={{ flex: 1 }} />
+          <Button size="small" onClick={() => setArmed(null)}>ยกเลิกการเลือก</Button>
+        </Paper>
+      )}
+
       <Box sx={{ display: 'flex', gap: 2.5, alignItems: 'flex-start' }}>
         {/* ── แถบเครื่องมือโหมดแก้ไข ── */}
         {isEditMode && (
@@ -416,29 +516,91 @@ export default function PMFloorPlanPage() {
 
             {editTab === 'seat' ? (
               <>
-                <TextField fullWidth size="small" placeholder="ค้นชื่อพนักงาน (2 อักษร+)..."
+                <TextField fullWidth size="small" placeholder="กรองชื่อในรายการ / ค้นคนนอกบริษัทนี้..."
                   value={search} onChange={e => setSearch(e.target.value)}
                   InputProps={{ endAdornment: searching ? <CircularProgress size={14} /> : undefined }} />
-                <Typography sx={{ fontSize: 10.5, color: 'text.secondary', mt: 0.75, lineHeight: 1.6 }}>
-                  เลือกคน ไม่ต้องเลือกเครื่อง — อุปกรณ์ทุกชิ้นของคนนั้นจะขึ้นตามมาเอง
-                  และเปลี่ยนตามทะเบียนโดยไม่ต้องกลับมาแก้แผนผัง
+
+                <Box sx={{ display: 'flex', gap: 0.5, mt: 1, flexWrap: 'wrap' }}>
+                  <Chip size="small" label="เฉพาะที่อยู่ในแผน PM" clickable
+                    color={plannedOnly ? 'primary' : 'default'}
+                    variant={plannedOnly ? 'filled' : 'outlined'}
+                    onClick={() => setPlannedOnly(v => !v)} sx={{ fontSize: 10.5 }} />
+                  <Chip size="small" label="ทุกแผนก" clickable
+                    color={deptFilter === '' ? 'primary' : 'default'}
+                    variant={deptFilter === '' ? 'filled' : 'outlined'}
+                    onClick={() => setDeptFilter('')} sx={{ fontSize: 10.5 }} />
+                </Box>
+
+                <Box sx={{ display: 'flex', gap: 0.5, mt: 0.75, flexWrap: 'wrap' }}>
+                  {deptGroups.map(g => (
+                    <Chip key={g.dept} size="small" clickable
+                      label={`${g.dept} ${g.remaining}`}
+                      color={deptFilter === g.dept ? 'primary' : 'default'}
+                      variant={deptFilter === g.dept ? 'filled' : 'outlined'}
+                      onClick={() => setDeptFilter(d => d === g.dept ? '' : g.dept)}
+                      sx={{ fontSize: 10, height: 22 }} />
+                  ))}
+                </Box>
+
+                <Typography sx={{ fontSize: 10.5, color: 'text.secondary', mt: 1.25, lineHeight: 1.7 }}>
+                  {armed
+                    ? 'คลิกตำแหน่งบนแผนผังเพื่อวางที่นั่ง'
+                    : 'กดชื่อคนก่อน แล้วคลิกบนแผนผังตรงที่เขานั่ง — อุปกรณ์ของเขาจะตามมาเอง'}
                 </Typography>
 
-                {owners.length > 0 && (
-                  <Box sx={{ mt: 1.25, maxHeight: 230, overflowY: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 1.5 }}>
-                    {owners.map(o => (
-                      <Box key={o.ownerName} onClick={() => addSeat(o)}
-                        sx={{ p: '8px 12px', borderBottom: '1px solid', borderColor: 'divider', cursor: 'pointer', fontSize: 12, '&:hover': { bgcolor: 'action.hover' }, '&:last-of-type': { borderBottom: 'none' } }}>
-                        <Box sx={{ fontWeight: 600 }}>{o.ownerName}</Box>
-                        <Box sx={{ color: 'text.secondary', fontSize: 10.5 }}>
-                          {o.departmentId || '—'} · อุปกรณ์ {o.devices} ชิ้น
-                          {o.looksLikeStorage && (
-                            <Box component="span" sx={{ color: 'warning.main', fontWeight: 700 }}> · น่าจะเป็นจุดเก็บ ไม่ใช่คน</Box>
-                          )}
+                <Box sx={{ mt: 1, maxHeight: 260, overflowY: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 1.5 }}>
+                  {trayList.length === 0 && (
+                    <Typography sx={{ p: 1.5, fontSize: 11, color: 'text.secondary', textAlign: 'center' }}>
+                      {candidates.length === 0 ? 'กำลังโหลดรายชื่อ...' : 'วางครบทุกคนตามเงื่อนไขนี้แล้ว'}
+                    </Typography>
+                  )}
+                  {trayList.map(c => {
+                    const isArmed = armed?.ownerName.toLowerCase() === c.ownerName.toLowerCase();
+                    return (
+                      <Box key={c.ownerName}
+                        onClick={() => { if (!c.placed) armSeat(c.ownerName, c.departmentId, c.looksLikeStorage); }}
+                        sx={{
+                          p: '7px 10px', borderBottom: '1px solid', borderColor: 'divider',
+                          cursor: c.placed ? 'default' : 'pointer', fontSize: 12,
+                          opacity: c.placed ? 0.45 : 1,
+                          bgcolor: isArmed ? alpha(theme.palette.primary.main, 0.14) : undefined,
+                          '&:hover': { bgcolor: c.placed ? undefined : 'action.hover' },
+                          '&:last-of-type': { borderBottom: 'none' },
+                        }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                          <Box sx={{ fontWeight: 600, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {c.ownerName}
+                          </Box>
+                          {c.placed && <Box sx={{ fontSize: 9.5, color: 'success.main', fontWeight: 700 }}>วางแล้ว</Box>}
+                          {isArmed && <Box sx={{ fontSize: 9.5, color: 'primary.main', fontWeight: 700 }}>เลือกอยู่</Box>}
+                        </Box>
+                        <Box sx={{ color: 'text.secondary', fontSize: 10 }}>
+                          {c.departmentId} · {c.devices} ชิ้น
+                          {c.pmPlanned && <Box component="span" sx={{ color: 'info.main' }}> · อยู่ในแผน PM</Box>}
+                          {c.looksLikeStorage && <Box component="span" sx={{ color: 'warning.main', fontWeight: 700 }}> · น่าจะเป็นจุดเก็บ</Box>}
                         </Box>
                       </Box>
-                    ))}
-                  </Box>
+                    );
+                  })}
+                </Box>
+
+                {owners.length > 0 && (
+                  <>
+                    <Typography sx={{ fontSize: 11, fontWeight: 700, mt: 1.75, mb: 0.5, color: 'text.secondary' }}>
+                      ผลค้นหานอกรายการข้างบน
+                    </Typography>
+                    <Box sx={{ maxHeight: 160, overflowY: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 1.5 }}>
+                      {owners.map(o => (
+                        <Box key={o.ownerName} onClick={() => armSeat(o.ownerName, o.departmentId, o.looksLikeStorage)}
+                          sx={{ p: '7px 10px', borderBottom: '1px solid', borderColor: 'divider', cursor: 'pointer', fontSize: 12, '&:hover': { bgcolor: 'action.hover' }, '&:last-of-type': { borderBottom: 'none' } }}>
+                          <Box sx={{ fontWeight: 600 }}>{o.ownerName}</Box>
+                          <Box sx={{ color: 'text.secondary', fontSize: 10 }}>
+                            {o.departmentId || '—'} · {o.company || '—'} · {o.devices} ชิ้น
+                          </Box>
+                        </Box>
+                      ))}
+                    </Box>
+                  </>
                 )}
 
                 <Typography sx={{ fontSize: 13, fontWeight: 700, mt: 2.5, mb: 1 }}>ที่นั่งบนแปลน ({draftSeats.length})</Typography>
@@ -518,7 +680,12 @@ export default function PMFloorPlanPage() {
               <Typography sx={{ fontSize: 14, fontWeight: 500 }}>กำลังโหลด...</Typography>
             </Box>
           ) : live ? (
-            <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'action.hover', p: 2 }}
+            <Box sx={{
+                position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                bgcolor: 'action.hover', p: 2,
+                cursor: armed ? 'crosshair' : 'default',
+              }}
+              onClick={placeArmedAt}
               onDragOver={onDragOver} onDrop={e => { e.preventDefault(); setDragging(null); }}>
               <Box sx={{ position: 'relative', display: 'inline-block' }}>
                 <Box component="img" ref={imgRef} draggable={false}
@@ -534,7 +701,7 @@ export default function PMFloorPlanPage() {
                     <Box key={`seat-${seat.id || i}-${seat.ownerName}`}
                       draggable={isEditMode}
                       onDragStart={e => onDragStart(e, 'seat', i)}
-                      onClick={() => setSelected(isSel ? null : { kind: 'seat', id: seat.id })}
+                      onClick={e => { e.stopPropagation(); setSelected(isSel ? null : { kind: 'seat', id: seat.id }); }}
                       sx={{
                         position: 'absolute', left: `${seat.x}%`, top: `${seat.y}%`,
                         transform: 'translate(-50%, -50%)',
@@ -583,7 +750,7 @@ export default function PMFloorPlanPage() {
                     <Box key={`spot-${sp.assetId}`}
                       draggable={isEditMode}
                       onDragStart={e => onDragStart(e, 'spot', i)}
-                      onClick={() => setSelected(isSel ? null : { kind: 'spot', id: sp.id })}
+                      onClick={e => { e.stopPropagation(); setSelected(isSel ? null : { kind: 'spot', id: sp.id }); }}
                       sx={{
                         position: 'absolute', left: `${sp.x}%`, top: `${sp.y}%`,
                         transform: 'translate(-50%, -50%)',
