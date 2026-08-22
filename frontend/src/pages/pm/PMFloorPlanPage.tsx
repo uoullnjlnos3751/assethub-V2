@@ -810,24 +810,36 @@ export default function PMFloorPlanPage() {
                         if (taken) return null;
                         const clickable = isEditMode && !!armed;
                         if (!showFreeDesks && !clickable) return null;
+                        // ช่องโต๊ะบนจอกว้างราว 22px ซึ่งเล็กเกินกว่าจะกดแม่น กรอบที่กดได้
+                        // จึงกินเต็มช่องในตาราง ส่วนกรอบที่เห็นยังเล็กกว่าเพื่อให้มีร่องห่าง
+                        // ระหว่างโต๊ะ — โตขึ้นได้เท่านี้โดยไม่ไปทับโต๊ะข้าง ๆ
+                        const hitW = d.w / 0.9, hitH = d.h / 0.82;
                         return (
                           <Tooltip key={`desk-${z.id}-${d.index}`} title={`${d.code} · โต๊ะว่าง`} arrow>
                             <Box
                               onClick={e => { e.stopPropagation(); if (clickable) placeOnDesk(z, d); }}
                               sx={{
                                 position: 'absolute', left: `${d.cx}%`, top: `${d.cy}%`,
-                                width: `${d.w}%`, height: `${d.h}%`,
+                                width: `${hitW}%`, height: `${hitH}%`,
                                 transform: 'translate(-50%, -50%)',
-                                border: `1px dashed ${alpha(theme.palette.text.disabled, 0.75)}`,
-                                bgcolor: clickable ? alpha(theme.palette.primary.main, 0.1) : alpha('#fff', 0.35),
-                                borderRadius: '4px', zIndex: 2,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                zIndex: 2,
                                 cursor: clickable ? 'pointer' : 'default',
                                 pointerEvents: clickable ? 'auto' : 'none',
-                                '&:hover': clickable ? {
-                                  bgcolor: alpha(theme.palette.primary.main, 0.28),
+                                '& > *': {
+                                  width: `${(d.w / hitW) * 100}%`, height: `${(d.h / hitH) * 100}%`,
+                                  border: `1px dashed ${alpha(theme.palette.text.disabled, 0.75)}`,
+                                  bgcolor: clickable ? alpha(theme.palette.primary.main, 0.1) : alpha('#fff', 0.35),
+                                  borderRadius: '4px',
+                                },
+                                '&:hover > *': clickable ? {
+                                  bgcolor: alpha(theme.palette.primary.main, 0.3),
                                   borderColor: theme.palette.primary.main,
+                                  borderStyle: 'solid',
                                 } : undefined,
-                              }} />
+                              }}>
+                              <Box />
+                            </Box>
                           </Tooltip>
                         );
                       })}
