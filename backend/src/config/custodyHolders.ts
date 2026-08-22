@@ -26,7 +26,7 @@ export interface CustodyHolder {
 export const CUSTODY_HOLDERS: CustodyHolder[] = [
   { code: 'HR_TRR', label: 'ฝ่ายบุคคล TRR', company: 'TRR', enabled: true },
   { code: 'HR_PS', label: 'ฝ่ายบุคคล PS', company: 'PS', enabled: false },
-  { code: 'IT_STORE', label: 'ห้องเก็บของ IT', company: 'TRR', enabled: false },
+  { code: 'IT_STORE', label: 'ห้องเก็บของ IT (TRRT)', company: 'TRR', enabled: true },
 ];
 
 export const enabledHolders = (): CustodyHolder[] => CUSTODY_HOLDERS.filter(h => h.enabled);

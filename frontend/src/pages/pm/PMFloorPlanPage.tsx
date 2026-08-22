@@ -537,6 +537,59 @@ export default function PMFloorPlanPage() {
   const occupiedIn = (z: LiveZone) =>
     z.desks.filter(d => occupiedDesks.has(`${z.id}:${d.index}`)).length;
 
+  /**
+   * เติมคนทั้งแผนกลงโต๊ะว่างในโซนของแผนกนั้นรวดเดียว
+   *
+   * ปักทีละคนหมายถึงกดร้อยกว่าครั้งต่อชั้น ซึ่งเป็นงานที่มักไม่ได้ทำจริง —
+   * แผนผังเดิมค้างอยู่ที่หมุดเดียวมาตลอดด้วยเหตุผลนี้ เรียงลงตามลำดับก่อนแล้ว
+   * ให้คนมาลากสลับเฉพาะตัวที่ผิด เร็วกว่าการวางถูกตั้งแต่แรกทีละคนมาก
+   *
+   * จับคู่แผนกกับโซนด้วยรหัสตรง ๆ (แผนก ACC -> โซน ACC) แผนกที่ไม่มีโซนรองรับ
+   * จะถูกข้ามและรายงานกลับ ไม่ใช่เดาว่าควรไปอยู่โซนไหน
+   */
+  const autoFillDepts = (codes: string[]) => {
+    const zoneOf = new Map(draftZones.filter(z => z.kind === 'DESKS').map(z => [z.code.toUpperCase(), z]));
+    const taken = new Set(draftSeats
+      .filter(s => s.zoneId !== null && s.deskIndex !== null)
+      .map(s => `${s.zoneId}:${s.deskIndex}`));
+    const seated = new Set(draftSeats.map(s => String(s.ownerName ?? '').toLowerCase()));
+
+    const added: LiveSeat[] = [];
+    const noZone: string[] = [];
+    let noDesk = 0;
+
+    for (const code of codes) {
+      const z = zoneOf.get(code.toUpperCase());
+      const people = candidates.filter(c =>
+        c.departmentId === code && !seated.has(c.ownerName.toLowerCase())
+        && (!plannedOnly || c.pmPlanned));
+      if (!people.length) continue;
+      if (!z) { noZone.push(`${code} (${people.length} คน)`); continue; }
+
+      const free = z.desks.filter(d => !taken.has(`${z.id}:${d.index}`));
+      for (const c of people) {
+        const d = free.shift();
+        if (!d) { noDesk++; continue; }
+        taken.add(`${z.id}:${d.index}`);
+        seated.add(c.ownerName.toLowerCase());
+        added.push({
+          id: 0, x: d.cx, y: d.cy, label: null,
+          zoneId: z.id, deskIndex: d.index, deskCode: d.code,
+          ownerName: c.ownerName, departmentId: c.departmentId, note: null,
+          devices: [], status: 'NO_PM', looksLikeStorage: c.looksLikeStorage,
+        });
+      }
+    }
+
+    if (!added.length && !noZone.length && !noDesk) { alert('ไม่มีใครเหลือให้เติมแล้ว'); return; }
+    setDraftSeats(prev => [...prev, ...added]);
+
+    const notes = [`วาง ${added.length} คนลงโต๊ะแล้ว — ลากสลับตัวที่ผิดได้`];
+    if (noDesk) notes.push(`อีก ${noDesk} คนยังไม่ได้วาง เพราะโต๊ะในโซนเต็ม — เพิ่มแถวในแท็บผังโซน`);
+    if (noZone.length) notes.push(`ไม่มีโซนรองรับ: ${noZone.join(', ')}`);
+    alert(notes.join('\n\n'));
+  };
+
   /** วางคนที่เลือกไว้ลงช่องโต๊ะ — ตำแหน่งมาจากตารางของโซน ไม่ใช่จุดที่เมาส์อยู่ */
   const placeOnDesk = (z: LiveZone, d: LiveDesk) => {
     if (!armed) return;
@@ -593,6 +646,24 @@ export default function PMFloorPlanPage() {
       // คนที่ยังไม่ได้วางขึ้นก่อนเสมอ คนที่วางแล้วไหลลงไปท้ายรายการ
       .sort((a, b) => Number(a.placed) - Number(b.placed));
   }, [candidates, plannedOnly, deptFilter, search, seatedNames]);
+
+  /** จำนวนที่ปุ่มเติมจะวางได้จริง กับจำนวนที่โต๊ะไม่พอ — คิดก่อนกดจะได้ไม่ต้องเดา */
+  const fillable = useMemo(() => {
+    const zoneOf = new Map(draftZones.filter(z => z.kind === 'DESKS').map(z => [z.code.toUpperCase(), z]));
+    const taken = new Set(draftSeats
+      .filter(s => s.zoneId !== null && s.deskIndex !== null)
+      .map(s => `${s.zoneId}:${s.deskIndex}`));
+    const depts = deptFilter ? [deptFilter] : deptGroups.map(g => g.dept);
+    let total = 0, short = 0;
+    for (const code of depts) {
+      const waiting = deptGroups.find(g => g.dept === code)?.remaining ?? 0;
+      const z = zoneOf.get(code.toUpperCase());
+      const free = z ? z.desks.filter(d => !taken.has(`${z.id}:${d.index}`)).length : 0;
+      total += Math.min(waiting, free);
+      short += Math.max(0, waiting - free);
+    }
+    return { total, short };
+  }, [draftZones, draftSeats, deptGroups, deptFilter]);
 
   const kindTotals = useMemo(() => {
     const b = s?.byKind || {};
@@ -890,6 +961,22 @@ export default function PMFloorPlanPage() {
                       sx={{ fontSize: 10, height: 22 }} />
                   ))}
                 </Box>
+
+                <Box sx={{ display: 'flex', gap: 0.75, mt: 1.25 }}>
+                  <Button size="small" variant="contained" fullWidth sx={{ fontSize: 11 }}
+                    disabled={!fillable.total}
+                    onClick={() => autoFillDepts(deptFilter ? [deptFilter] : deptGroups.map(g => g.dept))}>
+                    {deptFilter
+                      ? `เติม ${fillable.total} คนลง ${deptFilter}`
+                      : `เติมทุกแผนก (${fillable.total} คน)`}
+                  </Button>
+                </Box>
+                {!!fillable.total && (
+                  <Typography sx={{ fontSize: 10, color: 'text.secondary', mt: 0.5 }}>
+                    เรียงลงโต๊ะว่างตามลำดับรายชื่อ แล้วลากสลับตัวที่ผิด — เร็วกว่ากดทีละคน
+                    {fillable.short > 0 && ` · โต๊ะไม่พอ ${fillable.short} คน`}
+                  </Typography>
+                )}
 
                 <Typography sx={{ fontSize: 10.5, color: 'text.secondary', mt: 1.25, lineHeight: 1.7 }}>
                   {armed
