@@ -115,6 +115,9 @@ const thYear = (ad: number) => ad + 543;
 const ZONE_COLORS = ['#2563eb', '#dc2626', '#15803d', '#a16207', '#db2777',
                      '#0891b2', '#ea580c', '#7c3aed', '#0284c7', '#b45309'];
 
+/** ห้องกับจุดสังเกตไม่ควรแย่งสายตาไปจากโซนแผนก สีกลาง ๆ จึงเหมาะกว่าสีในชุดข้างบน */
+const ROOM_COLOR = '#64748b';
+
 export default function PMFloorPlanPage() {
   const navigate = useNavigate();
   const theme = useTheme();
@@ -141,6 +144,8 @@ export default function PMFloorPlanPage() {
   const [drawing, setDrawing] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const [zoneDrag, setZoneDrag] = useState<{ id: number; mode: 'move' | 'resize'; ox: number; oy: number } | null>(null);
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  const [applyingTemplate, setApplyingTemplate] = useState(false);
 
   const [showZones, setShowZones] = useState(true);
   const [showFreeDesks, setShowFreeDesks] = useState(true);
@@ -261,6 +266,37 @@ export default function PMFloorPlanPage() {
     } catch (err: any) {
       alert(err?.response?.data?.error || 'บันทึกเทมเพลตไม่สำเร็จ');
     }
+  };
+
+  /**
+   * ทับผังของชั้นนี้ด้วยเทมเพลต
+   *
+   * ย้อนยากกว่าการสร้างชั้นใหม่มาก เพราะโซนเดิมหายทั้งชุด คนที่นั่งอยู่จะหลุด
+   * ออกจากตาราง (ไม่หายไป แต่ต้องมาจัดใหม่) จึงบอกจำนวนคนที่กระทบก่อนเสมอ
+   */
+  const handleApplyTemplate = async (t: TemplateRow) => {
+    if (!live) return;
+    const seated = draftSeats.filter(s => s.zoneId !== null).length;
+    const warn = seated
+      ? `\n\nโซนเดิม ${draftZones.length} โซนจะถูกแทนที่ และที่นั่ง ${seated} คนจะหลุดออกจากตาราง (ยังอยู่บนแปลน ต้องมาวางใหม่)`
+      : `\n\nโซนเดิม ${draftZones.length} โซนจะถูกแทนที่`;
+    if (!confirm(`ใช้เทมเพลต "${t.name}" (${t.zoneCount} โซน ${t.deskCount} โต๊ะ) กับแปลนนี้?${warn}`)) return;
+    setApplyingTemplate(true);
+    try {
+      await floorPlanAPI.applyTemplate(live.plan.id, t.id, year);
+      setTemplatePickerOpen(false);
+      await fetchLive(live.plan.id, year);
+    } catch (err: any) {
+      alert(err?.response?.data?.error || 'ใช้เทมเพลตไม่สำเร็จ');
+    } finally { setApplyingTemplate(false); }
+  };
+
+  const handleDeleteTemplate = async (t: TemplateRow) => {
+    if (!confirm(`ลบเทมเพลต "${t.name}"? แปลนที่เคยใช้เทมเพลตนี้ไม่ได้รับผลกระทบ`)) return;
+    try {
+      await floorPlanAPI.deleteTemplate(t.id);
+      setTemplates(prev => prev.filter(x => x.id !== t.id));
+    } catch { alert('ลบเทมเพลตไม่สำเร็จ'); }
   };
 
   const handleSavePlan = async (e: React.FormEvent) => {
@@ -390,7 +426,18 @@ export default function PMFloorPlanPage() {
   };
 
   const patchZone = (id: number, patch: Partial<LiveZone>) =>
-    setDraftZones(prev => prev.map(z => (z.id === id ? { ...z, ...patch } : z)));
+    setDraftZones(prev => prev.map(z => {
+      if (z.id !== id) return z;
+      const next = { ...z, ...patch };
+      /* เปลี่ยนเป็นห้อง/จุดสังเกตแล้วยังใช้สีจากชุดโซนแผนกอยู่ ให้เปลี่ยนเป็นสีกลาง
+         เพราะห้องประชุมสีแดงสดจะแย่งสายตาไปจากโซนที่ต้องดูจริง — แต่ถ้าเลือกสีเอง
+         มาแล้วไม่ต้องไปยุ่ง */
+      if (patch.kind === 'ROOM' && ZONE_COLORS.includes(String(z.color))) next.color = ROOM_COLOR;
+      if (patch.kind === 'DESKS' && z.color === ROOM_COLOR) {
+        next.color = ZONE_COLORS[draftZones.findIndex(x => x.id === id) % ZONE_COLORS.length];
+      }
+      return next;
+    }));
 
   const removeZone = (id: number) => {
     const z = draftZones.find(x => x.id === id);
@@ -748,6 +795,10 @@ export default function PMFloorPlanPage() {
                     onClick={handleSaveTemplate} disabled={!draftZones.length}>
                     บันทึกเป็นเทมเพลต
                   </Button>
+                  <Button size="small" variant="outlined" fullWidth sx={{ fontSize: 11 }}
+                    onClick={() => { setTemplatePickerOpen(true); floorPlanAPI.templates().then(r => setTemplates(r.data || [])).catch(console.error); }}>
+                    ใช้เทมเพลต
+                  </Button>
                 </Box>
 
                 <Box sx={{ maxHeight: 460, overflowY: 'auto' }}>
@@ -790,6 +841,18 @@ export default function PMFloorPlanPage() {
                               sx={{ width: 66, '& input': { fontSize: 12, py: 0.6 } }} />
                           </>
                         )}
+                      </Box>
+                      <Box sx={{ display: 'flex', gap: 0.4, alignItems: 'center', mt: 0.75, flexWrap: 'wrap' }}>
+                        {[...ZONE_COLORS, ROOM_COLOR].map(c => (
+                          <Box key={c} onClick={() => patchZone(z.id, { color: c })}
+                            sx={{
+                              width: 15, height: 15, borderRadius: '50%', bgcolor: c, cursor: 'pointer',
+                              border: z.color === c ? '2px solid' : '1px solid',
+                              borderColor: z.color === c ? 'text.primary' : alpha('#000', 0.15),
+                              transition: 'transform .12s',
+                              '&:hover': { transform: 'scale(1.2)' },
+                            }} />
+                        ))}
                       </Box>
                       {z.kind === 'DESKS' && (
                         <Typography sx={{ fontSize: 10, color: 'text.secondary', mt: 0.5 }}>
@@ -1269,6 +1332,54 @@ export default function PMFloorPlanPage() {
           </Paper>
         )}
       </Box>
+
+      {/* ── เลือกเทมเพลตมาใช้กับแปลนที่มีอยู่ ── */}
+      <Modal open={templatePickerOpen} onClose={() => setTemplatePickerOpen(false)} title="ใช้เทมเพลตกับแปลนนี้">
+        <Box sx={{ pt: 1 }}>
+          <Box sx={{
+            p: '9px 12px', mb: 1.5, borderRadius: 1.5,
+            bgcolor: alpha(theme.palette.warning.main, 0.1),
+            border: `1px solid ${alpha(theme.palette.warning.main, 0.35)}`,
+          }}>
+            <Typography sx={{ fontSize: 11.5, lineHeight: 1.8 }}>
+              เทมเพลตจะ<b>แทนที่โซนเดิมทั้งชุด</b> ที่นั่งไม่หายไป แต่คนที่เกาะโซนเดิมอยู่
+              จะหลุดออกจากตารางและต้องมาวางใหม่ — บันทึกงานที่ค้างอยู่ก่อนใช้
+            </Typography>
+          </Box>
+
+          {templates.length === 0 ? (
+            <Typography sx={{ fontSize: 12.5, color: 'text.secondary', textAlign: 'center', py: 3 }}>
+              ยังไม่มีเทมเพลต — จัดผังให้เสร็จแล้วกด "บันทึกเป็นเทมเพลต" ก่อน
+            </Typography>
+          ) : templates.map(t => (
+            <Box key={t.id} sx={{
+              display: 'flex', alignItems: 'center', gap: 1.25, p: '10px 12px', mb: 0.75,
+              border: '1px solid', borderColor: 'divider', borderRadius: 1.5,
+              '&:hover': { bgcolor: 'action.hover' },
+            }}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 700 }}>{t.name}</Typography>
+                <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>
+                  {t.zoneCount} โซน · {t.deskCount} โต๊ะ
+                  {t.company ? ` · ${t.company}` : ''}
+                  {t.createdBy ? ` · โดย ${t.createdBy}` : ''}
+                </Typography>
+              </Box>
+              <Button size="small" variant="contained" disabled={applyingTemplate}
+                onClick={() => handleApplyTemplate(t)} sx={{ fontSize: 11.5 }}>
+                ใช้ผังนี้
+              </Button>
+              <IconButton size="small" color="error" onClick={() => handleDeleteTemplate(t)}>
+                <CloseIcon sx={{ fontSize: 17 }} />
+              </IconButton>
+            </Box>
+          ))}
+
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+            <Button onClick={() => setTemplatePickerOpen(false)}>ปิด</Button>
+          </Box>
+        </Box>
+      </Modal>
 
       {/* ── ตั้งค่าแปลน ── */}
       <Modal open={isModalOpen} onClose={() => setIsModalOpen(false)} title={formData.id ? 'แก้ไขแผนผังชั้น' : 'เพิ่มแผนผังชั้นใหม่'}>
