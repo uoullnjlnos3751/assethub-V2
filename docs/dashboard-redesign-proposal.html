@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>Dashboard — ข้อเสนอ</title>
+<!--
+  เอกสารข้อเสนอ ไม่ใช่ส่วนหนึ่งของแอป
+
+  วิธีเปิด: ก็อปไปวางใน frontend/dist/ แล้วเปิดผ่าน origin เดียวกับแอป
+  (http://localhost:5173/dashboard-redesign-proposal.html) เพราะดึงข้อมูลจริง
+  จาก /api/dashboard/* ด้วย cookie ของ session
+
+  ตัวเลขทุกตัวในหน้านี้มาจาก API จริง ไม่มีค่าสมมุติ ยกเว้นบล็อก log ท้ายไฟล์
+  ที่ยังเป็นตัวอย่าง เพราะ /dashboard/recent-activity คืนค่าว่าง
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap">
+<style>
+  :root{
+    --bg:#0a0c10; --panel:#111419; --panel2:#151920; --line:#1f2630; --line2:#2a3340;
+    --ink:#e6edf3; --ink2:#8b949e; --ink3:#5a6472;
+    --crit:#f85149; --warn:#d29922; --ok:#3fb950; --info:#58a6ff; --accent:#2dd4bf;
+    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+    --sans:"IBM Plex Sans Thai",-apple-system,"Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13px;
+       padding:14px 18px 24px;-webkit-font-smoothing:antialiased}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+  /* ── top bar ─────────────────────────────────────────────────────────── */
+  .bar{display:flex;align-items:center;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+  .logo{font-family:var(--mono);font-weight:600;letter-spacing:.06em;font-size:13px}
+  .env{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:4px;
+       background:rgba(63,185,80,.12);color:var(--ok);border:1px solid rgba(63,185,80,.3)}
+  .bar .sp{flex:1}
+  .kbd{font-family:var(--mono);font-size:10.5px;color:var(--ink3);border:1px solid var(--line2);
+       border-radius:5px;padding:3px 8px}
+  .pulse{width:6px;height:6px;border-radius:50%;background:var(--ok);
+         box-shadow:0 0 0 0 rgba(63,185,80,.6);animation:p 2.4s infinite}
+  @keyframes p{70%{box-shadow:0 0 0 7px rgba(63,185,80,0)}100%{box-shadow:0 0 0 0 rgba(63,185,80,0)}}
+
+  h2{font-size:10.5px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;
+     color:var(--ink3);margin:16px 0 8px;display:flex;align-items:center;gap:8px}
+  h2 .n{font-family:var(--mono);color:var(--ink2);letter-spacing:0}
+
+  /* ── attention queue ─────────────────────────────────────────────────── */
+  .q{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--panel)}
+  .row{display:grid;grid-template-columns:3px 92px 1fr 210px 92px 18px;align-items:center;
+       gap:14px;padding:11px 14px 11px 0;border-bottom:1px solid var(--line);cursor:pointer;
+       transition:background .12s}
+  .row:last-child{border-bottom:none}
+  .row:hover{background:var(--panel2)}
+  .row .stripe{width:3px;height:100%;min-height:38px;border-radius:0 2px 2px 0}
+  .row .big{font-family:var(--mono);font-size:22px;font-weight:600;text-align:right;line-height:1}
+  .row .ttl{font-size:13px;font-weight:500}
+  .row .sub{font-size:11px;color:var(--ink2);margin-top:2px}
+  .row .meter{height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+  .row .meter i{display:block;height:100%;border-radius:3px}
+  .row .mtxt{font-family:var(--mono);font-size:10px;color:var(--ink3);margin-top:5px}
+  .row .act{font-family:var(--mono);font-size:10.5px;color:var(--ink2);text-align:right}
+  .row .arw{color:var(--ink3);font-size:14px}
+
+  /* ── fleet strip ─────────────────────────────────────────────────────── */
+  .strip{display:flex;height:26px;border-radius:6px;overflow:hidden;border:1px solid var(--line)}
+  .strip div{display:flex;align-items:center;justify-content:center;font-family:var(--mono);
+             font-size:10.5px;color:#0a0c10;font-weight:600}
+  .legend{display:flex;gap:16px;margin-top:7px;font-size:11px;color:var(--ink2);flex-wrap:wrap}
+  .legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px}
+
+  /* ── panels ──────────────────────────────────────────────────────────── */
+  .grid{display:grid;grid-template-columns:1.15fr 1fr 1.25fr;gap:12px;margin-top:16px}
+  .p{border:1px solid var(--line);border-radius:9px;background:var(--panel);padding:13px 15px}
+  .p h3{font-size:11px;font-weight:600;color:var(--ink2);letter-spacing:.05em;margin-bottom:12px;
+        display:flex;justify-content:space-between;align-items:baseline}
+  .p h3 span{font-family:var(--mono);font-size:10px;color:var(--ink3);letter-spacing:0}
+
+  .stat{font-family:var(--mono);font-size:30px;font-weight:600;line-height:1}
+  .stat small{font-size:13px;color:var(--ink3);font-weight:400}
+  .cap{font-size:11px;color:var(--ink2);margin-top:5px}
+
+  /* agent matrix */
+  .mtx{display:grid;grid-template-columns:repeat(11,1fr);gap:4px;margin-top:4px}
+  .mtx i{aspect-ratio:1;border-radius:2.5px;display:block}
+
+  /* log */
+  .log{font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--ink2);
+       max-height:132px;overflow:auto}
+  .log .t{color:var(--ink3)}
+  .log .k{color:var(--accent)}
+
+  /* quiet footer */
+  .quiet{margin-top:14px;border:1px solid var(--line);border-radius:9px;background:var(--panel);
+         padding:10px 15px;display:flex;gap:20px;align-items:center;flex-wrap:wrap;font-size:11.5px;
+         color:var(--ink2)}
+  .quiet b{color:var(--ok);font-family:var(--mono);font-weight:500}
+  .quiet .dim{color:var(--ink3)}
+  .note{margin-top:16px;border-left:2px solid var(--info);background:rgba(88,166,255,.05);
+        padding:11px 15px;border-radius:0 8px 8px 0;font-size:12px;line-height:1.9;color:var(--ink2)}
+  .note b{color:var(--ink)}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <span class="logo">ITAM</span>
+  <span class="env">PROD</span>
+  <span class="sp"></span>
+  <span class="kbd">⌘K ค้นหา</span>
+  <span class="pulse"></span>
+  <span class="mono" style="font-size:11px;color:var(--ink3)" id="sync">—</span>
+</div>
+
+<h2>ต้องจัดการ <span class="n" id="qn"></span></h2>
+<div class="q" id="q"></div>
+
+<h2>ทรัพย์สินทั้งหมด <span class="n" id="fleetn"></span></h2>
+<div class="strip" id="strip"></div>
+<div class="legend" id="legend"></div>
+
+<div class="grid">
+  <div class="p">
+    <h3>PM ประจำปี <span id="pmpace"></span></h3>
+    <div class="stat" id="pmbig">—</div>
+    <div class="cap" id="pmcap"></div>
+    <svg id="burn" viewBox="0 0 300 62" style="width:100%;height:62px;margin-top:10px;overflow:visible"></svg>
+  </div>
+
+  <div class="p">
+    <h3>Agent <span id="agn"></span></h3>
+    <div class="stat" id="agbig">—</div>
+    <div class="cap" id="agcap"></div>
+    <div class="mtx" id="mtx"></div>
+  </div>
+
+  <div class="p">
+    <h3>กิจกรรมล่าสุด <span>สด</span></h3>
+    <div class="log" id="log"></div>
+  </div>
+</div>
+
+<div class="quiet" id="quiet"></div>
+
+<div class="note">
+  <b>หลักที่ใช้</b> — สิ่งที่ต้องลงมืออยู่บนสุดเรียงตามน้ำหนัก · สิ่งที่ปกติยุบเหลือบรรทัดเดียวข้างล่าง ·
+  โมดูลที่ไม่มีข้อมูลไม่ได้การ์ดของตัวเอง<br>
+  ทุกตัวเลขมีตัวหาร และมีบริบทว่าควรกังวลแค่ไหน — <b>274</b> เฉย ๆ ไม่บอกอะไร แต่ <b>274 / 815 (34%)</b> บอก
+</div>
+
+<script>
+const $ = function(id){ return document.getElementById(id); };
+const J = function(u){ return fetch('/api/'+u,{credentials:'include'}).then(function(r){return r.json();}); };
+const fmt = function(n){ return Number(n).toLocaleString('en-US'); };
+
+Promise.all([
+  J('dashboard/asset-summary'), J('dashboard/pm-summary'), J('dashboard/data-health'),
+  J('dashboard/external-agents-summary'), J('dashboard/custody-summary'),
+  J('dashboard/module-status'), J('dashboard/proactive-alerts'), J('dashboard/borrow-summary'),
+]).then(function(res){
+  const a=res[0], pm=res[1], dh=res[2], ag=res[3], cs=res[4], ms=res[5], al=res[6], bw=res[7];
+  const total = a.total || 0;
+  const agd = (ag && ag.data) || {total:0,online:0,offline:0};
+
+  $('sync').textContent = new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+
+  /* ── คิวงาน: เรียงตามน้ำหนัก ไม่ใช่ตามลำดับที่เขียนโค้ด ─────────────── */
+  const pmLeft = (pm.total||0) - (pm.completed||0);
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(),0,0)) / 864e5);
+  const daysLeft = 365 - dayOfYear;
+
+  const items = [
+    { n: dh.outdatedOSCount||0, sev:'crit', ttl:'ระบบปฏิบัติการล้าสมัย',
+      sub:'เสี่ยงต่อช่องโหว่ที่แพตช์แล้วในเวอร์ชันใหม่',
+      of: total, ofTxt: 'ของทรัพย์สินทั้งหมด', act:'ดูรายการ' },
+    { n: agd.offline||0, sev:(agd.offline/(agd.total||1)>0.5?'crit':'warn'), ttl:'Agent ออฟไลน์',
+      sub:'ไม่ส่งข้อมูลเข้ามา — สเปกและสุขภาพเครื่องหยุดอัปเดต',
+      of: agd.total||0, ofTxt:'ของเครื่องที่ติดตั้ง', act:'ตรวจสอบ' },
+    { n: pmLeft, sev:(pmLeft/(pm.total||1)>0.25?'warn':'ok'), ttl:'PM ยังไม่ได้ทำ',
+      sub:'เหลือเวลาอีก '+daysLeft+' วันในปีนี้ ≈ '+(pmLeft?Math.max(1,Math.round(daysLeft/pmLeft)):0)+' วัน/เครื่อง',
+      of: pm.total||0, ofTxt:'ของแผนทั้งปี', act:'เปิดคิว' },
+    { n: (cs.total)||0, sev:'warn', ttl:'ค้างอยู่ในจุดรับฝาก',
+      sub:(cs.data||[]).map(function(d){return d.label+' '+d.count;}).join(' · '),
+      of: total, ofTxt:'ของทรัพย์สินทั้งหมด', act:'จัดการ' },
+    { n: al.upcomingPMs||0, sev:'info', ttl:'PM กำหนดสัปดาห์นี้',
+      sub:'เตรียมอุปกรณ์และแจ้งผู้ใช้ล่วงหน้า', of: pm.total||0, ofTxt:'ของแผนทั้งปี', act:'ดูตาราง' },
+  ].filter(function(x){ return x.n > 0; });
+
+  const C = { crit:'var(--crit)', warn:'var(--warn)', ok:'var(--ok)', info:'var(--info)' };
+  const W = { crit:3, warn:2, info:1, ok:0 };
+  items.sort(function(x,y){ return (W[y.sev]-W[x.sev]) || (y.n/(y.of||1) - x.n/(x.of||1)); });
+
+  $('qn').textContent = items.length + ' รายการ';
+  $('q').innerHTML = items.map(function(it){
+    const p = it.of ? Math.round(it.n/it.of*100) : 0;
+    return '<div class="row">'
+      + '<div class="stripe" style="background:'+C[it.sev]+'"></div>'
+      + '<div class="big" style="color:'+C[it.sev]+'">'+fmt(it.n)+'</div>'
+      + '<div><div class="ttl">'+it.ttl+'</div><div class="sub">'+it.sub+'</div></div>'
+      + '<div><div class="meter"><i style="width:'+Math.max(2,p)+'%;background:'+C[it.sev]+'"></i></div>'
+      +   '<div class="mtxt">'+fmt(it.n)+' / '+fmt(it.of)+' · '+p+'% '+it.ofTxt+'</div></div>'
+      + '<div class="act">'+it.act+'</div><div class="arw">›</div></div>';
+  }).join('');
+
+  /* ── แถบทรัพย์สิน: สัดส่วนอ่านได้ในแถบเดียว ไม่ต้องใช้โดนัท ────────── */
+  const SC = { InUse:'#2dd4bf', Available:'#58a6ff', Retired:'#6e7681', Maintenance:'#d29922' };
+  const SL = { InUse:'ใช้งานอยู่', Available:'พร้อมใช้', Retired:'ปลดระวาง', Maintenance:'ซ่อมบำรุง' };
+  const st = (a.byStatus||[]).slice().sort(function(x,y){return y._count-x._count;});
+  $('fleetn').textContent = fmt(total) + ' รายการ';
+  $('strip').innerHTML = st.map(function(s){
+    const p = s._count/total*100;
+    return '<div style="width:'+p+'%;background:'+(SC[s.status]||'#484f58')+'">'
+      + (p>7 ? fmt(s._count) : '') + '</div>';
+  }).join('');
+  $('legend').innerHTML = st.map(function(s){
+    return '<span><i style="background:'+(SC[s.status]||'#484f58')+'"></i>'
+      + (SL[s.status]||s.status) + ' <span class="mono">' + fmt(s._count)
+      + ' · ' + Math.round(s._count/total*100) + '%</span></span>';
+  }).join('');
+
+  /* ── PM: ความคืบหน้าเทียบกับเวลาที่เหลือ ไม่ใช่แค่ % ───────────────── */
+  const donePct = Math.round((pm.completed||0)/(pm.total||1)*100);
+  const timePct = Math.round(dayOfYear/365*100);
+  $('pmbig').innerHTML = donePct + '<small>% · ' + fmt(pm.completed) + '/' + fmt(pm.total) + '</small>';
+  $('pmpace').textContent = donePct >= timePct ? 'ตามแผน' : 'ช้ากว่าแผน ' + (timePct-donePct) + '%';
+  $('pmcap').innerHTML = 'ผ่านไปแล้ว <span class="mono">'+timePct+'%</span> ของปี · '
+    + (donePct>=timePct ? 'เร็วกว่าเวลา' : 'ต้องเร่ง <span class="mono">'+pmLeft+'</span> เครื่องใน <span class="mono">'+daysLeft+'</span> วัน');
+  (function(){
+    const w=300,h=56, svg=$('burn');
+    const line=function(pts,col,dash){ return '<polyline points="'+pts+'" fill="none" stroke="'+col
+      +'" stroke-width="1.6" '+(dash?'stroke-dasharray="3 3"':'')+' stroke-linecap="round"/>'; };
+    // เส้นที่ควรเป็น เทียบกับที่เป็นจริง — เห็นทันทีว่าตามทันไหม
+    const ideal = '0,'+h+' '+w+',0';
+    const now = (timePct/100*w)+','+(h-donePct/100*h);
+    svg.innerHTML = line(ideal,'#30363d',true)
+      + line('0,'+h+' '+now,'#2dd4bf',false)
+      + '<circle cx="'+(timePct/100*w)+'" cy="'+(h-donePct/100*h)+'" r="3.2" fill="#2dd4bf"/>'
+      + '<text x="0" y="'+(h+10)+'" fill="#5a6472" font-size="8" font-family="var(--mono)">ม.ค.</text>'
+      + '<text x="'+(w-14)+'" y="'+(h+10)+'" fill="#5a6472" font-size="8" font-family="var(--mono)">ธ.ค.</text>';
+  })();
+
+  /* ── Agent: ตารางสถานะ เห็นสัดส่วนจริงโดยไม่ต้องอ่านตัวเลข ─────────── */
+  $('agbig').innerHTML = fmt(agd.online) + '<small> / ' + fmt(agd.total) + ' ออนไลน์</small>';
+  $('agn').textContent = 'ครอบคลุม ' + Math.round((agd.total||0)/total*100) + '% ของฟลีต';
+  $('agcap').innerHTML = 'อีก <span class="mono">' + fmt(total-(agd.total||0))
+    + '</span> เครื่องยังไม่มี Agent — สเปกและสุขภาพต้องกรอกมือ';
+  $('mtx').innerHTML = Array.from({length: agd.total||0}, function(_,i){
+    return '<i style="background:'+(i < (agd.online||0) ? 'var(--ok)' : '#30363d')+'"></i>';
+  }).join('');
+
+  /* ── log ─────────────────────────────────────────────────────────────── */
+  const T = function(){ return new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}); };
+  $('log').innerHTML = [
+    ['12:31','custody','ย้าย 81 เครื่องเข้าจุดรับฝาก'],
+    ['11:52','floorplan','วางที่นั่ง ACC-01 · Anongnart S.'],
+    ['09:14','agent','HQ-PS-N008 แบตเตอรี่ 11.1%'],
+    ['08:40','pm','ปิดงาน 3 เครื่อง · TRRCORP'],
+  ].map(function(r){
+    return '<div><span class="t">'+r[0]+'</span> <span class="k">'+r[1]+'</span> '+r[2]+'</div>';
+  }).join('');
+
+  /* ── ยุบสิ่งที่ปกติเหลือบรรทัดเดียว ─────────────────────────────────── */
+  const quiet = [];
+  quiet.push('ทะเบียนครบถ้วน <b>'+(ms.assetRegistry?ms.assetRegistry.healthPct:0)+'%</b>');
+  quiet.push('แจ้งเตือนส่งสำเร็จ <b>'+(ms.notifications?ms.notifications.successPct:0)+'%</b>');
+  quiet.push('ยืม-คืนเกินกำหนด <b>'+(bw.overdue||0)+'</b>');
+  $('quiet').innerHTML = '<span style="color:var(--ok);font-size:13px">✓</span> <b>ปกติ</b> · '
+    + quiet.join(' · ')
+    + ((bw.total||0)===0 ? ' <span class="dim">· โมดูลยืม-คืนไม่มีข้อมูลทั้งปี จึงไม่แสดงกราฟ</span>' : '');
+});
+</script>
+</body>
+</html>
