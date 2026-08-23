@@ -26,6 +26,7 @@ const PMPlanListPage = lazy(() => import('./pages/pm/PMPlanListPage'));
 const PMRunPage = lazy(() => import('./pages/pm/PMRunPage'));
 const PMSchedulePage = lazy(() => import('./pages/pm/PMSchedulePage'));
 const PMFloorPlanPage = lazy(() => import('./pages/pm/PMFloorPlanPage'));
+const ScanPage = lazy(() => import('./pages/ScanPage'));
 const DeviceTypesPage = lazy(() => import('./pages/assets/DeviceTypesPage'));
 const LocationsPage = lazy(() => import('./pages/assets/LocationsPage'));
 const VendorsPage = lazy(() => import('./pages/assets/VendorsPage'));
@@ -138,6 +139,9 @@ export default function App() {
           <Route path="pm/runs" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><PMRunPage /></ProtectedRoute>} />
           <Route path="pm/schedule" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><PMSchedulePage /></ProtectedRoute>} />
           <Route path="pm/floorplan" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><PMFloorPlanPage /></ProtectedRoute>} />
+          {/* หน้าสำหรับใช้บนมือถือหน้างาน — เปิดให้ทุกบทบาทที่เข้าระบบได้ เพราะ
+              การหาว่าเครื่องตรงหน้าคือเครื่องไหน ไม่ใช่ข้อมูลที่ต้องจำกัดสิทธิ์ */}
+          <Route path="scan" element={<ScanPage />} />
           <Route path="pm/templates" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><PMTemplatePage /></ProtectedRoute>} />
           {/* Reports */}
           <Route path="reports" element={<Navigate to="/reports/assets" replace />} />

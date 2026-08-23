@@ -18,6 +18,7 @@ import AddBoxIcon from '@mui/icons-material/AddBox';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import CategoryIcon from '@mui/icons-material/Category';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
+import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ImportExportIcon from '@mui/icons-material/ImportExport';
 import ErrorIcon from '@mui/icons-material/Error';
@@ -128,6 +129,7 @@ export const adminNav: NavEntry[] = [
       { label: 'แผน PM', path: '/pm/plans', icon: <AssignmentIcon fontSize="small" /> },
       { label: 'ทำ PM ทรัพย์สิน', path: '/pm/runs', icon: <PlayArrowIcon fontSize="small" /> },
       { label: 'แผนผังชั้น PM', path: '/pm/floorplan', icon: <LocationOnIcon fontSize="small" /> },
+      { label: 'สแกนหาเครื่อง', path: '/scan', icon: <QrCodeScannerIcon fontSize="small" /> },
       { label: 'Checklist Template', path: '/pm/templates', icon: <DescriptionIcon fontSize="small" /> },
       // ตู้ Switch/Hub เคยกาง 4 รายการที่ชื่อซ้ำกับด้านบนทุกบรรทัด (ภาพรวม/แผน/ตรวจ/Template)
       // ทั้งที่ทั้งกองมีการตรวจแค่ 6 ครั้ง ครั้งล่าสุด มิ.ย. 2569 — และหน้าทั้งสี่ลิงก์ถึงกัน

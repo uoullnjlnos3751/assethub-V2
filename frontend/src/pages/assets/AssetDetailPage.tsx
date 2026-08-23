@@ -27,6 +27,7 @@ import { DocumentsTab } from './tabs/DocumentsTab';
 import { AssetOverviewCard } from './components/AssetOverviewCard';
 import { AssetFinanceCard } from './components/AssetFinanceCard';
 import { AssetTimeline } from './components/AssetTimeline';
+import { CustodyChainCard } from './components/CustodyChainCard';
 import { AssetActionsPanel } from './components/AssetActionsPanel';
 import { AssetInsightTiles } from './components/AssetInsightTiles';
 import { AssetSpecMiniCard } from './components/AssetSpecMiniCard';
@@ -305,6 +306,7 @@ export default function AssetDetailPage() {
             flexDirection: 'column',
             gap: 2,
           }}>
+            <CustodyChainCard asset={asset} />
             <AssetTimeline asset={asset} maintenance={maintenance} />
             <AssetDocumentsRail asset={asset} onReload={reloadAsset} />
             <AssetActionsPanel

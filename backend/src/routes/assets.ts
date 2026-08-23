@@ -2858,15 +2858,48 @@ router.post('/bulk-update', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), a
     const { ids, data } = req.body;
     if (!Array.isArray(ids) || ids.length === 0) throw new AppError('No asset IDs provided', 400);
     if (!data || Object.keys(data).length === 0) throw new AppError('No update data provided', 400);
-    const allowed = ['status', 'departmentId', 'location', 'floor', 'company', 'ownerName', 'categoryId', 'brand', 'model'];
+    const allowed = ['status', 'departmentId', 'location', 'floor', 'company', 'ownerName', 'categoryId',
+                     'brand', 'model', 'vendor', 'purchaseDate', 'warrantyEndDate'];
     const updateData: any = {};
     for (const key of allowed) {
-      if (data[key] !== undefined) updateData[key] = data[key];
+      if (data[key] === undefined) continue;
+      updateData[key] = (key === 'purchaseDate' || key === 'warrantyEndDate')
+        ? (data[key] ? new Date(data[key]) : null)
+        : data[key];
     }
-    
+
     // Auto-clear ownerName if status is Retired or Disposed in bulk update
     if (updateData.status && (updateData.status === 'Retired' || updateData.status === 'Disposed')) {
       updateData.ownerName = null;
+    }
+
+    /**
+     * กรอกวันหมดประกันเป็นชุดจาก "อายุประกันกี่ปี" นับจากวันที่ซื้อของแต่ละเครื่อง
+     *
+     * วันหมดประกันกรอกไว้ 8 จาก 733 เครื่อง ทั้งที่มีวันที่ซื้ออยู่ 206 เครื่อง
+     * การกรอกทีละเครื่องคือเหตุผลที่มันว่าง แต่จะให้ระบบเดาอายุประกันเองก็ไม่ได้ —
+     * ตัวอย่างที่มีทั้งสองค่าอยู่ 6 เครื่อง กระจายตั้งแต่ 2.87 ถึง 3.92 ปี และ
+     * วันหมดประกันที่ผิดแย่กว่าช่องว่าง เพราะมันชี้นำการตัดสินใจซื้อ
+     *
+     * ตัวเลขอายุประกันจึงมาจากคนที่ถือใบสั่งซื้ออยู่ ระบบแค่คูณให้ทีละหลายเครื่อง
+     * เครื่องที่ไม่มีวันที่ซื้อจะถูกข้าม ไม่ใช่เดาวันซื้อให้
+     */
+    const years = Number(data.warrantyYearsFromPurchase);
+    let derived = 0, skipped = 0;
+    if (Number.isFinite(years) && years > 0 && years <= 10) {
+      const rows = await prisma.asset.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, purchaseDate: true },
+      });
+      await prisma.$transaction(rows.map(r => {
+        if (!r.purchaseDate) { skipped++; return prisma.asset.update({ where: { id: r.id }, data: {} }); }
+        const end = new Date(r.purchaseDate);
+        end.setFullYear(end.getFullYear() + Math.round(years));
+        derived++;
+        return prisma.asset.update({ where: { id: r.id }, data: { ...updateData, warrantyEndDate: end } });
+      }));
+      const note = skipped ? ` (ข้าม ${skipped} เครื่องที่ไม่มีวันที่ซื้อ)` : '';
+      return res.json({ message: `ตั้งวันหมดประกันจากวันที่ซื้อ + ${Math.round(years)} ปี ให้ ${derived} รายการ${note}` });
     }
 
     if (Object.keys(updateData).length === 0) throw new AppError('No valid fields to update', 400);

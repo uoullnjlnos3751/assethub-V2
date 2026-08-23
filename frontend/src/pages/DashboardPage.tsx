@@ -235,6 +235,14 @@ export default function DashboardPage() {
       actionLabel: 'ดูตาราง', href: '/pm/schedule',
     },
     {
+      key: 'missing-warranty', severity: 'info',
+      title: 'ยังไม่มีวันหมดประกัน',
+      detail: 'เป็นเหตุผลที่การ์ดใกล้หมดประกันว่างเปล่า — กรอกเป็นชุดได้จากหน้าทะเบียน',
+      count: dataHealth?.missingWarranty || 0,
+      of: dataHealth?.activeTotal || total, ofLabel: 'ของที่ยังไม่ปลดระวาง',
+      actionLabel: 'กรอกข้อมูล', href: '/assets?warrantyStatus=none',
+    },
+    {
       key: 'low-stock', severity: 'warn',
       title: 'วัสดุใกล้หมด',
       detail: 'ต่ำกว่าจุดสั่งซื้อ',

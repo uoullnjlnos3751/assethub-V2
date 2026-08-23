@@ -122,7 +122,16 @@ export async function dataHealth(prisma: PrismaClient) {
       },
     }),
   ]);
-  return { missingSerial, missingLocation, missingCompany, missingType, outdatedOSCount };
+  /* วันหมดประกันที่ยังว่าง — ช่องนี้เป็นเหตุผลเดียวที่การ์ด "ใกล้หมดประกัน" ว่าง
+     เปล่ามาตลอด ไม่ใช่เพราะฟีเจอร์พัง นับเฉพาะเครื่องที่ยังไม่ปลดระวาง */
+  const [missingWarranty, activeTotal] = await Promise.all([
+    prisma.asset.count({ where: { warrantyEndDate: null, NOT: { status: 'Retired' } } }),
+    prisma.asset.count({ where: { NOT: { status: 'Retired' } } }),
+  ]);
+  return {
+    missingSerial, missingLocation, missingCompany, missingType, outdatedOSCount,
+    missingWarranty, activeTotal,
+  };
 }
 
 export async function borrowSummary(prisma: PrismaClient) {
