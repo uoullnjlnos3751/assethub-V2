@@ -74,13 +74,19 @@ const ymd = (d: Date | null | undefined) => (d ? d.toISOString().slice(0, 10) : 
 
 const COMPUTER_TYPES = ['Notebook', 'PC Desktop', 'Macbook'];
 
+/**
+ * @param company ชื่อบริษัท หรือ null เพื่อรวมทั้งกลุ่ม
+ *
+ * แดชบอร์ดต้องการยอดรวมทั้งกลุ่ม ส่วนเอกสารที่ยื่นหน่วยงานต้องแยกบริษัท
+ * ใช้ตัวคำนวณตัวเดียวกันเพื่อไม่ให้ตัวเลขบนหน้าจอกับในเอกสารเถียงกันเอง
+ */
 export async function buildProcurementReport(
   prisma: PrismaClient,
-  company: string,
+  company: string | null,
   year: number,
 ): Promise<ProcurementReport> {
   const assets = await prisma.asset.findMany({
-    where: { company, type: { in: COMPUTER_TYPES }, NOT: { status: 'Retired' } },
+    where: { ...(company ? { company } : {}), type: { in: COMPUTER_TYPES }, NOT: { status: 'Retired' } },
     select: {
       id: true, assetName: true, departmentId: true, ownerName: true,
       ram: true, cpu: true, serialNo: true, purchaseDate: true,
@@ -177,7 +183,7 @@ export async function buildProcurementReport(
   replaceMachine.sort(bySeverity);
 
   return {
-    company,
+    company: company ?? 'ทุกบริษัท',
     year,
     generatedAt: new Date().toISOString(),
     coverage: {

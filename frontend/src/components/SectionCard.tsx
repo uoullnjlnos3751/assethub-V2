@@ -3,8 +3,9 @@ import { Box, Typography, alpha, useTheme } from '@mui/material';
 import { ArrowUpRight, type LucideIcon } from 'lucide-react';
 
 // Shared section card (themed) — icon + title header, optional top-right action link.
-export function SectionCard({ title, icon: Icon, action, actionLabel, children }: {
-  title: string; icon: LucideIcon; action?: () => void; actionLabel?: string; children: React.ReactNode;
+export function SectionCard({ title, subtitle, icon: Icon, action, actionLabel, children }: {
+  title: string; subtitle?: string; icon: LucideIcon;
+  action?: () => void; actionLabel?: string; children: React.ReactNode;
 }) {
   const theme = useTheme();
   return (
@@ -21,7 +22,14 @@ export function SectionCard({ title, icon: Icon, action, actionLabel, children }
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
           <Icon size={18} strokeWidth={2.2} color={theme.palette.primary.main} />
-          <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color: theme.palette.text.primary }}>{title}</Typography>
+          <Box>
+            <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color: theme.palette.text.primary }}>{title}</Typography>
+            {subtitle && (
+              <Typography sx={{ fontSize: '0.72rem', color: theme.palette.text.secondary, mt: '1px' }}>
+                {subtitle}
+              </Typography>
+            )}
+          </Box>
         </Box>
         {action && actionLabel && (
           <Box onClick={action} sx={{

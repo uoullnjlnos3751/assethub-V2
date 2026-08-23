@@ -14,6 +14,7 @@
  */
 import type { PrismaClient } from '@prisma/client';
 import { enabledHolders } from '../config/custodyHolders';
+import { buildProcurementReport } from './pmProcurement';
 
 export async function assetSummary(prisma: PrismaClient) {
   const [byStatus, byDepartment, byCompany, byType, byLocation, total, byCategory, costAgg] = await Promise.all([
@@ -283,6 +284,90 @@ export async function warrantyExpiring(prisma: PrismaClient, days: number) {
 }
 
 /**
+ * ทรัพย์สินอยู่ช่วงไหนของวงจรชีวิตบ้าง
+ *
+ * ระบบจัดตาม "โมดูล" มาตลอด ทำให้โมดูลที่ยังไม่มีข้อมูลดูเหมือนเมนูที่ไม่มีใครใช้
+ * พอเรียงเป็นวงจรชีวิตแทน ช่วงที่ว่างจะกลายเป็นข้อเท็จจริงที่ใช้ตัดสินใจได้ —
+ * "ยังไม่เริ่มบันทึกช่วงนี้" ต่างจาก "ช่วงนี้ไม่มีปัญหา" คนละเรื่องกัน
+ */
+export async function lifecycle(prisma: PrismaClient) {
+  const now = new Date();
+  const year = now.getFullYear();
+  const [
+    deliveryTotal, deliveryOpen,
+    inUse, available,
+    pmTotal, pmDone, maintenanceOpen,
+    custodyHeld,
+    retired, disposed,
+  ] = await Promise.all([
+    prisma.deliveryRequest.count(),
+    // ยังไม่ถึงมือผู้ใช้ = ยังไม่ CONFIRMED (ผู้รับยืนยันแล้ว) และไม่ใช่สายคืนของ
+    prisma.deliveryRequest.count({
+      where: { status: { notIn: ['CONFIRMED', 'RETURNED'] } },
+    }),
+    prisma.asset.count({ where: { status: 'InUse' } }),
+    prisma.asset.count({ where: { status: 'Available' } }),
+    prisma.pMRun.count({ where: { year } }),
+    prisma.pMRun.count({ where: { year, status: 'COMPLETED' } }),
+    prisma.asset.count({ where: { status: 'Maintenance' } }),
+    prisma.asset.count({ where: { custodyHolder: { not: null } } }),
+    prisma.asset.count({ where: { status: 'Retired' } }),
+    prisma.assetDisposal.count(),
+  ]);
+
+  return [
+    {
+      key: 'deliver', label: 'จัดหา & ส่งมอบ', value: deliveryTotal,
+      detail: deliveryOpen > 0 ? `ค้างอยู่ ${deliveryOpen} รายการ` : 'ยังไม่มีการบันทึกการส่งมอบ',
+      started: deliveryTotal > 0, href: '/deliveries',
+    },
+    {
+      key: 'inuse', label: 'ใช้งานอยู่', value: inUse,
+      detail: `พร้อมจ่ายอีก ${available} เครื่อง`,
+      started: true, href: '/assets?status=InUse',
+    },
+    {
+      key: 'maintain', label: 'ดูแล & ซ่อมบำรุง', value: pmDone,
+      detail: pmTotal > 0
+        ? `PM ${pmDone}/${pmTotal} · ซ่อมอยู่ ${maintenanceOpen}`
+        : 'ยังไม่มีแผน PM ปีนี้',
+      started: pmTotal > 0, href: '/pm/runs',
+    },
+    {
+      key: 'recover', label: 'เรียกคืน & รับฝาก', value: custodyHeld,
+      detail: custodyHeld > 0 ? 'รอตัดสินใจว่าจ่ายต่อหรือจำหน่าย' : 'ยังไม่มีเครื่องฝากไว้',
+      started: custodyHeld > 0, href: '/assets?custodyHolder=IT_STORE',
+    },
+    {
+      key: 'dispose', label: 'จำหน่ายออก', value: retired,
+      detail: disposed > 0
+        ? `บันทึกการจำหน่ายแล้ว ${disposed} รายการ`
+        : `ปลดระวางแล้วแต่ยังไม่บันทึกการจำหน่ายสักรายการ`,
+      started: disposed > 0, href: '/disposals',
+    },
+  ];
+}
+
+/**
+ * ผลลัพธ์ที่เสนอไปแล้วปีนี้ — ตัวเลขที่ผู้บริหารสนใจ ไม่ใช่จำนวนทรัพย์สิน
+ *
+ * ใช้ตัวคำนวณเดียวกับเอกสารที่ยื่นหน่วยงาน (buildProcurementReport) แต่ไม่กรอง
+ * บริษัท ตัวเลขบนแดชบอร์ดกับในเอกสารจึงเถียงกันเองไม่ได้
+ */
+export async function procurementOutcome(prisma: PrismaClient, year: number) {
+  const r = await buildProcurementReport(prisma, null, year);
+  return {
+    addRam: r.addRam.length,
+    replaceBattery: r.replaceBattery.length,
+    replaceMachine: r.replaceMachine.length,
+    // เหตุผลที่ต้องโชว์: เสนอเพิ่ม RAM แทนเปลี่ยนเครื่องได้กี่เครื่อง คือส่วนที่
+    // ประหยัดจริง และเป็นตัวเลขที่ไม่เคยขึ้นหน้าแรกมาก่อน
+    savedByRamUpgrade: r.addRam.length,
+    coverage: r.coverage,
+  };
+}
+
+/**
  * ทุกก้อนในคำขอเดียว
  *
  * ก้อนที่ล้มไม่ควรลากทั้งแดชบอร์ดลงไปด้วย — Agent เป็นบริการภายนอกที่ล่มได้
@@ -296,7 +381,7 @@ async function settle<T>(p: Promise<T>): Promise<T | null> {
 export async function dashboardOverview(prisma: PrismaClient, opts: { year: number; warrantyDays: number }) {
   const [
     assets, modules, categories, inventory, health, borrow, trend,
-    pm, agents, custody, activity, alerts, warranty,
+    pm, agents, custody, activity, alerts, warranty, stages, outcome,
   ] = await Promise.all([
     settle(assetSummary(prisma)),
     settle(moduleStatus(prisma)),
@@ -311,11 +396,13 @@ export async function dashboardOverview(prisma: PrismaClient, opts: { year: numb
     settle(recentActivity(prisma)),
     settle(proactiveAlerts(prisma)),
     settle(warrantyExpiring(prisma, opts.warrantyDays)),
+    settle(lifecycle(prisma)),
+    settle(procurementOutcome(prisma, opts.year)),
   ]);
   return {
     generatedAt: new Date().toISOString(),
     year: opts.year,
     assets, modules, categories, inventory, health, borrow, trend,
-    pm, agents, custody, activity, alerts, warranty,
+    pm, agents, custody, activity, alerts, warranty, stages, outcome,
   };
 }

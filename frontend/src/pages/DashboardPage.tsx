@@ -4,7 +4,7 @@ import { Box, Typography, alpha, useTheme } from '@mui/material';
 import {
   LayoutDashboard, Boxes, ShoppingCart, Wrench,
   CheckCircle2, Clock, Shield, ClipboardList,
-  RotateCcw, ArrowUpRight,
+  RotateCcw, ArrowUpRight, AlertTriangle,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -12,22 +12,19 @@ import { dashboardAPI, contractAPI, licenseAPI, presenceAPI } from '../services/
 import LoadingSkeleton from '../components/LoadingSkeleton';
 import { KpiCard } from './dashboard/components/KpiCard';
 import { OpsRoomCard } from './dashboard/components/OpsRoomCard';
-import { ProactiveAlertsBar } from './dashboard/components/ProactiveAlertsBar';
 import { CategoryDonutCard } from './dashboard/components/CategoryDonutCard';
-import { BorrowTrendCard } from './dashboard/components/BorrowTrendCard';
-import { RecentActivityCard } from './dashboard/components/RecentActivityCard';
 import { QuickActionsPanel } from './dashboard/components/QuickActionsPanel';
 import { AssetStatusBreakdownCard } from './dashboard/components/AssetStatusBreakdownCard';
 import { LocationBreakdownCard } from './dashboard/components/LocationBreakdownCard';
-import { BorrowSummaryCard } from './dashboard/components/BorrowSummaryCard';
-import { PMSummaryCard } from './dashboard/components/PMSummaryCard';
-import { DataHealthCard } from './dashboard/components/DataHealthCard';
 import { WarrantyAlertsCard } from './dashboard/components/WarrantyAlertsCard';
 import { ContractLicenseSummary } from './dashboard/components/ContractLicenseSummary';
-import { ModuleStatusCard } from './dashboard/components/ModuleStatusCard';
 import { ExternalAgentsSummaryCard } from './dashboard/components/ExternalAgentsSummaryCard';
-import { CustodySummaryCard, CustodySummaryEntry } from './dashboard/components/CustodySummaryCard';
+import { CustodySummaryEntry } from './dashboard/components/CustodySummaryCard';
 import { CategoryUtilizationCard } from './dashboard/components/CategoryUtilizationCard';
+import { AttentionQueue, AttentionItem } from './dashboard/components/AttentionQueue';
+import { LifecycleStrip, Stage } from './dashboard/components/LifecycleStrip';
+import { QuietStatusBar } from './dashboard/components/QuietStatusBar';
+import { OutcomeStrip } from './dashboard/components/OutcomeStrip';
 import { now, pct } from './dashboard/dashboardHelpers';
 
 // ── Main Dashboard ──────────────────────────────────────────────────────────
@@ -51,6 +48,8 @@ export default function DashboardPage() {
   const [moduleStatus, setModuleStatus] = useState<any>(null);
   const [categoryUtilization, setCategoryUtilization] = useState<any[]>([]);
   const [inventoryLowStock, setInventoryLowStock] = useState<any>(null);
+  const [stages, setStages] = useState<Stage[]>([]);
+  const [outcome, setOutcome] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -81,6 +80,8 @@ export default function DashboardPage() {
           setWarrantyData(d.warranty);
           setExternalAgentsSummary(d.agents?.available ? d.agents.data : null);
           setCustodySummary({ data: d.custody?.data || [], total: d.custody?.total || 0 });
+          setStages(d.stages || []);
+          setOutcome(d.outcome);
         })
         .catch(() => {})
         .finally(() => setLoading(false));
@@ -178,17 +179,78 @@ export default function DashboardPage() {
     (r: any) => r.returnedAt && new Date(r.returnedAt).toDateString() === todayStr
   ).length;
 
-  // Alerts list (from real proactive-alerts data)
-  const alerts: { icon: LucideIcon; text: string; sub: string; colorKey: string }[] = [];
-  if (proactiveAlerts) {
-    if (proactiveAlerts.overdueItems > 0) alerts.push({ icon: Clock, text: `ยืมเกินกำหนด ${proactiveAlerts.overdueItems} รายการ`, sub: 'กรุณาติดตามผู้ยืม', colorKey: 'error' });
-    if (proactiveAlerts.pendingApprovals > 0) alerts.push({ icon: ClipboardList, text: `รออนุมัติ ${proactiveAlerts.pendingApprovals} รายการ`, sub: 'คำขอยืมรอการตรวจสอบ', colorKey: 'warning' });
-    if (proactiveAlerts.upcomingPMs > 0) alerts.push({ icon: Shield, text: `มีแผน PM ในสัปดาห์นี้ ${proactiveAlerts.upcomingPMs} รายการ`, sub: 'เตรียมความพร้อมการตรวจนับ', colorKey: 'warning' });
-  }
-  if (alerts.length === 0) {
-    if (maintenance > 0) alerts.push({ icon: Wrench, text: `ส่งซ่อม ${maintenance} รายการ`, sub: 'อุปกรณ์อยู่ระหว่างซ่อม', colorKey: 'warning' });
-    else alerts.push({ icon: CheckCircle2, text: 'ไม่มีการแจ้งเตือนด่วน', sub: 'ระบบทำงานปกติทุกส่วน', colorKey: 'success' });
-  }
+
+  /* คิวงาน — เฉพาะเรื่องที่มีจำนวนจริง เรื่องที่เป็นศูนย์ไม่ต้องกินพื้นที่
+     ตัวหารของแต่ละเรื่องต่างกัน จึงต้องระบุไว้ ไม่งั้น 31 กับ 274 เทียบกันไม่ได้ */
+  const agentTotal = externalAgentsSummary?.total || 0;
+  const agentOffline = externalAgentsSummary?.offline || 0;
+  const attention: AttentionItem[] = [
+    {
+      key: 'agent-offline', severity: 'crit',
+      title: 'Agent ออฟไลน์',
+      detail: 'ไม่ส่งข้อมูลเข้ามา สเปกและสุขภาพเครื่องหยุดอัปเดต',
+      count: agentOffline, of: agentTotal, ofLabel: 'ของเครื่องที่ติดตั้ง',
+      actionLabel: 'ตรวจสอบ', href: '/assets/agent-drift',
+    },
+    {
+      key: 'outdated-os', severity: 'crit',
+      title: 'ระบบปฏิบัติการล้าสมัย',
+      detail: 'เสี่ยงต่อช่องโหว่ที่เวอร์ชันใหม่แพตช์ไปแล้ว',
+      count: dataHealth?.outdatedOSCount || 0, of: total, ofLabel: 'ของทรัพย์สินทั้งหมด',
+      actionLabel: 'ดูรายการ', href: '/assets',
+    },
+    {
+      key: 'custody', severity: 'warn',
+      title: 'ค้างอยู่ในจุดรับฝาก',
+      detail: 'เครื่องที่ไม่ได้ใช้งาน รอตัดสินใจว่าจ่ายต่อหรือจำหน่าย',
+      count: custodySummary.total, of: total, ofLabel: 'ของทรัพย์สินทั้งหมด',
+      actionLabel: 'จัดการ', href: '/assets?custodyHolder=IT_STORE',
+    },
+    {
+      key: 'pm-overdue', severity: 'warn',
+      title: 'PM เลยกำหนด',
+      detail: 'งานที่พ้นวันสิ้นสุดแผนแล้วแต่ยังไม่ปิด',
+      count: pmOverdue, of: pmTotal, ofLabel: 'ของแผนทั้งปี',
+      actionLabel: 'เปิดคิว', href: '/pm/runs',
+    },
+    {
+      key: 'borrow-overdue', severity: 'warn',
+      title: 'ยืมเกินกำหนด',
+      detail: 'ต้องติดตามผู้ยืม',
+      count: borrowOverdue, of: borrowActive || 1, ofLabel: 'ของที่ยืมอยู่',
+      actionLabel: 'ติดตาม', href: '/borrow/history',
+    },
+    {
+      key: 'approvals', severity: 'info',
+      title: 'คำขอยืมรออนุมัติ',
+      detail: 'รอการตรวจสอบ',
+      count: borrowPending, of: borrowSummary?.total || 1, ofLabel: 'ของคำขอทั้งหมด',
+      actionLabel: 'อนุมัติ', href: '/borrow/approval-queue',
+    },
+    {
+      key: 'upcoming-pm', severity: 'info',
+      title: 'PM กำหนดสัปดาห์นี้',
+      detail: 'เตรียมอุปกรณ์และแจ้งผู้ใช้ล่วงหน้า',
+      count: proactiveAlerts?.upcomingPMs || 0, of: pmTotal, ofLabel: 'ของแผนทั้งปี',
+      actionLabel: 'ดูตาราง', href: '/pm/schedule',
+    },
+    {
+      key: 'low-stock', severity: 'warn',
+      title: 'วัสดุใกล้หมด',
+      detail: 'ต่ำกว่าจุดสั่งซื้อ',
+      count: inventoryLowStock?.lowStockCount || 0,
+      of: inventoryLowStock?.totalQuantity || 1, ofLabel: 'ของสต๊อกทั้งหมด',
+      actionLabel: 'เติมสต๊อก', href: '/inventory',
+    },
+  ];
+
+  /* โมดูลที่สุขภาพดีไม่ต้องได้การ์ด — ยุบเป็นบรรทัดเดียว
+     ส่วนโมดูลที่ยังไม่มีข้อมูลแยกออกมา เพราะ "ยังไม่เริ่มใช้" ไม่ใช่ "ปกติ" */
+  const quietOk = [
+    moduleStatus?.assetRegistry && { label: 'ทะเบียนครบถ้วน', value: `${moduleStatus.assetRegistry.healthPct}%` },
+    moduleStatus?.notifications && { label: 'แจ้งเตือนส่งสำเร็จ', value: `${moduleStatus.notifications.successPct}%` },
+  ].filter(Boolean) as { label: string; value: string }[];
+  const quietNotStarted = (stages || []).filter(st => !st.started).map(st => st.label);
 
   return (
     <Box sx={{ pb: 3 }}>
@@ -215,35 +277,46 @@ export default function DashboardPage() {
         </Box>
       </Box>
 
-      <ProactiveAlertsBar alerts={alerts} />
-
-      {/* ── Row 1: 4 KPI cards (mockup-style) ────────────────────── */}
+      {/* ── Row 1: 4 KPI cards — เลือกเฉพาะตัวที่เปลี่ยนแปลงและมีความหมาย
+              ตัวที่เคยเป็น "กำลังยืม" ถูกแทนด้วย OS ล้าสมัย เพราะโมดูลยืม-คืน
+              เป็นศูนย์ทั้งปี ส่วน OS ล้าสมัยคือ 34% ของฟลีตที่ไม่เคยขึ้นหน้าแรก ── */}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 1.5, mb: 2 }}>
         <KpiCard
           icon={Boxes} label="ทรัพย์สิน IT ทั้งหมด" value={total}
-          sub={`พร้อมใช้ ${available} · ซ่อม ${maintenance}`}
+          sub={`ใช้งานอยู่ ${(byStatus.find(s => s.status === 'InUse')?._count || 0)} · พร้อมใช้ ${available}`}
           accent={theme.palette.primary.main}
           onClick={() => navigate('/assets')}
         />
         <KpiCard
-          icon={ShoppingCart} label="กำลังยืม / รออนุมัติ" value={borrowActive}
-          sub={`รออนุมัติ ${borrowPending} · เกินกำหนด ${borrowOverdue}`}
-          accent={theme.palette.warning.main}
-          onClick={() => navigate('/borrow/approval-queue')}
-        />
-        <KpiCard
-          icon={Wrench} label="งานซ่อมเปิดอยู่" value={maintenance}
-          sub="อุปกรณ์ระหว่างซ่อมบำรุง"
-          accent={theme.palette.error.main}
-          onClick={() => navigate('/assets?status=Maintenance')}
-        />
-        <KpiCard
           icon={Shield} label="PM เสร็จแล้ว" value={`${pmPct}%`}
-          sub={`${pmDone}/${pmTotal} แผนงาน`}
+          sub={`${pmDone}/${pmTotal} แผนงาน${pmOverdue > 0 ? ` · เลยกำหนด ${pmOverdue}` : ''}`}
           accent={theme.palette.success.main}
           onClick={() => navigate('/pm/runs')}
         />
+        <KpiCard
+          icon={AlertTriangle} label="OS ล้าสมัย" value={dataHealth?.outdatedOSCount ?? 0}
+          sub={total ? `${Math.round(((dataHealth?.outdatedOSCount || 0) / total) * 100)}% ของทรัพย์สินทั้งหมด` : ''}
+          accent={theme.palette.error.main}
+          onClick={() => navigate('/assets')}
+        />
+        <KpiCard
+          icon={Wrench} label="ค้างในจุดรับฝาก" value={custodySummary.total}
+          sub={custodySummary.data.map(c => `${c.label.replace(' (TRRT)', '')} ${c.count}`).join(' · ') || 'ยังไม่มีเครื่องฝากไว้'}
+          accent={theme.palette.warning.main}
+          onClick={() => navigate('/assets?custodyHolder=IT_STORE')}
+        />
       </Box>
+
+      {/* ── วงจรชีวิต: ช่วงที่ยังไม่เริ่มบันทึกจะจางและเขียนบอกตรง ๆ ── */}
+      <LifecycleStrip stages={stages} navigate={navigate} />
+
+      {/* ── สิ่งที่ต้องลงมือ เรียงตามความเร่งด่วน ── */}
+      <Box sx={{ mb: 2 }}>
+        <AttentionQueue items={attention} navigate={navigate} />
+      </Box>
+
+      {/* ── ผลลัพธ์จากการตรวจ PM ── */}
+      <OutcomeStrip outcome={outcome} year={new Date().getFullYear()} navigate={navigate} />
 
       {/* ── Row 2: IT Operations Room (live) + Donut ─────────────── */}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '7fr 5fr' }, gap: 1.5, mb: 2 }}>
@@ -259,44 +332,25 @@ export default function DashboardPage() {
         <CategoryDonutCard byCategory={byCategory} total={total} onNavigate={() => navigate('/assets')} />
       </Box>
 
-      {/* ── Row 3: Trend bar chart ───────────────────────────────── */}
-      <Box sx={{ mb: 2 }}>
-        <BorrowTrendCard trendData={trendData} onNavigate={() => navigate('/reports/borrow')} />
-      </Box>
-
-      {/* ── Row 4: Recent activity + Quick actions ───────────────── */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '8fr 4fr' }, gap: 1.5, mb: 2 }}>
-        <RecentActivityCard activityData={activityData} onNavigate={() => navigate('/borrow/history')} />
+      {/* ── Row 3: ทางลัด + สัดส่วนหมวด + Agent ─────────────────────
+              กราฟแนวโน้มยืม-คืนกับกิจกรรมล่าสุดถูกถอดออก ทั้งคู่เป็นศูนย์ตลอด 12
+              เดือนของปีนี้ กราฟที่ไม่มีเส้นกินพื้นที่เท่ากับกราฟที่มีข้อมูล
+              โมดูลยืม-คืนไปปรากฏในแถบวงจรชีวิตแทน ซึ่งบอกได้ว่า "ยังไม่เริ่มใช้" ── */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', lg: externalAgentsSummary ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)' }, gap: 1.5, mb: 2 }}>
+        <CategoryUtilizationCard categories={categoryUtilization} onNavigate={() => navigate('/assets')} />
+        <ExternalAgentsSummaryCard summary={externalAgentsSummary} />
         <QuickActionsPanel onNavigate={navigate} />
       </Box>
 
-      {/* ── Row 5: Status breakdown + Location + Borrow + PM ─────── */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 1.5, mb: 2 }}>
+      {/* ── Row 4: รายละเอียดที่ยังต้องดูเป็นตาราง ── */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 1.5, mb: 2 }}>
         <AssetStatusBreakdownCard byStatus={byStatus} total={total} onNavigate={() => navigate('/assets')} />
         <LocationBreakdownCard byLocation={byLocation} total={total} onNavigate={() => navigate('/assets')} />
-        <BorrowSummaryCard borrowActive={borrowActive} borrowPending={borrowPending} borrowOverdue={borrowOverdue} onNavigate={() => navigate('/borrow/approval-queue')} />
-        <PMSummaryCard pmTotal={pmTotal} pmDone={pmDone} pmPct={pmPct} onNavigate={() => navigate('/pm')} />
-      </Box>
-
-      {/* ── Row 6: Module status + Category utilization + External agents ── */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', lg: externalAgentsSummary ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)' }, gap: 1.5, mb: 2 }}>
-        <ModuleStatusCard moduleStatus={moduleStatus} />
-        <CategoryUtilizationCard categories={categoryUtilization} onNavigate={() => navigate('/assets')} />
-        <ExternalAgentsSummaryCard summary={externalAgentsSummary} />
-      </Box>
-
-      {/* ── Row 7: Data Health + Warranty + Custody ──────────────── */}
-      {/* CustodySummaryCard renders null while nothing is held, so the row
-          stays two-up until HR actually starts checking devices in. */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', lg: custodySummary.total > 0 ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)' }, gap: 1.5, mb: 2 }}>
-        <DataHealthCard dataHealth={dataHealth} navigate={navigate} />
         <WarrantyAlertsCard warrantyData={warrantyData} navigate={navigate} />
-        <CustodySummaryCard
-          entries={custodySummary.data}
-          total={custodySummary.total}
-          onNavigate={(code) => navigate(`/assets?custodyHolder=${code}`)}
-        />
       </Box>
+
+      {/* ── ทุกอย่างที่ปกติ ยุบเหลือแถบเดียว ── */}
+      <QuietStatusBar ok={quietOk} notStarted={quietNotStarted} />
 
       {/* ── Row 8: Executive Summary — Contract & License ─────── */}
       <ContractLicenseSummary contractList={contractList} licenseList={licenseList} navigate={navigate} />
