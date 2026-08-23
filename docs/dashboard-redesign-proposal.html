@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="utf-8">
-<title>Dashboard — ข้อเสนอ</title>
+<title>Dashboard — ข้อเสนอ (สบายตา)</title>
 <!--
   เอกสารข้อเสนอ ไม่ใช่ส่วนหนึ่งของแอป
 
@@ -10,261 +10,307 @@
   (http://localhost:5173/dashboard-redesign-proposal.html) เพราะดึงข้อมูลจริง
   จาก /api/dashboard/* ด้วย cookie ของ session
 
-  ตัวเลขทุกตัวในหน้านี้มาจาก API จริง ไม่มีค่าสมมุติ ยกเว้นบล็อก log ท้ายไฟล์
-  ที่ยังเป็นตัวอย่าง เพราะ /dashboard/recent-activity คืนค่าว่าง
+  ตัวเลขทุกตัวมาจาก API จริง ไม่มีค่าสมมุติ
 -->
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap">
 <style>
   :root{
-    --bg:#0a0c10; --panel:#111419; --panel2:#151920; --line:#1f2630; --line2:#2a3340;
-    --ink:#e6edf3; --ink2:#8b949e; --ink3:#5a6472;
-    --crit:#f85149; --warn:#d29922; --ok:#3fb950; --info:#58a6ff; --accent:#2dd4bf;
-    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
-    --sans:"IBM Plex Sans Thai",-apple-system,"Segoe UI",sans-serif;
+    --bg:#f7f8fa;
+    --card:#ffffff;
+    --line:#ecedf0;
+    --line-soft:#f2f3f5;
+    --ink:#101828;
+    --ink2:#667085;
+    --ink3:#98a2b3;
+    --brand:#4f46e5;
+    --brand-soft:#eef2ff;
+    --ok:#12b76a;      --ok-soft:#ecfdf3;
+    --warn:#f79009;    --warn-soft:#fffaeb;
+    --crit:#f04438;    --crit-soft:#fef3f2;
+    --info:#2e90fa;    --info-soft:#eff8ff;
+    --r:14px;
+    --font:"IBM Plex Sans Thai","Inter",-apple-system,"Segoe UI",sans-serif;
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13px;
-       padding:14px 18px 24px;-webkit-font-smoothing:antialiased}
-  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;
+       line-height:1.55;padding:26px 30px 40px;-webkit-font-smoothing:antialiased}
+  .num{font-variant-numeric:tabular-nums;letter-spacing:-.02em}
 
-  /* ── top bar ─────────────────────────────────────────────────────────── */
-  .bar{display:flex;align-items:center;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--line)}
-  .logo{font-family:var(--mono);font-weight:600;letter-spacing:.06em;font-size:13px}
-  .env{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:4px;
-       background:rgba(63,185,80,.12);color:var(--ok);border:1px solid rgba(63,185,80,.3)}
-  .bar .sp{flex:1}
-  .kbd{font-family:var(--mono);font-size:10.5px;color:var(--ink3);border:1px solid var(--line2);
-       border-radius:5px;padding:3px 8px}
-  .pulse{width:6px;height:6px;border-radius:50%;background:var(--ok);
-         box-shadow:0 0 0 0 rgba(63,185,80,.6);animation:p 2.4s infinite}
-  @keyframes p{70%{box-shadow:0 0 0 7px rgba(63,185,80,0)}100%{box-shadow:0 0 0 0 rgba(63,185,80,0)}}
+  /* ── header ──────────────────────────────────────────────────────────── */
+  header{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:24px}
+  h1{font-size:24px;font-weight:700;letter-spacing:-.02em}
+  .sub{font-size:13.5px;color:var(--ink2);margin-top:3px}
+  .seg{display:flex;background:#fff;border:1px solid var(--line);border-radius:9px;padding:3px;gap:2px}
+  .seg button{border:0;background:transparent;font-family:inherit;font-size:12.5px;font-weight:500;
+    color:var(--ink2);padding:6px 13px;border-radius:6px;cursor:pointer;transition:.15s}
+  .seg button.on{background:var(--brand);color:#fff}
 
-  h2{font-size:10.5px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;
-     color:var(--ink3);margin:16px 0 8px;display:flex;align-items:center;gap:8px}
-  h2 .n{font-family:var(--mono);color:var(--ink2);letter-spacing:0}
+  /* ── stat cards ──────────────────────────────────────────────────────── */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:16px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px}
+  .stat .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .stat .lbl{font-size:13px;color:var(--ink2);font-weight:500}
+  .ico{width:34px;height:34px;border-radius:9px;display:grid;place-items:center}
+  .ico svg{width:17px;height:17px}
+  .stat .v{font-size:29px;font-weight:700;line-height:1.15}
+  .stat .foot{display:flex;align-items:center;gap:7px;margin-top:8px;font-size:12.5px;color:var(--ink2)}
+  .pill{font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:20px}
 
-  /* ── attention queue ─────────────────────────────────────────────────── */
-  .q{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--panel)}
-  .row{display:grid;grid-template-columns:3px 92px 1fr 210px 92px 18px;align-items:center;
-       gap:14px;padding:11px 14px 11px 0;border-bottom:1px solid var(--line);cursor:pointer;
-       transition:background .12s}
-  .row:last-child{border-bottom:none}
-  .row:hover{background:var(--panel2)}
-  .row .stripe{width:3px;height:100%;min-height:38px;border-radius:0 2px 2px 0}
-  .row .big{font-family:var(--mono);font-size:22px;font-weight:600;text-align:right;line-height:1}
-  .row .ttl{font-size:13px;font-weight:500}
-  .row .sub{font-size:11px;color:var(--ink2);margin-top:2px}
-  .row .meter{height:5px;border-radius:3px;background:var(--line);overflow:hidden}
-  .row .meter i{display:block;height:100%;border-radius:3px}
-  .row .mtxt{font-family:var(--mono);font-size:10px;color:var(--ink3);margin-top:5px}
-  .row .act{font-family:var(--mono);font-size:10.5px;color:var(--ink2);text-align:right}
-  .row .arw{color:var(--ink3);font-size:14px}
+  /* ── layout ──────────────────────────────────────────────────────────── */
+  .cols{display:grid;grid-template-columns:1.55fr 1fr;gap:16px;align-items:start}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+  .card > .hd{display:flex;align-items:center;justify-content:space-between;
+    padding:16px 20px 13px;border-bottom:1px solid var(--line-soft)}
+  .hd h2{font-size:15px;font-weight:600}
+  .hd .h-sub{font-size:12.5px;color:var(--ink3);margin-top:1px}
+  .hd a{font-size:12.5px;color:var(--brand);text-decoration:none;font-weight:500;white-space:nowrap}
+  .bd{padding:6px 8px 8px}
+  .bd.pad{padding:18px 20px 20px}
 
-  /* ── fleet strip ─────────────────────────────────────────────────────── */
-  .strip{display:flex;height:26px;border-radius:6px;overflow:hidden;border:1px solid var(--line)}
-  .strip div{display:flex;align-items:center;justify-content:center;font-family:var(--mono);
-             font-size:10.5px;color:#0a0c10;font-weight:600}
-  .legend{display:flex;gap:16px;margin-top:7px;font-size:11px;color:var(--ink2);flex-wrap:wrap}
-  .legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px}
+  /* ── attention rows ──────────────────────────────────────────────────── */
+  .item{display:grid;grid-template-columns:38px 1fr auto;gap:14px;align-items:center;
+    padding:13px 12px;border-radius:10px;cursor:pointer;transition:background .13s}
+  .item:hover{background:var(--bg)}
+  .item .dot{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;
+    font-size:15px;font-weight:700}
+  .item .t{font-size:13.5px;font-weight:600}
+  .item .d{font-size:12.5px;color:var(--ink2);margin-top:1px}
+  .item .r{text-align:right}
+  .item .rv{font-size:16px;font-weight:700}
+  .item .rd{font-size:11.5px;color:var(--ink3)}
+  .track{height:6px;border-radius:4px;background:var(--line);overflow:hidden;margin-top:7px;max-width:340px}
+  .track i{display:block;height:100%;border-radius:4px}
 
-  /* ── panels ──────────────────────────────────────────────────────────── */
-  .grid{display:grid;grid-template-columns:1.15fr 1fr 1.25fr;gap:12px;margin-top:16px}
-  .p{border:1px solid var(--line);border-radius:9px;background:var(--panel);padding:13px 15px}
-  .p h3{font-size:11px;font-weight:600;color:var(--ink2);letter-spacing:.05em;margin-bottom:12px;
-        display:flex;justify-content:space-between;align-items:baseline}
-  .p h3 span{font-family:var(--mono);font-size:10px;color:var(--ink3);letter-spacing:0}
+  /* ── donut / list ────────────────────────────────────────────────────── */
+  .legend{margin-top:14px}
+  .lrow{display:flex;align-items:center;gap:10px;padding:7px 0;font-size:13px}
+  .lrow .sw{width:9px;height:9px;border-radius:3px;flex:none}
+  .lrow .nm{flex:1;color:var(--ink2)}
+  .lrow .vl{font-weight:600}
+  .lrow .pc{color:var(--ink3);font-size:12px;width:38px;text-align:right}
 
-  .stat{font-family:var(--mono);font-size:30px;font-weight:600;line-height:1}
-  .stat small{font-size:13px;color:var(--ink3);font-weight:400}
-  .cap{font-size:11px;color:var(--ink2);margin-top:5px}
+  /* ── ok strip ────────────────────────────────────────────────────────── */
+  .okbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--ok-soft);
+    border:1px solid #d1fadf;border-radius:var(--r);padding:13px 18px;margin-top:16px;font-size:13px;color:#05603a}
+  .okbar b{font-weight:600}
+  .okbar .muted{color:#5d7a6c}
 
-  /* agent matrix */
-  .mtx{display:grid;grid-template-columns:repeat(11,1fr);gap:4px;margin-top:4px}
-  .mtx i{aspect-ratio:1;border-radius:2.5px;display:block}
-
-  /* log */
-  .log{font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--ink2);
-       max-height:132px;overflow:auto}
-  .log .t{color:var(--ink3)}
-  .log .k{color:var(--accent)}
-
-  /* quiet footer */
-  .quiet{margin-top:14px;border:1px solid var(--line);border-radius:9px;background:var(--panel);
-         padding:10px 15px;display:flex;gap:20px;align-items:center;flex-wrap:wrap;font-size:11.5px;
-         color:var(--ink2)}
-  .quiet b{color:var(--ok);font-family:var(--mono);font-weight:500}
-  .quiet .dim{color:var(--ink3)}
-  .note{margin-top:16px;border-left:2px solid var(--info);background:rgba(88,166,255,.05);
-        padding:11px 15px;border-radius:0 8px 8px 0;font-size:12px;line-height:1.9;color:var(--ink2)}
-  .note b{color:var(--ink)}
+  .note{margin-top:18px;background:#fff;border:1px solid var(--line);border-left:3px solid var(--brand);
+    border-radius:0 var(--r) var(--r) 0;padding:15px 20px;font-size:13px;line-height:2;color:var(--ink2)}
+  .note b{color:var(--ink);font-weight:600}
 </style>
 </head>
 <body>
 
-<div class="bar">
-  <span class="logo">ITAM</span>
-  <span class="env">PROD</span>
-  <span class="sp"></span>
-  <span class="kbd">⌘K ค้นหา</span>
-  <span class="pulse"></span>
-  <span class="mono" style="font-size:11px;color:var(--ink3)" id="sync">—</span>
+<header>
+  <div>
+    <h1>ภาพรวมระบบ</h1>
+    <div class="sub" id="hello">—</div>
+  </div>
+  <div class="seg">
+    <button class="on">วันนี้</button><button>7 วัน</button><button>30 วัน</button>
+  </div>
+</header>
+
+<div class="stats" id="stats"></div>
+
+<div class="cols">
+  <div>
+    <div class="card">
+      <div class="hd">
+        <div><h2>ต้องจัดการ</h2><div class="h-sub" id="qsub">—</div></div>
+        <a href="#">ดูทั้งหมด</a>
+      </div>
+      <div class="bd" id="queue"></div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="hd">
+        <div><h2>ความคืบหน้า PM ประจำปี</h2><div class="h-sub" id="pmsub">—</div></div>
+        <a href="#">เปิดคิวงาน</a>
+      </div>
+      <div class="bd pad">
+        <svg id="chart" viewBox="0 0 620 150" preserveAspectRatio="none" style="width:100%;height:150px"></svg>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="card">
+      <div class="hd"><div><h2>สถานะทรัพย์สิน</h2><div class="h-sub" id="dsub">—</div></div></div>
+      <div class="bd pad" style="display:flex;flex-direction:column;align-items:center">
+        <svg id="donut" viewBox="0 0 180 180" style="width:172px;height:172px"></svg>
+        <div class="legend" style="width:100%" id="legend"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="hd"><div><h2>Agent บนเครื่อง</h2><div class="h-sub" id="agsub">—</div></div><a href="#">ตรวจสอบ</a></div>
+      <div class="bd pad" id="agent"></div>
+    </div>
+  </div>
 </div>
 
-<h2>ต้องจัดการ <span class="n" id="qn"></span></h2>
-<div class="q" id="q"></div>
-
-<h2>ทรัพย์สินทั้งหมด <span class="n" id="fleetn"></span></h2>
-<div class="strip" id="strip"></div>
-<div class="legend" id="legend"></div>
-
-<div class="grid">
-  <div class="p">
-    <h3>PM ประจำปี <span id="pmpace"></span></h3>
-    <div class="stat" id="pmbig">—</div>
-    <div class="cap" id="pmcap"></div>
-    <svg id="burn" viewBox="0 0 300 62" style="width:100%;height:62px;margin-top:10px;overflow:visible"></svg>
-  </div>
-
-  <div class="p">
-    <h3>Agent <span id="agn"></span></h3>
-    <div class="stat" id="agbig">—</div>
-    <div class="cap" id="agcap"></div>
-    <div class="mtx" id="mtx"></div>
-  </div>
-
-  <div class="p">
-    <h3>กิจกรรมล่าสุด <span>สด</span></h3>
-    <div class="log" id="log"></div>
-  </div>
-</div>
-
-<div class="quiet" id="quiet"></div>
+<div class="okbar" id="okbar"></div>
 
 <div class="note">
-  <b>หลักที่ใช้</b> — สิ่งที่ต้องลงมืออยู่บนสุดเรียงตามน้ำหนัก · สิ่งที่ปกติยุบเหลือบรรทัดเดียวข้างล่าง ·
-  โมดูลที่ไม่มีข้อมูลไม่ได้การ์ดของตัวเอง<br>
-  ทุกตัวเลขมีตัวหาร และมีบริบทว่าควรกังวลแค่ไหน — <b>274</b> เฉย ๆ ไม่บอกอะไร แต่ <b>274 / 815 (34%)</b> บอก
+  <b>สิ่งที่เปลี่ยนจากของเดิม</b><br>
+  เรียงตามสิ่งที่ต้องลงมือก่อน ไม่ใช่ตามลำดับที่เขียนโค้ด · สิ่งที่ปกติยุบเหลือแถบเขียวแถบเดียว ·
+  โมดูลที่ไม่มีข้อมูลไม่ได้การ์ดของตัวเอง · ทุกตัวเลขมีตัวหารกำกับ
 </div>
 
 <script>
-const $ = function(id){ return document.getElementById(id); };
-const J = function(u){ return fetch('/api/'+u,{credentials:'include'}).then(function(r){return r.json();}); };
-const fmt = function(n){ return Number(n).toLocaleString('en-US'); };
+var $ = function(id){ return document.getElementById(id); };
+var J = function(u){ return fetch('/api/'+u,{credentials:'include'}).then(function(r){return r.json();}); };
+var f = function(n){ return Number(n||0).toLocaleString('en-US'); };
+
+var ICON = {
+  box:'<path d="M21 8l-9-5-9 5v8l9 5 9-5V8z"/><path d="M3.3 7.5L12 12.5l8.7-5"/><path d="M12 22V12.5"/>',
+  chip:'<rect x="7" y="7" width="10" height="10" rx="2"/><path d="M9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3"/>',
+  check:'<path d="M20 6L9 17l-5-5"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
+  alert:'<path d="M12 3l9.5 17H2.5L12 3z"/><path d="M12 9v5M12 17.5v.5"/>'
+};
+var svgIco = function(p,c){ return '<svg viewBox="0 0 24 24" fill="none" stroke="'+c
+  +'" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">'+p+'</svg>'; };
 
 Promise.all([
   J('dashboard/asset-summary'), J('dashboard/pm-summary'), J('dashboard/data-health'),
   J('dashboard/external-agents-summary'), J('dashboard/custody-summary'),
-  J('dashboard/module-status'), J('dashboard/proactive-alerts'), J('dashboard/borrow-summary'),
-]).then(function(res){
-  const a=res[0], pm=res[1], dh=res[2], ag=res[3], cs=res[4], ms=res[5], al=res[6], bw=res[7];
-  const total = a.total || 0;
-  const agd = (ag && ag.data) || {total:0,online:0,offline:0};
+  J('dashboard/module-status'), J('dashboard/proactive-alerts'), J('dashboard/borrow-summary')
+]).then(function(R){
+  var a=R[0], pm=R[1], dh=R[2], ag=R[3], cs=R[4], ms=R[5], al=R[6], bw=R[7];
+  var total=a.total||0, agd=(ag&&ag.data)||{total:0,online:0,offline:0};
+  var pmLeft=(pm.total||0)-(pm.completed||0);
+  var doy=Math.floor((Date.now()-new Date(new Date().getFullYear(),0,0))/864e5);
+  var daysLeft=365-doy, donePct=Math.round((pm.completed||0)/(pm.total||1)*100), timePct=Math.round(doy/365*100);
 
-  $('sync').textContent = new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  $('hello').textContent='ข้อมูล ณ '+new Date().toLocaleDateString('th-TH',{day:'numeric',month:'long',year:'numeric'})
+    +' · อัปเดตอัตโนมัติทุก 15 วินาที';
 
-  /* ── คิวงาน: เรียงตามน้ำหนัก ไม่ใช่ตามลำดับที่เขียนโค้ด ─────────────── */
-  const pmLeft = (pm.total||0) - (pm.completed||0);
-  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(),0,0)) / 864e5);
-  const daysLeft = 365 - dayOfYear;
-
-  const items = [
-    { n: dh.outdatedOSCount||0, sev:'crit', ttl:'ระบบปฏิบัติการล้าสมัย',
-      sub:'เสี่ยงต่อช่องโหว่ที่แพตช์แล้วในเวอร์ชันใหม่',
-      of: total, ofTxt: 'ของทรัพย์สินทั้งหมด', act:'ดูรายการ' },
-    { n: agd.offline||0, sev:(agd.offline/(agd.total||1)>0.5?'crit':'warn'), ttl:'Agent ออฟไลน์',
-      sub:'ไม่ส่งข้อมูลเข้ามา — สเปกและสุขภาพเครื่องหยุดอัปเดต',
-      of: agd.total||0, ofTxt:'ของเครื่องที่ติดตั้ง', act:'ตรวจสอบ' },
-    { n: pmLeft, sev:(pmLeft/(pm.total||1)>0.25?'warn':'ok'), ttl:'PM ยังไม่ได้ทำ',
-      sub:'เหลือเวลาอีก '+daysLeft+' วันในปีนี้ ≈ '+(pmLeft?Math.max(1,Math.round(daysLeft/pmLeft)):0)+' วัน/เครื่อง',
-      of: pm.total||0, ofTxt:'ของแผนทั้งปี', act:'เปิดคิว' },
-    { n: (cs.total)||0, sev:'warn', ttl:'ค้างอยู่ในจุดรับฝาก',
-      sub:(cs.data||[]).map(function(d){return d.label+' '+d.count;}).join(' · '),
-      of: total, ofTxt:'ของทรัพย์สินทั้งหมด', act:'จัดการ' },
-    { n: al.upcomingPMs||0, sev:'info', ttl:'PM กำหนดสัปดาห์นี้',
-      sub:'เตรียมอุปกรณ์และแจ้งผู้ใช้ล่วงหน้า', of: pm.total||0, ofTxt:'ของแผนทั้งปี', act:'ดูตาราง' },
-  ].filter(function(x){ return x.n > 0; });
-
-  const C = { crit:'var(--crit)', warn:'var(--warn)', ok:'var(--ok)', info:'var(--info)' };
-  const W = { crit:3, warn:2, info:1, ok:0 };
-  items.sort(function(x,y){ return (W[y.sev]-W[x.sev]) || (y.n/(y.of||1) - x.n/(x.of||1)); });
-
-  $('qn').textContent = items.length + ' รายการ';
-  $('q').innerHTML = items.map(function(it){
-    const p = it.of ? Math.round(it.n/it.of*100) : 0;
-    return '<div class="row">'
-      + '<div class="stripe" style="background:'+C[it.sev]+'"></div>'
-      + '<div class="big" style="color:'+C[it.sev]+'">'+fmt(it.n)+'</div>'
-      + '<div><div class="ttl">'+it.ttl+'</div><div class="sub">'+it.sub+'</div></div>'
-      + '<div><div class="meter"><i style="width:'+Math.max(2,p)+'%;background:'+C[it.sev]+'"></i></div>'
-      +   '<div class="mtxt">'+fmt(it.n)+' / '+fmt(it.of)+' · '+p+'% '+it.ofTxt+'</div></div>'
-      + '<div class="act">'+it.act+'</div><div class="arw">›</div></div>';
+  /* ── การ์ดสรุป: เลือกเฉพาะตัวที่เปลี่ยนแปลงและมีความหมาย ─────────────── */
+  var cards=[
+    {lbl:'ทรัพย์สินทั้งหมด', v:f(total), ico:ICON.box, c:'var(--brand)', bg:'var(--brand-soft)',
+     foot:'ใช้งานอยู่ '+f((a.byStatus.find(function(s){return s.status==='InUse';})||{})._count)+' รายการ', pill:null},
+    {lbl:'PM เสร็จแล้ว', v:donePct+'%', ico:ICON.check, c:'var(--ok)', bg:'var(--ok-soft)',
+     foot:f(pm.completed)+' จาก '+f(pm.total)+' แผนงาน',
+     pill:{t:(donePct>=timePct?'เร็วกว่าแผน':'ช้ากว่าแผน'), c:(donePct>=timePct?'var(--ok)':'var(--warn)'),
+           bg:(donePct>=timePct?'var(--ok-soft)':'var(--warn-soft)')}},
+    {lbl:'OS ล้าสมัย', v:f(dh.outdatedOSCount), ico:ICON.alert, c:'var(--crit)', bg:'var(--crit-soft)',
+     foot:Math.round((dh.outdatedOSCount||0)/total*100)+'% ของทรัพย์สินทั้งหมด', pill:null},
+    {lbl:'ค้างในจุดรับฝาก', v:f(cs.total), ico:ICON.clock, c:'var(--warn)', bg:'var(--warn-soft)',
+     foot:(cs.data||[]).map(function(d){return d.label.replace(' (TRRT)','')+' '+d.count;}).join(' · '), pill:null}
+  ];
+  $('stats').innerHTML=cards.map(function(c){
+    return '<div class="stat"><div class="top"><span class="lbl">'+c.lbl+'</span>'
+      +'<span class="ico" style="background:'+c.bg+'">'+svgIco(c.ico,c.c)+'</span></div>'
+      +'<div class="v num">'+c.v+'</div><div class="foot">'
+      +(c.pill?'<span class="pill" style="color:'+c.pill.c+';background:'+c.pill.bg+'">'+c.pill.t+'</span>':'')
+      +'<span>'+c.foot+'</span></div></div>';
   }).join('');
 
-  /* ── แถบทรัพย์สิน: สัดส่วนอ่านได้ในแถบเดียว ไม่ต้องใช้โดนัท ────────── */
-  const SC = { InUse:'#2dd4bf', Available:'#58a6ff', Retired:'#6e7681', Maintenance:'#d29922' };
-  const SL = { InUse:'ใช้งานอยู่', Available:'พร้อมใช้', Retired:'ปลดระวาง', Maintenance:'ซ่อมบำรุง' };
-  const st = (a.byStatus||[]).slice().sort(function(x,y){return y._count-x._count;});
-  $('fleetn').textContent = fmt(total) + ' รายการ';
-  $('strip').innerHTML = st.map(function(s){
-    const p = s._count/total*100;
-    return '<div style="width:'+p+'%;background:'+(SC[s.status]||'#484f58')+'">'
-      + (p>7 ? fmt(s._count) : '') + '</div>';
-  }).join('');
-  $('legend').innerHTML = st.map(function(s){
-    return '<span><i style="background:'+(SC[s.status]||'#484f58')+'"></i>'
-      + (SL[s.status]||s.status) + ' <span class="mono">' + fmt(s._count)
-      + ' · ' + Math.round(s._count/total*100) + '%</span></span>';
+  /* ── คิวงาน ──────────────────────────────────────────────────────────── */
+  var Q=[
+    {n:agd.offline, ttl:'Agent ออฟไลน์', d:'ไม่ส่งข้อมูลเข้ามา สเปกและสุขภาพเครื่องหยุดอัปเดต',
+     of:agd.total, ofT:'ของเครื่องที่ติดตั้ง', sev:'crit'},
+    {n:dh.outdatedOSCount, ttl:'ระบบปฏิบัติการล้าสมัย', d:'เสี่ยงต่อช่องโหว่ที่เวอร์ชันใหม่แพตช์ไปแล้ว',
+     of:total, ofT:'ของทรัพย์สินทั้งหมด', sev:'crit'},
+    {n:cs.total, ttl:'ค้างอยู่ในจุดรับฝาก', d:'เครื่องที่ไม่ได้ใช้งาน รอตัดสินใจว่าจะจ่ายต่อหรือจำหน่าย',
+     of:total, ofT:'ของทรัพย์สินทั้งหมด', sev:'warn'},
+    {n:al.upcomingPMs, ttl:'PM กำหนดสัปดาห์นี้', d:'เตรียมอุปกรณ์และแจ้งผู้ใช้ล่วงหน้า',
+     of:pm.total, ofT:'ของแผนทั้งปี', sev:'info'},
+    {n:pmLeft, ttl:'PM ยังไม่ได้ทำ', d:'เหลือ '+daysLeft+' วันในปีนี้',
+     of:pm.total, ofT:'ของแผนทั้งปี', sev:'ok'}
+  ].filter(function(x){return x.n>0;});
+  var W={crit:3,warn:2,info:1,ok:0};
+  Q.sort(function(x,y){return (W[y.sev]-W[x.sev])||(y.n/(y.of||1)-x.n/(x.of||1));});
+  $('qsub').textContent=Q.length+' เรื่องที่รอการตัดสินใจ';
+  $('queue').innerHTML=Q.map(function(q){
+    var pc=q.of?Math.round(q.n/q.of*100):0;
+    return '<div class="item"><span class="dot" style="background:var(--'+q.sev+'-soft);color:var(--'+q.sev+')">'
+      + (q.sev==='crit'?'!':q.sev==='warn'?'•':'·') + '</span>'
+      +'<div><div class="t">'+q.ttl+'</div><div class="d">'+q.d+'</div>'
+      +'<div class="track"><i style="width:'+Math.max(2,pc)+'%;background:var(--'+q.sev+')"></i></div></div>'
+      +'<div class="r"><div class="rv num" style="color:var(--'+q.sev+')">'+f(q.n)+'</div>'
+      +'<div class="rd num">'+pc+'% '+q.ofT+'</div></div></div>';
   }).join('');
 
-  /* ── PM: ความคืบหน้าเทียบกับเวลาที่เหลือ ไม่ใช่แค่ % ───────────────── */
-  const donePct = Math.round((pm.completed||0)/(pm.total||1)*100);
-  const timePct = Math.round(dayOfYear/365*100);
-  $('pmbig').innerHTML = donePct + '<small>% · ' + fmt(pm.completed) + '/' + fmt(pm.total) + '</small>';
-  $('pmpace').textContent = donePct >= timePct ? 'ตามแผน' : 'ช้ากว่าแผน ' + (timePct-donePct) + '%';
-  $('pmcap').innerHTML = 'ผ่านไปแล้ว <span class="mono">'+timePct+'%</span> ของปี · '
-    + (donePct>=timePct ? 'เร็วกว่าเวลา' : 'ต้องเร่ง <span class="mono">'+pmLeft+'</span> เครื่องใน <span class="mono">'+daysLeft+'</span> วัน');
+  /* ── กราฟ PM: เส้นที่ควรเป็น เทียบกับที่เป็นจริง ─────────────────────── */
+  $('pmsub').textContent='ผ่านไปแล้ว '+timePct+'% ของปี · ทำได้ '+donePct+'%'
+    +(donePct>=timePct?' — เร็วกว่าเวลา':' — ต้องเร่ง '+pmLeft+' เครื่องใน '+daysLeft+' วัน');
   (function(){
-    const w=300,h=56, svg=$('burn');
-    const line=function(pts,col,dash){ return '<polyline points="'+pts+'" fill="none" stroke="'+col
-      +'" stroke-width="1.6" '+(dash?'stroke-dasharray="3 3"':'')+' stroke-linecap="round"/>'; };
-    // เส้นที่ควรเป็น เทียบกับที่เป็นจริง — เห็นทันทีว่าตามทันไหม
-    const ideal = '0,'+h+' '+w+',0';
-    const now = (timePct/100*w)+','+(h-donePct/100*h);
-    svg.innerHTML = line(ideal,'#30363d',true)
-      + line('0,'+h+' '+now,'#2dd4bf',false)
-      + '<circle cx="'+(timePct/100*w)+'" cy="'+(h-donePct/100*h)+'" r="3.2" fill="#2dd4bf"/>'
-      + '<text x="0" y="'+(h+10)+'" fill="#5a6472" font-size="8" font-family="var(--mono)">ม.ค.</text>'
-      + '<text x="'+(w-14)+'" y="'+(h+10)+'" fill="#5a6472" font-size="8" font-family="var(--mono)">ธ.ค.</text>';
+    var W2=620,H=118,PX=6;
+    var x=function(p){return PX+p/100*(W2-PX*2);}, y=function(p){return H-p/100*(H-8);};
+    var pts=[]; for(var i=0;i<=timePct;i++){ pts.push(x(i)+','+y(donePct*(i/(timePct||1)))); }
+    var area=PX+','+H+' '+pts.join(' ')+' '+x(timePct)+','+H;
+    var lbl=function(px,txt,anch){return '<text x="'+x(px)+'" y="'+(H+22)+'" fill="#98a2b3" font-size="11" '
+      +'text-anchor="'+anch+'" font-family="var(--font)">'+txt+'</text>';};
+    $('chart').innerHTML=
+      '<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">'
+      +'<stop offset="0%" stop-color="#4f46e5" stop-opacity=".18"/>'
+      +'<stop offset="100%" stop-color="#4f46e5" stop-opacity="0"/></linearGradient></defs>'
+      +[25,50,75].map(function(g){return '<line x1="'+PX+'" y1="'+y(g)+'" x2="'+(W2-PX)+'" y2="'+y(g)
+        +'" stroke="#f2f3f5" stroke-width="1"/>';}).join('')
+      +'<polyline points="'+PX+','+y(0)+' '+(W2-PX)+','+y(100)+'" fill="none" stroke="#d0d5dd" '
+      +'stroke-width="1.5" stroke-dasharray="5 4"/>'
+      +'<polygon points="'+area+'" fill="url(#g)"/>'
+      +'<polyline points="'+pts.join(' ')+'" fill="none" stroke="#4f46e5" stroke-width="2.4" stroke-linecap="round"/>'
+      +'<circle cx="'+x(timePct)+'" cy="'+y(donePct)+'" r="5.5" fill="#fff" stroke="#4f46e5" stroke-width="2.6"/>'
+      +lbl(0,'ม.ค.','start')+lbl(50,'ก.ค.','middle')+lbl(100,'ธ.ค.','end')
+      +'<text x="'+(x(timePct)-8)+'" y="'+(y(donePct)-13)+'" fill="#4f46e5" font-size="12" '
+      +'font-weight="600" text-anchor="end" font-family="var(--font)">'+donePct+'%</text>';
   })();
 
-  /* ── Agent: ตารางสถานะ เห็นสัดส่วนจริงโดยไม่ต้องอ่านตัวเลข ─────────── */
-  $('agbig').innerHTML = fmt(agd.online) + '<small> / ' + fmt(agd.total) + ' ออนไลน์</small>';
-  $('agn').textContent = 'ครอบคลุม ' + Math.round((agd.total||0)/total*100) + '% ของฟลีต';
-  $('agcap').innerHTML = 'อีก <span class="mono">' + fmt(total-(agd.total||0))
-    + '</span> เครื่องยังไม่มี Agent — สเปกและสุขภาพต้องกรอกมือ';
-  $('mtx').innerHTML = Array.from({length: agd.total||0}, function(_,i){
-    return '<i style="background:'+(i < (agd.online||0) ? 'var(--ok)' : '#30363d')+'"></i>';
+  /* ── โดนัท: รวม slice ที่เล็กกว่า 1% เป็น "อื่น ๆ" ไม่ให้มีเส้นบางจนมองไม่เห็น ── */
+  var SC={InUse:'#4f46e5',Available:'#2e90fa',Retired:'#d0d5dd',Maintenance:'#f79009'};
+  var SL={InUse:'ใช้งานอยู่',Available:'พร้อมใช้งาน',Retired:'ปลดระวาง',Maintenance:'ซ่อมบำรุง'};
+  var st=(a.byStatus||[]).slice().sort(function(p,q){return q._count-p._count;});
+  $('dsub').textContent=f(total)+' รายการ';
+  (function(){
+    var cx=90,cy=90,r=62,sw=22,C=2*Math.PI*r,off=0;
+    $('donut').innerHTML='<circle cx="90" cy="90" r="'+r+'" fill="none" stroke="#f2f3f5" stroke-width="'+sw+'"/>'
+      + st.map(function(s){
+          var frac=s._count/total, dash=frac*C;
+          /* ช่องว่างระหว่างชิ้นต้องไม่กว้างกว่าตัวชิ้นเอง — ชิ้น 3 รายการจาก 815
+             ยาวแค่ 1.4px พอหัก 2.5px แล้วติดลบ เบราว์เซอร์จะทิ้ง dasharray ทั้งเส้น
+             แล้ววาดวงเต็มทับทุกชิ้นที่วาดไว้ก่อนหน้า */
+          var gap=Math.min(2.5, dash*0.4), len=Math.max(dash-gap, 1);
+          var el='<circle cx="90" cy="90" r="'+r+'" fill="none" stroke="'+(SC[s.status]||'#98a2b3')
+            +'" stroke-width="'+sw+'" stroke-dasharray="'+len+' '+(C-len)
+            +'" stroke-dashoffset="'+(-off)+'" stroke-linecap="'+(dash>10?'round':'butt')
+            +'" transform="rotate(-90 90 90)"/>';
+          off+=dash; return el;
+        }).join('')
+      +'<text x="90" y="86" text-anchor="middle" font-size="27" font-weight="700" fill="#101828" '
+      +'font-family="var(--font)" style="font-variant-numeric:tabular-nums">'+f(total)+'</text>'
+      +'<text x="90" y="106" text-anchor="middle" font-size="12" fill="#98a2b3" font-family="var(--font)">รายการ</text>';
+  })();
+  $('legend').innerHTML=st.map(function(s){
+    return '<div class="lrow"><span class="sw" style="background:'+(SC[s.status]||'#98a2b3')+'"></span>'
+      +'<span class="nm">'+(SL[s.status]||s.status)+'</span>'
+      +'<span class="vl num">'+f(s._count)+'</span>'
+      +'<span class="pc num">'+Math.round(s._count/total*100)+'%</span></div>';
   }).join('');
 
-  /* ── log ─────────────────────────────────────────────────────────────── */
-  const T = function(){ return new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}); };
-  $('log').innerHTML = [
-    ['12:31','custody','ย้าย 81 เครื่องเข้าจุดรับฝาก'],
-    ['11:52','floorplan','วางที่นั่ง ACC-01 · Anongnart S.'],
-    ['09:14','agent','HQ-PS-N008 แบตเตอรี่ 11.1%'],
-    ['08:40','pm','ปิดงาน 3 เครื่อง · TRRCORP'],
-  ].map(function(r){
-    return '<div><span class="t">'+r[0]+'</span> <span class="k">'+r[1]+'</span> '+r[2]+'</div>';
-  }).join('');
+  /* ── Agent: บอกทั้งที่ออนไลน์และที่ยังไม่มีเลย ───────────────────────── */
+  var cov=Math.round((agd.total||0)/total*100);
+  $('agsub').textContent='ครอบคลุม '+cov+'% ของทรัพย์สิน';
+  $('agent').innerHTML=
+    '<div style="display:flex;align-items:baseline;gap:8px">'
+    +'<span class="num" style="font-size:29px;font-weight:700;color:var(--ok)">'+f(agd.online)+'</span>'
+    +'<span style="color:var(--ink2);font-size:13.5px">ออนไลน์ จาก '+f(agd.total)+' เครื่องที่ติดตั้ง</span></div>'
+    +'<div class="track" style="max-width:none;margin-top:12px;height:8px">'
+    +'<i style="width:'+Math.max(2,agd.online/(agd.total||1)*100)+'%;background:var(--ok)"></i></div>'
+    +'<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line-soft);font-size:13px;color:var(--ink2)">'
+    +'อีก <b class="num" style="color:var(--ink)">'+f(total-(agd.total||0))+'</b> เครื่องยังไม่มี Agent — '
+    +'สเปกและสุขภาพต้องกรอกมือ</div>';
 
-  /* ── ยุบสิ่งที่ปกติเหลือบรรทัดเดียว ─────────────────────────────────── */
-  const quiet = [];
-  quiet.push('ทะเบียนครบถ้วน <b>'+(ms.assetRegistry?ms.assetRegistry.healthPct:0)+'%</b>');
-  quiet.push('แจ้งเตือนส่งสำเร็จ <b>'+(ms.notifications?ms.notifications.successPct:0)+'%</b>');
-  quiet.push('ยืม-คืนเกินกำหนด <b>'+(bw.overdue||0)+'</b>');
-  $('quiet').innerHTML = '<span style="color:var(--ok);font-size:13px">✓</span> <b>ปกติ</b> · '
-    + quiet.join(' · ')
-    + ((bw.total||0)===0 ? ' <span class="dim">· โมดูลยืม-คืนไม่มีข้อมูลทั้งปี จึงไม่แสดงกราฟ</span>' : '');
+  /* ── สิ่งที่ปกติ ─────────────────────────────────────────────────────── */
+  $('okbar').innerHTML='<span style="font-size:16px">✓</span><b>ระบบส่วนที่เหลือปกติ</b>'
+    +'<span>ทะเบียนครบถ้วน <b class="num">'+(ms.assetRegistry?ms.assetRegistry.healthPct:0)+'%</b></span>'
+    +'<span>แจ้งเตือนส่งสำเร็จ <b class="num">'+(ms.notifications?ms.notifications.successPct:0)+'%</b></span>'
+    +'<span>ยืม-คืนเกินกำหนด <b class="num">'+(bw.overdue||0)+'</b></span>'
+    +((bw.total||0)===0?'<span class="muted">· โมดูลยืม-คืนยังไม่มีข้อมูลทั้งปี จึงไม่แสดงกราฟ</span>':'');
 });
 </script>
 </body>
