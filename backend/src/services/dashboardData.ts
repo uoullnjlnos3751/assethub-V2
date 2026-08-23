@@ -13,7 +13,6 @@
  * ก็ดึงของตัวเอง การแยกก๊อปจะทำให้สองทางเพี้ยนจากกันเมื่อแก้ข้างเดียว
  */
 import type { PrismaClient } from '@prisma/client';
-import { enabledHolders } from '../config/custodyHolders';
 import { buildProcurementReport } from './pmProcurement';
 
 export async function assetSummary(prisma: PrismaClient) {
@@ -222,18 +221,6 @@ export async function externalAgentsSummary() {
   }
 }
 
-export async function custodySummary(prisma: PrismaClient) {
-  const grouped = await prisma.asset.groupBy({
-    by: ['custodyHolder'],
-    where: { custodyHolder: { not: null } },
-    _count: { _all: true },
-  });
-  const counts = new Map(grouped.map(g => [g.custodyHolder, g._count._all]));
-  return {
-    data: enabledHolders().map(h => ({ code: h.code, label: h.label, count: counts.get(h.code) || 0 })),
-    total: grouped.reduce((sum, g) => sum + g._count._all, 0),
-  };
-}
 
 export async function recentActivity(prisma: PrismaClient) {
   const [recentRequests, recentReturns] = await Promise.all([
@@ -306,7 +293,6 @@ export async function lifecycle(prisma: PrismaClient) {
     deliveryTotal, deliveryOpen,
     inUse, available,
     pmTotal, pmDone, maintenanceOpen,
-    custodyHeld,
     retired, disposed,
   ] = await Promise.all([
     prisma.deliveryRequest.count(),
@@ -319,7 +305,6 @@ export async function lifecycle(prisma: PrismaClient) {
     prisma.pMRun.count({ where: { year } }),
     prisma.pMRun.count({ where: { year, status: 'COMPLETED' } }),
     prisma.asset.count({ where: { status: 'Maintenance' } }),
-    prisma.asset.count({ where: { custodyHolder: { not: null } } }),
     prisma.asset.count({ where: { status: 'Retired' } }),
     prisma.assetDisposal.count(),
   ]);
@@ -343,9 +328,10 @@ export async function lifecycle(prisma: PrismaClient) {
       started: pmTotal > 0, href: '/pm/runs',
     },
     {
-      key: 'recover', label: 'เรียกคืน & รับฝาก', value: custodyHeld,
-      detail: custodyHeld > 0 ? 'รอตัดสินใจว่าจ่ายต่อหรือจำหน่าย' : 'ยังไม่มีเครื่องฝากไว้',
-      started: custodyHeld > 0, href: '/assets?custodyHolder=IT_STORE',
+      // เครื่องที่ว่างอยู่คือช่วง "เรียกคืนแล้วรอจ่ายต่อ" ของวงจรชีวิต
+      key: 'recover', label: 'รอจ่ายต่อ', value: available,
+      detail: available > 0 ? 'พร้อมจ่ายให้ผู้ใช้รายถัดไป' : 'ไม่มีเครื่องว่าง',
+      started: available > 0, href: '/assets?status=Available',
     },
     {
       key: 'dispose', label: 'จำหน่ายออก', value: retired,
@@ -390,7 +376,7 @@ async function settle<T>(p: Promise<T>): Promise<T | null> {
 export async function dashboardOverview(prisma: PrismaClient, opts: { year: number; warrantyDays: number }) {
   const [
     assets, modules, categories, inventory, health, borrow, trend,
-    pm, agents, custody, activity, alerts, warranty, stages, outcome,
+    pm, agents, activity, alerts, warranty, stages, outcome,
   ] = await Promise.all([
     settle(assetSummary(prisma)),
     settle(moduleStatus(prisma)),
@@ -401,7 +387,6 @@ export async function dashboardOverview(prisma: PrismaClient, opts: { year: numb
     settle(borrowTrend(prisma, opts.year)),
     settle(pmSummary(prisma, opts.year)),
     settle(externalAgentsSummary()),
-    settle(custodySummary(prisma)),
     settle(recentActivity(prisma)),
     settle(proactiveAlerts(prisma)),
     settle(warrantyExpiring(prisma, opts.warrantyDays)),
@@ -412,6 +397,6 @@ export async function dashboardOverview(prisma: PrismaClient, opts: { year: numb
     generatedAt: new Date().toISOString(),
     year: opts.year,
     assets, modules, categories, inventory, health, borrow, trend,
-    pm, agents, custody, activity, alerts, warranty, stages, outcome,
+    pm, agents, activity, alerts, warranty, stages, outcome,
   };
 }

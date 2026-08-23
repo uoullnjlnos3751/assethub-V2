@@ -101,7 +101,7 @@ router.put('/users/:id/role', authenticate, authorize('SUPERADMIN'), async (req:
     const { role } = req.body;
     // VIEWER was missing here while the UI already offered it — picking it
     // returned "บทบาทไม่ถูกต้อง". Kept in sync with the UserRole enum.
-    if (!['SUPERADMIN', 'IT_ADMIN', 'USER', 'VIEWER', 'HR_CUSTODY'].includes(role)) throw new AppError('บทบาทไม่ถูกต้อง');
+    if (!['SUPERADMIN', 'IT_ADMIN', 'USER', 'VIEWER'].includes(role)) throw new AppError('บทบาทไม่ถูกต้อง');
 
     const user = await prisma.appUser.findUnique({ where: { id } });
     if (!user) throw new AppError('ไม่พบผู้ใช้', 404);

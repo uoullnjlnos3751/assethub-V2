@@ -6,7 +6,6 @@ import {
 import { ScanLine, Search, ArrowRight, Laptop, MapPin, UserCheck, Wrench } from 'lucide-react';
 import QRScannerModal from '../components/QRScannerModal';
 import { assetAPI, pmAPI } from '../services/api';
-import { custodyHolderLabel } from '../constants/custodyHolders';
 
 /**
  * หน้าสแกนสำหรับใช้บนมือถือหน้างาน
@@ -80,9 +79,7 @@ export default function ScanPage() {
   const facts = asset ? [
     {
       icon: UserCheck, label: 'ผู้ครอบครอง',
-      value: asset.custodyHolder
-        ? `ฝากไว้ที่ ${custodyHolderLabel(asset.custodyHolder)}`
-        : (asset.ownerName || 'ยังไม่ระบุ'),
+      value: asset.ownerName || 'ยังไม่ระบุ',
     },
     { icon: MapPin, label: 'ที่ตั้ง', value: [asset.location, asset.departmentId].filter(Boolean).join(' · ') || 'ยังไม่ระบุ' },
     { icon: Laptop, label: 'สถานะ', value: asset.status || '—' },

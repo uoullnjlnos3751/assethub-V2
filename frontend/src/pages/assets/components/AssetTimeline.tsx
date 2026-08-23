@@ -3,7 +3,6 @@ import { Box, Typography, alpha, useTheme } from '@mui/material';
 import { History } from 'lucide-react';
 import { SectionCard } from '../../../components/SectionCard';
 import { calcDepreciation } from './assetFinance';
-import { custodyHolderLabel } from '../../../constants/custodyHolders';
 
 type Tone = 'primary' | 'success' | 'warning' | 'error' | 'muted';
 
@@ -60,15 +59,13 @@ function buildEntries(asset: any, maintenance: any[]): Entry[] {
         });
         break;
       case 'CUSTODY_CHANGE':
+        // ฟีเจอร์จุดรับฝากถูกยกเลิกแล้ว แต่แถวประวัติเก่ายังอยู่และต้องอ่านออก
+        // จึงแสดงรหัสดิบแทนการแปลชื่อจุด ซึ่งไม่มีตารางให้แปลอีกต่อไป
         out.push({
           at,
-          // fromLoc/toLoc carry the holder codes — custody reuses those columns
-          // rather than adding two more to asset_history.
-          title: h.toLoc
-            ? `รับฝากไว้ที่ ${custodyHolderLabel(h.toLoc)}`
-            : `เอาออกจาก ${custodyHolderLabel(h.fromLoc) || 'จุดรับฝาก'}`,
+          title: h.toLoc ? `ย้ายไปจุดเก็บ ${h.toLoc}` : 'เอาออกจากจุดเก็บ',
           sub: [fmt(new Date(at)), actor, h.note || ''].filter(Boolean).join(' · '),
-          tone: 'warning',
+          tone: 'muted',
         });
         break;
       // ทั้งสองรายการนี้เขียนทับข้อมูลสเปคของเครื่อง จึงต้องบอกว่าใครสั่ง

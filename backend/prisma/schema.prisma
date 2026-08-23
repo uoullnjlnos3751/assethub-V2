@@ -83,15 +83,6 @@ model Asset {
   ownerName           String?
   departmentId        String?
   location            String?
-  // ── Custody: "เครื่องนี้ฝากไว้ที่ไหน" ─────────────────────────────
-  // Deliberately separate from `location` (IT's own field, and already
-  // overloaded in the data) and from `status` (IT decides that, not the
-  // holder). Plain String rather than an enum so a new drop-off point can be
-  // opened by editing src/config/custodyHolders.ts — no migration needed.
-  custodyHolder       String?              // e.g. "HR_TRR"; null = not held anywhere
-  custodyNote         String?
-  custodyUpdatedAt    DateTime?            // powers the "ฝากไว้กี่วันแล้ว" column
-  custodyUpdatedById  Int?                 // no FK — AssetHistory keeps the real audit trail
   status              AssetStatus          @default(Available)
   remark              String?
   createdAt           DateTime             @default(now())
@@ -171,7 +162,6 @@ model Asset {
   @@index([vendorRefId])
   @@index([locationRefId])
   @@index([categoryId])
-  @@index([custodyHolder])
   @@map("assets")
 }
 

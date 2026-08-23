@@ -4,7 +4,6 @@ import { GridColDef } from '@mui/x-data-grid';
 import ImageOffIcon from '@mui/icons-material/ImageNotSupported';
 import StatusChip from '../../../components/StatusChip';
 import { formatDate, formatDateTime } from '../assetListConfig';
-import { custodyHolderLabel } from '../../../constants/custodyHolders';
 
 const textColumn = (field: string, headerName: string, width = 140): GridColDef => ({
   field,
@@ -113,23 +112,6 @@ export const assetColumnMap: Record<string, GridColDef> = {
   ownerName: textColumn('ownerName', 'ผู้ถือครอง', 170),
   departmentId: textColumn('departmentId', 'แผนก', 130),
   location: textColumn('location', 'สถานที่ติดตั้ง/อาคาร', 160),
-  custodyHolder: {
-    field: 'custodyHolder',
-    headerName: 'จุดรับฝาก',
-    width: 150,
-    renderCell: ({ row }) =>
-      row.custodyHolder ? (
-        <Typography sx={{ fontSize: '0.78rem' }}>{custodyHolderLabel(row.custodyHolder)}</Typography>
-      ) : (
-        <Typography sx={{ fontSize: '0.78rem', color: 'text.disabled' }}>—</Typography>
-      ),
-  },
-  custodyUpdatedAt: {
-    field: 'custodyUpdatedAt',
-    headerName: 'รับฝากเมื่อ',
-    width: 130,
-    renderCell: ({ row }) => <span>{row.custodyUpdatedAt ? formatDate(row.custodyUpdatedAt) : '—'}</span>,
-  },
   floor: textColumn('floor', 'ชั้น', 90),
   company: textColumn('company', 'บริษัท', 130),
   oldAssetCode: textColumn('oldAssetCode', 'Computer Name เดิม', 150),

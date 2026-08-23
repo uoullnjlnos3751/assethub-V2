@@ -11,26 +11,25 @@ interface MatrixRow {
   itAdmin: Access;
   viewer: Access;
   user: Access;
-  hrCustody: Access;
 }
 
 // Hand-compiled from the real, current gates in frontend/src/navigation/nav.tsx
 // (adminNav roles arrays + Layout.tsx's viewerVisiblePaths/Labels allowlist)
 // and backend authorize() calls — not a stored/editable data model.
 const ROWS: MatrixRow[] = [
-  { label: 'ภาพรวม (Dashboard)', superadmin: 'full', itAdmin: 'full', viewer: 'read', user: 'none', hrCustody: 'none' },
-  { label: 'ทะเบียนทรัพย์สิน IT', superadmin: 'full', itAdmin: 'full', viewer: 'none', user: 'none', hrCustody: 'none' },
-  { label: 'เครื่องใหม่ & ส่งมอบ', superadmin: 'full', itAdmin: 'full', viewer: 'none', user: 'none', hrCustody: 'none' },
-  { label: 'คลังวัสดุ', superadmin: 'full', itAdmin: 'full', viewer: 'none', user: 'none', hrCustody: 'none' },
-  { label: 'ระบบยืม-คืน (คิว/อนุมัติ/ส่งมอบ/รับคืน)', superadmin: 'full', itAdmin: 'full', viewer: 'none', user: 'none', hrCustody: 'none' },
-  { label: 'PM ทรัพย์สิน + ตู้ Switch/Hub', superadmin: 'full', itAdmin: 'full', viewer: 'none', user: 'none', hrCustody: 'none' },
-  { label: 'จำหน่ายทรัพย์สินออก / บริจาค', superadmin: 'full', itAdmin: 'full', viewer: 'none', user: 'none', hrCustody: 'none' },
-  { label: 'License & สัญญา', superadmin: 'full', itAdmin: 'full', viewer: 'read', user: 'none', hrCustody: 'none' },
-  { label: 'รายงานระบบ', superadmin: 'full', itAdmin: 'full', viewer: 'read', user: 'none', hrCustody: 'none' },
-  { label: 'ข้อมูลหลัก (Master Data)', superadmin: 'full', itAdmin: 'full', viewer: 'none', user: 'none', hrCustody: 'none' },
-  { label: 'ตั้งค่าระบบ (ทั่วไป/Backup/Flowchart/Audit Log)', superadmin: 'full', itAdmin: 'full', viewer: 'none', user: 'none', hrCustody: 'none' },
-  { label: 'ตั้งค่าระบบหลัก / จัดการผู้ใช้งาน / ประวัติแจ้งเตือน', superadmin: 'full', itAdmin: 'none', viewer: 'none', user: 'none', hrCustody: 'none' },
-  { label: 'เครื่องที่รับฝาก (ฝ่ายบุคคล)', superadmin: 'full', itAdmin: 'full', viewer: 'none', user: 'none', hrCustody: 'full' },
+  { label: 'ภาพรวม (Dashboard)', superadmin: 'full', itAdmin: 'full', viewer: 'read', user: 'none' },
+  { label: 'ทะเบียนทรัพย์สิน IT', superadmin: 'full', itAdmin: 'full', viewer: 'none', user: 'none' },
+  { label: 'เครื่องใหม่ & ส่งมอบ', superadmin: 'full', itAdmin: 'full', viewer: 'none', user: 'none' },
+  { label: 'คลังวัสดุ', superadmin: 'full', itAdmin: 'full', viewer: 'none', user: 'none' },
+  { label: 'ระบบยืม-คืน (คิว/อนุมัติ/ส่งมอบ/รับคืน)', superadmin: 'full', itAdmin: 'full', viewer: 'none', user: 'none' },
+  { label: 'PM ทรัพย์สิน + ตู้ Switch/Hub', superadmin: 'full', itAdmin: 'full', viewer: 'none', user: 'none' },
+  { label: 'จำหน่ายทรัพย์สินออก / บริจาค', superadmin: 'full', itAdmin: 'full', viewer: 'none', user: 'none' },
+  { label: 'License & สัญญา', superadmin: 'full', itAdmin: 'full', viewer: 'read', user: 'none' },
+  { label: 'รายงานระบบ', superadmin: 'full', itAdmin: 'full', viewer: 'read', user: 'none' },
+  { label: 'ข้อมูลหลัก (Master Data)', superadmin: 'full', itAdmin: 'full', viewer: 'none', user: 'none' },
+  { label: 'ตั้งค่าระบบ (ทั่วไป/Backup/Flowchart/Audit Log)', superadmin: 'full', itAdmin: 'full', viewer: 'none', user: 'none' },
+  { label: 'ตั้งค่าระบบหลัก / จัดการผู้ใช้งาน / ประวัติแจ้งเตือน', superadmin: 'full', itAdmin: 'none', viewer: 'none', user: 'none' },
+  { label: 'เครื่องที่รับฝาก (ฝ่ายบุคคล)', superadmin: 'full', itAdmin: 'full', viewer: 'none', user: 'none' },
 ];
 
 function AccessCell({ v }: { v: Access }) {
@@ -66,7 +65,6 @@ export default function PermissionMatrixTab() {
                 <TableCell align="center">IT_ADMIN</TableCell>
                 <TableCell align="center">VIEWER</TableCell>
                 <TableCell align="center">USER</TableCell>
-                <TableCell align="center">HR_CUSTODY</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -77,7 +75,6 @@ export default function PermissionMatrixTab() {
                   <TableCell align="center"><AccessCell v={r.itAdmin} /></TableCell>
                   <TableCell align="center"><AccessCell v={r.viewer} /></TableCell>
                   <TableCell align="center"><AccessCell v={r.user} /></TableCell>
-                  <TableCell align="center"><AccessCell v={r.hrCustody} /></TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -85,7 +82,6 @@ export default function PermissionMatrixTab() {
         </TableContainer>
         <Typography sx={{ fontSize: '0.68rem', color: theme.palette.text.disabled, mt: 1.5, lineHeight: 1.6 }}>
           ✓ = เข้าถึง/แก้ไขได้ · อ่าน = ดูอย่างเดียว (VIEWER เป็นบทบาทอ่านอย่างเดียวสำหรับผู้บริหาร) · — = ไม่เห็นเมนู<br />
-          HR_CUSTODY เห็นเมนูเดียวคือ "เครื่องที่รับฝาก" — ค้นเครื่องได้ทุกบริษัทแต่ครั้งละไม่เกิน 25 รายการ และเปิดทะเบียนทรัพย์สินไม่ได้เลย<br />
           USER ไม่เห็นเมนูฝั่งดูแลระบบด้านบนเลย — จะเห็นเมนูของตัวเองแยกต่างหาก 6 รายการ (ยืมทรัพย์สิน, คำขอของฉัน, รายการที่ยืม, คำขอขยายวัน, ประวัติการยืม, ของพร้อมยืม)
         </Typography>
       </SectionCard>

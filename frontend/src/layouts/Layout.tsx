@@ -29,7 +29,7 @@ import Breadcrumbs from '../components/Breadcrumbs';
 import PageTransition from '../components/PageTransition';
 import QRScannerModal from '../components/QRScannerModal';
 import { notificationAPI, assetAPI, presenceAPI, dashboardAPI } from '../services/api';
-import { adminNav, custodyNavItems, NavGroup, NavItem, userNavItems } from '../navigation/nav';
+import { adminNav, NavGroup, NavItem, userNavItems } from '../navigation/nav';
 import { APP_VERSION, GIT_COMMIT, BUILD_NUMBER, BUILD_TIME, formatBuildTime } from '../utils/buildInfo';
 
 // ── Sidebar width matching ITSM HTML (210px) ───────────────────────────────
@@ -152,7 +152,6 @@ export default function Layout() {
 
   const isAdmin = user?.role === 'IT_ADMIN' || user?.role === 'SUPERADMIN';
   const isViewer = user?.role === 'VIEWER';
-  const isCustody = user?.role === 'HR_CUSTODY';
 
   // PM overdue count — powers the red nav badge on "PM ทรัพย์สิน" (mirrors the mockup's nav-badge)
   useEffect(() => {
@@ -171,8 +170,6 @@ export default function Layout() {
       })
     : isViewer
     ? adminNav.filter(entry => viewerVisiblePaths.has(('path' in entry && entry.path) || '') || viewerVisibleLabels.has(entry.label))
-    : isCustody
-    ? custodyNavItems
     : userNavItems;
 
   const isActive = (path: string) => {
@@ -905,7 +902,7 @@ export default function Layout() {
                   {user?.displayName}
                 </Typography>
                 <Typography sx={{ fontSize: '11px', color: theme.palette.text.secondary, mt: '2px' }}>
-                  {user?.role === 'SUPERADMIN' ? 'ผู้ดูแลระบบสูงสุด' : user?.role === 'IT_ADMIN' ? 'IT Admin' : user?.role === 'VIEWER' ? 'ผู้บริหาร (อ่านอย่างเดียว)' : user?.role === 'HR_CUSTODY' ? 'ฝ่ายบุคคล (รับฝากเครื่อง)' : 'ผู้ใช้'}
+                  {user?.role === 'SUPERADMIN' ? 'ผู้ดูแลระบบสูงสุด' : user?.role === 'IT_ADMIN' ? 'IT Admin' : user?.role === 'VIEWER' ? 'ผู้บริหาร (อ่านอย่างเดียว)' : 'ผู้ใช้'}
                 </Typography>
               </Box>
               <MenuItem
@@ -1035,17 +1032,10 @@ export default function Layout() {
               }
             }}
           >
-            {/* HR only ever has one screen — showing them the registry and
-                borrow tabs here would offer two routes they get bounced off. */}
-            {isCustody ? [
-              <BottomNavigationAction key="custody" label="เครื่องที่รับฝาก" value="/custody" icon={<AssignmentReturnIcon />} />,
-              <BottomNavigationAction key="scan" label="สแกน" value="scan" icon={<QrCodeScannerIcon />} />,
-            ] : [
-              <BottomNavigationAction key="home" label="หน้าหลัก" value="/dashboard" icon={<DashboardIcon />} />,
-              <BottomNavigationAction key="assets" label="ทรัพย์สิน" value="/assets" icon={<DevicesIcon />} />,
-              <BottomNavigationAction key="borrow" label="ยืม-คืน" value="/borrow/new" icon={<ShoppingCartIcon />} />,
-              <BottomNavigationAction key="scan" label="สแกน" value="scan" icon={<QrCodeScannerIcon />} />,
-            ]}
+            <BottomNavigationAction label="หน้าหลัก" value="/dashboard" icon={<DashboardIcon />} />
+            <BottomNavigationAction label="ทรัพย์สิน" value="/assets" icon={<DevicesIcon />} />
+            <BottomNavigationAction label="ยืม-คืน" value="/borrow/new" icon={<ShoppingCartIcon />} />
+            <BottomNavigationAction label="สแกน" value="scan" icon={<QrCodeScannerIcon />} />
           </BottomNavigation>
         </Paper>
       )}

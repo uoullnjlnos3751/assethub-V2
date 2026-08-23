@@ -24,7 +24,7 @@ const HISTORY_LABEL: Record<string, string> = {
   OWNER_CHANGE: 'เปลี่ยนผู้ถือครอง', LOCATION_CHANGE: 'เปลี่ยนสถานที่',
   CHECKOUT: 'ส่งมอบอุปกรณ์ Check-out', RETURN: 'คืนอุปกรณ์',
   GLPI_SYNC: 'ซิงค์จาก GLPI', AGENT_SYNC: 'ซิงค์จาก Agent',
-  CUSTODY_CHANGE: 'เปลี่ยนจุดรับฝาก',
+  CUSTODY_CHANGE: 'ย้ายจุดเก็บ (ยกเลิกแล้ว)',
 };
 
 const HISTORY_ICON: Record<string, React.ElementType> = {

@@ -45,7 +45,7 @@ const HISTORY_LABEL: Record<string, string> = {
   'RETURN': 'คืนทรัพย์สิน',
   'GLPI_SYNC': 'ซิงค์จาก GLPI',
   'AGENT_SYNC': 'ซิงค์จาก Agent',
-  'CUSTODY_CHANGE': 'เปลี่ยนจุดรับฝาก',
+  'CUSTODY_CHANGE': 'ย้ายจุดเก็บ (ยกเลิกแล้ว)',
   'MAINTENANCE': 'บำรุงรักษา',
   'IMPORT': 'นำเข้าจากไฟล์',
 };

@@ -413,7 +413,6 @@ export const dashboardAPI = {
   categoryUtilization: () => api.get('/dashboard/category-utilization'),
   inventoryLowStock: () => api.get('/dashboard/inventory-low-stock'),
   externalAgentsSummary: () => api.get('/dashboard/external-agents-summary'),
-  custodySummary: () => api.get('/dashboard/custody-summary'),
 };
 
 // Inventory
@@ -525,13 +524,3 @@ export const assetLinkAPI = {
   delete: (id: number) => api.delete(`/asset-links/${id}`),
 };
 
-// Asset custody — HR receiving devices back from leavers (backend/src/routes/custody.ts).
-// Deliberately narrow: search is capped server-side at 25 rows and needs 3+
-// characters, so HR can look up the machine in their hand but not browse the fleet.
-export const custodyAPI = {
-  holders: () => api.get('/custody/holders'),
-  search: (q: string) => api.get('/custody/search', { params: { q } }),
-  set: (assetId: number, data: { holder: string | null; note?: string }) => api.post(`/custody/assets/${assetId}`, data),
-  held: (holder?: string) => api.get('/custody/held', { params: holder ? { holder } : {} }),
-  summary: () => api.get('/custody/summary'),
-};

@@ -45,7 +45,6 @@ router.get('/borrow-summary', ...guard, send(() => D.borrowSummary(prisma)));
 router.get('/borrow-trend', ...guard, send(req => D.borrowTrend(prisma, yearOf(req))));
 router.get('/pm-summary', ...guard, send(req => D.pmSummary(prisma, yearOf(req))));
 router.get('/external-agents-summary', ...guard, send(() => D.externalAgentsSummary()));
-router.get('/custody-summary', ...guard, send(() => D.custodySummary(prisma)));
 router.get('/recent-activity', ...guard, send(() => D.recentActivity(prisma)));
 router.get('/proactive-alerts', ...guard, send(() => D.proactiveAlerts(prisma)));
 router.get('/warranty-expiring', ...guard,

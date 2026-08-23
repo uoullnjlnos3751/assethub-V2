@@ -33,13 +33,6 @@ export const PRESET_VIEWS: PresetView[] = [
   { key: 'devices', label: 'อุปกรณ์ต่อพ่วง', params: { typeGroup: 'devices' }, group: 'type' },
   { key: 'rack', label: 'Rack & Infra', params: { typeGroup: 'rack' }, group: 'type' },
   { key: 'available', label: 'ของพร้อมยืม', params: { status: 'Available' }, group: 'status' },
-  {
-    key: 'custody-hr-trr',
-    label: 'เครื่องที่ฝ่ายบุคคลรับฝาก',
-    params: { custodyHolder: 'HR_TRR' },
-    roles: ['SUPERADMIN', 'IT_ADMIN'],
-    group: 'status',
-  },
 ];
 
 export const presetsFor = (role?: string) =>

@@ -19,7 +19,6 @@ import { LocationBreakdownCard } from './dashboard/components/LocationBreakdownC
 import { WarrantyAlertsCard } from './dashboard/components/WarrantyAlertsCard';
 import { ContractLicenseSummary } from './dashboard/components/ContractLicenseSummary';
 import { ExternalAgentsSummaryCard } from './dashboard/components/ExternalAgentsSummaryCard';
-import { CustodySummaryEntry } from './dashboard/components/CustodySummaryCard';
 import { CategoryUtilizationCard } from './dashboard/components/CategoryUtilizationCard';
 import { AttentionQueue, AttentionItem } from './dashboard/components/AttentionQueue';
 import { LifecycleStrip, Stage } from './dashboard/components/LifecycleStrip';
@@ -44,7 +43,6 @@ export default function DashboardPage() {
   const [licenseList, setLicenseList] = useState<any[]>([]);
   const [onlineNow, setOnlineNow] = useState<any[]>([]);
   const [externalAgentsSummary, setExternalAgentsSummary] = useState<any>(null);
-  const [custodySummary, setCustodySummary] = useState<{ data: CustodySummaryEntry[]; total: number }>({ data: [], total: 0 });
   const [moduleStatus, setModuleStatus] = useState<any>(null);
   const [categoryUtilization, setCategoryUtilization] = useState<any[]>([]);
   const [inventoryLowStock, setInventoryLowStock] = useState<any>(null);
@@ -79,7 +77,6 @@ export default function DashboardPage() {
           setInventoryLowStock(d.inventory);
           setWarrantyData(d.warranty);
           setExternalAgentsSummary(d.agents?.available ? d.agents.data : null);
-          setCustodySummary({ data: d.custody?.data || [], total: d.custody?.total || 0 });
           setStages(d.stages || []);
           setOutcome(d.outcome);
         })
@@ -200,13 +197,6 @@ export default function DashboardPage() {
       actionLabel: 'ดูรายการ', href: '/assets',
     },
     {
-      key: 'custody', severity: 'warn',
-      title: 'ค้างอยู่ในจุดรับฝาก',
-      detail: 'เครื่องที่ไม่ได้ใช้งาน รอตัดสินใจว่าจ่ายต่อหรือจำหน่าย',
-      count: custodySummary.total, of: total, ofLabel: 'ของทรัพย์สินทั้งหมด',
-      actionLabel: 'จัดการ', href: '/assets?custodyHolder=IT_STORE',
-    },
-    {
       key: 'pm-overdue', severity: 'warn',
       title: 'PM เลยกำหนด',
       detail: 'งานที่พ้นวันสิ้นสุดแผนแล้วแต่ยังไม่ปิด',
@@ -308,10 +298,10 @@ export default function DashboardPage() {
           onClick={() => navigate('/assets')}
         />
         <KpiCard
-          icon={Wrench} label="ค้างในจุดรับฝาก" value={custodySummary.total}
-          sub={custodySummary.data.map(c => `${c.label.replace(' (TRRT)', '')} ${c.count}`).join(' · ') || 'ยังไม่มีเครื่องฝากไว้'}
+          icon={Wrench} label="งานซ่อมเปิดอยู่" value={maintenance}
+          sub="อุปกรณ์ระหว่างซ่อมบำรุง"
           accent={theme.palette.warning.main}
-          onClick={() => navigate('/assets?custodyHolder=IT_STORE')}
+          onClick={() => navigate('/assets?status=Maintenance')}
         />
       </Box>
 

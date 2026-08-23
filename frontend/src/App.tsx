@@ -63,14 +63,11 @@ const DeliveryConfirmPage = lazy(() => import('./pages/delivery/DeliveryConfirmP
 // System Settings
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const FlowchartsPage = lazy(() => import('./pages/admin/FlowchartsPage'));
-const CustodyIntakePage = lazy(() => import('./pages/custody/CustodyIntakePage'));
 
 // Where a role lands after login, and where it gets bounced to when it hits a
-// route it may not see. HR_CUSTODY cannot read any of the dashboard endpoints
-// (they are all authorize('IT_ADMIN','SUPERADMIN','VIEWER')), so sending them
-// to /dashboard would have meant a page of failed requests.
-function homePathFor(role: string | undefined): string {
-  return role === 'HR_CUSTODY' ? '/custody' : '/dashboard';
+// route it may not see.
+function homePathFor(_role: string | undefined): string {
+  return '/dashboard';
 }
 
 function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles?: string[] }) {
@@ -95,9 +92,6 @@ export default function App() {
         <Route path="/" element={<ProtectedRoute><ErrorBoundary><Layout /></ErrorBoundary></ProtectedRoute>}>
           <Route index element={<Navigate to={homePathFor(user?.role)} />} />
           <Route path="dashboard" element={<DashboardPage />} />
-          {/* Custody — HR's only screen; also reachable by IT to see what HR filed */}
-          <Route path="custody" element={<ProtectedRoute roles={['HR_CUSTODY', 'IT_ADMIN', 'SUPERADMIN']}><CustodyIntakePage /></ProtectedRoute>} />
-          {/* Assets — HR_CUSTODY is deliberately absent: they use /custody instead */}
           <Route path="assets" element={<ProtectedRoute roles={['SUPERADMIN', 'IT_ADMIN', 'USER', 'VIEWER']}><AssetListPage /></ProtectedRoute>} />
           <Route path="assets/new" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><AssetFormPage /></ProtectedRoute>} />
           <Route path="assets/:id" element={<ProtectedRoute roles={['SUPERADMIN', 'IT_ADMIN', 'USER', 'VIEWER']}><AssetDetailPage /></ProtectedRoute>} />
