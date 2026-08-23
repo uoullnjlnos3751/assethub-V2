@@ -56,52 +56,40 @@ export default function DashboardPage() {
   useEffect(() => {
     if (user?.role === 'IT_ADMIN' || user?.role === 'SUPERADMIN' || user?.role === 'VIEWER') {
       const year = new Date().getFullYear();
-      Promise.all([
-        dashboardAPI.assetSummary(),
-        dashboardAPI.borrowSummary(),
-        dashboardAPI.pmSummary(),
-        dashboardAPI.proactiveAlerts(),
-        dashboardAPI.dataHealth(),
-        dashboardAPI.borrowTrend(year),
-        dashboardAPI.recentActivity(),
-        dashboardAPI.moduleStatus(),
-        dashboardAPI.categoryUtilization(),
-        dashboardAPI.inventoryLowStock(),
-      ])
-        .then(([a, b, p, pa, dh, tr, ra, ms, cu, ls]) => {
-          setAssetSummary(a.data);
-          setBorrowSummary(b.data);
-          setPmSummary(p.data);
-          setProactiveAlerts(pa.data);
-          setDataHealth(dh.data);
-          setTrendData(tr.data);
-          setActivityData(ra.data);
-          setModuleStatus(ms.data);
-          setCategoryUtilization(cu.data || []);
-          setInventoryLowStock(ls.data);
+
+      /* ทุกก้อนของแดชบอร์ดมาในคำขอเดียว
+       *
+       * เดิมยิง 13 คำขอไปยัง /dashboard/* แล้วรอให้ครบก่อนวาด วัดจริงได้ 25
+       * วินาที ตอนนี้ทุก query วิ่งพร้อมกันฝั่ง server เวลารวมจึงเท่ากับก้อนที่
+       * ช้าที่สุด ไม่ใช่ผลบวก
+       *
+       * ก้อนที่ล้มจะมาเป็น null ไม่ลากทั้งหน้าลงไปด้วย — เดิมแต่ละก้อนมี
+       * .catch() ของตัวเองอยู่แล้ว ที่นี่ย้ายไปทำฝั่ง server แทน
+       */
+      dashboardAPI.overview(year, 60)
+        .then(({ data: d }) => {
+          setAssetSummary(d.assets);
+          setBorrowSummary(d.borrow);
+          setPmSummary(d.pm);
+          setProactiveAlerts(d.alerts);
+          setDataHealth(d.health);
+          setTrendData(d.trend);
+          setActivityData(d.activity);
+          setModuleStatus(d.modules);
+          setCategoryUtilization(d.categories || []);
+          setInventoryLowStock(d.inventory);
+          setWarrantyData(d.warranty);
+          setExternalAgentsSummary(d.agents?.available ? d.agents.data : null);
+          setCustodySummary({ data: d.custody?.data || [], total: d.custody?.total || 0 });
         })
+        .catch(() => {})
         .finally(() => setLoading(false));
 
-      // Warranty แยกออกมา — ถ้า API ยังไม่พร้อมหรือ 404 ไม่ทำให้ Dashboard พัง
-      dashboardAPI.warrantyExpiring(60)
-        .then(w => setWarrantyData(w.data))
-        .catch(() => setWarrantyData(null));
-
-      // Contract & License summary (Phase 3) — non-blocking, fail silently
+      /* สัญญากับ License ยังแยกอยู่ เพราะเป็น endpoint ของโมดูลตัวเอง ไม่ใช่ของ
+       * แดชบอร์ด และการ์ดซ่อนตัวเองเมื่อทั้งสองว่าง คำขอที่ล้มจึงไม่ต่างจาก
+       * "ไม่มีข้อมูล" — ไม่ต้องรอ ไม่บล็อกการวาด */
       contractAPI.list({}).then(r => setContractList(r.data || [])).catch(() => {});
       licenseAPI.list({}).then(r => setLicenseList(r.data || [])).catch(() => {});
-
-      // External agent summary — separate service, non-blocking so a slow/
-      // unreachable agent server never delays the rest of the dashboard.
-      dashboardAPI.externalAgentsSummary()
-        .then(r => setExternalAgentsSummary(r.data?.available ? r.data.data : null))
-        .catch(() => setExternalAgentsSummary(null));
-
-      // Devices parked at HR / other drop-off points — the card hides itself
-      // when the count is zero, so a failed call is the same as "nothing there".
-      dashboardAPI.custodySummary()
-        .then(r => setCustodySummary({ data: r.data?.data || [], total: r.data?.total || 0 }))
-        .catch(() => setCustodySummary({ data: [], total: 0 }));
     } else {
       setLoading(false);
     }
