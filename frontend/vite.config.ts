@@ -3,7 +3,8 @@ import react from '@vitejs/plugin-react';
 import { loadEnv } from 'vite';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const projectRoot = fileURLToPath(new URL('.', import.meta.url));
 
@@ -47,7 +48,29 @@ export default defineConfig(({ mode }) => {
 
   return {
     root: projectRoot,
-    plugins: [react()],
+    plugins: [
+      react(),
+      /**
+       * ใส่รหัส build ลงใน sw.js ตอน build
+       *
+       * ไฟล์ใน public/ ถูกก๊อปดิบ ๆ ไม่ผ่าน define ของ vite ชื่อแคชจึงคงที่ตลอด
+       * และตัว activate ลบแคชเก่าไม่ได้เพราะชื่อไม่เคยต่างกัน เขียนทับหลัง build
+       * เสร็จเพื่อให้ทุก build ได้ชื่อแคชใหม่และล้างของเก่าทิ้งจริง
+       */
+      {
+        name: 'stamp-service-worker',
+        apply: 'build' as const,
+        closeBundle() {
+          const out = join(projectRoot, 'dist', 'sw.js');
+          try {
+            const src = readFileSync(out, 'utf-8');
+            writeFileSync(out, src.replace('__BUILD_ID__', `${getGitCommitCount()}-${getGitCommit()}`));
+          } catch {
+            // ไม่มี sw.js ก็ไม่เป็นไร build ต้องไม่ล้มเพราะเรื่องนี้
+          }
+        },
+      },
+    ],
     // Baked into the bundle at build time so the running app can always show
     // exactly which build is live — see src/utils/buildInfo.ts.
     define: {
