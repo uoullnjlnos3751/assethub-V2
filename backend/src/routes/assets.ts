@@ -2712,8 +2712,13 @@ router.put('/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req
 
     const data = normalizeAssetPayload(assetData);
 
-    // Auto-clear ownerName if status becomes Retired or Disposed
-    if (data.status && (data.status === 'Retired' || data.status === 'Disposed')) {
+    // Auto-clear ownerName when status TRANSITIONS to Retired or Disposed —
+    // not merely whenever the request happens to carry that status. A quick
+    // inline-edit chip (AssetOverviewCard.tsx) resends every writable field
+    // including the current status on every save, so without the != old.status
+    // guard, editing e.g. the owner chip on an asset that's already Retired
+    // would silently null out the very value the request was trying to set.
+    if (data.status && data.status !== old.status && (data.status === 'Retired' || data.status === 'Disposed')) {
       data.ownerName = null;
     }
 
