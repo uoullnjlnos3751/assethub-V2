@@ -334,10 +334,16 @@ export default function AssetDetailPage() {
           </Box>
 
           {/* ── Context rail ────────────────────────────────── */}
-          {/* Deliberately not sticky: with timeline + documents + actions
-              stacked, the rail is taller than the viewport, and a sticky block
-              taller than its viewport pins its overflow off-screen where it
-              can't be scrolled to. */}
+          {/* The rail as a whole is deliberately not sticky: with timeline +
+              documents stacked below, it runs taller than the viewport, and a
+              sticky block taller than its viewport pins its overflow
+              off-screen where it can't be scrolled to. Actions is the
+              exception — on its own it's well under viewport height, it's
+              what someone comes to this page to actually DO, and it used to
+              sit dead last after timeline+documents, so reaching it meant
+              scrolling past everything else first. Leading the rail AND
+              staying pinned as the page scrolls means it's never more than a
+              glance away. */}
           <Box sx={{
             width: { xs: '100%', lg: 340 },
             flex: 'none',
@@ -345,20 +351,20 @@ export default function AssetDetailPage() {
             flexDirection: 'column',
             gap: 2,
           }}>
-            {/* Leads the rail — "does this machine need attention right now"
-                outranks history/documents/actions in a person's scan order. */}
+            <Box sx={{ position: 'sticky', top: '66px', zIndex: 1 }}>
+              <AssetActionsPanel
+                onEdit={() => navigate(`/assets/${id}/edit`)}
+                onTransfer={() => navigate(`/assets/${id}/edit`)}
+                onReportRepair={goRepairs}
+                onBorrow={() => navigate('/borrow/new')}
+                onShowQR={() => setShowQR(true)}
+                onReportDamage={() => navigate(`/assets/${id}/edit`)}
+                onProposeDisposal={() => navigate('/disposals')}
+              />
+            </Box>
             <AssetLiveStatusCard loading={loadingExternalAgent} agent={externalAgent} />
             <AssetTimeline asset={asset} maintenance={maintenance} />
             <AssetDocumentsRail asset={asset} onReload={reloadAsset} />
-            <AssetActionsPanel
-              onEdit={() => navigate(`/assets/${id}/edit`)}
-              onTransfer={() => navigate(`/assets/${id}/edit`)}
-              onReportRepair={goRepairs}
-              onBorrow={() => navigate('/borrow/new')}
-              onShowQR={() => setShowQR(true)}
-              onReportDamage={() => navigate(`/assets/${id}/edit`)}
-              onProposeDisposal={() => navigate('/disposals')}
-            />
           </Box>
         </Box>
       ) : (
