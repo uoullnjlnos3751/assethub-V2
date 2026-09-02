@@ -291,10 +291,13 @@ const validateAssetData = (data: any, isCreate = true) => {
     errors.push('แผนก ต้องไม่ว่างเปล่า');
   }
 
-  const ownerName = data.ownerName ? String(data.ownerName).trim() : '';
-  if (!ownerName) {
-    errors.push('ผู้ถือครอง ต้องไม่ว่างเปล่า');
-  }
+  // ผู้ถือครอง (ownerName) is genuinely optional — a machine sitting in IT
+  // storage or handed to HR pending assignment has no current holder, and the
+  // dashboard already tracks "ไม่มีผู้ครอบครอง" as a normal count, not an error
+  // state. The frontend form itself labels this field "(ถ้ามี)" and never
+  // required it client-side. Requiring it here blocked every update to an
+  // asset that already has no owner on file — including edits that don't
+  // touch ownerName at all, since the whole payload gets rejected together.
 
   // Warranty Date validation
   if (data.purchaseDate && data.warrantyEndDate) {
