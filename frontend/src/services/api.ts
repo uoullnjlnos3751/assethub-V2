@@ -81,6 +81,10 @@ export const authAPI = {
 // Assets
 export const assetAPI = {
   list: (params?: any) => api.get('/assets', { params }),
+  /** Count / total purchase value / breakdown-by-dimension for whatever
+   * filters are applied — same params as `list`, plus optional `dimension`
+   * (location | departmentId | status | type | company, default location). */
+  summary: (params?: any) => api.get('/assets/summary', { params }),
   get: (id: number) => api.get(`/assets/${id}`),
   create: (data: any) => api.post('/assets', data),
   upsert: (data: any) => api.post('/assets/upsert', data),

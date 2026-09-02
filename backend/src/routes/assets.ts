@@ -604,13 +604,12 @@ const ASSET_TYPE_GROUPS: Record<string, string[]> = {
   rack: ['Server Rack', 'Server', 'PDU', 'UPS', 'Enclosure'],
 };
 
-router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { search, status, department, location, type, typeGroup, categoryId, cpu, ram, warrantyStatus, warrantyExpiringInDays, ownerName, exactOwnerName, screenSize, resolution, panelType, printerType, isColor, ipAddress, storage, osType, company, serialNo, purchaseDateFrom, purchaseDateTo, page = '1', limit = '50' } = req.query;
-    const pageNum = parseInt(page as string);
-    const parsedLimit = parseInt(limit as string);
-    const limitNum = parsedLimit === 10000 ? 10000 : Math.min(parsedLimit, 100);
-    const skip = (pageNum - 1) * limitNum;
+// Shared by GET / (the list) and GET /summary (count/value/breakdown for
+// whatever's currently filtered) — extracted so the two can never drift
+// apart on what a given querystring actually matches. Async because the
+// non-admin company-visibility lookup needs a DB round trip.
+async function buildAssetListWhere(req: Request): Promise<any> {
+    const { search, status, department, location, type, typeGroup, categoryId, cpu, ram, warrantyStatus, warrantyExpiringInDays, ownerName, exactOwnerName, screenSize, resolution, panelType, printerType, isColor, ipAddress, storage, osType, company, serialNo, purchaseDateFrom, purchaseDateTo } = req.query;
 
     const where: any = {};
     if (status) {
@@ -759,6 +758,18 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
       where.status = 'Available';
     }
 
+    return where;
+}
+
+router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { page = '1', limit = '50' } = req.query;
+    const pageNum = parseInt(page as string);
+    const parsedLimit = parseInt(limit as string);
+    const limitNum = parsedLimit === 10000 ? 10000 : Math.min(parsedLimit, 100);
+    const skip = (pageNum - 1) * limitNum;
+    const where = await buildAssetListWhere(req);
+
     const [assets, total] = await Promise.all([
       prisma.asset.findMany({
         where, skip, take: limitNum, orderBy: { createdAt: 'desc' },
@@ -856,6 +867,50 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
     res.json({ data: enriched, total, page: pageNum, totalPages: Math.ceil(total / limitNum) });
   } catch (err) { next(err); }
   });
+
+// Result count / total purchase value / breakdown-by-dimension for whatever
+// filters the list page currently has applied — same querystring as GET /,
+// run through the identical buildAssetListWhere() so this can never disagree
+// with what the table on screen is actually showing. Adapted from an
+// InvGate-style Explorer sidebar (docs/ITAM-V3's V3 explorer mockup).
+const ASSET_SUMMARY_DIMENSIONS = ['location', 'departmentId', 'status', 'type', 'company'] as const;
+router.get('/summary', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const where = await buildAssetListWhere(req);
+    const dimensionParam = String(req.query.dimension || 'location');
+    const dimension = (ASSET_SUMMARY_DIMENSIONS as readonly string[]).includes(dimensionParam)
+      ? dimensionParam as typeof ASSET_SUMMARY_DIMENSIONS[number]
+      : 'location';
+
+    const [total, valueAgg, groups] = await Promise.all([
+      prisma.asset.count({ where }),
+      prisma.asset.aggregate({ where, _sum: { purchasePrice: true } }),
+      // groupBy skips rows where the grouped column is null, so a count of
+      // "ไม่ระบุ" (unset) is added back below from `total - sum(breakdown)`
+      // rather than trying to coax Prisma into grouping NULLs as one bucket.
+      prisma.asset.groupBy({
+        by: [dimension] as any,
+        where,
+        _count: true,
+        orderBy: { _count: { [dimension]: 'desc' } } as any,
+      }),
+    ]);
+
+    const breakdown = (groups as any[])
+      .map((g) => ({ label: String(g[dimension] ?? '').trim(), count: g._count as number }))
+      .filter((g) => g.label);
+    const unassignedCount = total - breakdown.reduce((sum, g) => sum + g.count, 0);
+    if (unassignedCount > 0) breakdown.push({ label: 'ไม่ระบุ', count: unassignedCount });
+    breakdown.sort((a, b) => b.count - a.count);
+
+    res.json({
+      total,
+      totalValue: valueAgg._sum.purchasePrice != null ? Number(valueAgg._sum.purchasePrice) : 0,
+      dimension,
+      breakdown: breakdown.slice(0, 10),
+    });
+  } catch (err) { next(err); }
+});
 
 router.get('/filter-options', authenticate, async (_req: Request, res: Response, next: NextFunction) => {
   try {
