@@ -669,19 +669,31 @@ export default function PMRunPage() {
     }
   };
 
+  /** Does the run's own template even have a place to put detected monitors?
+   * The merge/apply buttons need this to know whether "nothing added" means
+   * "already up to date" or "this template has nowhere to write it" —
+   * those used to be indistinguishable and the button/toast claimed success
+   * either way. */
+  const hasMonitorArrayItem = (run: any): boolean =>
+    !!run && getChecklistItems(run).some((item: any) => (item.type || '').toLowerCase() === 'monitor_array');
+
   // Merge detected monitors into the "ตรวจสอบจอ Monitor" device list.
   //
   // Shared by the GLPI and Agent paths: both end up filling the same checklist
-  // item, and the merge has to behave identically either way. Serial number is
-  // the key, so pressing a button twice — or pressing it after the technician
-  // already typed a monitor in by hand — never duplicates or wipes their work.
-  // Returns how many rows were actually added, for the toast to be honest.
-  const mergeMonitorsIntoAnswers = (target: Record<string, any>, devices: any[]): number => {
-    if (!devices.length || !pmModal.run) return 0;
+  // item, and the merge has to behave identically either way. Pressing a
+  // button twice — or pressing it after the technician already typed a
+  // monitor in by hand — never duplicates or wipes their work: dedup keys on
+  // serialNo when there is one, falls back to the matched registry _assetId,
+  // and as a last resort (a panel with neither — real, not rare; see
+  // agentMonitors.ts) a connectedPort+brand+model signature, since serial-less
+  // devices used to sail through the old serial-only check on every press.
+  const mergeMonitorsIntoAnswers = (target: Record<string, any>, devices: any[]): { added: number; hasField: boolean } => {
+    if (!pmModal.run) return { added: 0, hasField: false };
     const monitorItem = getChecklistItems(pmModal.run).find(
       (item: any) => (item.type || '').toLowerCase() === 'monitor_array'
     );
-    if (!monitorItem) return 0;
+    if (!monitorItem) return { added: 0, hasField: false };
+    if (!devices.length) return { added: 0, hasField: true };
 
     let existingDevices: any[] = [];
     const rawExisting = target[monitorItem.key];
@@ -692,16 +704,24 @@ export default function PMRunPage() {
       } catch { /* start fresh if it wasn't valid device JSON */ }
     }
 
+    const noIdSignature = (d: any) => `${d.connectedPort || ''}|${d.brand || ''}|${d.model || ''}`;
     const existingSerials = new Set(
       existingDevices.map((d) => (d.serialNo || '').trim().toLowerCase()).filter(Boolean)
     );
-    const fresh = devices.filter(
-      (d) => !d.serialNo || !existingSerials.has(String(d.serialNo).trim().toLowerCase())
+    const existingAssetIds = new Set(existingDevices.map((d) => d._assetId).filter(Boolean));
+    const existingNoIdSignatures = new Set(
+      existingDevices.filter((d) => !d.serialNo && !d._assetId).map(noIdSignature)
     );
-    if (!fresh.length) return 0;
+
+    const fresh = devices.filter((d) => {
+      if (d.serialNo) return !existingSerials.has(String(d.serialNo).trim().toLowerCase());
+      if (d._assetId) return !existingAssetIds.has(d._assetId);
+      return !existingNoIdSignatures.has(noIdSignature(d));
+    });
+    if (!fresh.length) return { added: 0, hasField: true };
 
     target[monitorItem.key] = JSON.stringify([...existingDevices, ...fresh]);
-    return fresh.length;
+    return { added: fresh.length, hasField: true };
   };
 
   // เติมเฉพาะข้อที่ Agent ตอบได้ พร้อมหมายเหตุที่บอกว่าตอบจากอะไร ช่างแก้ทับได้
@@ -720,7 +740,7 @@ export default function PMRunPage() {
     // Agent มองไม่เห็นขนาดจอ (นิ้ว) และลำโพงในตัว จึงไม่ส่ง screenSize/ports/
     // hasSpeaker มาเลย — ถ้าส่งมาแม้แต่ตัวเดียว ฝั่งบันทึกจะ upsert MonitorDetail
     // แล้วเขียนอีกสองช่องที่เหลือเป็น null ทับของเดิมที่เคยกรอกไว้
-    const added = mergeMonitorsIntoAnswers(next, monitors.map((m: any) => ({
+    const { added, hasField: hasMonitorField } = mergeMonitorsIntoAnswers(next, monitors.map((m: any) => ({
       _assetId: m._assetId || undefined,
       assetCode: m._assetId ? (m.assetCode || '') : undefined,
       hasMonitor: true,
@@ -739,6 +759,14 @@ export default function PMRunPage() {
       answerCount ? `คำตอบ ${answerCount} ข้อ` : '',
       added ? `จอ ${added} ตัว` : '',
     ].filter(Boolean);
+    // เทมเพลตนี้ไม่มีช่องจอเลย — ไม่ใช่ว่า "ครบแล้ว" ต้องบอกตรงๆ ว่าจอที่ Agent
+    // เห็นไม่มีที่ให้เติม ไม่งั้นข้อความจะขัดกับความจริง (จอหายไปเงียบๆ)
+    if (monitors.length > 0 && !hasMonitorField) {
+      showToast(parts.filter(p => !p.includes('จอ')).length
+        ? `⚠️ เติม${parts.filter(p => !p.includes('จอ')).join('')}จาก Agent แล้ว — แต่เทมเพลตนี้ไม่มีช่องบันทึกจอภาพ จอที่ตรวจพบ ${monitors.length} ตัวจึงไม่ถูกเติม`
+        : `⚠️ เทมเพลตนี้ไม่มีช่องบันทึกจอภาพ — จอที่ Agent ตรวจพบ ${monitors.length} ตัวจึงไม่ถูกเติม`);
+      return;
+    }
     // กดซ้ำแล้วจอที่ Agent เห็นอยู่ในฟอร์มครบแล้ว — บอกตามจริงดีกว่าขึ้นว่าเติมสำเร็จ
     showToast(parts.length
       ? `✅ เติม${parts.join(' และ ')}จาก Agent แล้ว — ตรวจทานได้ก่อนบันทึก`
@@ -1543,16 +1571,25 @@ export default function PMRunPage() {
                         </Typography>
                       )}
                       <Box sx={{ flex: 1 }} />
-                      {agentCheck.available && ((agentCheck.answers?.length > 0) || (agentCheck.monitors?.length > 0)) && !isReadOnly && (
-                        <Button size="small" variant={agentApplied ? 'outlined' : 'contained'} color="secondary"
-                          onClick={applyAgentAnswers}
-                          sx={{ fontSize: 10.5, py: 0.25, textTransform: 'none' }}>
-                          {agentApplied ? `เติมแล้ว (กดซ้ำได้)` : `เติม${[
-                            agentCheck.answers?.length ? `คำตอบ ${agentCheck.answers.length} ข้อ` : '',
-                            agentCheck.monitors?.length ? `จอ ${agentCheck.monitors.length} ตัว` : '',
-                          ].filter(Boolean).join(' + ')}`}
-                        </Button>
-                      )}
+                      {(() => {
+                        // Only promise "จอ N ตัว" when the template actually has
+                        // somewhere to put them — otherwise the button claims a
+                        // count it can never write, then reports false success.
+                        const canFileMonitors = hasMonitorArrayItem(pmModal.run);
+                        const monitorCount = canFileMonitors ? (agentCheck.monitors?.length || 0) : 0;
+                        const answerCount = agentCheck.answers?.length || 0;
+                        if (!agentCheck.available || isReadOnly || (!answerCount && !monitorCount)) return null;
+                        return (
+                          <Button size="small" variant={agentApplied ? 'outlined' : 'contained'} color="secondary"
+                            onClick={applyAgentAnswers}
+                            sx={{ fontSize: 10.5, py: 0.25, textTransform: 'none' }}>
+                            {agentApplied ? `เติมแล้ว (กดซ้ำได้)` : `เติม${[
+                              answerCount ? `คำตอบ ${answerCount} ข้อ` : '',
+                              monitorCount ? `จอ ${monitorCount} ตัว` : '',
+                            ].filter(Boolean).join(' + ')}`}
+                          </Button>
+                        );
+                      })()}
                     </Box>
 
                     <Box sx={{ p: '10px 14px' }}>
