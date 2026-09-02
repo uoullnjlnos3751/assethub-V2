@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;padding:0;background:#f4f7fc}
+*{box-sizing:border-box}
+a{color:#0891b2;text-decoration:none}
+a:hover{color:#0e7490}
+@keyframes stShimmer{0%{background-position:-320px 0}100%{background-position:320px 0}}
+@keyframes stSpin{to{transform:rotate(360deg)}}
+@keyframes stBlink{0%,100%{opacity:1}50%{opacity:.3}}
+</style>
+</helmet>
+
+<div style="width:1920px;min-height:1240px;padding:32px 38px 44px;font-family:'IBM Plex Sans Thai','IBM Plex Sans',system-ui,sans-serif;color:#15243c;background:radial-gradient(1200px 700px at 60% -10%,#eef3fb 0%,#f4f7fc 60%)">
+
+  <div style="display:flex;align-items:flex-end;gap:18px;margin-bottom:24px">
+    <div style="flex:1">
+      <div style="font-size:12.5px;color:#68788e;letter-spacing:.06em">ITAM · STATES &amp; EDGE CASES</div>
+      <div style="font-size:28px;font-weight:700;margin-top:4px">สถานะว่าง · กำลังโหลด · ผิดพลาด · ไม่มีสิทธิ์</div>
+      <div style="font-size:13.5px;color:#68788e;margin-top:5px">สถานะที่ระบบจริงต้องรองรับ แต่ยังไม่ปรากฏในหน้าจอหลักที่มีข้อมูลเต็ม</div>
+    </div>
+    <span style="padding:9px 15px;border-radius:11px;background:#ffffff;border:1px solid #dde5f0;font-size:12.5px;color:#54637a">ใช้ชุดสีและระยะเดียวกับหน้าจอหลัก</span>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px">
+
+    <div style="background:#ffffff;border:1px solid #e3e9f2;border-radius:20px;box-shadow:0 1px 3px rgba(20,40,80,.05);padding:18px 20px 20px">
+      <div style="font-size:14.5px;font-weight:700">กำลังโหลดตาราง</div>
+      <div style="font-size:12px;color:#68788e;margin-top:2px;margin-bottom:14px">Skeleton แทน spinner เพื่อลดการกระพริบของ layout</div>
+      <div style="display:flex;flex-direction:column;gap:11px">
+        <div style="display:flex;gap:12px"><div style="width:120px;height:12px;border-radius:6px;background:linear-gradient(90deg,#eef2f7 25%,#f7fafc 37%,#eef2f7 63%);background-size:320px 100%;animation:stShimmer 1.4s linear infinite"></div><div style="flex:1;height:12px;border-radius:6px;background:linear-gradient(90deg,#eef2f7 25%,#f7fafc 37%,#eef2f7 63%);background-size:320px 100%;animation:stShimmer 1.4s linear .1s infinite"></div></div>
+        <div style="display:flex;gap:12px"><div style="width:96px;height:12px;border-radius:6px;background:linear-gradient(90deg,#eef2f7 25%,#f7fafc 37%,#eef2f7 63%);background-size:320px 100%;animation:stShimmer 1.4s linear .2s infinite"></div><div style="flex:1;height:12px;border-radius:6px;background:linear-gradient(90deg,#eef2f7 25%,#f7fafc 37%,#eef2f7 63%);background-size:320px 100%;animation:stShimmer 1.4s linear .3s infinite"></div></div>
+        <div style="display:flex;gap:12px"><div style="width:140px;height:12px;border-radius:6px;background:linear-gradient(90deg,#eef2f7 25%,#f7fafc 37%,#eef2f7 63%);background-size:320px 100%;animation:stShimmer 1.4s linear .4s infinite"></div><div style="flex:1;height:12px;border-radius:6px;background:linear-gradient(90deg,#eef2f7 25%,#f7fafc 37%,#eef2f7 63%);background-size:320px 100%;animation:stShimmer 1.4s linear .5s infinite"></div></div>
+        <div style="display:flex;gap:12px"><div style="width:110px;height:12px;border-radius:6px;background:linear-gradient(90deg,#eef2f7 25%,#f7fafc 37%,#eef2f7 63%);background-size:320px 100%;animation:stShimmer 1.4s linear .6s infinite"></div><div style="flex:1;height:12px;border-radius:6px;background:linear-gradient(90deg,#eef2f7 25%,#f7fafc 37%,#eef2f7 63%);background-size:320px 100%;animation:stShimmer 1.4s linear .7s infinite"></div></div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:6px;font-size:12.5px;color:#0e7490"><span style="width:14px;height:14px;border-radius:50%;border:2px solid rgba(8,145,178,.25);border-top-color:#0891b2;animation:stSpin .8s linear infinite"></span>กำลังโหลดข้อมูล 2,847 รายการ…</div>
+      </div>
+    </div>
+
+    <div style="background:#ffffff;border:1px solid #e3e9f2;border-radius:20px;box-shadow:0 1px 3px rgba(20,40,80,.05);padding:18px 20px 20px">
+      <div style="font-size:14.5px;font-weight:700">ยังไม่มีแผน PM ปี 2569</div>
+      <div style="font-size:12px;color:#68788e;margin-top:2px;margin-bottom:14px">สถานะว่างครั้งแรก — ต้องพาผู้ใช้ไปขั้นตอนถัดไป</div>
+      <div style="border:1px dashed #d6dfec;border-radius:16px;background:#fbfcfe;padding:30px 18px;text-align:center">
+        <div style="width:52px;height:52px;margin:0 auto 12px;border-radius:16px;background:rgba(8,145,178,.09);border:1px solid rgba(8,145,178,.28);display:flex;align-items:center;justify-content:center;font-size:22px">🛡</div>
+        <div style="font-size:14px;font-weight:600">ยังไม่มีข้อมูล PM</div>
+        <div style="font-size:12.5px;color:#68788e;margin-top:5px;line-height:1.6">เริ่มต้นด้วยการสร้างแผน PM แล้วกด Generate<br>ระบบจะสร้างงานหนึ่งใบต่อหนึ่งเครื่องอัตโนมัติ</div>
+        <div style="display:flex;gap:9px;justify-content:center;margin-top:16px">
+          <span style="padding:10px 15px;border-radius:11px;background:rgba(20,50,90,.05);border:1px solid #d6dfec;font-size:13px;cursor:pointer">📝 สร้าง Template</span>
+          <span style="padding:10px 15px;border-radius:11px;background:linear-gradient(120deg,#0891b2,#2563eb);color:#ffffff;font-weight:600;font-size:13px;cursor:pointer">📋 สร้างแผน PM</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:#ffffff;border:1px solid #e3e9f2;border-radius:20px;box-shadow:0 1px 3px rgba(20,40,80,.05);padding:18px 20px 20px">
+      <div style="font-size:14.5px;font-weight:700">ค้นหาไม่พบ</div>
+      <div style="font-size:12px;color:#68788e;margin-top:2px;margin-bottom:14px">ต่างจาก "ยังไม่มีข้อมูล" — ต้องเสนอให้ล้างตัวกรอง</div>
+      <div style="display:flex;align-items:center;gap:9px;padding:10px 13px;border-radius:12px;border:1px solid #dde5f0;background:#f8fafc;font-size:13px;color:#31435c;margin-bottom:12px">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8494a8" stroke-width="1.9"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4 4"></path></svg>IT-NB-2570
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+        <span style="padding:6px 12px;border-radius:999px;font-size:11.5px;background:rgba(8,145,178,.1);border:1px solid rgba(8,145,178,.35);color:#0e7490">หมวด: โน้ตบุ๊ก ✕</span>
+        <span style="padding:6px 12px;border-radius:999px;font-size:11.5px;background:rgba(8,145,178,.1);border:1px solid rgba(8,145,178,.35);color:#0e7490">สถานะ: ว่าง ✕</span>
+      </div>
+      <div style="border:1px dashed #d6dfec;border-radius:16px;background:#fbfcfe;padding:26px 18px;text-align:center">
+        <div style="font-size:24px;margin-bottom:8px">🔍</div>
+        <div style="font-size:13.5px;font-weight:600">ไม่พบรายการที่ตรงกับเงื่อนไข</div>
+        <div style="font-size:12.5px;color:#68788e;margin-top:4px">ลองลดตัวกรอง หรือค้นด้วย Serial No. แทน</div>
+        <span style="display:inline-block;margin-top:14px;padding:9px 15px;border-radius:11px;background:rgba(20,50,90,.05);border:1px solid #d6dfec;font-size:13px;cursor:pointer">ล้างตัวกรองทั้งหมด</span>
+      </div>
+    </div>
+
+    <div style="background:#ffffff;border:1px solid rgba(220,38,38,.28);border-radius:20px;box-shadow:0 1px 3px rgba(20,40,80,.05);padding:18px 20px 20px">
+      <div style="font-size:14.5px;font-weight:700;color:#b91c1c">โหลดข้อมูลล้มเหลว</div>
+      <div style="font-size:12px;color:#68788e;margin-top:2px;margin-bottom:14px">บอกสาเหตุ + ให้ลองใหม่ ไม่ปล่อยหน้าว่าง</div>
+      <div style="border:1px solid rgba(220,38,38,.24);border-radius:16px;background:#fff5f5;padding:26px 18px;text-align:center">
+        <div style="width:52px;height:52px;margin:0 auto 12px;border-radius:16px;background:rgba(220,38,38,.1);border:1px solid rgba(220,38,38,.32);display:flex;align-items:center;justify-content:center;font-size:22px">⚠️</div>
+        <div style="font-size:14px;font-weight:600;color:#b91c1c">ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้</div>
+        <div style="font-size:12.5px;color:#92400e;margin-top:5px;line-height:1.6">API /api/assets ตอบกลับ 503 Service Unavailable<br>เวลา 03:57 น. · รหัสอ้างอิง REQ-8f21c4</div>
+        <div style="display:flex;gap:9px;justify-content:center;margin-top:16px">
+          <span style="padding:10px 15px;border-radius:11px;background:#ffffff;border:1px solid #d6dfec;font-size:13px;cursor:pointer">คัดลอกรหัสอ้างอิง</span>
+          <span style="padding:10px 15px;border-radius:11px;background:#dc2626;color:#ffffff;font-weight:600;font-size:13px;cursor:pointer">↺ ลองใหม่</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:#ffffff;border:1px solid #e3e9f2;border-radius:20px;box-shadow:0 1px 3px rgba(20,40,80,.05);padding:18px 20px 20px">
+      <div style="font-size:14.5px;font-weight:700">ไม่มีสิทธิ์เข้าถึง</div>
+      <div style="font-size:12px;color:#68788e;margin-top:2px;margin-bottom:14px">พนักงานทั่วไปเปิดลิงก์เมนูผู้ดูแลระบบ</div>
+      <div style="border:1px solid #e3e9f2;border-radius:16px;background:#f8fafc;padding:26px 18px;text-align:center">
+        <div style="width:52px;height:52px;margin:0 auto 12px;border-radius:16px;background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.3);display:flex;align-items:center;justify-content:center;font-size:22px">🔒</div>
+        <div style="font-size:14px;font-weight:600">หน้านี้สำหรับผู้ดูแลระบบเท่านั้น</div>
+        <div style="font-size:12.5px;color:#68788e;margin-top:5px;line-height:1.6">บัญชีของคุณมีสิทธิ์ระดับ USER<br>หากต้องใช้งาน กรุณาแจ้งฝ่ายไอทีเพื่อขอสิทธิ์เพิ่ม</div>
+        <div style="display:flex;gap:9px;justify-content:center;margin-top:16px">
+          <span style="padding:10px 15px;border-radius:11px;background:rgba(20,50,90,.05);border:1px solid #d6dfec;font-size:13px;cursor:pointer">ขอสิทธิ์เข้าถึง</span>
+          <span style="padding:10px 15px;border-radius:11px;background:linear-gradient(120deg,#0891b2,#2563eb);color:#ffffff;font-weight:600;font-size:13px;cursor:pointer">กลับหน้าภาพรวม</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:#ffffff;border:1px solid #e3e9f2;border-radius:20px;box-shadow:0 1px 3px rgba(20,40,80,.05);padding:18px 20px 20px">
+      <div style="font-size:14.5px;font-weight:700">ออฟไลน์ / รอซิงก์</div>
+      <div style="font-size:12px;color:#68788e;margin-top:2px;margin-bottom:14px">ช่างทำ PM หน้างานที่สัญญาณไม่ถึง</div>
+      <div style="display:flex;flex-direction:column;gap:11px">
+        <div style="display:flex;align-items:center;gap:11px;padding:12px 14px;border-radius:14px;border:1px solid rgba(194,130,10,.32);background:#fffaf5">
+          <span style="width:8px;height:8px;flex:none;border-radius:50%;background:#c2820a;animation:stBlink 1.5s ease-in-out infinite"></span>
+          <div style="flex:1"><div style="font-size:13px;color:#92400e">ไม่มีการเชื่อมต่อ · ทำงานแบบออฟไลน์</div><div style="font-size:11.5px;color:#b45309">ข้อมูลจะถูกเก็บในเครื่องและซิงก์อัตโนมัติ</div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:11px;padding:12px 14px;border-radius:14px;border:1px solid #e3e9f2;background:#f8fafc">
+          <div style="flex:1"><div style="font-size:13px">ใบตรวจ PM รอซิงก์</div><div style="font-size:11.5px;color:#68788e">RUN-2569-0318, 0319, 0321</div></div>
+          <span style="font-size:16px;font-weight:700;font-family:'IBM Plex Sans',sans-serif">3</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:11px;padding:12px 14px;border-radius:14px;border:1px solid #e3e9f2;background:#f8fafc">
+          <div style="flex:1"><div style="font-size:13px">รูปถ่ายรออัปโหลด</div><div style="font-size:11.5px;color:#68788e">รวม 8.4 MB</div></div>
+          <span style="font-size:16px;font-weight:700;font-family:'IBM Plex Sans',sans-serif">6</span>
+        </div>
+        <span style="text-align:center;padding:11px;border-radius:12px;background:rgba(20,50,90,.05);border:1px solid #d6dfec;font-size:13px;cursor:pointer">ลองซิงก์ตอนนี้</span>
+      </div>
+    </div>
+
+    <div style="background:#ffffff;border:1px solid #e3e9f2;border-radius:20px;box-shadow:0 1px 3px rgba(20,40,80,.05);padding:18px 20px 20px">
+      <div style="font-size:14.5px;font-weight:700">ฟอร์มกรอกไม่ครบ</div>
+      <div style="font-size:12px;color:#68788e;margin-top:2px;margin-bottom:14px">ข้อความผิดพลาดติดกับฟิลด์ ไม่ใช่ alert รวม</div>
+      <div style="display:flex;flex-direction:column;gap:13px">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:12.5px;color:#68788e">เลขครุภัณฑ์ <span style="color:#dc2626">*</span></span>
+          <div style="padding:11px 13px;border-radius:12px;border:1px solid #dde5f0;background:#f8fafc;font-size:13.5px;color:#31435c">IT-NB-2569-0431</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:12.5px;color:#68788e">Serial No. <span style="color:#dc2626">*</span></span>
+          <div style="padding:11px 13px;border-radius:12px;border:1px solid #dc2626;background:#fff5f5;font-size:13.5px;color:#7a889c">กรอก Serial No.</div>
+          <span style="font-size:11.5px;color:#b91c1c">⚠ จำเป็นต้องกรอก · ใช้ตรวจสอบซ้ำกับทะเบียนเดิม</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:12.5px;color:#68788e">ราคาทุน <span style="color:#dc2626">*</span></span>
+          <div style="padding:11px 13px;border-radius:12px;border:1px solid #dc2626;background:#fff5f5;font-size:13.5px;color:#31435c">-18,900</div>
+          <span style="font-size:11.5px;color:#b91c1c">⚠ ราคาต้องมากกว่า 0</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:11px">
+          <span style="flex:1;text-align:center;padding:12px;border-radius:12px;background:#eef2f7;border:1px solid #e3e9f2;font-size:13.5px;color:#a3b0c2">ถัดไป (ยังกรอกไม่ครบ)</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:#ffffff;border:1px solid #e3e9f2;border-radius:20px;box-shadow:0 1px 3px rgba(20,40,80,.05);padding:18px 20px 20px">
+      <div style="font-size:14.5px;font-weight:700">ยืนยันการทำรายการ</div>
+      <div style="font-size:12px;color:#68788e;margin-top:2px;margin-bottom:14px">งานที่ย้อนกลับไม่ได้ต้องบอกผลกระทบให้ชัด</div>
+      <div style="border:1px solid #e3e9f2;border-radius:16px;overflow:hidden">
+        <div style="padding:14px 16px;border-bottom:1px solid #edf1f7;font-size:14px;font-weight:600">ยืนยันการตัดจำหน่าย 32 รายการ</div>
+        <div style="padding:15px 16px;font-size:13px;color:#31435c;line-height:1.7">
+          ระบบจะเปลี่ยนสถานะทรัพย์สินเป็น <strong>Disposed</strong> ตัดออกจากทะเบียนสินทรัพย์ถาวร และแจ้งฝ่ายบัญชีอัตโนมัติ
+          <div style="margin-top:11px;padding:11px 13px;border-radius:12px;background:#fff5f5;border:1px solid rgba(220,38,38,.24);font-size:12.5px;color:#b91c1c">การดำเนินการนี้ไม่สามารถยกเลิกได้ · ต้องมีเลขที่อนุมัติกำกับ</div>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;padding:14px 16px;border-top:1px solid #edf1f7">
+          <span style="padding:10px 15px;border-radius:11px;background:rgba(20,50,90,.05);border:1px solid #d6dfec;font-size:13px;cursor:pointer">ยกเลิก</span>
+          <span style="padding:10px 15px;border-radius:11px;background:#dc2626;color:#ffffff;font-weight:600;font-size:13px;cursor:pointer">ยืนยันตัดจำหน่าย</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:#ffffff;border:1px solid #e3e9f2;border-radius:20px;box-shadow:0 1px 3px rgba(20,40,80,.05);padding:18px 20px 20px">
+      <div style="font-size:14.5px;font-weight:700">ข้อความแจ้งผล (TOAST)</div>
+      <div style="font-size:12px;color:#68788e;margin-top:2px;margin-bottom:14px">ตำแหน่งเดียวกันทุกหน้า · หายเองใน 3 วินาที</div>
+      <div style="display:flex;flex-direction:column;gap:11px">
+        <div style="display:flex;align-items:center;gap:11px;padding:13px 15px;border-radius:14px;background:#0f172a;color:#ffffff;font-size:13px"><span style="color:#34d399">✅</span>บันทึกผล PM สำหรับ AST-PC-0812 สำเร็จ</div>
+        <div style="display:flex;align-items:center;gap:11px;padding:13px 15px;border-radius:14px;background:#0f172a;color:#ffffff;font-size:13px"><span style="color:#f87171">❌</span>บันทึกไม่สำเร็จ · แผน PM นี้ยังไม่มี Checklist Template</div>
+        <div style="display:flex;align-items:center;gap:11px;padding:13px 15px;border-radius:14px;background:#0f172a;color:#ffffff;font-size:13px"><span style="color:#22d3ee">🔍</span>สแกนพบรหัส: AST-PR-0112</div>
+        <div style="display:flex;align-items:center;gap:11px;padding:13px 15px;border-radius:14px;background:#0f172a;color:#ffffff;font-size:13px"><span style="color:#fbbf24">⏳</span>กำลังส่งออก Excel 2,847 รายการ…</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="margin-top:28px;font-size:12px;color:#7a889c">© 2569 · ระบบบริหารทรัพย์สินไอที — สถานะและกรณีขอบ (Mockup)</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1920,&quot;height&quot;:1240}}"></script>
+</body>
+</html>

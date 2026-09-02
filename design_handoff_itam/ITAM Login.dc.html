@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#eef3f9; font-family:'Noto Sans Thai','IBM Plex Sans',sans-serif; color:#15243c; }
+  a { color:#0e7490; text-decoration:none; }
+  a:hover { color:#0891b2; }
+  input { font-family:inherit; }
+</style>
+</helmet>
+
+<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 24px;position:relative;overflow:hidden;background:radial-gradient(1100px 600px at 15% 12%,rgba(34,211,238,.16),transparent 60%),radial-gradient(900px 620px at 88% 88%,rgba(37,99,235,.14),transparent 62%),#eef3f9">
+
+  <div style="width:1040px;max-width:100%;min-height:620px;display:flex;flex-wrap:wrap;border-radius:28px;background:#ffffff;border:1px solid #e1e8f2;box-shadow:0 30px 70px rgba(20,40,80,.14)">
+
+    <div style="box-sizing:border-box;flex:1 1 380px;min-width:340px;display:flex;flex-direction:column;justify-content:center;padding:44px 48px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:34px">
+        <div style="width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,#0891b2,#2563eb);display:flex;align-items:center;justify-content:center">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.8"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"></path><path d="M4 7.5l8 4.5 8-4.5M12 12v9"></path></svg>
+        </div>
+        <div>
+          <div style="font-size:19px;font-weight:700;letter-spacing:.2px">AssetHub</div>
+          <div style="font-size:12.5px;color:#68788e">ระบบบริหารทรัพย์สินไอที</div>
+        </div>
+      </div>
+
+      <sc-if value="{{ isSignIn }}" hint-placeholder-val="{{ true }}">
+      <div>
+        <div style="font-size:28px;font-weight:700">เข้าสู่ระบบ</div>
+        <div style="font-size:13.5px;color:#68788e;margin-top:6px">ใช้บัญชี Active Directory ขององค์กรในการเข้าใช้งาน</div>
+
+        <div style="display:flex;flex-direction:column;gap:14px;margin-top:26px">
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <span style="font-size:12.5px;color:#68788e">ชื่อผู้ใช้ (AD Username)</span>
+            <div style="display:flex;align-items:center;gap:11px;padding:13px 15px;border-radius:14px;border:1px solid #dde5f0;background:#f8fafc">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8494a8" stroke-width="1.8"><circle cx="12" cy="8" r="3.6"></circle><path d="M4.5 20a7.5 7.5 0 0115 0"></path></svg>
+              <span style="font-size:14px;color:#31435c">thanakrit.s</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <span style="font-size:12.5px;color:#68788e">รหัสผ่าน</span>
+            <div style="display:flex;align-items:center;gap:11px;padding:13px 15px;border-radius:14px;border:1px solid rgba(8,145,178,.42);background:#ffffff;box-shadow:0 0 0 3px rgba(8,145,178,.09)">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8494a8" stroke-width="1.8"><rect x="4.5" y="10" width="15" height="10" rx="2.5"></rect><path d="M8.5 10V7.5a3.5 3.5 0 017 0V10"></path></svg>
+              <span style="flex:1;font-size:15px;color:#31435c;letter-spacing:3px">••••••••••</span>
+              <svg style="cursor:pointer" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8494a8" stroke-width="1.8"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px;margin-top:16px;font-size:13px;color:#54637a">
+          <span style="width:17px;height:17px;flex:none;border-radius:5px;border:1px solid #cfd9e8;background:#f8fafc"></span>
+          <span style="flex:1;min-width:150px">จดจำการเข้าสู่ระบบ</span>
+          <a href="#" style="white-space:nowrap">ลืมรหัสผ่าน?</a>
+        </div>
+
+        <div onClick="{{ goExpiry }}" style="margin-top:24px;text-align:center;padding:14px;border-radius:14px;background:linear-gradient(120deg,#0891b2,#2563eb);color:#ffffff;font-weight:600;font-size:14.5px;cursor:pointer;box-shadow:0 10px 24px rgba(8,145,178,.28)">เข้าสู่ระบบ</div>
+
+        <div style="margin-top:22px;display:flex;align-items:center;gap:12px;padding:13px 15px;border-radius:14px;background:rgba(20,50,90,.035);border:1px solid #e6ecf5">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0e7490" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5v5l3 1.8"></path></svg>
+          <span style="flex:1;font-size:12.5px;color:#54637a">รหัสผ่าน AD ของคุณจะหมดอายุใน 18 วัน</span>
+          <span onClick="{{ goExpiry }}" style="font-size:12.5px;color:#0e7490;font-weight:600;cursor:pointer">ตรวจสอบ</span>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isExpiry }}" hint-placeholder-val="{{ false }}">
+      <div>
+        <div style="font-size:28px;font-weight:700">ตรวจสอบวันหมดอายุรหัสผ่าน</div>
+        <div style="font-size:13.5px;color:#68788e;margin-top:6px">กรอกบัญชี AD เพื่อดูจำนวนวันคงเหลือก่อนรหัสผ่านหมดอายุ</div>
+
+        <div style="margin-top:24px;padding:16px 18px;border-radius:16px;background:#fffaf5;border:1px solid rgba(194,130,10,.32)">
+          <div style="display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;color:#b45309">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#b45309" stroke-width="1.8"><rect x="4" y="5" width="16" height="16" rx="2.5"></rect><path d="M8 3v4M16 3v4M4 10h16"></path></svg>
+            <span>เหลืออีก 18 วัน</span>
+          </div>
+          <div style="font-size:12.5px;color:#92400e;margin-top:7px">รหัสผ่านจะหมดอายุวันที่ 23 ส.ค. 2569 · กรุณาเปลี่ยนรหัสผ่านผ่านเครื่องที่เชื่อมต่อโดเมน</div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:14px;margin-top:22px">
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <span style="font-size:12.5px;color:#68788e">ชื่อผู้ใช้ (AD Username)</span>
+            <div style="display:flex;align-items:center;gap:11px;padding:13px 15px;border-radius:14px;border:1px solid #dde5f0;background:#f8fafc">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8494a8" stroke-width="1.8"><circle cx="12" cy="8" r="3.6"></circle><path d="M4.5 20a7.5 7.5 0 0115 0"></path></svg>
+              <span style="font-size:14px;color:#31435c">thanakrit.s</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <span style="font-size:12.5px;color:#68788e">รหัสผ่าน</span>
+            <div style="display:flex;align-items:center;gap:11px;padding:13px 15px;border-radius:14px;border:1px solid #dde5f0;background:#f8fafc">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8494a8" stroke-width="1.8"><rect x="4.5" y="10" width="15" height="10" rx="2.5"></rect><path d="M8.5 10V7.5a3.5 3.5 0 017 0V10"></path></svg>
+              <span style="flex:1;font-size:15px;color:#31435c;letter-spacing:3px">••••••••••</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:24px;text-align:center;padding:14px;border-radius:14px;background:linear-gradient(120deg,#0891b2,#2563eb);color:#ffffff;font-weight:600;font-size:14.5px;cursor:pointer;box-shadow:0 10px 24px rgba(8,145,178,.28)">ตรวจสอบวันหมดอายุ</div>
+        <div onClick="{{ goSignIn }}" style="margin-top:12px;text-align:center;padding:13px;border-radius:14px;border:1px solid #d6dfec;background:rgba(20,50,90,.04);font-size:14px;cursor:pointer" style-hover="background:rgba(20,50,90,.08)">กลับไปหน้าเข้าสู่ระบบ</div>
+      </div>
+      </sc-if>
+    </div>
+
+    <div style="box-sizing:border-box;flex:0 1 360px;min-width:300px;position:relative;border-radius:0 27px 27px 0;background:linear-gradient(150deg,#0e7490,#1d4ed8 62%,#1e3a8a);display:flex;flex-direction:column;justify-content:center;padding:44px 40px;color:#ffffff">
+      <div style="position:absolute;inset:0;overflow:hidden;border-radius:inherit;pointer-events:none">
+        <div style="position:absolute;width:340px;height:340px;border-radius:50%;background:rgba(255,255,255,.07);top:-120px;right:-110px"></div>
+        <div style="position:absolute;width:260px;height:260px;border-radius:50%;background:rgba(255,255,255,.05);bottom:-90px;left:-80px"></div>
+      </div>
+
+      <sc-if value="{{ isSignIn }}" hint-placeholder-val="{{ true }}">
+      <div style="position:relative">
+        <div style="font-size:26px;font-weight:700;line-height:1.35">รหัสผ่าน AD<br>ใกล้หมดอายุหรือไม่?</div>
+        <div style="font-size:13.5px;color:rgba(255,255,255,.82);margin-top:14px;line-height:1.7">ตรวจสอบจำนวนวันคงเหลือได้ด้วยตัวเอง ไม่ต้องแจ้งฝ่ายไอที</div>
+        <div onClick="{{ goExpiry }}" style="margin-top:26px;display:inline-block;padding:12px 26px;border-radius:12px;border:1px solid rgba(255,255,255,.6);font-size:14px;font-weight:600;cursor:pointer" style-hover="background:rgba(255,255,255,.14)">ตรวจสอบวันหมดอายุ</div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isExpiry }}" hint-placeholder-val="{{ false }}">
+      <div style="position:relative">
+        <div style="font-size:26px;font-weight:700;line-height:1.35">กลับไปเข้าใช้งาน<br>ระบบทรัพย์สิน</div>
+        <div style="font-size:13.5px;color:rgba(255,255,255,.82);margin-top:14px;line-height:1.7">ดูทรัพย์สินในความดูแล ยืม–คืนอุปกรณ์ และแจ้งซ่อมได้จากที่เดียว</div>
+        <div onClick="{{ goSignIn }}" style="margin-top:26px;display:inline-block;padding:12px 26px;border-radius:12px;border:1px solid rgba(255,255,255,.6);font-size:14px;font-weight:600;cursor:pointer" style-hover="background:rgba(255,255,255,.14)">เข้าสู่ระบบ</div>
+      </div>
+      </sc-if>
+
+      <div style="position:relative;margin-top:44px;padding-top:22px;border-top:1px solid rgba(255,255,255,.22);display:flex;gap:26px;font-size:12.5px;color:rgba(255,255,255,.75)">
+        <div><div style="font-size:19px;font-weight:700;font-family:'IBM Plex Sans',sans-serif;color:#ffffff">4,182</div>ทรัพย์สินในระบบ</div>
+        <div><div style="font-size:19px;font-weight:700;font-family:'IBM Plex Sans',sans-serif;color:#ffffff">1,142</div>ผู้ใช้งาน</div>
+        <div><div style="font-size:19px;font-weight:700;font-family:'IBM Plex Sans',sans-serif;color:#ffffff">3</div>บริษัทในเครือ</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="position:absolute;bottom:20px;font-size:12px;color:#7a889c">© 2569 · ระบบบริหารทรัพย์สินไอที v1.0 — Mockup</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  state = { mode: "signin" };
+  renderVals() {
+    return {
+      isSignIn: this.state.mode === "signin",
+      isExpiry: this.state.mode === "expiry",
+      goSignIn: () => this.setState({ mode: "signin" }),
+      goExpiry: () => this.setState({ mode: "expiry" })
+    };
+  }
+}
+</script>
+</body>
+</html>
