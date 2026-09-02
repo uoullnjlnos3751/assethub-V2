@@ -316,7 +316,17 @@ export default function MyRequestsPage() {
                   detailReq.status === 'Pending' ? 2 :
                   detailReq.status === 'Approved' ? 3 :
                   detailReq.status === 'CheckedOut' ? 4 :
-                  detailReq.status === 'Returned' ? 5 : 1
+                  detailReq.status === 'Returned' ? 5 :
+                  // Rejected: land on whichever step actually rejected it, so the
+                  // active step lines up with the red `error` marker below instead
+                  // of sitting one step behind it (the fallback here used to be a
+                  // flat `1`, left over from before the supervisor step existed —
+                  // now it means "หัวหน้างานอนุมัติ", not "รอ IT Admin อนุมัติ").
+                  // Same rejected/no-approvals condition as each StepLabel's own
+                  // `error` check just below, so the two never disagree.
+                  detailReq.status === 'Rejected'
+                    ? (detailReq.approvals?.some((a: any) => a.stage === 'Supervisor' && a.action === 'Rejected') ? 1 : 2)
+                    : 0
                 } alternativeLabel>
                   <Step><StepLabel>สร้างคำขอ</StepLabel></Step>
                   <Step>
