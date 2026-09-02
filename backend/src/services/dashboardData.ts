@@ -139,7 +139,10 @@ export async function borrowSummary(prisma: PrismaClient) {
     prisma.borrowRequest.count(),
     prisma.borrowRequestItem.count({ where: { itemStatus: 'CheckedOut', dueDate: { lt: new Date() } } }),
     prisma.borrowRequestItem.count({ where: { itemStatus: { in: ['CheckedOut', 'PartiallyReturned'] } } }),
-    prisma.borrowRequest.count({ where: { status: 'Pending' } }),
+    // ทั้ง Pending (รอ IT Admin) และ PendingSupervisor (รอหัวหน้างาน) คือคำขอที่
+    // "ยังรออนุมัติอยู่" — นับแค่ Pending ตัวเดียวทำให้คำขอที่ค้างอยู่ที่หัวหน้างาน
+    // หายไปจากตัวเลขนี้ทั้งที่ยังไม่จบขั้นตอน
+    prisma.borrowRequest.count({ where: { status: { in: ['Pending', 'PendingSupervisor'] } } }),
   ]);
   return { total, byStatus, overdue, activeItems, pendingApproval };
 }
@@ -244,7 +247,7 @@ export async function proactiveAlerts(prisma: PrismaClient) {
   nextWeek.setDate(now.getDate() + 7);
   const [overdueItems, pendingApprovals, upcomingPMs] = await Promise.all([
     prisma.borrowRequestItem.count({ where: { itemStatus: 'CheckedOut', dueDate: { lt: now } } }),
-    prisma.borrowRequest.count({ where: { status: 'Pending' } }),
+    prisma.borrowRequest.count({ where: { status: { in: ['Pending', 'PendingSupervisor'] } } }),
     prisma.pMRun.count({
       where: { status: { not: 'COMPLETED' }, plan: { endDate: { gte: now, lte: nextWeek } } },
     }),

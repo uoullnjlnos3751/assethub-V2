@@ -162,10 +162,14 @@ router.post('/requests', authenticate, validate(borrowRequestSchema), async (req
 
     // มีหัวหน้างานผูกไว้ (managerId) -> ต้องรอหัวหน้าอนุมัติก่อน ถึงจะเด้งไปหา IT Admin
     // ไม่มีหัวหน้างานผูกไว้ -> ข้ามขั้นนี้ไปเข้าคิว IT Admin เหมือนพฤติกรรมเดิมทุกประการ
+    // หัวหน้างานที่ถูกปิดใช้งานล็อกอินไม่ได้อีกแล้ว (auth.service.ts บล็อก
+    // isActive:false) — ถือเป็น "ไม่มีหัวหน้างาน" เหมือนกัน ไม่งั้นคำขอจะไปค้างรอ
+    // คนที่อนุมัติไม่ได้ตลอดไป
     const manager = user?.managerId
       ? await prisma.appUser.findUnique({ where: { id: user.managerId } })
       : null;
-    const initialStatus: 'PendingSupervisor' | 'Pending' = manager ? 'PendingSupervisor' : 'Pending';
+    const activeManager = manager?.isActive ? manager : null;
+    const initialStatus: 'PendingSupervisor' | 'Pending' = activeManager ? 'PendingSupervisor' : 'Pending';
 
     const request = await prisma.borrowRequest.create({
       data: {
@@ -239,19 +243,19 @@ router.post('/requests', authenticate, validate(borrowRequestSchema), async (req
       items: itemsPayload,
     };
 
-    if (initialStatus === 'PendingSupervisor' && manager) {
+    if (initialStatus === 'PendingSupervisor' && activeManager) {
       // ขั้นแรก: แจ้งเฉพาะหัวหน้างานของผู้ขอ ยังไม่แจ้ง IT Admin
       await prisma.appNotification.create({
         data: {
-          userId: manager.id,
+          userId: activeManager.id,
           title: 'มีคำขอยืมรออนุมัติ',
           message: `${user?.displayName || req.user!.adUsername} ส่งคำขอยืมเลขที่ ${request.requestNo} รอการอนุมัติจากคุณ`,
           type: 'BORROW',
           link: '/borrow/supervisor-queue',
         },
       });
-      if (manager.email) {
-        await createNotification('borrow_pending_supervisor', 'EMAIL', manager.email, payload);
+      if (activeManager.email) {
+        await createNotification('borrow_pending_supervisor', 'EMAIL', activeManager.email, payload);
       }
     } else {
       // ไม่มีหัวหน้างานผูกไว้ -> แจ้ง IT Admin ตรงเลยเหมือนพฤติกรรมเดิม
@@ -436,6 +440,10 @@ router.post('/requests/:id/supervisor-approve', authenticate, validate(approveSc
           await createNotification('borrow_supervisor_approved', 'EMAIL', admin.email, adminPayload);
         }
       }));
+      // The no-manager create path also broadcasts to LINE at this handoff
+      // point (line ~276) — this was the one channel missing here, so IT's
+      // LINE group went quiet for every requester who has a manager.
+      await createNotification('borrow_supervisor_approved', 'LINE', 'broadcast', adminPayload);
     }
 
     await prisma.appNotification.create({
@@ -1188,18 +1196,24 @@ router.get('/stats', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_
     const oneDayAgo = new Date(now.getTime() - 86400000);
 
     const [
-      pending, pendingOverDay, approvedToday, rejectedThisMonth,
+      pending, approvedToday, rejectedThisMonth,
       recentApprovals, activeItems, activeRequesterRows,
       overdueItems, dueTodayItems, returnsThisMonth,
       extensionsPending, extensionsApprovedThisMonth, extensionsRejectedThisMonth, pendingExtensionExtraDays,
+      pendingSupervisor, pendingSupervisorOverDay,
     ] = await Promise.all([
       prisma.borrowRequest.count({ where: { status: 'Pending' } }),
-      prisma.borrowRequest.count({ where: { status: 'Pending', createdAt: { lt: oneDayAgo } } }),
-      prisma.borrowApproval.count({ where: { action: 'Approved', actedAt: { gte: startOfToday, lt: endOfToday } } }),
-      prisma.borrowApproval.count({ where: { action: 'Rejected', actedAt: { gte: startOfMonth } } }),
+      // pendingOverDay itself is computed below (needs each request's actual
+      // IT-Admin-queue entry time, not just createdAt — see pendingOverDay
+      // computation after this Promise.all).
+      // stage:'ITAdmin' — a two-stage request also carries a stage:'Supervisor'
+      // approval row; counting both here double-counted every such request in
+      // this month's approved/rejected/avg-latency figures.
+      prisma.borrowApproval.count({ where: { action: 'Approved', stage: 'ITAdmin', actedAt: { gte: startOfToday, lt: endOfToday } } }),
+      prisma.borrowApproval.count({ where: { action: 'Rejected', stage: 'ITAdmin', actedAt: { gte: startOfMonth } } }),
       prisma.borrowApproval.findMany({
-        where: { actedAt: { gte: startOfMonth } },
-        select: { actedAt: true, request: { select: { createdAt: true } } },
+        where: { action: 'Approved', stage: 'ITAdmin', actedAt: { gte: startOfMonth } },
+        select: { requestId: true, actedAt: true, request: { select: { createdAt: true } } },
       }),
       prisma.borrowRequestItem.count({ where: { itemStatus: 'CheckedOut' } }),
       prisma.borrowRequestItem.findMany({
@@ -1224,12 +1238,54 @@ router.get('/stats', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_
         where: { extension: { status: 'Pending' } },
         select: { extraDays: true },
       }),
+      // Supervisor-stage backlog — previously not surfaced anywhere, so a
+      // request stuck waiting on a supervisor was invisible to every
+      // dashboard/report/SLA check (which all filtered status:'Pending'
+      // only) and never tripped the "over 24h" alarm ApprovalQueuePage's
+      // own copy promises. Its clock starts at createdAt directly — there's
+      // no earlier stage before this one.
+      prisma.borrowRequest.count({ where: { status: 'PendingSupervisor' } }),
+      prisma.borrowRequest.count({ where: { status: 'PendingSupervisor', createdAt: { lt: oneDayAgo } } }),
     ]);
 
+    // A two-stage request's IT-Admin clock starts when it left the supervisor
+    // stage (that approval's actedAt), not when it was originally created —
+    // otherwise a request that waited days on its supervisor looks instantly
+    // overdue the moment it reaches IT Admin, and a fast supervisor approval
+    // makes IT Admin's own avg-latency figure look better than it really is.
+    // Requests that skipped the supervisor stage (no manager) still use
+    // createdAt, same as before.
+    const itAdminRequestIds = [
+      ...new Set([...recentApprovals.map(a => a.requestId)]),
+    ];
+    const pendingNow = await prisma.borrowRequest.findMany({
+      where: { status: 'Pending' },
+      select: { id: true, createdAt: true },
+    });
+    const supervisorActedLookupIds = [...new Set([...itAdminRequestIds, ...pendingNow.map(r => r.id)])];
+    const supervisorApprovals = supervisorActedLookupIds.length > 0
+      ? await prisma.borrowApproval.findMany({
+          where: { requestId: { in: supervisorActedLookupIds }, stage: 'Supervisor', action: 'Approved' },
+          select: { requestId: true, actedAt: true },
+          orderBy: { actedAt: 'desc' },
+        })
+      : [];
+    const queuedSinceByRequestId = new Map<number, Date>();
+    for (const sa of supervisorApprovals) {
+      if (!queuedSinceByRequestId.has(sa.requestId)) queuedSinceByRequestId.set(sa.requestId, sa.actedAt);
+    }
+
     const avgApprovalHours = recentApprovals.length > 0
-      ? recentApprovals.reduce((sum, a) => sum + (a.actedAt.getTime() - a.request.createdAt.getTime()), 0)
-        / recentApprovals.length / 3600000
+      ? recentApprovals.reduce((sum, a) => {
+          const queuedSince = queuedSinceByRequestId.get(a.requestId) ?? a.request.createdAt;
+          return sum + (a.actedAt.getTime() - queuedSince.getTime());
+        }, 0) / recentApprovals.length / 3600000
       : null;
+
+    const pendingOverDay = pendingNow.filter((r) => {
+      const queuedSince = queuedSinceByRequestId.get(r.id) ?? r.createdAt;
+      return queuedSince.getTime() < oneDayAgo.getTime();
+    }).length;
 
     const activeBorrowers = new Set(activeRequesterRows.map(r => r.request.requesterUserId)).size;
 
@@ -1245,6 +1301,9 @@ router.get('/stats', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (_
 
     res.json({
       pending, pendingOverDay, approvedToday, rejectedThisMonth,
+      // ก่อนหน้านี้ไม่มีสองค่านี้ — คำขอที่ค้างรอหัวหน้างานอนุมัติจึงไม่โผล่ใน
+      // dashboard ไหนเลย และไม่เคยเข้าเงื่อนไข "เกิน 1 วันทำการ" ให้ระบบเตือน
+      pendingSupervisor, pendingSupervisorOverDay,
       avgApprovalHours: avgApprovalHours != null ? Math.round(avgApprovalHours * 10) / 10 : null,
       activeItems, activeBorrowers,
       overdueItems: overdueItems.length,

@@ -531,7 +531,9 @@ export default function UsersPermissionsTab() {
               onChange={e => setSelectedManagerId(e.target.value === '' ? '' : Number(e.target.value))}
             >
               <MenuItem value="">— ไม่มี (เข้าคิว IT Admin ทันที) —</MenuItem>
-              {users.filter(u => u.id !== managerDialog.user?.id).map(u => (
+              {/* ผู้ใช้ที่ปิดใช้งานล็อกอินไม่ได้อีกแล้ว — ตั้งเป็นหัวหน้างานไม่ได้จริง
+                  (backend ปฏิเสธด้วย) ตัดออกจากตัวเลือกไปเลยดีกว่าให้เลือกแล้วพัง */}
+              {users.filter(u => u.id !== managerDialog.user?.id && u.isActive !== false).map(u => (
                 <MenuItem key={u.id} value={u.id}>{u.displayName || u.adUsername} ({u.adUsername})</MenuItem>
               ))}
             </Select>
