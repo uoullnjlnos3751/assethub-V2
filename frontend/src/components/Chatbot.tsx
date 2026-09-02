@@ -27,13 +27,18 @@ export const Chatbot: React.FC = () => {
   }, [messages, isOpen, toolStatus]);
 
   // A question handed in from outside (e.g. the AppBar search box's "ถาม AI"
-  // row) — send it as if the visitor had typed it themselves.
+  // row) — send it as if the visitor had typed it themselves. Waits for any
+  // answer already streaming to finish first: sendText() appends its chunks
+  // by rewriting `messages[messages.length - 1]`, so two streams running at
+  // once would interleave their text into whichever bubble is currently
+  // last. Not clearing queuedQuery until it's actually sent means this
+  // re-fires and catches it once isLoading drops back to false.
   useEffect(() => {
-    if (!queuedQuery) return;
+    if (!queuedQuery || isLoading) return;
     clearQueuedQuery();
     sendText(queuedQuery.text);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queuedQuery]);
+  }, [queuedQuery, isLoading]);
 
   const sendText = async (text: string) => {
     if (!text.trim()) return;
