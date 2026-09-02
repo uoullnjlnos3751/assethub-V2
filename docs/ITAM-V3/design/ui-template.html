@@ -1,0 +1,2125 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>TRR Asset Register</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anuphan:wght@500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* ============================================================
+   DESIGN TOKENS — แก้สีทั้งระบบได้ที่นี่ที่เดียว
+   ============================================================ */
+:root{
+  --ground:#f4f6f8;
+  --surface:#ffffff;
+  --surface-2:#eaeef2;
+  --surface-3:#f7f9fb;
+  --line:#dbe2e9;
+  --line-soft:#e8edf2;
+  --ink:#152029;
+  --ink-2:#5b6b7a;
+  --ink-3:#8496a6;
+
+  --brand:#0d3b47;          /* แถบเมนูซ้าย */
+  --brand-hi:#12505f;
+  --brand-ink:#cfe4e9;
+  --brand-ink-hi:#ffffff;
+
+  --accent:#0b6e80;         /* ปุ่มหลัก / ลิงก์ / active */
+  --accent-hi:#095a69;
+  --accent-tint:#e0f0f3;
+  --accent-ink:#ffffff;
+
+  /* Status — ตรวจผ่าน CVD validator แล้ว */
+  --st-good:#0ca30c;
+  --st-info:#2a78d6;
+  --st-warn:#d98407;
+  --st-crit:#d03b3b;
+  --st-mute:#8a8f96;
+  --st-good-bg:#e4f6e4; --st-good-tx:#0a6b12;
+  --st-info-bg:#e4eefb; --st-info-tx:#1b5aa6;
+  --st-warn-bg:#fbeedb; --st-warn-tx:#8a5406;
+  --st-crit-bg:#fae5e5; --st-crit-tx:#9c2626;
+  --st-mute-bg:#eceff2; --st-mute-tx:#5b6b7a;
+
+  --shadow-sm:0 1px 2px rgba(21,32,41,.06);
+  --shadow:0 2px 4px rgba(21,32,41,.05), 0 12px 28px -14px rgba(21,32,41,.22);
+  --shadow-lg:0 8px 40px -12px rgba(21,32,41,.30);
+
+  --r-sm:6px; --r:9px; --r-lg:12px;
+  --rail:240px; --rail-min:64px; --topbar:56px;
+
+  --f-display:'Anuphan','IBM Plex Sans Thai',system-ui,sans-serif;
+  --f-body:'IBM Plex Sans Thai',system-ui,-apple-system,sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,'SFMono-Regular',monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#0d141a;
+    --surface:#141d25;
+    --surface-2:#1b2630;
+    --surface-3:#111a21;
+    --line:#28353f;
+    --line-soft:#1f2b34;
+    --ink:#e6eef5;
+    --ink-2:#93a5b5;
+    --ink-3:#6d8091;
+
+    --brand:#0a2c36;
+    --brand-hi:#124453;
+    --brand-ink:#9dc0c9;
+    --brand-ink-hi:#ffffff;
+
+    --accent:#3fb3c9;
+    --accent-hi:#5cc6da;
+    --accent-tint:#10333c;
+    --accent-ink:#04222a;
+
+    --st-good:#16b516;
+    --st-info:#3987e5;
+    --st-warn:#e5a020;
+    --st-crit:#e05c5c;
+    --st-mute:#8f9dad;
+    --st-good-bg:#0f2c16; --st-good-tx:#5fd45f;
+    --st-info-bg:#12263d; --st-info-tx:#79b4f2;
+    --st-warn-bg:#33260f; --st-warn-tx:#e9b45a;
+    --st-crit-bg:#361a1a; --st-crit-tx:#f08a8a;
+    --st-mute-bg:#1d262e; --st-mute-tx:#93a5b5;
+
+    --shadow-sm:0 1px 2px rgba(0,0,0,.4);
+    --shadow:0 2px 4px rgba(0,0,0,.3), 0 12px 28px -14px rgba(0,0,0,.7);
+    --shadow-lg:0 8px 40px -12px rgba(0,0,0,.75);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0d141a;
+  --surface:#141d25;
+  --surface-2:#1b2630;
+  --surface-3:#111a21;
+  --line:#28353f;
+  --line-soft:#1f2b34;
+  --ink:#e6eef5;
+  --ink-2:#93a5b5;
+  --ink-3:#6d8091;
+
+  --brand:#0a2c36;
+  --brand-hi:#124453;
+  --brand-ink:#9dc0c9;
+  --brand-ink-hi:#ffffff;
+
+  --accent:#3fb3c9;
+  --accent-hi:#5cc6da;
+  --accent-tint:#10333c;
+  --accent-ink:#04222a;
+
+  --st-good:#16b516;
+  --st-info:#3987e5;
+  --st-warn:#e5a020;
+  --st-crit:#e05c5c;
+  --st-mute:#8f9dad;
+  --st-good-bg:#0f2c16; --st-good-tx:#5fd45f;
+  --st-info-bg:#12263d; --st-info-tx:#79b4f2;
+  --st-warn-bg:#33260f; --st-warn-tx:#e9b45a;
+  --st-crit-bg:#361a1a; --st-crit-tx:#f08a8a;
+  --st-mute-bg:#1d262e; --st-mute-tx:#93a5b5;
+
+  --shadow-sm:0 1px 2px rgba(0,0,0,.4);
+  --shadow:0 2px 4px rgba(0,0,0,.3), 0 12px 28px -14px rgba(0,0,0,.7);
+  --shadow-lg:0 8px 40px -12px rgba(0,0,0,.75);
+}
+
+/* ============================================================ RESET */
+*,*::before,*::after{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;}
+body{
+  background:var(--ground);
+  color:var(--ink);
+  font-family:var(--f-body);
+  font-size:14px;
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+  overflow:hidden;
+}
+button,input,select{font:inherit;color:inherit;}
+button{background:none;border:none;cursor:pointer;}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px;}
+.mono{font-family:var(--f-mono);font-size:.86em;letter-spacing:-.01em;}
+.num{font-variant-numeric:tabular-nums;}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms !important;transition-duration:.01ms !important;}
+}
+
+/* ============================================================ SHELL */
+.app{display:flex;height:100vh;overflow:hidden;}
+
+/* --- Sidebar --- */
+.rail{
+  width:var(--rail);flex:none;background:var(--brand);color:var(--brand-ink);
+  display:flex;flex-direction:column;transition:width .18s ease;z-index:40;
+}
+.app.collapsed .rail{width:var(--rail-min);}
+.rail-top{
+  height:var(--topbar);display:flex;align-items:center;gap:10px;
+  padding:0 14px;border-bottom:1px solid rgba(255,255,255,.09);flex:none;
+}
+.logo{
+  width:32px;height:32px;flex:none;border-radius:var(--r-sm);
+  background:var(--accent);color:var(--accent-ink);
+  display:grid;place-items:center;font-family:var(--f-display);
+  font-weight:700;font-size:13px;letter-spacing:-.02em;
+}
+.logo-tx{display:flex;flex-direction:column;line-height:1.15;overflow:hidden;}
+.logo-tx b{font-family:var(--f-display);font-size:13.5px;font-weight:600;color:var(--brand-ink-hi);white-space:nowrap;}
+.logo-tx span{font-size:10px;color:var(--brand-ink);opacity:.7;white-space:nowrap;letter-spacing:.04em;}
+.app.collapsed .logo-tx{display:none;}
+
+.rail-nav{flex:1;overflow-y:auto;padding:10px 8px;display:flex;flex-direction:column;gap:1px;}
+.rail-sec{
+  font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--brand-ink);opacity:.5;padding:14px 10px 5px;white-space:nowrap;
+}
+.app.collapsed .rail-sec{opacity:0;height:14px;padding:6px 0 0;overflow:hidden;}
+.nav-i{
+  display:flex;align-items:center;gap:11px;width:100%;
+  padding:9px 10px;border-radius:var(--r-sm);
+  color:var(--brand-ink);font-size:13.5px;text-align:left;
+  transition:background .12s,color .12s;position:relative;
+}
+.nav-i svg{width:19px;height:19px;flex:none;}
+.nav-i span{white-space:nowrap;overflow:hidden;}
+.app.collapsed .nav-i span{display:none;}
+.app.collapsed .nav-i{justify-content:center;padding:9px 0;}
+.nav-i:hover{background:var(--brand-hi);color:var(--brand-ink-hi);}
+.nav-i.on{background:var(--brand-hi);color:var(--brand-ink-hi);font-weight:500;}
+.nav-i.on::before{
+  content:"";position:absolute;left:-8px;top:50%;transform:translateY(-50%);
+  width:3px;height:20px;border-radius:0 3px 3px 0;background:var(--accent);
+}
+.nav-badge{
+  margin-left:auto;background:var(--st-crit);color:#fff;font-size:10px;
+  font-weight:600;padding:1px 6px;border-radius:99px;line-height:1.5;
+}
+.app.collapsed .nav-badge{display:none;}
+.rail-foot{padding:8px;border-top:1px solid rgba(255,255,255,.09);flex:none;}
+
+/* --- Main --- */
+.main{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden;}
+.topbar{
+  height:var(--topbar);flex:none;background:var(--surface);
+  border-bottom:1px solid var(--line);
+  display:flex;align-items:center;gap:12px;padding:0 16px;
+}
+.icon-btn{
+  width:34px;height:34px;flex:none;border-radius:var(--r-sm);
+  display:grid;place-items:center;color:var(--ink-2);
+  transition:background .12s,color .12s;
+}
+.icon-btn svg{width:18px;height:18px;}
+.icon-btn:hover{background:var(--surface-2);color:var(--ink);}
+.icon-btn.on{background:var(--accent-tint);color:var(--accent);}
+.page-title{font-family:var(--f-display);font-size:16px;font-weight:600;white-space:nowrap;}
+
+.search{
+  flex:1;max-width:520px;position:relative;display:flex;align-items:center;
+}
+.search svg{position:absolute;left:11px;width:16px;height:16px;color:var(--ink-3);pointer-events:none;}
+.search input{
+  width:100%;height:36px;padding:0 12px 0 34px;
+  background:var(--surface-2);border:1px solid transparent;
+  border-radius:var(--r);font-size:13.5px;
+  transition:border-color .12s,background .12s;
+}
+.search input::placeholder{color:var(--ink-3);}
+.search input:focus{outline:none;background:var(--surface);border-color:var(--accent);}
+.spacer{flex:1;}
+
+.btn{
+  display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 13px;
+  border-radius:var(--r-sm);font-size:13px;font-weight:500;
+  transition:background .12s,border-color .12s;white-space:nowrap;
+}
+.btn svg{width:15px;height:15px;}
+.btn-primary{background:var(--accent);color:var(--accent-ink);}
+.btn-primary:hover{background:var(--accent-hi);}
+.btn-ghost{border:1px solid var(--line);color:var(--ink-2);}
+.btn-ghost:hover{background:var(--surface-2);color:var(--ink);}
+.avatar{
+  width:32px;height:32px;border-radius:50%;background:var(--accent);
+  color:var(--accent-ink);display:grid;place-items:center;
+  font-size:12px;font-weight:600;flex:none;
+}
+
+/* --- Sub tabs --- */
+.subtabs{
+  flex:none;background:var(--surface);border-bottom:1px solid var(--line);
+  display:flex;gap:2px;padding:0 12px;overflow-x:auto;scrollbar-width:none;
+}
+.subtabs::-webkit-scrollbar{display:none;}
+.subtab{
+  display:flex;align-items:center;gap:7px;
+  padding:11px 14px 9px;font-size:13.5px;color:var(--ink-2);
+  border-bottom:2px solid transparent;white-space:nowrap;transition:color .12s;
+}
+.subtab svg{width:16px;height:16px;flex:none;opacity:.75;}
+.subtab.on svg{opacity:1;}
+.subtab:hover{color:var(--ink);}
+.subtab.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:500;}
+
+/* --- Content --- */
+.content{flex:1;overflow:auto;padding:16px;position:relative;}
+.content.flush{padding:0;display:flex;flex-direction:column;overflow:hidden;}
+
+/* --- Explorer toolbar --- */
+.toolbar{
+  flex:none;display:flex;align-items:center;gap:4px;
+  padding:8px 12px;background:var(--surface);border-bottom:1px solid var(--line);
+  flex-wrap:wrap;
+}
+.chip{
+  display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 11px;
+  border-radius:99px;border:1px solid var(--line);font-size:12.5px;color:var(--ink-2);
+  transition:background .12s,border-color .12s,color .12s;
+}
+.chip svg{width:14px;height:14px;}
+.chip:hover{background:var(--surface-2);color:var(--ink);}
+.chip.on{background:var(--accent-tint);border-color:transparent;color:var(--accent);font-weight:500;}
+.tb-div{width:1px;height:20px;background:var(--line);margin:0 5px;flex:none;}
+
+/* --- Table --- */
+.tbl-scroll{flex:1;overflow:auto;background:var(--surface);}
+table.grid{border-collapse:separate;border-spacing:0;width:100%;min-width:1100px;}
+table.grid thead th{
+  position:sticky;top:0;z-index:5;background:var(--surface-3);
+  text-align:left;font-size:11px;font-weight:600;letter-spacing:.03em;
+  text-transform:uppercase;color:var(--ink-2);
+  padding:9px 12px;border-bottom:1px solid var(--line);white-space:nowrap;
+}
+table.grid thead th.sortable{cursor:pointer;user-select:none;}
+table.grid thead th.sortable:hover{color:var(--accent);}
+.sort-ind{display:inline-block;margin-left:4px;opacity:.35;font-size:9px;}
+.sort-ind.on{opacity:1;color:var(--accent);}
+tr.filters th{
+  position:sticky;top:33px;z-index:4;background:var(--surface);
+  padding:6px 8px;border-bottom:1px solid var(--line);
+}
+tr.filters input{
+  width:100%;min-width:70px;height:28px;padding:0 8px;font-size:12px;
+  background:var(--surface-2);border:1px solid transparent;border-radius:var(--r-sm);
+}
+tr.filters input:focus{outline:none;background:var(--surface);border-color:var(--accent);}
+table.grid tbody td{
+  padding:9px 12px;border-bottom:1px solid var(--line-soft);
+  font-size:13px;vertical-align:middle;white-space:nowrap;
+}
+table.grid tbody tr{transition:background .1s;cursor:pointer;}
+table.grid tbody tr:hover{background:var(--surface-3);}
+table.grid tbody tr.sel{background:var(--accent-tint);}
+td.cell-link{color:var(--accent);font-weight:500;}
+/* คอลัมน์ปุ่ม ⋮ ตรึงไว้ขอบขวาเสมอ แม้ตารางจะเลื่อนแนวนอน */
+table.grid thead th:last-child{position:sticky;right:0;z-index:6;background:var(--surface-3);border-left:1px solid var(--line);}
+tr.filters th:last-child{position:sticky;right:0;z-index:5;background:var(--surface);border-left:1px solid var(--line);}
+table.grid tbody td:last-child{position:sticky;right:0;background:var(--surface);border-left:1px solid var(--line-soft);}
+table.grid tbody tr:hover td:last-child{background:var(--surface-3);}
+table.grid tbody tr.sel td:last-child{background:var(--accent-tint);}
+.chk{width:15px;height:15px;accent-color:var(--accent);cursor:pointer;vertical-align:middle;}
+.col-chk{width:38px;}
+
+.pill{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:2px 9px 2px 7px;border-radius:99px;font-size:11.5px;font-weight:500;
+}
+.pill .dot{width:6px;height:6px;border-radius:50%;flex:none;}
+.pill.good{background:var(--st-good-bg);color:var(--st-good-tx);}
+.pill.good .dot{background:var(--st-good);}
+.pill.info{background:var(--st-info-bg);color:var(--st-info-tx);}
+.pill.info .dot{background:var(--st-info);}
+.pill.warn{background:var(--st-warn-bg);color:var(--st-warn-tx);}
+.pill.warn .dot{background:var(--st-warn);}
+.pill.crit{background:var(--st-crit-bg);color:var(--st-crit-tx);}
+.pill.crit .dot{background:var(--st-crit);}
+.pill.mute{background:var(--st-mute-bg);color:var(--st-mute-tx);}
+.pill.mute .dot{background:var(--st-mute);}
+
+.path{color:var(--ink-2);font-size:12.5px;}
+.path i{color:var(--ink-3);font-style:normal;margin:0 4px;}
+.person{display:flex;align-items:center;gap:7px;}
+.person .ini{
+  width:22px;height:22px;border-radius:50%;flex:none;
+  background:var(--surface-2);color:var(--ink-2);
+  display:grid;place-items:center;font-size:10px;font-weight:600;
+}
+.tag{
+  display:inline-block;padding:1px 8px;border-radius:var(--r-sm);
+  background:var(--surface-2);color:var(--ink-2);font-size:11.5px;
+}
+
+/* --- Cards view --- */
+.cards{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));
+  gap:12px;padding:14px;
+}
+.acard{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
+  padding:14px;box-shadow:var(--shadow-sm);cursor:pointer;transition:box-shadow .14s,border-color .14s;
+}
+.acard:hover{box-shadow:var(--shadow);border-color:var(--accent);}
+.acard-h{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:10px;}
+.acard-h b{font-family:var(--f-display);font-size:14.5px;font-weight:600;}
+.acard-code{font-family:var(--f-mono);font-size:11px;color:var(--ink-3);display:block;margin-top:1px;}
+.acard-rows{display:flex;flex-direction:column;gap:5px;border-top:1px solid var(--line-soft);padding-top:10px;}
+.acard-r{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;}
+.acard-r span{color:var(--ink-3);flex:none;}
+.acard-r b{font-weight:500;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* --- Footer / pagination --- */
+.tbl-foot{
+  flex:none;display:flex;align-items:center;gap:12px;
+  padding:9px 14px;background:var(--surface);border-top:1px solid var(--line);
+  font-size:12.5px;color:var(--ink-2);flex-wrap:wrap;
+}
+.count b{color:var(--accent);font-weight:600;font-family:var(--f-mono);}
+.pager{display:flex;align-items:center;gap:3px;}
+.pg{
+  min-width:28px;height:28px;padding:0 7px;border-radius:var(--r-sm);
+  font-size:12.5px;color:var(--ink-2);display:grid;place-items:center;
+  font-variant-numeric:tabular-nums;
+}
+.pg:hover:not(:disabled){background:var(--surface-2);color:var(--ink);}
+.pg.on{background:var(--accent);color:var(--accent-ink);font-weight:600;}
+.pg:disabled{opacity:.3;cursor:default;}
+
+/* --- Bulk bar --- */
+.bulk{
+  position:absolute;bottom:20px;left:50%;transform:translateX(-50%);
+  background:var(--ink);color:var(--ground);border-radius:99px;
+  padding:8px 10px 8px 18px;display:flex;align-items:center;gap:12px;
+  box-shadow:var(--shadow-lg);z-index:30;font-size:13px;white-space:nowrap;
+}
+.bulk button{color:var(--ground);opacity:.8;display:flex;align-items:center;gap:5px;font-size:12.5px;}
+.bulk button:hover{opacity:1;}
+.bulk button svg{width:14px;height:14px;}
+
+/* ============================================================ DASHBOARD */
+.dash{display:flex;flex-direction:column;gap:14px;max-width:1400px;}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;}
+.stat{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
+  padding:14px 16px;box-shadow:var(--shadow-sm);
+  display:flex;flex-direction:column;gap:2px;position:relative;overflow:hidden;
+}
+.stat::after{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);}
+.stat.s-warn::after{background:var(--st-warn);}
+.stat.s-crit::after{background:var(--st-crit);}
+.stat.s-good::after{background:var(--st-good);}
+.stat-l{font-size:12px;color:var(--ink-2);display:flex;align-items:center;gap:6px;}
+.stat-l svg{width:15px;height:15px;color:var(--ink-3);}
+.stat-v{font-family:var(--f-display);font-size:28px;font-weight:700;line-height:1.2;letter-spacing:-.02em;}
+.stat-s{font-size:11.5px;color:var(--ink-3);}
+.delta{font-size:11.5px;font-weight:600;}
+.delta.up{color:var(--st-good-tx);}
+.delta.down{color:var(--st-crit-tx);}
+
+.panels{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:14px;}
+@media (max-width:1000px){.panels{grid-template-columns:1fr;}}
+.panel{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
+  box-shadow:var(--shadow-sm);display:flex;flex-direction:column;overflow:hidden;
+}
+.panel-h{
+  padding:13px 16px;border-bottom:1px solid var(--line-soft);
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+}
+.panel-h h3{margin:0;font-family:var(--f-display);font-size:14px;font-weight:600;}
+.panel-h p{margin:1px 0 0;font-size:11.5px;color:var(--ink-3);}
+.panel-b{padding:16px;flex:1;}
+
+/* Donut */
+.donut-wrap{display:flex;flex-direction:column;align-items:center;gap:16px;}
+.donut{position:relative;width:170px;height:170px;flex:none;}
+.donut svg{transform:rotate(-90deg);display:block;}
+.donut-c{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;pointer-events:none;
+}
+.donut-c b{font-family:var(--f-display);font-size:30px;font-weight:700;line-height:1;letter-spacing:-.02em;}
+.donut-c span{font-size:11px;color:var(--ink-3);margin-top:3px;}
+.donut path{transition:opacity .12s;}
+.donut path:hover{opacity:.75;cursor:pointer;}
+.legend{width:100%;display:flex;flex-direction:column;gap:1px;}
+.lg-row{
+  display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:var(--r-sm);
+  font-size:12.5px;transition:background .1s;cursor:pointer;
+}
+.lg-row:hover{background:var(--surface-3);}
+.lg-row .sw{width:10px;height:10px;border-radius:3px;flex:none;}
+.lg-row .nm{flex:1;color:var(--ink-2);}
+.lg-row .vl{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:500;}
+.lg-row .pc{font-family:var(--f-mono);font-size:11px;color:var(--ink-3);width:42px;text-align:right;font-variant-numeric:tabular-nums;}
+
+/* Bars */
+.bars{display:flex;flex-direction:column;gap:11px;}
+.bar-row{display:grid;grid-template-columns:132px minmax(0,1fr) 46px;align-items:center;gap:11px;}
+.bar-lb{font-size:12.5px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bar-tr{display:block;height:9px;background:var(--surface-2);border-radius:99px;overflow:hidden;}
+.bar-fl{display:block;height:9px;min-width:4px;background:var(--accent);border-radius:99px;transition:width .5s cubic-bezier(.4,0,.2,1);}
+.bar-vl{font-family:var(--f-mono);font-size:12px;font-variant-numeric:tabular-nums;text-align:right;font-weight:500;}
+
+/* Alert list */
+.alerts{display:flex;flex-direction:column;}
+.alert{
+  display:flex;align-items:flex-start;gap:11px;padding:11px 16px;
+  border-bottom:1px solid var(--line-soft);cursor:pointer;transition:background .1s;
+}
+.alert:last-child{border-bottom:none;}
+.alert:hover{background:var(--surface-3);}
+.alert-ic{width:28px;height:28px;border-radius:var(--r-sm);display:grid;place-items:center;flex:none;}
+.alert-ic svg{width:15px;height:15px;}
+.alert-ic.warn{background:var(--st-warn-bg);color:var(--st-warn-tx);}
+.alert-ic.crit{background:var(--st-crit-bg);color:var(--st-crit-tx);}
+.alert-ic.info{background:var(--st-info-bg);color:var(--st-info-tx);}
+.alert-b{flex:1;min-width:0;}
+.alert-b b{display:block;font-size:13px;font-weight:500;}
+.alert-b span{display:block;font-size:11.5px;color:var(--ink-3);margin-top:1px;}
+.alert-n{font-family:var(--f-mono);font-size:15px;font-weight:500;color:var(--ink-2);flex:none;}
+
+/* ============================================================ DRAWER */
+.scrim{
+  position:fixed;inset:0;background:rgba(10,20,26,.42);z-index:50;
+  opacity:0;pointer-events:none;transition:opacity .2s;
+}
+.scrim.on{opacity:1;pointer-events:auto;}
+.drawer{
+  position:fixed;top:0;right:0;bottom:0;width:min(440px,92vw);z-index:60;
+  background:var(--surface);border-left:1px solid var(--line);
+  box-shadow:var(--shadow-lg);transform:translateX(100%);
+  transition:transform .22s cubic-bezier(.4,0,.2,1);
+  display:flex;flex-direction:column;
+}
+.drawer.on{transform:translateX(0);}
+.dw-h{padding:16px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;gap:12px;}
+.dw-h h2{margin:0;font-family:var(--f-display);font-size:17px;font-weight:600;}
+.dw-h .mono{display:block;color:var(--ink-3);margin-top:2px;}
+.dw-tabs{display:flex;gap:2px;padding:0 12px;border-bottom:1px solid var(--line);flex:none;}
+.dw-b{flex:1;overflow-y:auto;padding:16px;}
+.dl{display:flex;flex-direction:column;gap:0;}
+.dl-r{display:grid;grid-template-columns:118px minmax(0,1fr);gap:12px;padding:8px 0;border-bottom:1px solid var(--line-soft);font-size:13px;}
+.dl-r dt{color:var(--ink-3);font-size:12.5px;}
+.dl-r dd{margin:0;font-weight:500;overflow-wrap:anywhere;}
+.dw-f{padding:12px 16px;border-top:1px solid var(--line);display:flex;gap:8px;flex:none;}
+
+/* ============================================================ SIDE PANEL (สรุปสถิติของผลลัพธ์ที่กรองอยู่) */
+.withside{display:flex;flex:1;min-height:0;}
+.withside > .tbl-scroll{flex:1;min-width:0;}
+.side{
+  width:290px;flex:none;border-left:1px solid var(--line);
+  background:var(--surface);overflow-y:auto;padding:18px 16px;
+  display:flex;flex-direction:column;gap:18px;
+}
+.side-stat{text-align:center;padding-bottom:16px;border-bottom:1px solid var(--line-soft);}
+.side-stat span{display:block;font-size:12px;color:var(--ink-2);margin-bottom:4px;}
+.side-stat b{
+  display:block;font-family:var(--f-display);font-weight:700;
+  font-size:30px;line-height:1.15;letter-spacing:-.02em;font-variant-numeric:tabular-nums;
+}
+.side-stat b.money{font-size:23px;}
+.side-sel{
+  width:100%;height:34px;padding:0 10px;border-radius:var(--r-sm);
+  border:1px solid var(--line);background:var(--surface-2);font-size:13px;
+}
+.side-sel:focus{outline:none;border-color:var(--accent);}
+.side h4{
+  margin:0;font-family:var(--f-display);font-size:12px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);
+}
+@media (max-width:1100px){.side{display:none;}}
+
+/* ============================================================ OPTIONS MENU */
+.menu{
+  position:absolute;right:12px;top:6px;z-index:35;min-width:280px;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
+  box-shadow:var(--shadow-lg);padding:6px;
+}
+/* เมนูคำสั่งรายแถว — ลอยตามตำแหน่งที่กด */
+.rmenu{
+  position:fixed;z-index:80;min-width:212px;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
+  box-shadow:var(--shadow-lg);padding:5px;
+}
+.rmenu button{
+  display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+  padding:8px 10px;border-radius:var(--r-sm);font-size:13px;transition:background .1s;
+}
+.rmenu button:hover{background:var(--surface-3);}
+.rmenu button svg{width:16px;height:16px;color:var(--ink-3);flex:none;}
+.rmenu hr{border:none;border-top:1px solid var(--line-soft);margin:5px 6px;}
+.rmenu .danger{color:var(--st-crit-tx);}
+.rmenu .danger svg{color:var(--st-crit-tx);}
+.menu-i{
+  display:flex;align-items:center;gap:11px;width:100%;padding:9px 10px;
+  border-radius:var(--r-sm);text-align:left;transition:background .1s;
+}
+.menu-i:hover{background:var(--surface-3);}
+.menu-i > svg{width:17px;height:17px;color:var(--ink-3);flex:none;}
+.menu-i .mi-b{flex:1;min-width:0;}
+.menu-i b{display:block;font-size:13px;font-weight:500;}
+.menu-i span{display:block;font-size:11.5px;color:var(--ink-3);}
+.menu-i .mi-v{
+  font-size:12px;color:var(--accent);background:var(--accent-tint);
+  padding:2px 9px;border-radius:99px;font-weight:600;flex:none;
+}
+.menu select{
+  height:28px;border-radius:var(--r-sm);border:1px solid var(--line);
+  background:var(--surface-2);font-size:12px;padding:0 6px;flex:none;
+}
+
+/* ============================================================ DETAIL PAGE */
+.dt-head{
+  background:var(--surface);border-bottom:1px solid var(--line);
+  padding:14px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;flex:none;
+}
+.dt-ic{
+  width:52px;height:52px;border-radius:var(--r-lg);flex:none;
+  background:var(--accent-tint);color:var(--accent);display:grid;place-items:center;
+}
+.dt-ic svg{width:26px;height:26px;}
+.dt-id{min-width:0;flex:1;}
+.dt-id h2{margin:0;font-family:var(--f-display);font-size:19px;font-weight:700;letter-spacing:-.01em;}
+.dt-id p{margin:1px 0 0;font-size:12.5px;color:var(--ink-2);}
+.dt-id .upd{font-size:11.5px;color:var(--ink-3);}
+.dt-quick{display:flex;gap:10px;flex-wrap:wrap;}
+.qcard{
+  display:flex;align-items:center;gap:10px;min-width:172px;
+  border:1px solid var(--line);border-radius:var(--r);padding:8px 11px;
+  background:var(--surface-3);transition:border-color .12s;
+}
+.qcard:hover{border-color:var(--accent);}
+.qcard > svg{width:18px;height:18px;color:var(--accent);flex:none;}
+.qcard > svg:last-child{width:14px;height:14px;color:var(--ink-3);}
+.qcard-b{flex:1;min-width:0;}
+.qcard-b b{display:block;font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.qcard-b span{display:block;font-size:11px;color:var(--ink-3);white-space:nowrap;}
+
+.dt-body{flex:1;overflow-y:auto;padding:16px 18px 40px;}
+.dt-alerts{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));
+  gap:11px;margin-bottom:16px;
+}
+.hcard{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+  border-left:3px solid var(--st-mute);padding:11px 13px;
+  display:flex;align-items:center;gap:11px;box-shadow:var(--shadow-sm);
+}
+.hcard.ok{border-left-color:var(--st-good);}
+.hcard.warn{border-left-color:var(--st-warn);}
+.hcard.crit{border-left-color:var(--st-crit);}
+.hcard-b{flex:1;min-width:0;}
+.hcard-b b{display:block;font-size:13px;font-weight:600;}
+.hcard.ok b{color:var(--st-good-tx);}
+.hcard.warn b{color:var(--st-warn-tx);}
+.hcard.crit b{color:var(--st-crit-tx);}
+.hcard-b span{display:block;font-size:11.5px;color:var(--ink-3);}
+.hcard > svg{width:20px;height:20px;flex:none;color:var(--ink-3);}
+
+.dt-grid{display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:14px;align-items:start;}
+@media (max-width:1000px){.dt-grid{grid-template-columns:1fr;}}
+.dt-col{display:flex;flex-direction:column;gap:14px;min-width:0;}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:0;}
+.fld{padding:11px 14px;border-right:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);min-width:0;}
+.fld dt{font-size:11.5px;color:var(--ink-3);margin-bottom:2px;}
+.fld dd{margin:0;font-size:13.5px;font-weight:500;overflow-wrap:anywhere;}
+.fld dd.na{color:var(--ink-3);font-weight:400;font-style:italic;}
+
+.tl{display:flex;flex-direction:column;}
+.tl-i{display:flex;gap:11px;padding:10px 16px;border-bottom:1px solid var(--line-soft);}
+.tl-i:last-child{border-bottom:none;}
+.tl-d{width:26px;height:26px;border-radius:50%;flex:none;display:grid;place-items:center;background:var(--surface-2);color:var(--ink-2);}
+.tl-d svg{width:14px;height:14px;}
+.tl-b b{display:block;font-size:13px;font-weight:500;}
+.tl-b span{display:block;font-size:11.5px;color:var(--ink-3);}
+.chips{display:flex;flex-wrap:wrap;gap:7px;padding:14px 16px;}
+.chip-tag{
+  display:inline-flex;align-items:center;gap:6px;padding:3px 11px;border-radius:99px;
+  background:var(--surface-2);font-size:12px;color:var(--ink-2);
+}
+.chip-tag i{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:none;}
+
+/* ============================================================ SETTINGS PAGE */
+.setwrap{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(390px,1fr));
+  gap:14px;align-items:start;max-width:1500px;
+}
+.setsec{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
+  box-shadow:var(--shadow-sm);overflow:hidden;
+}
+.setsec-h{
+  display:flex;align-items:center;gap:10px;padding:13px 16px;
+  border-bottom:1px solid var(--line-soft);background:var(--surface-3);
+}
+.setsec-h > svg{width:19px;height:19px;color:var(--accent);flex:none;}
+.setsec-h h3{margin:0;font-family:var(--f-display);font-size:14.5px;font-weight:600;}
+.setsec-n{margin-left:auto;font-size:11.5px;color:var(--ink-3);flex:none;}
+.setsec-b{display:flex;flex-direction:column;}
+.setitem{
+  display:flex;align-items:center;gap:12px;width:100%;text-align:left;
+  padding:11px 16px;border-bottom:1px solid var(--line-soft);transition:background .1s;
+}
+.setitem:last-child{border-bottom:none;}
+.setitem:hover{background:var(--surface-3);}
+.setitem-ic{
+  width:30px;height:30px;border-radius:var(--r-sm);flex:none;
+  background:var(--accent-tint);color:var(--accent);display:grid;place-items:center;
+}
+.setitem-ic svg{width:16px;height:16px;}
+.setitem-b{flex:1;min-width:0;}
+.setitem-b b{display:block;font-size:13.5px;font-weight:500;}
+.setitem-b > span{display:block;font-size:11.5px;color:var(--ink-3);line-height:1.45;}
+.setitem > svg:last-child{width:15px;height:15px;color:var(--ink-3);flex:none;}
+
+/* ============================================================ MISC */
+.empty{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;padding:70px 20px;color:var(--ink-3);text-align:center;
+}
+.empty svg{width:42px;height:42px;opacity:.4;}
+.empty b{font-family:var(--f-display);font-size:15px;font-weight:600;color:var(--ink-2);}
+.empty p{margin:0;font-size:13px;max-width:340px;}
+
+.toasts{position:fixed;bottom:18px;right:18px;z-index:90;display:flex;flex-direction:column;gap:8px;}
+.toast{
+  background:var(--ink);color:var(--ground);padding:11px 15px;border-radius:var(--r);
+  font-size:13px;box-shadow:var(--shadow-lg);display:flex;align-items:center;gap:9px;
+  animation:tin .22s ease;max-width:330px;
+}
+.toast svg{width:16px;height:16px;flex:none;}
+@keyframes tin{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:none;}}
+
+.tip{position:relative;}
+.tip::after{
+  content:attr(data-tip);position:absolute;left:calc(100% + 10px);top:50%;
+  transform:translateY(-50%);background:var(--ink);color:var(--ground);
+  padding:4px 9px;border-radius:var(--r-sm);font-size:11.5px;white-space:nowrap;
+  opacity:0;pointer-events:none;transition:opacity .12s;z-index:70;
+}
+.app:not(.collapsed) .tip::after{display:none;}
+.tip:hover::after{opacity:1;}
+
+.mob-btn{display:none;}
+@media (max-width:860px){
+  :root{--rail:250px;}
+  .mob-btn{display:grid;}
+  .rail{position:fixed;top:0;bottom:0;left:0;transform:translateX(-100%);transition:transform .2s;}
+  .app.mob-open .rail{transform:translateX(0);}
+  .app.collapsed .rail{width:var(--rail);}
+  .page-title{display:none;}
+  .hide-sm{display:none !important;}
+  .content{padding:12px;}
+  .bar-row{grid-template-columns:100px minmax(0,1fr) 42px;}
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="rail">
+    <div class="rail-top">
+      <div class="logo">TRR</div>
+      <div class="logo-tx">
+        <b>Asset Register</b>
+        <span>TRR GROUP · IT</span>
+      </div>
+    </div>
+    <nav class="rail-nav" id="nav"></nav>
+    <div class="rail-foot">
+      <button class="nav-i tip" data-tip="สลับโหมดสี" onclick="toggleTheme()">
+        <span id="themeIcon"></span><span id="themeLabel">โหมดมืด</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <div class="main">
+    <header class="topbar">
+      <button class="icon-btn mob-btn" onclick="toggleMobNav()" aria-label="เมนู" id="mobBtn"></button>
+      <button class="icon-btn hide-sm" onclick="toggleRail()" aria-label="ย่อ/ขยายเมนู" id="railBtn"></button>
+      <div class="page-title" id="pageTitle">แดชบอร์ด</div>
+      <div class="search">
+        <span id="searchIcon"></span>
+        <input id="q" type="search" placeholder="ค้นหารหัสทรัพย์สิน ชื่ออุปกรณ์ Serial หรือผู้ครอบครอง…" oninput="onSearch(this.value)" autocomplete="off">
+      </div>
+      <div class="spacer"></div>
+      <button class="btn btn-primary hide-sm" onclick="toast('เปิดฟอร์มเพิ่มรายการใหม่')" id="newBtn"></button>
+      <button class="icon-btn" onclick="toast('ไม่มีการแจ้งเตือนใหม่')" aria-label="แจ้งเตือน" id="bellBtn"></button>
+      <div class="avatar" title="ผู้ดูแลระบบ">AD</div>
+    </header>
+
+    <div class="subtabs" id="subtabs"></div>
+    <div class="toolbar" id="toolbar"></div>
+    <div class="content" id="content"></div>
+  </div>
+</div>
+
+<div class="scrim" id="scrim" onclick="closeDrawer()"></div>
+<aside class="drawer" id="drawer" aria-hidden="true"></aside>
+<div class="toasts" id="toasts"></div>
+
+<script>
+/* ============================================================
+   1) ICONS
+   ============================================================ */
+const P = {
+  /* ---- แถบเมนูซ้าย (ตรงกับชุดของ InvGate ทุกหัวข้อ แต่วาดขึ้นใหม่) ---- */
+  dash:'M3 3h7v8H3zM14 3h7v5h-7zM14 11h7v10h-7zM3 14h7v7H3z',
+  laptop:'M4 5h16v11H4zM2 19h20M9 19h6',
+  disc:'M4 5h16v14H4zM4 10h16M8 14.5h3',
+  award:'M12 14a6 6 0 1 0 0-12 6 6 0 0 0 0 12M8.2 13.2L7 22l5-3 5 3-1.2-8.8',
+  cart:'M2 3h3l2.7 12.3a2 2 0 0 0 2 1.7h7.7a2 2 0 0 0 2-1.6L21 7H6M9.5 21h.01M18 21h.01',
+  layers:'M12 2l9 5-9 5-9-5zM3 12l9 5 9-5M3 17l9 5 9-5',
+  headset:'M4 15v-3a8 8 0 0 1 16 0v3M4 15a2 2 0 0 0 2 2h1v-6H6a2 2 0 0 0-2 2zM20 15a2 2 0 0 1-2 2h-1v-6h1a2 2 0 0 1 2 2z',
+  spark:'M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM18 16l.8 2.2L21 19l-2.2.8L18 22l-.8-2.2L15 19l2.2-.8z',
+  doc:'M6 3h8l4 4v14H6zM14 3v4h4',
+  swap:'M7 4v13M7 4L4 7M7 4l3 3M17 20V7M17 20l3-3M17 20l-3-3',
+  wrench:'M15 4a5 5 0 0 0-6.6 6L4 14.4V20h5.6l4.4-4.4A5 5 0 0 0 20 9l-3 3-2-2 3-3a5 5 0 0 0-3-3z',
+  users:'M16 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 10a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7M22 20v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
+  clock:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18M12 7v5l3.5 2',
+
+  /* ---- แท็บย่อยของแต่ละโมดูล ---- */
+  cloud:'M7 18.5a4.2 4.2 0 0 1 .3-8.4 5.6 5.6 0 0 1 10.7 1.6A3.6 3.6 0 0 1 17.4 19H7z',
+  radar:'M12 12l5.5-5.5M4.9 19.1a10 10 0 1 1 14.2 0M8.5 15.5a5 5 0 1 1 7 0M12 12h.01',
+  appsvc:'M4 5h16v14H4zM4 9h16M12 15.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4M12 11.5v-1M12 16.5v1M14.4 12.1l.9-.5M8.7 15.4l.9-.5M14.4 15.4l.9.5M8.7 12.1l.9.5',
+  appfind:'M4 5h14v6M4 9h14M4 5v9h6M15.5 20a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7M21 21l-3-3',
+  update:'M20 11A8 8 0 0 0 6.3 6.3L3 9M3 5v4h4M4 13a8 8 0 0 0 13.7 4.7L21 15M21 19v-4h-4',
+  deploy:'M12 3v10M8.5 9.5l3.5 3.5 3.5-3.5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4',
+  db:'M12 7c4.4 0 8-1.1 8-2.5S16.4 2 12 2 4 3.1 4 4.5 7.6 7 12 7M20 4.5v15c0 1.4-3.6 2.5-8 2.5s-8-1.1-8-2.5v-15M4 12c0 1.4 3.6 2.5 8 2.5s8-1.1 8-2.5',
+  key:'M14.5 7a4 4 0 1 1-3.8 5.2L4 19v3h3v-2h2v-2h2l1.2-1.2A4 4 0 0 1 14.5 7M16.5 9h.01',
+  compliance:'M9 5H6v16h12V5h-3M9 5V3h6v2M8.5 12.5l2 2 4-4',
+  receipt:'M6 2h12v20l-2-1.5L14 22l-2-1.5L10 22l-2-1.5L6 22zM9 7h6M9 11h6M9 15h4',
+  store:'M3 9l1.5-5h15L21 9M3 9h18v11H3zM3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0M9 20v-6h6v6',
+  coins:'M9 14a6 3 0 1 0 0-6 6 3 0 0 0 0 6M3 11v4c0 1.7 2.7 3 6 3s6-1.3 6-3v-4M15 8.6c2.9.3 5 1.5 5 2.9M21 11.5v4c0 1.7-2.7 3-6 3-.7 0-1.4 0-2-.2',
+
+  /* ---- หมวดใน Settings ---- */
+  network:'M9 3h6v4H9zM3 12h6v4H3zM15 12h6v4h-6zM12 7v2M6 9v3M18 9v3M6 9h12M6 20h12M12 16v4',
+  tasks:'M9.5 6H21M9.5 12H21M9.5 18H21M3 6l1.3 1.3L7 4.6M3 12l1.3 1.3L7 10.6M3 18l1.3 1.3L7 16.6',
+  email:'M3 5h18v14H3zM3 6.2l9 6.8 9-6.8',
+  wand:'M15 4V2M15 10V8M12.5 6h-2M19.5 6h-2M17 4.2l-1.3-1.3M17 7.8l-1.3 1.3M13 4.2l1.3-1.3M13 7.8l1.3 1.3M3 21l9.5-9.5M12 12l2 2',
+  plug:'M9 2v6M15 2v6M6 8h12v3.5a6 6 0 0 1-12 0zM12 17.5V22',
+
+  /* ---- เมนูย่อยใน Settings ---- */
+  sliders:'M4 6h10M18 6h2M4 12h4M12 12h8M4 18h10M18 18h2M14 4v4M8 10v4M14 16v4',
+  sitemap:'M9 3h6v4H9zM3 17h6v4H3zM15 17h6v4h-6zM12 7v4M6 17v-2h12v2M12 11v4',
+  usershield:'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M2 21v-2a4 4 0 0 1 4-4h4M17.5 13l4 1.5V18c0 2.2-2 3.6-4 4-2-.4-4-1.8-4-4v-3.5z',
+  list:'M8 6h13M8 12h13M8 18h13M3.6 6h.01M3.6 12h.01M3.6 18h.01',
+  folder:'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
+  pulse:'M22 12h-4l-3 8-4-16-3 8H2',
+  cycle:'M3 12a9 9 0 0 1 15.2-6.5L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.2 6.5L3 16M3 21v-5h5',
+  barcode:'M3 5v14M6.5 5v14M10 5v10M13.5 5v14M17 5v10M20.5 5v14',
+  bolt:'M13 2L4 14h7l-1 8 9-12h-7z',
+  gauge:'M12 14.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4M13.4 11.1L18 6.5M3.5 20a10 10 0 1 1 17 0z',
+  chartdown:'M3 5v14h18M7 9.5l4 4 3-3 5 5M19 15.5v-4h-4',
+  hdd:'M3 12h18M5.5 12l2-6h9l2 6M3 12v5h18v-5M7 15h.01M11 15h.01',
+  server:'M3 4h18v6H3zM3 14h18v6H3zM7 7h.01M7 17h.01',
+  printer:'M6.5 9V3h11v6M6.5 18H4v-7h16v7h-2.5M8.5 14h7v7h-7z',
+  code:'M8 18l-6-6 6-6M16 6l6 6-6 6',
+  monitor:'M3 4h18v12H3zM8.5 20h7M12 16v4',
+  lock:'M5 11h14v10H5zM8.5 11V7a3.5 3.5 0 0 1 7 0v4',
+  log:'M4 4h16v16H4zM8 9h8M8 13h8M8 17h5',
+  gear:'M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1v.3a2 2 0 1 1-4 0v-.2a1.6 1.6 0 0 0-2.8-1.1l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 3.5 15h-.3a2 2 0 1 1 0-4h.2A1.6 1.6 0 0 0 4.5 8.2l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3h.1A1.6 1.6 0 0 0 10.2 4v-.3a2 2 0 1 1 4 0v.2a1.6 1.6 0 0 0 2.7 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8v.1a1.6 1.6 0 0 0 1.5 1h.3a2 2 0 1 1 0 4h-.2a1.6 1.6 0 0 0-1.6 1z',
+  search:'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16M21 21l-4.3-4.3',
+  bell:'M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0',
+  plus:'M12 5v14M5 12h14',
+  menu:'M3 6h18M3 12h18M3 18h18',
+  chevL:'M15 6l-6 6 6 6',
+  chevR:'M9 6l6 6-6 6',
+  chevLL:'M11 6l-6 6 6 6M19 6l-6 6 6 6',
+  filter:'M3 5h18l-7 8v6l-4 2v-8z',
+  save:'M5 3h11l3 3v15H5zM8 3v6h8V3M8 14h8v7H8',
+  refresh:'M20 11A8 8 0 0 0 6.3 6.3L3 9M3 5v4h4M4 13a8 8 0 0 0 13.7 4.7L21 15M21 19v-4h-4',
+  gridv:'M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z',
+  tablev:'M3 4h18v16H3zM3 9h18M3 14h18M9 4v16',
+  panel:'M3 4h18v16H3zM15 4v16',
+  expand:'M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5',
+  more:'M12 6.5h.01M12 12h.01M12 17.5h.01',
+  down:'M12 3v12M7 11l5 5 5-5M4 21h16',
+  x:'M18 6L6 18M6 6l12 12',
+  check:'M20 6L9 17l-5-5',
+  trash:'M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13',
+  tag:'M20.6 12.6L12 21.2 2.8 12V3h9l8.6 8.6zM7.5 7.5h.01',
+  alert:'M12 9v4M12 17h.01M10.3 3.9L2.8 17a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z',
+  cal:'M5 5h14v16H5zM5 10h14M9 3v4M15 3v4',
+  box:'M21 8l-9-5-9 5 9 5zM3 8v8l9 5 9-5V8M12 13v8',
+  sun:'M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4',
+  moon:'M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z',
+  pin:'M12 21s7-5.7 7-11a7 7 0 1 0-14 0c0 5.3 7 11 7 11M12 12a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5',
+  pen:'M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z',
+  arrowL:'M19 12H5M12 19l-7-7 7-7',
+  shield:'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10M9 12l2 2 4-4',
+  wifi:'M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0M2 9a15 15 0 0 1 20 0M12 20h.01',
+  cols:'M3 4h18v16H3zM9 4v16M15 4v16',
+  rows:'M3 4h18v16H3zM3 10h18M3 15h18',
+  cpu:'M6 6h12v12H6zM9 9h6v6H9M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4',
+  money:'M12 2v20M17 6.5c0-1.9-2.2-3-5-3s-5 1.1-5 3 2.2 2.7 5 3.2 5 1.3 5 3.3-2.2 3.5-5 3.5-5-1.3-5-3.2'
+};
+function ic(n, s){
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(s||1.7)+
+         '" stroke-linecap="round" stroke-linejoin="round"><path d="'+P[n]+'"/></svg>';
+}
+
+/* ============================================================
+   2) MOCK DATA
+   สลับเป็น API จริงได้ที่ loadModule() — โครงสร้างเดิมทั้งหมด
+   ============================================================ */
+const PEOPLE = ['สมชาย ใจดี','วราภรณ์ ศรีสุข','ธนกร พงษ์เจริญ','ปิยะนุช วัฒนา','อนุชา รักงาน',
+  'กมลชนก ทองแท้','ศุภชัย มั่นคง','นภาพร ใจงาม','ณัฐพล เกียรติกุล','จิราพร แสงทอง',
+  'ภาณุพงศ์ ดีมาก','สุนิสา พรหมมา'];
+const DEPTS = ['เทคโนโลยีสารสนเทศ','บัญชีและการเงิน','ฝ่ายผลิต','จัดซื้อ','ทรัพยากรบุคคล','คลังสินค้า','วิศวกรรม','ฝ่ายขาย'];
+const LOCS = [
+  ['สำนักงานใหญ่','อาคาร A','ชั้น 3'],['สำนักงานใหญ่','อาคาร A','ชั้น 5'],
+  ['สำนักงานใหญ่','อาคาร B','ชั้น 2'],['โรงงานระยอง','อาคารผลิต 1','ชั้น 1'],
+  ['โรงงานระยอง','สำนักงาน','ชั้น 2'],['สาขาชลบุรี','อาคารหลัก','ชั้น 1'],
+  ['คลังสินค้าบางนา','โกดัง 2','ชั้น 1']
+];
+/* สถานะ: good=ใช้งาน info=ในคลัง warn=ซ่อมบำรุง crit=ชำรุด mute=จำหน่ายแล้ว */
+const ST = {
+  good:{l:'ใช้งาน',c:'good'}, info:{l:'ในคลัง',c:'info'}, warn:{l:'ซ่อมบำรุง',c:'warn'},
+  crit:{l:'ชำรุด',c:'crit'}, mute:{l:'จำหน่ายแล้ว',c:'mute'}
+};
+
+function mkAssets(){
+  const models = [
+    ['Notebook','Lenovo ThinkPad E14','NB'],['Notebook','Dell Latitude 5440','NB'],
+    ['Notebook','HP ProBook 450 G9','NB'],['Desktop','Dell OptiPlex 7010','PC'],
+    ['Desktop','HP EliteDesk 800','PC'],['Monitor','Dell P2422H 24"','MN'],
+    ['Printer','Canon iR-ADV C3826','PR'],['Switch','MikroTik CRS328-24P','SW'],
+    ['Router','MikroTik RB5009UG','RT'],['Access Point','Ubiquiti U6-Pro','AP'],
+    ['CCTV','Hikvision DS-2CD2143','CC'],['Server','Dell PowerEdge R650','SV'],
+    ['UPS','APC Smart-UPS 3000VA','UP'],['Tablet','iPad 10th Gen','TB']
+  ];
+  const sts = ['good','good','good','good','good','good','info','info','warn','crit','mute'];
+  const out=[];
+  for(let i=0;i<26;i++){
+    const m = models[i%models.length];
+    const st = sts[(i*3)%sts.length];
+    const loc = LOCS[i%LOCS.length];
+    const yr = 2565 + (i%5);
+    const owner = (st==='info'||st==='mute') ? '' : PEOPLE[i%PEOPLE.length];
+    out.push({
+      code:'TRR-'+m[2]+'-'+yr+'-'+String(101+i*7).padStart(4,'0'),
+      name:m[1],
+      type:m[0],
+      status:st,
+      owner:owner,
+      dept: owner ? DEPTS[i%DEPTS.length] : '—',
+      loc:loc,
+      serial:(m[2]+'X'+(4820+i*137)).toUpperCase()+String.fromCharCode(65+(i%26)),
+      ip: ['Switch','Router','Access Point','CCTV','Server','Printer'].includes(m[0])
+          ? '10.'+(10+(i%4))+'.'+(1+(i%6))+'.'+(20+i) : (st==='good'?'10.20.'+(1+(i%5))+'.'+(101+i):''),
+      buy:(yr-543)+'-'+String(1+(i%12)).padStart(2,'0')+'-'+String(1+(i%27)).padStart(2,'0'),
+      age:(2569-yr)+ (i%2?0.5:0),
+      /* ---- ฟิลด์สำหรับหน้ารายละเอียด ---- */
+      d:{
+        maker: m[1].startsWith('iPad') ? 'Apple' : m[1].split(' ')[0],   // ยี่ห้อดึงจากชื่อรุ่นให้ตรงกันเสมอ
+        os:['Windows 11 Pro 23H2','Windows 10 Pro 22H2','macOS 14 Sonoma','RouterOS 7.14','—'][i%5],
+        cpu:['Intel Core i7-1255U','Intel Core i5-12500','Apple M2','AMD Ryzen 5 5600','—'][i%5],
+        ram:[8,16,16,32,4][i%5]+' GB',
+        disk:['SSD 512 GB','SSD 256 GB','SSD 1 TB','HDD 1 TB','eMMC 64 GB'][i%5],
+        mac:'B8:09:'+(10+i).toString(16).toUpperCase().padStart(2,'0')+':AB:C9:'+(20+i).toString(16).toUpperCase().padStart(2,'0'),
+        host:m[1].split(' ')[0].toUpperCase()+'-'+(101+i*7),
+        warranty:(2569-yr>3?'หมดประกันแล้ว':'ถึง '+(yr-543+3)+'-'+String(1+(i%12)).padStart(2,'0')+'-15'),
+        wexp:(2569-yr>3),
+        vendor:['บจก. ไอทีซัพพลาย','บมจ. ซินเน็ค','บจก. เจ.ไอ.บี.','บจก. แอดไวซ์'][i%4],
+        po:'PO-'+yr+'-'+String(2100+i*13).padStart(4,'0'),
+        price:(18500+i*2350).toLocaleString('th-TH'),
+        book:(Math.max(0,18500+i*2350-(2569-yr)*4200)).toLocaleString('th-TH'),
+        av:i%4===0?'ไม่พบ':'ESET Endpoint · เปิดใช้งาน',
+        avOk:i%4!==0,
+        fw:i%5===0?'ปิดใช้งาน':'เปิดใช้งาน',
+        fwOk:i%5!==0,
+        online:i%3!==0,
+        agent:'3.7.'+(1+i%4),
+        seen:(i%3!==0)?'เมื่อ '+(1+i%50)+' นาทีที่แล้ว':(1+i%12)+' วันที่แล้ว'
+      }
+    });
+  }
+  return out;
+}
+
+const DB = {
+  dashboard:{ label:'แดชบอร์ด', icon:'dash', kind:'dashboard' },
+
+  assets:{
+    label:'อุปกรณ์', icon:'laptop', kind:'explorer', sec:'ทะเบียนทรัพย์สิน',
+    tabs:[
+      {t:'อุปกรณ์',         ic:'laptop'},
+      {t:'อุปกรณ์บนคลาวด์',  ic:'cloud', filter:()=>false},
+      {t:'การค้นพบอุปกรณ์',  ic:'radar', filter:r=>r.status==='info'}
+    ],
+    views:['มุมมองเริ่มต้น','เฉพาะที่ต้องซ่อม','ไม่มีผู้ครอบครอง'],
+    newLabel:'เพิ่มอุปกรณ์',
+    cols:[
+      {k:'code',   t:'รหัสทรัพย์สิน', ty:'mono', w:150},
+      {k:'name',   t:'ชื่ออุปกรณ์',   ty:'link', w:190},
+      {k:'type',   t:'ประเภท',        ty:'tag',  w:110},
+      {k:'status', t:'สถานะ',         ty:'pill', w:110},
+      {k:'owner',  t:'ผู้ครอบครอง',   ty:'person', w:170},
+      {k:'dept',   t:'แผนก',          w:150},
+      {k:'loc',    t:'สถานที่',       ty:'path', w:230},
+      {k:'serial', t:'Serial Number', ty:'mono', w:140},
+      {k:'ip',     t:'IP Address',    ty:'mono', w:120},
+      {k:'buy',    t:'วันที่ซื้อ',    ty:'mono', w:110},
+      {k:'age',    t:'อายุ (ปี)',     ty:'num',  w:90}
+    ],
+    rows: mkAssets()
+  },
+
+  software:{
+    label:'ซอฟต์แวร์', icon:'disc', kind:'explorer', sec:'ทะเบียนทรัพย์สิน',
+    tabs:[
+      {t:'ซอฟต์แวร์',            ic:'disc'},
+      {t:'ซอฟต์แวร์บนคลาวด์',     ic:'cloud',    filter:r=>r.lic==='Subscription'},
+      {t:'Application Services', ic:'appsvc',   filter:()=>false},
+      {t:'ค้นหา App Services',    ic:'appfind',  filter:()=>false},
+      {t:'อัปเดตระบบปฏิบัติการ',   ic:'update',   filter:()=>false},
+      {t:'การติดตั้ง',            ic:'deploy',   filter:()=>false},
+      {t:'ฐานข้อมูล',             ic:'db',       filter:()=>false},
+      {t:'นโยบายอนุญาตใช้งาน',    ic:'key',      filter:r=>r.status==='crit'}
+    ],
+    views:['มุมมองเริ่มต้น'], newLabel:'เพิ่มซอฟต์แวร์',
+    cols:[
+      {k:'name',t:'ชื่อซอฟต์แวร์',ty:'link',w:210},
+      {k:'ver',t:'เวอร์ชัน',ty:'mono',w:110},
+      {k:'vendor',t:'ผู้ผลิต',w:150},
+      {k:'lic',t:'ประเภทลิขสิทธิ์',ty:'tag',w:130},
+      {k:'inst',t:'ติดตั้งแล้ว',ty:'num',w:100},
+      {k:'total',t:'สิทธิ์ทั้งหมด',ty:'num',w:110},
+      {k:'left',t:'คงเหลือ',ty:'num',w:95},
+      {k:'status',t:'สถานะ',ty:'pill',w:110}
+    ],
+    rows:[
+      {name:'Microsoft 365 Business Std',ver:'16.0.17328',vendor:'Microsoft',lic:'Subscription',inst:142,total:150,left:8,status:'good'},
+      {name:'Adobe Acrobat Pro DC',ver:'23.006.20360',vendor:'Adobe',lic:'Subscription',inst:28,total:25,left:-3,status:'crit'},
+      {name:'AutoCAD 2024',ver:'2024.1.2',vendor:'Autodesk',lic:'Named User',inst:11,total:12,left:1,status:'warn'},
+      {name:'ESET Endpoint Security',ver:'10.1.2058',vendor:'ESET',lic:'Volume',inst:147,total:200,left:53,status:'good'},
+      {name:'SolidWorks Premium',ver:'2024 SP2',vendor:'Dassault',lic:'Network',inst:6,total:8,left:2,status:'good'},
+      {name:'TeamViewer Corporate',ver:'15.49.2',vendor:'TeamViewer',lic:'Subscription',inst:14,total:15,left:1,status:'warn'},
+      {name:'Windows 11 Pro',ver:'23H2',vendor:'Microsoft',lic:'OEM',inst:138,total:138,left:0,status:'warn'},
+      {name:'WinRAR',ver:'6.24',vendor:'RARLAB',lic:'ไม่มีลิขสิทธิ์',inst:52,total:0,left:-52,status:'crit'},
+      {name:'Zoom Workplace',ver:'6.0.4',vendor:'Zoom',lic:'Subscription',inst:64,total:80,left:16,status:'good'},
+      {name:'Node.js LTS',ver:'20.14.0',vendor:'OpenJS',lic:'Open Source',inst:19,total:0,left:0,status:'info'}
+    ]
+  },
+
+  contracts:{
+    label:'สัญญา / ลิขสิทธิ์', icon:'award', kind:'explorer', sec:'ทะเบียนทรัพย์สิน',
+    tabs:[
+      {t:'สัญญา',              ic:'award'},
+      {t:'ความสอดคล้องลิขสิทธิ์', ic:'compliance', filter:r=>r.type==='Subscription'}
+    ],
+    views:['มุมมองเริ่มต้น'], newLabel:'เพิ่มสัญญา',
+    cols:[
+      {k:'no',t:'เลขที่สัญญา',ty:'mono',w:150},
+      {k:'name',t:'ชื่อสัญญา',ty:'link',w:230},
+      {k:'type',t:'ประเภท',ty:'tag',w:130},
+      {k:'vendor',t:'ผู้ขาย / ผู้ให้บริการ',w:180},
+      {k:'start',t:'วันเริ่ม',ty:'mono',w:110},
+      {k:'end',t:'วันสิ้นสุด',ty:'mono',w:110},
+      {k:'value',t:'มูลค่า (บาท)',ty:'num',w:130},
+      {k:'status',t:'สถานะ',ty:'pill',w:120}
+    ],
+    rows:[
+      {no:'CT-2569-0012',name:'MA ระบบเครือข่ายสำนักงานใหญ่',type:'Maintenance',vendor:'บจก. เน็ตเวิร์คโปร',start:'2026-01-01',end:'2026-12-31',value:'480,000',status:'good'},
+      {no:'CT-2569-0007',name:'Microsoft 365 ต่ออายุประจำปี',type:'Subscription',vendor:'บมจ. ซอฟต์แวร์ไทย',start:'2026-04-01',end:'2027-03-31',value:'1,260,000',status:'good'},
+      {no:'CT-2568-0031',name:'ประกันอุปกรณ์ Notebook Lot 3',type:'Warranty',vendor:'Lenovo Thailand',start:'2025-06-15',end:'2026-09-14',value:'96,000',status:'warn'},
+      {no:'CT-2568-0044',name:'เช่าเครื่องพิมพ์ Multifunction',type:'Lease',vendor:'บจก. แคนนอน มาร์เก็ตติ้ง',start:'2025-10-01',end:'2026-09-30',value:'336,000',status:'warn'},
+      {no:'CT-2567-0019',name:'MA ระบบกล้องวงจรปิด โรงงานระยอง',type:'Maintenance',vendor:'บจก. ซีเคียวริตี้ ซิสเต็ม',start:'2024-11-01',end:'2025-10-31',value:'215,000',status:'crit'},
+      {no:'CT-2569-0021',name:'Internet Leased Line 500/500 Mbps',type:'Service',vendor:'บมจ. โทรคมนาคมแห่งชาติ',start:'2026-02-01',end:'2029-01-31',value:'2,880,000',status:'good'},
+      {no:'CT-2569-0025',name:'ESET Endpoint Security 200 Seats',type:'Subscription',vendor:'บจก. ไซเบอร์การ์ด',start:'2026-05-01',end:'2027-04-30',value:'184,000',status:'good'},
+      {no:'CT-2568-0052',name:'บำรุงรักษาระบบ UPS',type:'Maintenance',vendor:'บจก. เพาเวอร์เทค',start:'2025-08-01',end:'2026-07-31',value:'72,000',status:'mute'}
+    ]
+  },
+
+  procurement:{
+    label:'จัดซื้อ', icon:'cart', kind:'explorer', sec:'ทะเบียนทรัพย์สิน',
+    tabs:[
+      {t:'ใบสั่งซื้อ', ic:'receipt'},
+      {t:'ผู้ขาย',    ic:'store',
+        cols:[
+          {k:'code',t:'รหัสผู้ขาย',ty:'mono',w:130},
+          {k:'name',t:'ชื่อผู้ขาย',ty:'link',w:230},
+          {k:'cat',t:'ประเภทสินค้า',ty:'tag',w:160},
+          {k:'contact',t:'ผู้ติดต่อ',ty:'person',w:170},
+          {k:'tel',t:'โทรศัพท์',ty:'mono',w:130},
+          {k:'orders',t:'จำนวน PO',ty:'num',w:110},
+          {k:'status',t:'สถานะ',ty:'pill',w:110}
+        ],
+        rows:[
+          {code:'VD-0012',name:'บจก. ไอทีซัพพลาย',cat:'คอมพิวเตอร์',contact:'สมพร ขายดี',tel:'02-345-6789',orders:14,status:'good'},
+          {code:'VD-0031',name:'บมจ. ซินเน็ค (ประเทศไทย)',cat:'คอมพิวเตอร์',contact:'วิชัย พาณิชย์',tel:'02-553-8888',orders:9,status:'good'},
+          {code:'VD-0044',name:'บจก. เจ.ไอ.บี. คอมพิวเตอร์',cat:'อุปกรณ์ต่อพ่วง',contact:'ปรีชา ทองดี',tel:'02-711-2233',orders:6,status:'good'},
+          {code:'VD-0058',name:'บจก. เน็ตเวิร์คโปร',cat:'อุปกรณ์เครือข่าย',contact:'ธีรพงษ์ เชื่อมต่อ',tel:'038-441-990',orders:5,status:'good'},
+          {code:'VD-0067',name:'บจก. ซีเคียวริตี้ ซิสเต็ม',cat:'กล้องวงจรปิด',contact:'อรุณ ปลอดภัย',tel:'038-772-114',orders:3,status:'warn'},
+          {code:'VD-0071',name:'บจก. แอดไวซ์ ไอที',cat:'อุปกรณ์ต่อพ่วง',contact:'มานพ ค้าขาย',tel:'02-115-7788',orders:2,status:'mute'}
+        ]}
+    ],
+    views:['มุมมองเริ่มต้น'], newLabel:'สร้างใบสั่งซื้อ',
+    cols:[
+      {k:'no',t:'เลขที่ใบสั่งซื้อ',ty:'mono',w:150},
+      {k:'title',t:'รายการ',ty:'link',w:230},
+      {k:'vendor',t:'ผู้ขาย',w:190},
+      {k:'req',t:'ผู้ขอซื้อ',ty:'person',w:165},
+      {k:'date',t:'วันที่สั่ง',ty:'mono',w:110},
+      {k:'due',t:'กำหนดส่ง',ty:'mono',w:110},
+      {k:'amount',t:'มูลค่า (บาท)',ty:'num',w:130},
+      {k:'status',t:'สถานะ',ty:'pill',w:120}
+    ],
+    rows:[
+      {no:'PO-2569-0231',title:'Notebook Lenovo ThinkPad E14 × 10',vendor:'บมจ. ซินเน็ค',req:'สมชาย ใจดี',date:'2026-08-12',due:'2026-09-05',amount:'285,000',status:'good'},
+      {no:'PO-2569-0228',title:'จอมอนิเตอร์ Dell 24" × 15',vendor:'บจก. เจ.ไอ.บี.',req:'สมชาย ใจดี',date:'2026-08-08',due:'2026-08-28',amount:'67,500',status:'good'},
+      {no:'PO-2569-0225',title:'MikroTik CRS328-24P × 2',vendor:'บจก. เน็ตเวิร์คโปร',req:'ธนกร พงษ์เจริญ',date:'2026-08-05',due:'2026-09-01',amount:'96,000',status:'warn'},
+      {no:'PO-2569-0219',title:'ต่ออายุ License ESET 200 Seats',vendor:'บจก. ไซเบอร์การ์ด',req:'ปิยะนุช วัฒนา',date:'2026-07-28',due:'2026-08-15',amount:'184,000',status:'good'},
+      {no:'PO-2569-0214',title:'กล้องวงจรปิด Hikvision × 8',vendor:'บจก. ซีเคียวริตี้ ซิสเต็ม',req:'อนุชา รักงาน',date:'2026-07-20',due:'2026-08-10',amount:'52,800',status:'crit'},
+      {no:'PO-2569-0208',title:'UPS APC 3000VA × 3',vendor:'บจก. เพาเวอร์เทค',req:'ธนกร พงษ์เจริญ',date:'2026-07-11',due:'2026-08-01',amount:'138,000',status:'good'},
+      {no:'PO-2569-0201',title:'iPad 10th Gen × 5',vendor:'บจก. ไอทีซัพพลาย',req:'นภาพร ใจงาม',date:'2026-07-02',due:'2026-07-25',amount:'74,500',status:'mute'}
+    ]
+  },
+
+  cmdb:{
+    label:'CMDB', icon:'layers', kind:'explorer', sec:'ทะเบียนทรัพย์สิน',
+    tabs:[{t:'Business Applications', ic:'layers'}],
+    views:['มุมมองเริ่มต้น'], newLabel:'เพิ่มระบบงาน',
+    cols:[
+      {k:'code',t:'รหัสระบบ',ty:'mono',w:130},
+      {k:'name',t:'ชื่อระบบงาน',ty:'link',w:220},
+      {k:'owner',t:'ผู้ดูแลระบบ',ty:'person',w:170},
+      {k:'dept',t:'ฝ่ายที่ใช้งาน',w:170},
+      {k:'cis',t:'จำนวน CI',ty:'num',w:110},
+      {k:'rel',t:'ความสัมพันธ์',ty:'num',w:120},
+      {k:'crit',t:'ความสำคัญ',ty:'tag',w:120},
+      {k:'status',t:'สถานะ',ty:'pill',w:110}
+    ],
+    rows:[
+      {code:'BA-001',name:'ระบบเครือข่ายสำนักงานใหญ่',owner:'ธนกร พงษ์เจริญ',dept:'เทคโนโลยีสารสนเทศ',cis:24,rel:31,crit:'สูงมาก',status:'good'},
+      {code:'BA-002',name:'ระบบ ERP (SAP B1)',owner:'ปิยะนุช วัฒนา',dept:'บัญชีและการเงิน',cis:12,rel:18,crit:'สูงมาก',status:'good'},
+      {code:'BA-003',name:'ระบบกล้องวงจรปิดโรงงาน',owner:'อนุชา รักงาน',dept:'ฝ่ายผลิต',cis:31,rel:9,crit:'ปานกลาง',status:'warn'},
+      {code:'BA-004',name:'ระบบ File Server',owner:'สมชาย ใจดี',dept:'เทคโนโลยีสารสนเทศ',cis:6,rel:14,crit:'สูง',status:'good'},
+      {code:'BA-005',name:'ระบบสแกนลายนิ้วมือ',owner:'กมลชนก ทองแท้',dept:'ทรัพยากรบุคคล',cis:9,rel:4,crit:'ต่ำ',status:'good'},
+      {code:'BA-006',name:'ระบบ Wi-Fi สำหรับแขก',owner:'ธนกร พงษ์เจริญ',dept:'เทคโนโลยีสารสนเทศ',cis:15,rel:7,crit:'ต่ำ',status:'mute'}
+    ]
+  },
+
+  others:{
+    label:'ข้อมูลอ้างอิง', icon:'box', kind:'explorer', sec:'ทะเบียนทรัพย์สิน',
+    views:['มุมมองเริ่มต้น'], newLabel:'เพิ่มรายการ',
+    tabs:[
+      {t:'บุคลากร', ic:'users'},
+      {t:'สถานที่', ic:'pin',
+        cols:[
+          {k:'code',t:'รหัสสถานที่',ty:'mono',w:130},
+          {k:'name',t:'ชื่อสถานที่',ty:'link',w:200},
+          {k:'path',t:'ลำดับชั้น',ty:'path',w:280},
+          {k:'type',t:'ประเภท',ty:'tag',w:130},
+          {k:'assets',t:'จำนวนอุปกรณ์',ty:'num',w:140},
+          {k:'people',t:'จำนวนพนักงาน',ty:'num',w:140}
+        ],
+        rows:[
+          {code:'LOC-001',name:'อาคาร A ชั้น 3',path:['สำนักงานใหญ่','อาคาร A','ชั้น 3'],type:'สำนักงาน',assets:42,people:28},
+          {code:'LOC-002',name:'อาคาร A ชั้น 5',path:['สำนักงานใหญ่','อาคาร A','ชั้น 5'],type:'สำนักงาน',assets:35,people:22},
+          {code:'LOC-003',name:'อาคาร B ชั้น 2',path:['สำนักงานใหญ่','อาคาร B','ชั้น 2'],type:'สำนักงาน',assets:19,people:14},
+          {code:'LOC-011',name:'อาคารผลิต 1 ชั้น 1',path:['โรงงานระยอง','อาคารผลิต 1','ชั้น 1'],type:'โรงงาน',assets:26,people:64},
+          {code:'LOC-012',name:'สำนักงานโรงงาน ชั้น 2',path:['โรงงานระยอง','สำนักงาน','ชั้น 2'],type:'สำนักงาน',assets:17,people:11},
+          {code:'LOC-021',name:'อาคารหลัก ชั้น 1',path:['สาขาชลบุรี','อาคารหลัก','ชั้น 1'],type:'สาขา',assets:12,people:9},
+          {code:'LOC-031',name:'โกดัง 2 ชั้น 1',path:['คลังสินค้าบางนา','โกดัง 2','ชั้น 1'],type:'คลังสินค้า',assets:8,people:6}
+        ]},
+      {t:'ผู้ขาย', ic:'store',
+        cols:[
+          {k:'code',t:'รหัสผู้ขาย',ty:'mono',w:130},
+          {k:'name',t:'ชื่อผู้ขาย',ty:'link',w:230},
+          {k:'cat',t:'ประเภทสินค้า',ty:'tag',w:160},
+          {k:'contact',t:'ผู้ติดต่อ',ty:'person',w:170},
+          {k:'tel',t:'โทรศัพท์',ty:'mono',w:130},
+          {k:'status',t:'สถานะ',ty:'pill',w:110}
+        ],
+        rows:[
+          {code:'VD-0012',name:'บจก. ไอทีซัพพลาย',cat:'คอมพิวเตอร์',contact:'สมพร ขายดี',tel:'02-345-6789',status:'good'},
+          {code:'VD-0031',name:'บมจ. ซินเน็ค (ประเทศไทย)',cat:'คอมพิวเตอร์',contact:'วิชัย พาณิชย์',tel:'02-553-8888',status:'good'},
+          {code:'VD-0058',name:'บจก. เน็ตเวิร์คโปร',cat:'อุปกรณ์เครือข่าย',contact:'ธีรพงษ์ เชื่อมต่อ',tel:'038-441-990',status:'good'},
+          {code:'VD-0067',name:'บจก. ซีเคียวริตี้ ซิสเต็ม',cat:'กล้องวงจรปิด',contact:'อรุณ ปลอดภัย',tel:'038-772-114',status:'warn'}
+        ]},
+      {t:'ศูนย์ต้นทุน', ic:'coins',
+        cols:[
+          {k:'code',t:'รหัสศูนย์ต้นทุน',ty:'mono',w:150},
+          {k:'name',t:'ชื่อศูนย์ต้นทุน',ty:'link',w:210},
+          {k:'owner',t:'ผู้รับผิดชอบ',ty:'person',w:170},
+          {k:'budget',t:'งบประมาณ (บาท)',ty:'num',w:160},
+          {k:'used',t:'ใช้ไปแล้ว (บาท)',ty:'num',w:160},
+          {k:'status',t:'สถานะ',ty:'pill',w:110}
+        ],
+        rows:[
+          {code:'CC-1000',name:'เทคโนโลยีสารสนเทศ',owner:'สมชาย ใจดี',budget:'3,500,000',used:'2,180,400',status:'good'},
+          {code:'CC-2000',name:'ฝ่ายผลิต',owner:'อนุชา รักงาน',budget:'1,800,000',used:'1,712,900',status:'warn'},
+          {code:'CC-3000',name:'บัญชีและการเงิน',owner:'ปิยะนุช วัฒนา',budget:'620,000',used:'318,700',status:'good'},
+          {code:'CC-4000',name:'ทรัพยากรบุคคล',owner:'กมลชนก ทองแท้',budget:'450,000',used:'467,200',status:'crit'},
+          {code:'CC-5000',name:'คลังสินค้า',owner:'ศุภชัย มั่นคง',budget:'380,000',used:'121,000',status:'good'}
+        ]}
+    ],
+    cols:[
+      {k:'emp',t:'รหัสพนักงาน',ty:'mono',w:130},
+      {k:'name',t:'ชื่อ-สกุล',ty:'person',w:190},
+      {k:'dept',t:'แผนก',w:170},
+      {k:'pos',t:'ตำแหน่ง',w:170},
+      {k:'mail',t:'อีเมล',ty:'mono',w:210},
+      {k:'loc',t:'สถานที่ประจำ',ty:'path',w:220},
+      {k:'assets',t:'อุปกรณ์ที่ถือ',ty:'num',w:120}
+    ],
+    rows: PEOPLE.map((n,i)=>({
+      emp:'EMP-'+String(1042+i*3).padStart(5,'0'),
+      name:n, dept:DEPTS[i%DEPTS.length],
+      pos:['เจ้าหน้าที่','หัวหน้าแผนก','ผู้จัดการ','วิศวกร','เจ้าหน้าที่อาวุโส'][i%5],
+      mail:['somchai','waraporn','thanakorn','piyanuch','anucha','kamonchanok',
+            'supachai','napaporn','nuttapon','jiraporn','panupong','sunisa'][i]+'@trr.co.th',
+      loc:LOCS[i%LOCS.length], assets:1+(i%4)
+    }))
+  },
+
+  transfer:{
+    label:'รับ-ส่งมอบ', icon:'swap', kind:'explorer', sec:'งานประจำวัน (เพิ่มเติมจาก InvGate)',
+    tabs:[
+      {t:'เอกสารทั้งหมด', ic:'swap'},
+      {t:'รออนุมัติ',     ic:'clock', filter:r=>r.status==='warn'},
+      {t:'ตีกลับ',        ic:'x',     filter:r=>r.status==='crit'}
+    ],
+    views:['มุมมองเริ่มต้น'], newLabel:'สร้างใบส่งมอบ',
+    cols:[
+      {k:'no',t:'เลขที่เอกสาร',ty:'mono',w:150},
+      {k:'type',t:'ประเภท',ty:'tag',w:120},
+      {k:'asset',t:'อุปกรณ์',ty:'link',w:210},
+      {k:'from',t:'ผู้ส่งมอบ',ty:'person',w:170},
+      {k:'to',t:'ผู้รับมอบ',ty:'person',w:170},
+      {k:'date',t:'วันที่',ty:'mono',w:110},
+      {k:'status',t:'สถานะ',ty:'pill',w:120}
+    ],
+    rows:[
+      {no:'TF-2569-0188',type:'ส่งมอบ',asset:'Lenovo ThinkPad E14',from:'สมชาย ใจดี',to:'ณัฐพล เกียรติกุล',date:'2026-08-22',status:'good'},
+      {no:'TF-2569-0187',type:'คืนอุปกรณ์',asset:'Dell Latitude 5440',from:'จิราพร แสงทอง',to:'สมชาย ใจดี',date:'2026-08-21',status:'good'},
+      {no:'TF-2569-0186',type:'ส่งมอบ',asset:'iPad 10th Gen',from:'สมชาย ใจดี',to:'ภาณุพงศ์ ดีมาก',date:'2026-08-20',status:'warn'},
+      {no:'TF-2569-0185',type:'โอนย้าย',asset:'HP EliteDesk 800',from:'ปิยะนุช วัฒนา',to:'อนุชา รักงาน',date:'2026-08-19',status:'warn'},
+      {no:'TF-2569-0184',type:'ส่งซ่อม',asset:'Canon iR-ADV C3826',from:'กมลชนก ทองแท้',to:'บจก. แคนนอน',date:'2026-08-18',status:'info'},
+      {no:'TF-2569-0183',type:'ส่งมอบ',asset:'Dell P2422H 24"',from:'สมชาย ใจดี',to:'สุนิสา พรหมมา',date:'2026-08-15',status:'good'},
+      {no:'TF-2569-0182',type:'จำหน่าย',asset:'HP ProBook 450 G6',from:'สมชาย ใจดี',to:'คลังจำหน่าย',date:'2026-08-12',status:'mute'},
+      {no:'TF-2569-0181',type:'ส่งมอบ',asset:'Ubiquiti U6-Pro',from:'ธนกร พงษ์เจริญ',to:'ฝ่ายผลิต',date:'2026-08-11',status:'good'},
+      {no:'TF-2569-0180',type:'คืนอุปกรณ์',asset:'Lenovo ThinkPad E15',from:'ศุภชัย มั่นคง',to:'สมชาย ใจดี',date:'2026-08-08',status:'crit'}
+    ]
+  },
+
+  maintenance:{
+    label:'ซ่อมบำรุง', icon:'wrench', kind:'explorer', badge:4,
+    tabs:[
+      {t:'ใบแจ้งซ่อมทั้งหมด', ic:'wrench'},
+      {t:'ค้างดำเนินการ',    ic:'clock', filter:r=>r.status!=='good'},
+      {t:'เกินกำหนด',        ic:'alert', filter:r=>r.days>12}
+    ],
+    views:['มุมมองเริ่มต้น'], newLabel:'แจ้งซ่อม',
+    cols:[
+      {k:'no',t:'เลขที่ใบแจ้ง',ty:'mono',w:150},
+      {k:'asset',t:'อุปกรณ์',ty:'link',w:200},
+      {k:'issue',t:'อาการ / ปัญหา',w:250},
+      {k:'by',t:'ผู้แจ้ง',ty:'person',w:165},
+      {k:'assign',t:'ผู้รับผิดชอบ',ty:'person',w:165},
+      {k:'date',t:'วันที่แจ้ง',ty:'mono',w:110},
+      {k:'days',t:'ค้าง (วัน)',ty:'num',w:100},
+      {k:'status',t:'สถานะ',ty:'pill',w:120}
+    ],
+    rows:[
+      {no:'MT-2569-0421',asset:'Canon iR-ADV C3826',issue:'กระดาษติดบ่อย ถาดที่ 2',by:'กมลชนก ทองแท้',assign:'ธนกร พงษ์เจริญ',date:'2026-08-18',days:6,status:'warn'},
+      {no:'MT-2569-0420',asset:'Dell OptiPlex 7010',issue:'เปิดไม่ติด ไฟ Power ไม่ขึ้น',by:'สุนิสา พรหมมา',assign:'สมชาย ใจดี',date:'2026-08-17',days:7,status:'crit'},
+      {no:'MT-2569-0419',asset:'MikroTik CRS328-24P',issue:'Port 14-18 ไม่ทำงาน',by:'อนุชา รักงาน',assign:'ธนกร พงษ์เจริญ',date:'2026-08-16',days:8,status:'crit'},
+      {no:'MT-2569-0418',asset:'Lenovo ThinkPad E14',issue:'แบตเตอรี่เสื่อม ใช้ได้ 40 นาที',by:'ณัฐพล เกียรติกุล',assign:'สมชาย ใจดี',date:'2026-08-14',days:10,status:'warn'},
+      {no:'MT-2569-0417',asset:'APC Smart-UPS 3000VA',issue:'เสียงเตือนดังต่อเนื่อง',by:'ภาณุพงศ์ ดีมาก',assign:'ธนกร พงษ์เจริญ',date:'2026-08-11',days:13,status:'good'},
+      {no:'MT-2569-0416',asset:'Hikvision DS-2CD2143',issue:'ภาพเบลอ ปรับโฟกัสไม่ได้',by:'ศุภชัย มั่นคง',assign:'อนุชา รักงาน',date:'2026-08-09',days:15,status:'good'},
+      {no:'MT-2569-0415',asset:'HP ProBook 450 G9',issue:'จอกระพริบเมื่อพับ-กาง',by:'จิราพร แสงทอง',assign:'สมชาย ใจดี',date:'2026-08-05',days:19,status:'good'},
+      {no:'MT-2569-0414',asset:'Dell PowerEdge R650',issue:'Disk 3 แจ้ง Predictive Failure',by:'ธนกร พงษ์เจริญ',assign:'ธนกร พงษ์เจริญ',date:'2026-08-01',days:23,status:'good'}
+    ]
+  },
+
+  activities:{
+    label:'ประวัติการเปลี่ยนแปลง', icon:'clock', kind:'explorer', sec:'ระบบและการตั้งค่า',
+    tabs:[
+      {t:'ทั้งหมด',      ic:'clock'},
+      {t:'ระดับสำคัญ',   ic:'alert', filter:r=>r.level==='crit'||r.level==='warn'}
+    ],
+    views:['มุมมองเริ่มต้น'], newLabel:'',
+    cols:[
+      {k:'time',t:'เวลา',ty:'mono',w:150},
+      {k:'event',t:'เหตุการณ์',w:200},
+      {k:'target',t:'รายการ',ty:'link',w:180},
+      {k:'before',t:'ค่าเดิม',ty:'mono',w:170},
+      {k:'after',t:'ค่าใหม่',ty:'mono',w:170},
+      {k:'who',t:'ผู้ดำเนินการ',ty:'person',w:165},
+      {k:'level',t:'ระดับ',ty:'pill',w:110}
+    ],
+    rows:[
+      {time:'2026-08-24 09:14',event:'เปลี่ยนผู้ครอบครอง',target:'TRR-NB-2568-0143',before:'จิราพร แสงทอง',after:'ณัฐพล เกียรติกุล',who:'สมชาย ใจดี',level:'info'},
+      {time:'2026-08-24 08:52',event:'เปลี่ยนสถานะ',target:'TRR-PR-2567-0210',before:'ใช้งาน',after:'ซ่อมบำรุง',who:'กมลชนก ทองแท้',level:'warn'},
+      {time:'2026-08-23 17:20',event:'แก้ไข IP Address',target:'TRR-SW-2566-0088',before:'10.10.1.24',after:'10.10.1.28',who:'ธนกร พงษ์เจริญ',level:'info'},
+      {time:'2026-08-23 16:05',event:'เพิ่มอุปกรณ์ใหม่',target:'TRR-NB-2569-0301',before:'—',after:'Lenovo ThinkPad E14',who:'สมชาย ใจดี',level:'good'},
+      {time:'2026-08-23 14:33',event:'เปลี่ยนสถานที่',target:'TRR-MN-2567-0155',before:'อาคาร A ชั้น 3',after:'อาคาร B ชั้น 2',who:'อนุชา รักงาน',level:'info'},
+      {time:'2026-08-23 11:47',event:'เปลี่ยนสถานะ',target:'TRR-PC-2565-0042',before:'ซ่อมบำรุง',after:'ชำรุด',who:'สุนิสา พรหมมา',level:'crit'},
+      {time:'2026-08-22 15:12',event:'ต่ออายุสัญญา',target:'CT-2569-0007',before:'2026-03-31',after:'2027-03-31',who:'ปิยะนุช วัฒนา',level:'good'},
+      {time:'2026-08-22 10:08',event:'จำหน่ายทรัพย์สิน',target:'TRR-NB-2564-0019',before:'ชำรุด',after:'จำหน่ายแล้ว',who:'สมชาย ใจดี',level:'mute'},
+      {time:'2026-08-21 16:40',event:'ติดตั้งซอฟต์แวร์',target:'TRR-NB-2568-0136',before:'—',after:'AutoCAD 2024',who:'ระบบอัตโนมัติ',level:'info'},
+      {time:'2026-08-21 09:25',event:'แก้ไข Serial Number',target:'TRR-SV-2566-0002',before:'SVX5104K',after:'SVX5104N',who:'ธนกร พงษ์เจริญ',level:'warn'}
+    ]
+  },
+
+  recommendations:{
+    label:'คำแนะนำอัจฉริยะ', icon:'spark', kind:'explorer', sec:'ระบบและการตั้งค่า', badge:5,
+    tabs:[
+      {t:'คำแนะนำทั้งหมด', ic:'spark'},
+      {t:'ความปลอดภัย',    ic:'shield', filter:r=>r.cat==='ความปลอดภัย'},
+      {t:'ประหยัดต้นทุน',   ic:'coins',  filter:r=>r.cat==='ต้นทุน'}
+    ],
+    views:['มุมมองเริ่มต้น'], newLabel:'',
+    cols:[
+      {k:'id',t:'รหัส',ty:'mono',w:110},
+      {k:'title',t:'คำแนะนำ',ty:'link',w:300},
+      {k:'cat',t:'หมวด',ty:'tag',w:140},
+      {k:'affected',t:'อุปกรณ์ที่เกี่ยว',ty:'num',w:150},
+      {k:'save',t:'ผลที่คาดว่าจะได้',w:220},
+      {k:'level',t:'ความสำคัญ',ty:'pill',w:120}
+    ],
+    rows:[
+      {id:'RC-001',title:'มี 6 เครื่องยังไม่ได้ติดตั้งแอนตี้ไวรัส',cat:'ความปลอดภัย',affected:6,save:'ลดความเสี่ยงถูกโจมตี',level:'crit'},
+      {id:'RC-002',title:'Windows 10 จะหมดการสนับสนุน ควรวางแผนอัปเกรด',cat:'ความปลอดภัย',affected:14,save:'คงสถานะได้รับแพตช์',level:'crit'},
+      {id:'RC-003',title:'ติดตั้ง Adobe Acrobat เกินสิทธิ์ 3 เครื่อง',cat:'ต้นทุน',affected:3,save:'เลี่ยงค่าปรับ ~54,000 บาท/ปี',level:'warn'},
+      {id:'RC-004',title:'พบ WinRAR ไม่มีลิขสิทธิ์ 52 เครื่อง',cat:'ต้นทุน',affected:52,save:'เปลี่ยนไปใช้ 7-Zip แทนได้ฟรี',level:'warn'},
+      {id:'RC-005',title:'อุปกรณ์ 5 ชิ้นไม่มีผู้ครอบครอง',cat:'ข้อมูล',affected:5,save:'ทำให้ Audit Trail ครบถ้วน',level:'warn'},
+      {id:'RC-006',title:'Notebook 4 เครื่องอายุเกิน 5 ปี ควรพิจารณาทดแทน',cat:'ต้นทุน',affected:4,save:'ลดค่าซ่อมและเวลาสูญเสีย',level:'info'},
+      {id:'RC-007',title:'Firewall ถูกปิดใช้งานบน 5 เครื่อง',cat:'ความปลอดภัย',affected:5,save:'ปิดช่องโหว่ระดับเครือข่าย',level:'crit'}
+    ]
+  },
+
+  /* ============ SETTINGS — โครง 10 หมวดตรงกับ InvGate ============ */
+  settings:{
+    label:'ตั้งค่าระบบ', icon:'gear', kind:'settings', sec:'ระบบและการตั้งค่า',
+    sections:[
+      {t:'ทั่วไป', ic:'gear', items:[
+        {n:'การตั้งค่าพื้นฐาน', ic:'sliders', d:'ชื่อบริษัท ขนาดไฟล์แนบ รูปแบบวันที่ และหน้าตาระบบ'},
+        {n:'สถานที่',          ic:'pin',     d:'จัดการผังสถานที่แบบลำดับชั้น บริษัท › อาคาร › ชั้น › ห้อง'},
+        {n:'แท็ก',             ic:'tag',     d:'สร้าง Smart tag ที่ติดอัตโนมัติตามเงื่อนไข และแท็กแบบกำหนดเอง'},
+        {n:'แม่แบบเอกสาร',      ic:'doc',     d:'แม่แบบใบส่งมอบ ใบรับคืน และใบแจ้งซ่อม'}
+      ]},
+      {t:'ผู้ใช้งาน', ic:'users', items:[
+        {n:'ผู้ใช้งาน',        ic:'users',      d:'สร้าง นำเข้า และจัดการผู้ใช้ทั้งเจ้าหน้าที่และพนักงานทั่วไป'},
+        {n:'การยืนยันตัวตน',    ic:'key',        d:'ตั้งค่าการเข้าสู่ระบบ นโยบายรหัสผ่าน และ SSO'},
+        {n:'Directory Service', ic:'sitemap',   d:'เชื่อมต่อ Entra ID / Active Directory เพื่อ Sync ผู้ใช้อัตโนมัติ'},
+        {n:'สิทธิ์การใช้งาน',    ic:'usershield', d:'กำหนด Role และสิทธิ์ระดับแถวสำหรับแต่ละแผนก'}
+      ]},
+      {t:'ทรัพย์สิน (CI)', ic:'laptop', items:[
+        {n:'ตั้งค่าทั่วไป',       ic:'sliders',   d:'ตรวจจับรายการซ้ำ รวมอัตโนมัติ และกำหนดผู้ครอบครองอัตโนมัติ'},
+        {n:'ฟิลด์ข้อมูล',        ic:'list',      d:'เพิ่มหรือแก้ไขฟิลด์ของ CI ได้เองโดยไม่ต้องแก้โปรแกรม'},
+        {n:'ประเภททรัพย์สิน',    ic:'folder',    d:'กำหนดประเภทอุปกรณ์ เช่น Notebook, Switch, CCTV'},
+        {n:'สุขภาพอุปกรณ์',      ic:'pulse',     d:'ตั้งกฎประเมิน เช่น ไม่มีแอนตี้ไวรัส หรือประกันใกล้หมด'},
+        {n:'วงจรชีวิต',          ic:'cycle',     d:'กำหนดสถานะ ในคลัง › ใช้งาน › ซ่อม › จำหน่าย'},
+        {n:'รูปแบบรหัสทรัพย์สิน', ic:'barcode',  d:'สร้างรหัสอัตโนมัติ เช่น TRR-NB-2569-0001'},
+        {n:'Automation',        ic:'bolt',      d:'สั่งงานอัตโนมัติเมื่อเกิดเหตุการณ์ เช่น แจ้งเตือนเมื่อสถานะเปลี่ยน'},
+        {n:'การวัดการใช้งาน',    ic:'gauge',     d:'ระบุซอฟต์แวร์ที่ต้องเก็บสถิติการเปิดใช้จริง'},
+        {n:'ค่าเสื่อมราคา',      ic:'chartdown', d:'กำหนดวิธีคิดค่าเสื่อมและอายุการใช้งานตามประเภท'}
+      ]},
+      {t:'การติดตั้งซอฟต์แวร์', ic:'deploy', items:[
+        {n:'ตั้งค่าการติดตั้ง', ic:'sliders', d:'จำนวนงานพร้อมกัน ระยะเวลาลองใหม่ และแท็กที่ยกเว้น'},
+        {n:'การควบคุมความปลอดภัย', ic:'shield', d:'กำหนดสิทธิ์และการตรวจสอบก่อนติดตั้งลงเครื่องปลายทาง'},
+        {n:'ไดรฟ์ที่ใช้ร่วมกัน', ic:'hdd',    d:'ที่เก็บไฟล์ติดตั้งสำหรับกระจายไปยังเครื่องปลายทาง'}
+      ]},
+      {t:'การค้นหาอุปกรณ์', ic:'network', items:[
+        {n:'ติดตั้ง Agent',    ic:'deploy',  d:'กระจาย Agent ผ่าน Manual, GPO หรือ Remote via Proxy'},
+        {n:'Proxy',            ic:'server',  d:'จัดการเครื่อง Proxy สำหรับเครือข่ายที่แยกวง'},
+        {n:'แหล่งค้นหาอุปกรณ์', ic:'plug',   d:'เชื่อมต่อ Network scan, Entra ID หรือ Intune'},
+        {n:'SNMP Profile',     ic:'network', d:'กำหนดข้อมูลที่จะเก็บจากอุปกรณ์เครือข่ายและเครื่องพิมพ์'},
+        {n:'เครื่องพิมพ์',      ic:'printer', d:'จัดการเครื่องพิมพ์ที่ตรวจพบผ่าน Agent และ USB'}
+      ]},
+      {t:'งานเบื้องหลัง', ic:'tasks', items:[
+        {n:'รายการงาน', ic:'tasks', d:'ติดตามงานที่รันอยู่เบื้องหลัง เช่น การนำเข้าและการติดตั้ง'}
+      ]},
+      {t:'อีเมล', ic:'email', items:[
+        {n:'อีเมลขาออก', ic:'email', d:'ตั้งค่า SMTP Server สำหรับส่งการแจ้งเตือน'}
+      ]},
+      {t:'AI Hub', ic:'wand', beta:true, items:[
+        {n:'บริการ AI',     ic:'wand',  d:'เลือกผู้ให้บริการ AI ที่ใช้ประมวลผล'},
+        {n:'ฟีเจอร์ AI',    ic:'spark', d:'เปิด-ปิด สรุปอัปเดต OS, คำแนะนำอัจฉริยะ และค้นหาด้วยภาษาธรรมชาติ'}
+      ]},
+      {t:'การเชื่อมต่อ', ic:'plug', items:[
+        {n:'ระบบ Service Desk', ic:'headset', d:'เชื่อมกับระบบ Helpdesk เพื่อผูกอุปกรณ์เข้ากับใบแจ้งปัญหา'},
+        {n:'API',               ic:'code',    d:'จัดการ API Key และสิทธิ์การเรียกใช้จากระบบภายนอก'},
+        {n:'Remote Desktop',    ic:'monitor', d:'กำหนดโปรแกรมรีโมตที่เรียกใช้ได้จากหน้าอุปกรณ์'},
+        {n:'API ข้อมูลประกัน',   ic:'award',   d:'ดึงข้อมูลวันหมดประกันจากผู้ผลิตโดยอัตโนมัติ'}
+      ]},
+      {t:'ระบบ', ic:'wrench', items:[
+        {n:'ข้อมูลระบบ',     ic:'wrench', d:'เวอร์ชัน สถานะการใช้งาน และข้อมูลผู้ให้บริการ'},
+        {n:'ความเป็นส่วนตัว', ic:'lock',   d:'นโยบายเก็บข้อมูลส่วนบุคคลและระยะเวลาเก็บ Log'},
+        {n:'Log ผู้ดูแลระบบ', ic:'log',    d:'บันทึกการเข้าใช้และการเปลี่ยนแปลงการตั้งค่าระบบ'}
+      ]}
+    ]
+  }
+};
+
+/* ============================================================
+   3) STATE
+   ============================================================ */
+const S = {
+  mod:'dashboard', tab:0, view:'table', page:1, per:10,
+  sort:{k:null,dir:1}, q:'', colq:{}, sel:new Set(),
+  collapsed:false, mobOpen:false,
+  side:true,        // แผงสรุปสถิติด้านขวาของ Explorer
+  menu:false,       // เมนู Options (⋮)
+  rowMenu:null,     // {id,x,y} เมนูคำสั่งรายแถว
+  detail:null,      // id ของรายการที่กำลังเปิดหน้ารายละเอียด
+  dtab:0,           // แท็บในหน้ารายละเอียด
+  sideDim:'loc'     // มิติที่ใช้สรุปในแผงด้านขวา
+};
+
+/* ============================================================
+   4) HELPERS
+   ============================================================ */
+const $ = s=>document.querySelector(s);
+
+/* M() = โมดูลที่กำลังเปิดอยู่ "รวมกับ" ข้อมูลของแท็บที่เลือก
+   แท็บกำหนด cols/rows ของตัวเองได้ หรือใช้ filter คัดจากข้อมูลกลางก็ได้ */
+function M(){
+  const m = DB[S.mod], t = (m.tabs && m.tabs[S.tab]) || {};
+  return { ...m, cols: t.cols || m.cols, rows: t.rows || m.rows, _filter: t.cols ? null : t.filter };
+}
+const esc = s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const initials = n=>{const p=String(n||'').trim().split(/\s+/);return ((p[0]||'?')[0]+(p[1]||'')[0]||'').toUpperCase();};
+
+function toast(msg,icon){
+  const el=document.createElement('div');
+  el.className='toast';
+  el.innerHTML=ic(icon||'check')+'<span>'+esc(msg)+'</span>';
+  $('#toasts').appendChild(el);
+  setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity .25s';setTimeout(()=>el.remove(),250);},2600);
+}
+
+/* ค้นหาแบบข้ามทุกคอลัมน์ + ฟิลเตอร์รายคอลัมน์ + เรียงลำดับ */
+function cellText(row,col){
+  const v=row[col.k];
+  if(col.ty==='path' && Array.isArray(v)) return v.join(' ');
+  if(col.ty==='pill') return (ST[v]||{l:v}).l;
+  return String(v??'');
+}
+function processed(){
+  const m=M(); if(!m.cols) return [];
+  let rows=m.rows.slice();
+  if(m._filter) rows=rows.filter(m._filter);
+  if(S.q.trim()){
+    const q=S.q.toLowerCase();
+    rows=rows.filter(r=>m.cols.some(c=>cellText(r,c).toLowerCase().includes(q)));
+  }
+  for(const key in S.colq){
+    const v=(S.colq[key]||'').toLowerCase(); if(!v) continue;
+    const col=m.cols.find(c=>c.k===key); if(!col) continue;
+    rows=rows.filter(r=>cellText(r,col).toLowerCase().includes(v));
+  }
+  if(S.sort.k){
+    const col=m.cols.find(c=>c.k===S.sort.k);
+    rows.sort((a,b)=>{
+      let A=cellText(a,col), B=cellText(b,col);
+      if(col.ty==='num'){A=parseFloat(String(a[col.k]).replace(/,/g,''))||0;B=parseFloat(String(b[col.k]).replace(/,/g,''))||0;}
+      return (A<B?-1:A>B?1:0)*S.sort.dir;
+    });
+  }
+  return rows;
+}
+
+/* ============================================================
+   5) RENDER — SIDEBAR
+   ============================================================ */
+function renderNav(){
+  let h='', lastSec=null;
+  for(const key in DB){
+    const m=DB[key];
+    if(m.sec && m.sec!==lastSec){ h+='<div class="rail-sec">'+esc(m.sec)+'</div>'; lastSec=m.sec; }
+    h+='<button class="nav-i tip'+(S.mod===key?' on':'')+'" data-tip="'+esc(m.label)+'" onclick="go(\''+key+'\')">'
+      + ic(m.icon) + '<span>'+esc(m.label)+'</span>'
+      + (m.badge?'<span class="nav-badge">'+m.badge+'</span>':'') + '</button>';
+  }
+  $('#nav').innerHTML=h;
+}
+
+/* ============================================================
+   6) RENDER — SUBTABS + TOOLBAR
+   ============================================================ */
+function renderChrome(){
+  const m=M();
+  $('#pageTitle').textContent=m.label;
+  $('#newBtn').innerHTML = ic('plus') + '<span>' + esc(m.newLabel || 'สร้างใหม่') + '</span>';
+  $('#newBtn').style.display = (m.kind==='explorer' && m.newLabel) ? '' : 'none';
+
+  // ในหน้ารายละเอียด: ซ่อนแถบเครื่องมือของ Explorer ทั้งหมด (หน้านั้นมีแท็บของตัวเอง)
+  if(S.detail){ $('#subtabs').style.display='none'; $('#toolbar').style.display='none'; $('#newBtn').style.display='none'; return; }
+
+  // Sub tabs
+  if(m.tabs && m.tabs.length>1){
+    $('#subtabs').style.display='flex';
+    $('#subtabs').innerHTML=m.tabs.map((t,i)=>
+      '<button class="subtab'+(S.tab===i?' on':'')+'" onclick="setTab('+i+')">'
+      + (t.ic?ic(t.ic):'') + '<span>'+esc(t.t)+'</span></button>').join('');
+  } else $('#subtabs').style.display='none';
+
+  // Toolbar
+  if(m.kind!=='explorer'){ $('#toolbar').style.display='none'; return; }
+  $('#toolbar').style.display='flex';
+  const activeFilters=Object.values(S.colq).filter(Boolean).length;
+  $('#toolbar').innerHTML =
+    '<button class="chip on">'+ic('save')+'<span>'+esc(m.views[0])+'</span></button>'
+    + (m.views.length>1 ? '<button class="chip hide-sm" onclick="toast(\'เปิดรายการมุมมองที่บันทึกไว้\')">'+ic('chevR')+'<span>มุมมองอื่น ('+(m.views.length-1)+')</span></button>' : '')
+    + '<div class="tb-div"></div>'
+    + '<button class="chip'+(activeFilters?' on':'')+'" onclick="clearFilters()">'+ic('filter')
+      +'<span>'+(activeFilters?('ล้างตัวกรอง '+activeFilters):'ตัวกรอง')+'</span></button>'
+    + '<button class="chip" onclick="exportCSV()">'+ic('down')+'<span class="hide-sm">ส่งออก CSV</span></button>'
+    + '<div class="spacer"></div>'
+    + '<button class="icon-btn hide-sm" onclick="refresh()" aria-label="โหลดใหม่">'+ic('refresh')+'</button>'
+    + '<button class="icon-btn'+(S.view==='table'?' on':'')+'" onclick="setView(\'table\')" aria-label="มุมมองตาราง">'+ic('tablev')+'</button>'
+    + '<button class="icon-btn'+(S.view==='cards'?' on':'')+'" onclick="setView(\'cards\')" aria-label="มุมมองการ์ด">'+ic('gridv')+'</button>'
+    + '<button class="icon-btn hide-sm'+(S.side?' on':'')+'" onclick="toggleSide()" aria-label="แผงสรุปสถิติ">'+ic('panel')+'</button>'
+    + '<button class="icon-btn menu-trigger hide-sm'+(S.menu?' on':'')+'" onclick="toggleMenu()" aria-label="ตัวเลือก">'+ic('more',2.4)+'</button>';
+}
+
+/* ============================================================
+   7) RENDER — CELL
+   ============================================================ */
+function cell(row,col){
+  const v=row[col.k];
+  switch(col.ty){
+    case 'mono':  return v?'<span class="mono">'+esc(v)+'</span>':'<span style="color:var(--ink-3)">—</span>';
+    case 'link':  return '<span class="cell-link">'+esc(v)+'</span>';
+    case 'tag':   return v?'<span class="tag">'+esc(v)+'</span>':'—';
+    case 'num':   return '<span class="mono num">'+esc(v)+'</span>';
+    case 'pill': {
+      const s=ST[v]||{l:v,c:'mute'};
+      return '<span class="pill '+s.c+'"><span class="dot"></span>'+esc(s.l)+'</span>';
+    }
+    case 'path':  return Array.isArray(v)
+      ? '<span class="path">'+v.map(esc).join('<i>›</i>')+'</span>' : esc(v);
+    case 'person':
+      if(!v||v==='—') return '<span style="color:var(--ink-3)">ไม่ระบุ</span>';
+      return '<span class="person"><span class="ini">'+esc(initials(v))+'</span>'+esc(v)+'</span>';
+    default: return esc(v);
+  }
+}
+
+/* ============================================================
+   8) RENDER — CONTENT
+   ============================================================ */
+function render(){
+  renderNav(); renderChrome();
+  const m=M(), c=$('#content');
+
+  if(S.detail){ c.className='content flush'; c.innerHTML=detailHTML(); animateBars(); return; }
+  if(m.kind==='dashboard'){ c.className='content'; c.innerHTML=dashboardHTML(); animateBars(); return; }
+  if(m.kind==='settings'){ c.className='content'; c.innerHTML=settingsHTML(m); return; }
+  if(m.kind==='stub'){ c.className='content'; c.innerHTML=stubHTML(m); return; }
+
+  c.className='content flush';
+  const rows=processed();
+  const pages=Math.max(1,Math.ceil(rows.length/S.per));
+  if(S.page>pages) S.page=pages;
+  const slice=rows.slice((S.page-1)*S.per, S.page*S.per);
+
+  c.innerHTML =
+    '<div class="withside">'
+      + (S.view==='table' ? tableHTML(m,slice) : cardsHTML(m,slice))
+      + (S.side ? sideHTML(m,rows) : '')
+    + '</div>'
+    + footHTML(rows.length,pages)
+    + (S.menu ? menuHTML() : '')
+    + (S.rowMenu ? rowMenuHTML() : '')
+    + (S.sel.size ? bulkHTML() : '');
+  animateBars();
+}
+
+/* ---------- แผงสรุปสถิติด้านขวา (อ้างอิงจากผลลัพธ์ที่กรองอยู่จริง) ---------- */
+function sideHTML(m,rows){
+  const dimCol = m.cols.find(c=>c.k===S.sideDim) || m.cols.find(c=>c.ty==='pill') || m.cols[2];
+  /* ถ้ามีการเลือกแถวอยู่ ให้สรุปเฉพาะแถวที่เลือก (พฤติกรรมเดียวกับ InvGate) */
+  const key=m.cols[0].k;
+  const scoped = S.sel.size ? rows.filter(r=>S.sel.has(r[key])) : rows;
+  const selMode = S.sel.size>0;
+  rows = scoped;
+  const tally={};
+  rows.forEach(r=>{ const k=cellText(r,dimCol)||'ไม่ระบุ'; tally[k]=(tally[k]||0)+1; });
+  const top=Object.entries(tally).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const max=Math.max(1,...top.map(t=>t[1]));
+
+  // มูลค่ารวม — คิดเฉพาะโมดูลที่มีราคา
+  let money='';
+  if(S.mod==='assets'){
+    const sum=rows.reduce((a,r)=>a+parseInt(String(r.d?.price||'0').replace(/,/g,''),10),0);
+    money='<div class="side-stat"><span>มูลค่าตามราคาซื้อ</span><b class="money">฿'+sum.toLocaleString('th-TH')+'</b></div>';
+  }
+  const opts=m.cols.filter(c=>['pill','tag','path','person'].includes(c.ty)||c.k==='dept')
+    .map(c=>'<option value="'+c.k+'"'+(c.k===dimCol.k?' selected':'')+'>'+esc(c.t)+'</option>').join('');
+
+  return '<aside class="side">'
+    + '<div class="side-stat"><span>'+(selMode?'รายการที่เลือกอยู่':'ผลลัพธ์ที่แสดงอยู่')+'</span>'
+      + '<b'+(selMode?' style="color:var(--accent)"':'')+'>'+rows.length.toLocaleString('th-TH')+'</b></div>'
+    + money
+    + '<div><h4 style="margin-bottom:9px">สรุปตามมิติ</h4>'
+      + '<select class="side-sel" onchange="setDim(this.value)">'+opts+'</select></div>'
+    + '<div class="bars">'
+      + top.map(t=>'<div class="bar-row" style="grid-template-columns:1fr" title="'+esc(t[0])+': '+t[1]+'">'
+          + '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:4px">'
+            + '<span class="bar-lb">'+esc(t[0])+'</span>'
+            + '<span class="bar-vl">'+t[1]+'</span></div>'
+          + '<span class="bar-tr"><span class="bar-fl" data-w="'+(t[1]/max*100)+'" style="width:0"></span></span>'
+          + '</div>').join('')
+    + '</div></aside>';
+}
+
+/* ---------- เมนูคำสั่งรายแถว (⋮ ท้ายแถว) ---------- */
+function rowMenuHTML(){
+  const r=S.rowMenu, isAsset=S.mod==='assets';
+  const x=Math.min(r.x, window.innerWidth-224), y=Math.min(r.y, window.innerHeight-330);
+  const b=(icon,label,fn,cls)=>'<button class="'+(cls||'')+'" onclick="'+fn+'">'+ic(icon)+label+'</button>';
+  return '<div class="rmenu" style="left:'+x+'px;top:'+y+'px">'
+    + b('expand','ดูรายละเอียด',      'closeRowMenu();openDetail(\''+r.id+'\')')
+    + b('panel','ดูอย่างย่อ',          'closeRowMenu();openDrawer(\''+r.id+'\')')
+    + b('pen','แก้ไขข้อมูล',           'closeRowMenu();toast(\'เปิดฟอร์มแก้ไข\')')
+    + b('doc','เพิ่มบันทึกย่อ',        'closeRowMenu();toast(\'เปิดช่องบันทึกย่อ\')')
+    + '<hr>'
+    + b('barcode','สร้าง QR ติดเครื่อง','closeRowMenu();toast(\'สร้าง QR สำหรับ '+r.id+'\')')
+    + b('sitemap','ผังความสัมพันธ์',   'closeRowMenu();toast(\'เปิดผังความสัมพันธ์ของ CI\')')
+    + (isAsset ? '<hr>'
+        + b('update','สั่งรีบูตเครื่อง','closeRowMenu();toast(\'ส่งคำสั่งรีบูตผ่าน Agent\')')
+        + b('x','สั่งปิดเครื่อง',      'closeRowMenu();toast(\'ส่งคำสั่งปิดเครื่องผ่าน Agent\')','danger')
+      : '')
+    + '</div>';
+}
+
+/* ---------- เมนู Options (⋮) ---------- */
+function menuHTML(){
+  return '<div class="menu">'
+    + '<button class="menu-i" onclick="toast(\'เปิดหน้าตั้งค่าคอลัมน์\')">'+ic('cols')
+      + '<span class="mi-b"><b>คอลัมน์ในตาราง</b><span>เลือกคอลัมน์ที่ต้องการแสดง</span></span>'
+      + '<span class="mi-v">'+M().cols.length+'</span></button>'
+    + '<label class="menu-i">'+ic('rows')
+      + '<span class="mi-b"><b>จำนวนแถวต่อหน้า</b><span>ปรับได้ตามความถนัด</span></span>'
+      + '<select onchange="setPer(this.value)" onclick="event.stopPropagation()">'
+        + [10,25,50,100].map(n=>'<option value="'+n+'"'+(n===S.per?' selected':'')+'>'+n+'</option>').join('')
+      + '</select></label>'
+    + '<button class="menu-i" onclick="closeMenu();exportCSV()">'+ic('down')
+      + '<span class="mi-b"><b>ส่งออกข้อมูล</b><span>ดาวน์โหลดผลลัพธ์เป็นไฟล์ CSV</span></span></button>'
+    + '</div>';
+}
+
+/* ============================================================
+   8b) DETAIL PAGE — โครงหน้าเดียวใช้ซ้ำได้กับทุกโมดูล
+   ============================================================ */
+const DTABS=['ภาพรวม','ฮาร์ดแวร์','ซอฟต์แวร์','สัญญา / การเงิน','ซ่อมบำรุง','ประวัติ'];
+
+function fgrid(pairs){
+  return '<div class="fgrid">' + pairs.map(p=>
+    '<div class="fld"><dt>'+esc(p[0])+'</dt><dd'+(p[1]?'':' class="na"')+'>'
+    + (p[1] ? (p[2]==='mono' ? '<span class="mono">'+esc(p[1])+'</span>' : esc(p[1])) : 'ไม่มีข้อมูล')
+    + '</dd></div>').join('') + '</div>';
+}
+function panel(title,inner,action){
+  return '<section class="panel"><div class="panel-h"><div><h3>'+esc(title)+'</h3></div>'
+       + (action||'') + '</div>'+inner+'</section>';
+}
+
+function detailHTML(){
+  const m=M(), key=m.cols[0].k;
+  const r=m.rows.find(x=>String(x[key])===String(S.detail));
+  if(!r) return stubHTML(m);
+  const d=r.d||{};
+  const st=ST[r.status]||{l:r.status,c:'mute'};
+  const locTx=Array.isArray(r.loc)?r.loc.join(' › '):(r.loc||'');
+
+  /* --- header --- */
+  const head='<div class="dt-head">'
+    + '<button class="icon-btn" onclick="closeDetail()" aria-label="ย้อนกลับ">'+ic('arrowL')+'</button>'
+    + '<div class="dt-ic">'+ic(m.icon,1.5)+'</div>'
+    + '<div class="dt-id"><h2>'+esc(r[m.cols[1].k])+'</h2>'
+      + '<p><span class="mono">'+esc(r[key])+'</span> · '+esc(r.type||m.label)+'</p>'
+      + '<p class="upd">อัปเดตล่าสุด 24 ส.ค. 2569 08:46</p></div>'
+    + '<div class="dt-quick">'
+      + qcard('check','สถานะ','<span class="pill '+st.c+'"><span class="dot"></span>'+esc(st.l)+'</span>')
+      + qcard('pin','สถานที่',esc(locTx))
+      + qcard('users','ผู้ครอบครอง',esc(r.owner||'ไม่ระบุ'))
+    + '</div>'
+    + '<button class="btn btn-primary" onclick="toast(\'เปิดฟอร์มแก้ไขข้อมูล\')">'+ic('pen')+'แก้ไข</button>'
+    + '</div>'
+    + '<div class="subtabs">'+DTABS.map((t,i)=>
+        '<button class="subtab'+(S.dtab===i?' on':'')+'" onclick="setDTab('+i+')">'+esc(t)+'</button>').join('')
+      + '</div>';
+
+  return head + '<div class="dt-body">' + detailTab(r,d,st,locTx) + '</div>';
+}
+
+function qcard(icon,label,val){
+  return '<div class="qcard">'+ic(icon)+'<div class="qcard-b"><b>'+val+'</b><span>'+esc(label)+'</span></div>'
+       + ic('pen')+'</div>';
+}
+
+function detailTab(r,d,st,locTx){
+  const m=M();
+  switch(S.dtab){
+
+    /* ---------- 0 · ภาพรวม ---------- */
+    case 0: return ''
+      + '<div class="dt-alerts">'
+        + hcard(d.online?'ok':'crit', d.online?'wifi':'alert', d.online?'ออนไลน์':'ออฟไลน์', 'Agent '+(d.agent||'—')+' · '+(d.seen||'—'))
+        + hcard(d.avOk?'ok':'crit','shield', d.avOk?'มีแอนตี้ไวรัส':'ไม่พบแอนตี้ไวรัส', d.av||'—')
+        + hcard(d.fwOk?'ok':'warn','shield','Firewall '+(d.fw||'—'), d.fwOk?'ทำงานปกติ':'ควรเปิดใช้งาน')
+        + hcard(d.wexp?'crit':'ok','doc', d.wexp?'หมดประกันแล้ว':'อยู่ในประกัน', d.warranty||'—')
+      + '</div>'
+      + '<div class="dt-grid"><div class="dt-col">'
+        + panel('ข้อมูลทั่วไป', fgrid([
+            ['รหัสทรัพย์สิน',r.code,'mono'],['ชื่ออุปกรณ์',r.name],['ประเภท',r.type],
+            ['ผู้ผลิต',d.maker],['Serial Number',r.serial,'mono'],['วันที่ซื้อ',r.buy,'mono'],
+            ['อายุการใช้งาน',r.age+' ปี'],['แผนก',r.dept],['สถานที่',locTx]
+          ]))
+        + panel('เครือข่าย', fgrid([
+            ['Hostname',d.host,'mono'],['IP Address',r.ip,'mono'],['MAC Address',d.mac,'mono']
+          ]))
+      + '</div><div class="dt-col">'
+        + panel('ความเคลื่อนไหวล่าสุด',
+            '<div class="tl">'
+            + tl('swap','เปลี่ยนผู้ครอบครอง','2 วันที่แล้ว')
+            + tl('pen','แก้ไข IP Address','5 วันที่แล้ว')
+            + tl('disc','ตรวจพบซอฟต์แวร์ใหม่','1 สัปดาห์ที่แล้ว')
+            + tl('plus','เพิ่มเข้าทะเบียน',r.buy)
+            + '</div>',
+            '<button class="chip" onclick="go(\'activities\')">ดูทั้งหมด</button>')
+        + panel('แท็ก',
+            '<div class="chips">'
+            + ['<i></i>'+esc(d.maker||''),'<i></i>'+esc(r.type),'<i></i>'+esc((r.loc||[])[0]||'')]
+              .filter(x=>x.length>8).map(x=>'<span class="chip-tag">'+x+'</span>').join('')
+            + '</div>')
+        + panel('เอกสารแนบ',
+            '<div class="empty" style="padding:26px 16px">'+ic('doc',1.4)
+            + '<p style="font-size:12.5px">ยังไม่มีไฟล์แนบ — ใบส่งมอบ ใบรับประกัน หรือรูปถ่ายอุปกรณ์</p></div>',
+            '<button class="icon-btn" onclick="toast(\'เปิดหน้าต่างอัปโหลด\')" aria-label="เพิ่มไฟล์">'+ic('plus')+'</button>')
+      + '</div></div>';
+
+    /* ---------- 1 · ฮาร์ดแวร์ ---------- */
+    case 1: return panel('สเปกเครื่อง', fgrid([
+        ['ผู้ผลิต',d.maker],['รุ่น',r.name],['ประเภท',r.type],
+        ['หน่วยประมวลผล',d.cpu],['หน่วยความจำ',d.ram],['พื้นที่จัดเก็บ',d.disk],
+        ['Serial Number',r.serial,'mono'],['สถานะการรับประกัน',d.warranty],['อายุการใช้งาน',r.age+' ปี']
+      ]));
+
+    /* ---------- 2 · ซอฟต์แวร์ ---------- */
+    case 2: return panel('ระบบปฏิบัติการและความปลอดภัย', fgrid([
+        ['ระบบปฏิบัติการ',d.os],['แอนตี้ไวรัส',d.av],['Firewall',d.fw],
+        ['เวอร์ชัน Agent',d.agent,'mono'],['รายงานล่าสุด',d.seen]
+      ]))
+      + panel('ซอฟต์แวร์ที่ติดตั้ง',
+        '<div class="empty" style="padding:40px 20px">'+ic('disc',1.4)
+        + '<b>ยังไม่ได้เชื่อมข้อมูลรายการติดตั้ง</b>'
+        + '<p>ดึงจาก <span class="mono">DB.software.rows</span> โดยกรองด้วยรหัสทรัพย์สินของเครื่องนี้</p></div>');
+
+    /* ---------- 3 · สัญญา / การเงิน ---------- */
+    case 3: return panel('การจัดซื้อ', fgrid([
+        ['ผู้ขาย',d.vendor],['เลขที่ใบสั่งซื้อ',d.po,'mono'],['วันที่ซื้อ',r.buy,'mono'],
+        ['ราคาซื้อ',d.price?'฿'+d.price:''],['มูลค่าตามบัญชี',d.book?'฿'+d.book:''],['สถานะประกัน',d.warranty]
+      ]))
+      + panel('สัญญาที่เกี่ยวข้อง',
+        '<div class="empty" style="padding:40px 20px">'+ic('doc',1.4)
+        + '<b>ไม่มีสัญญาผูกกับอุปกรณ์นี้</b>'
+        + '<p>ผูกได้จากโมดูลสัญญา หรือกรอง <span class="mono">DB.contracts.rows</span> ด้วยรหัสทรัพย์สิน</p></div>');
+
+    /* ---------- 4 · ซ่อมบำรุง ---------- */
+    case 4: {
+      const jobs=DB.maintenance.rows.filter(x=>x.asset===r.name);
+      if(!jobs.length) return '<div class="empty" style="padding:70px 20px">'+ic('wrench',1.4)
+        + '<b>ไม่มีประวัติการซ่อมบำรุง</b><p>อุปกรณ์ชิ้นนี้ยังไม่เคยมีใบแจ้งซ่อมในระบบ</p>'
+        + '<button class="btn btn-primary" onclick="toast(\'เปิดฟอร์มแจ้งซ่อม\')">'+ic('plus')+'แจ้งซ่อม</button></div>';
+      return panel('ใบแจ้งซ่อมของอุปกรณ์นี้','<div class="tl">'
+        + jobs.map(j=>'<div class="tl-i"><div class="tl-d">'+ic('wrench')+'</div>'
+          + '<div class="tl-b"><b>'+esc(j.issue)+'</b>'
+          + '<span><span class="mono">'+esc(j.no)+'</span> · แจ้งโดย '+esc(j.by)+' · '+esc(j.date)+'</span></div>'
+          + '<div style="margin-left:auto">'+cell(j,DB.maintenance.cols.find(c=>c.ty==='pill'))+'</div></div>').join('')
+        + '</div>');
+    }
+
+    /* ---------- 5 · ประวัติ ---------- */
+    default: return panel('ประวัติการเปลี่ยนแปลง','<div class="tl">'
+      + DB.activities.rows.slice(0,6).map(a=>'<div class="tl-i"><div class="tl-d">'+ic('clock')+'</div>'
+        + '<div class="tl-b"><b>'+esc(a.event)+'</b>'
+        + '<span>'+esc(a.before)+' → '+esc(a.after)+' · '+esc(a.who)+' · '+esc(a.time)+'</span></div></div>').join('')
+      + '</div>');
+  }
+}
+
+function hcard(lvl,icon,title,sub){
+  return '<div class="hcard '+lvl+'">'+ic(icon)
+    + '<div class="hcard-b"><b>'+esc(title)+'</b><span>'+esc(sub)+'</span></div></div>';
+}
+function tl(icon,title,when){
+  return '<div class="tl-i"><div class="tl-d">'+ic(icon)+'</div>'
+    + '<div class="tl-b"><b>'+esc(title)+'</b><span>'+esc(when)+'</span></div></div>';
+}
+
+function tableHTML(m,rows){
+  if(!rows.length) return '<div class="tbl-scroll">'+emptyHTML()+'</div>';
+  const head='<tr>'
+    + '<th class="col-chk"><input class="chk" type="checkbox" onclick="selAll(this.checked)" aria-label="เลือกทั้งหมด"></th>'
+    + m.cols.map(c=>{
+        const on=S.sort.k===c.k;
+        return '<th class="sortable" style="min-width:'+c.w+'px" onclick="sortBy(\''+c.k+'\')">'
+             + esc(c.t) + '<span class="sort-ind'+(on?' on':'')+'">'+(on?(S.sort.dir>0?'▲':'▼'):'▲')+'</span></th>';
+      }).join('') + '<th></th></tr>';
+  const filt='<tr class="filters"><th></th>'
+    + m.cols.map(c=>'<th><input type="text" placeholder="กรอง…" value="'+esc(S.colq[c.k]||'')
+        +'" oninput="setColFilter(\''+c.k+'\',this.value)" aria-label="กรอง '+esc(c.t)+'"></th>').join('')
+    + '<th></th></tr>';
+  const body=rows.map(r=>{
+    const id=String(r[m.cols[0].k]).replace(/'/g,'');
+    return '<tr class="'+(S.sel.has(r[m.cols[0].k])?'sel':'')+'" onclick="openDetail(\''+id+'\')">'
+      + '<td onclick="event.stopPropagation()"><input class="chk" type="checkbox" '+(S.sel.has(r[m.cols[0].k])?'checked':'')
+        +' onclick="selOne(\''+id+'\',this.checked)" aria-label="เลือกแถว"></td>'
+      + m.cols.map(c=>'<td>'+cell(r,c)+'</td>').join('')
+      + '<td onclick="event.stopPropagation()" style="width:36px">'
+        + '<button class="icon-btn menu-trigger" style="width:26px;height:26px" onclick="openRowMenu(event,\''+id+'\')" aria-label="คำสั่งเพิ่มเติม">'
+        + ic('more',2.4)+'</button></td>'
+      + '</tr>';
+  }).join('');
+  return '<div class="tbl-scroll"><table class="grid"><thead>'+head+filt+'</thead><tbody>'+body+'</tbody></table></div>';
+}
+
+function cardsHTML(m,rows){
+  if(!rows.length) return '<div class="tbl-scroll">'+emptyHTML()+'</div>';
+  const key=m.cols[0].k, nameCol=m.cols[1], show=m.cols.slice(2,6);
+  const stCol=m.cols.find(c=>c.ty==='pill'), tagCol=m.cols.find(c=>c.ty==='tag');
+  return '<div class="tbl-scroll"><div class="cards">'+rows.map(r=>{
+    const id=String(r[key]).replace(/'/g,'');
+    return '<div class="acard" onclick="openDetail(\''+id+'\')">'
+      + '<div style="display:flex;align-items:center;gap:7px;margin-bottom:11px">'
+        + (stCol?cell(r,stCol):'') + (tagCol?cell(r,tagCol):'')
+        + '<button class="icon-btn menu-trigger" style="width:24px;height:24px;margin-left:auto" '
+          + 'onclick="event.stopPropagation();openRowMenu(event,\''+id+'\')" aria-label="คำสั่งเพิ่มเติม">'+ic('more',2.4)+'</button>'
+      + '</div>'
+      + '<div class="acard-h"><div><b>'+esc(r[nameCol.k])+'</b><span class="acard-code">'+esc(r[key])+'</span></div></div>'
+      + '<div class="acard-rows">'
+      + show.filter(c=>c.ty!=='pill'&&c.ty!=='tag').map(c=>
+          '<div class="acard-r"><span>'+esc(c.t)+'</span><b>'+cell(r,c)+'</b></div>').join('')
+      + '</div></div>';
+  }).join('')+'</div></div>';
+}
+
+function footHTML(total,pages){
+  let pg='';
+  const win=[];
+  for(let i=1;i<=pages;i++){ if(i===1||i===pages||Math.abs(i-S.page)<=1) win.push(i); else if(win[win.length-1]!=='…') win.push('…'); }
+  pg=win.map(i=> i==='…' ? '<span class="pg" style="cursor:default">…</span>'
+      : '<button class="pg'+(i===S.page?' on':'')+'" onclick="goPage('+i+')">'+i+'</button>').join('');
+  return '<div class="tbl-foot">'
+    + '<span class="count"><b>'+total.toLocaleString('th-TH')+'</b> รายการ</span>'
+    + (S.sel.size?'<span style="color:var(--accent)">เลือก '+S.sel.size+'</span>':'')
+    + '<div class="spacer"></div>'
+    + '<span class="hide-sm">แสดง '+S.per+' ต่อหน้า</span>'
+    + '<div class="pager">'
+    + '<button class="pg" onclick="goPage(S.page-1)" '+(S.page===1?'disabled':'')+' aria-label="ก่อนหน้า">'+ic('chevL')+'</button>'
+    + pg
+    + '<button class="pg" onclick="goPage(S.page+1)" '+(S.page===pages?'disabled':'')+' aria-label="ถัดไป">'+ic('chevR')+'</button>'
+    + '</div></div>';
+}
+
+function bulkHTML(){
+  const n=S.sel.size, total=processed().length;
+  return '<div class="bulk"><b>'+n+' จาก '+total+' รายการ</b>'
+    + '<button onclick="toast(\'แก้ไข '+n+' รายการพร้อมกัน\')">'+ic('pen')+'แก้ไข</button>'
+    + '<button onclick="toast(\'ติดแท็ก '+n+' รายการ\')">'+ic('tag')+'ติดแท็ก</button>'
+    + '<button onclick="toast(\'สร้าง QR '+n+' ใบ\')">'+ic('barcode')+'สร้าง QR</button>'
+    + '<button onclick="exportCSV()">'+ic('down')+'ส่งออก</button>'
+    + '<button class="icon-btn" onclick="clearSel()" aria-label="ยกเลิก" style="width:26px;height:26px">'+ic('x')+'</button>'
+    + '</div>';
+}
+
+function emptyHTML(){
+  return '<div class="empty">'+ic('box',1.4)+'<b>ไม่พบข้อมูลที่ตรงกับเงื่อนไข</b>'
+    + '<p>ลองล้างตัวกรองรายคอลัมน์ หรือแก้คำค้นด้านบน แล้วค้นหาอีกครั้ง</p>'
+    + '<button class="btn btn-ghost" onclick="clearFilters()">ล้างตัวกรองทั้งหมด</button></div>';
+}
+
+/* ---------- หน้า Settings: 10 หมวด แต่ละหมวดมีเมนูย่อยของตัวเอง ---------- */
+function settingsHTML(m){
+  return '<div class="setwrap">'
+    + m.sections.map((s,si)=>
+        '<section class="setsec">'
+        + '<div class="setsec-h">'+ic(s.ic)+'<h3>'+esc(s.t)+'</h3>'
+          + (s.beta?'<span class="badge">BETA</span>':'')
+          + '<span class="setsec-n">'+s.items.length+' รายการ</span></div>'
+        + '<div class="setsec-b">'
+        + s.items.map(it=>
+            '<button class="setitem" onclick="toast(\'เปิด: '+esc(it.n).replace(/'/g,'')+'\')">'
+            + '<span class="setitem-ic">'+ic(it.ic)+'</span>'
+            + '<span class="setitem-b"><b>'+esc(it.n)+'</b><span>'+esc(it.d)+'</span></span>'
+            + ic('chevR') + '</button>').join('')
+        + '</div></section>').join('')
+    + '</div>';
+}
+
+function stubHTML(m){
+  return '<div class="empty" style="padding:100px 20px">'+ic(m.icon,1.4)
+    + '<b>'+esc(m.label)+'</b>'
+    + '<p>หน้านี้เว้นไว้ให้พัฒนาต่อ — เพิ่ม <span class="mono">cols</span> และ <span class="mono">rows</span> '
+    + 'ลงใน <span class="mono">DB.'+S.mod+'</span> แล้วเปลี่ยน <span class="mono">kind</span> เป็น '
+    + '<span class="mono">\'explorer\'</span> ตารางจะสร้างขึ้นเองทั้งหมด</p></div>';
+}
+
+/* ============================================================
+   9) DASHBOARD
+   ============================================================ */
+function statusCounts(){
+  const c={good:0,info:0,warn:0,crit:0,mute:0};
+  DB.assets.rows.forEach(r=>c[r.status]++);
+  return c;
+}
+function typeCounts(){
+  const m={};
+  DB.assets.rows.forEach(r=>m[r.type]=(m[r.type]||0)+1);
+  return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,7);
+}
+
+/* Donut แบบ path arc — เว้นช่อง 2px ระหว่างชิ้นตามหลัก data-viz */
+function donutSVG(data,total){
+  const cx=85,cy=85,r=62,w=20, gap=0.035;
+  let a0=0, out='';
+  data.forEach(d=>{
+    if(!d.v) return;
+    const frac=d.v/total;
+    const a1=a0+frac*Math.PI*2;
+    const s=a0+gap/2, e=Math.max(s+0.001,a1-gap/2);
+    const large=(e-s)>Math.PI?1:0;
+    const ro=r+w/2, ri=r-w/2;
+    const x1=cx+ro*Math.cos(s),y1=cy+ro*Math.sin(s);
+    const x2=cx+ro*Math.cos(e),y2=cy+ro*Math.sin(e);
+    const x3=cx+ri*Math.cos(e),y3=cy+ri*Math.sin(e);
+    const x4=cx+ri*Math.cos(s),y4=cy+ri*Math.sin(s);
+    out+='<path d="M'+x1+' '+y1+' A'+ro+' '+ro+' 0 '+large+' 1 '+x2+' '+y2
+       + ' L'+x3+' '+y3+' A'+ri+' '+ri+' 0 '+large+' 0 '+x4+' '+y4+' Z" fill="'+d.color+'">'
+       + '<title>'+esc(d.label)+': '+d.v+' รายการ ('+Math.round(frac*100)+'%)</title></path>';
+    a0=a1;
+  });
+  return '<svg width="170" height="170" viewBox="0 0 170 170" role="img" aria-label="สัดส่วนสถานะอุปกรณ์">'+out+'</svg>';
+}
+
+function dashboardHTML(){
+  const c=statusCounts();
+  const total=DB.assets.rows.length;
+  const cs=getComputedStyle(document.documentElement);
+  const col=n=>cs.getPropertyValue('--st-'+n).trim();
+  const data=[
+    {label:ST.good.l,v:c.good,color:col('good')},
+    {label:ST.info.l,v:c.info,color:col('info')},
+    {label:ST.warn.l,v:c.warn,color:col('warn')},
+    {label:ST.crit.l,v:c.crit,color:col('crit')},
+    {label:ST.mute.l,v:c.mute,color:col('mute')}
+  ];
+  const types=typeCounts(), maxT=Math.max(...types.map(t=>t[1]));
+
+  return '<div class="dash">'
+  /* --- Stat tiles --- */
+  + '<div class="stats">'
+    + statTile('laptop','อุปกรณ์ทั้งหมด',total,'ใช้งานอยู่ '+c.good+' เครื่อง','+6 เดือนนี้','up','')
+    + statTile('wrench','ใบแจ้งซ่อมค้าง',DB.maintenance.rows.filter(r=>r.status!=='good').length,'เกินกำหนด 3 ใบ','','','s-warn')
+    + statTile('doc','สัญญาใกล้หมดอายุ',3,'ภายใน 90 วันข้างหน้า','','','s-crit')
+    + statTile('disc','สิทธิ์ซอฟต์แวร์เกิน',2,'Adobe Acrobat, WinRAR','','','s-crit')
+    + statTile('swap','รับ-ส่งมอบเดือนนี้',DB.transfer.rows.length,'รออนุมัติ 3 รายการ','','','s-good')
+  + '</div>'
+
+  + '<div class="panels">'
+  /* --- Donut --- */
+    + '<div class="panel"><div class="panel-h"><div>'
+      + '<h3>สถานะอุปกรณ์</h3><p>แยกตามสถานะปัจจุบัน</p></div></div>'
+      + '<div class="panel-b"><div class="donut-wrap">'
+      + '<div class="donut">'+donutSVG(data,total)
+        + '<div class="donut-c"><b class="num">'+total+'</b><span>รายการทั้งหมด</span></div></div>'
+      + '<div class="legend">'+data.map(d=>
+          '<div class="lg-row" onclick="go(\'assets\')">'
+          + '<span class="sw" style="background:'+d.color+'"></span>'
+          + '<span class="nm">'+esc(d.label)+'</span>'
+          + '<span class="vl">'+d.v+'</span>'
+          + '<span class="pc">'+Math.round(d.v/total*100)+'%</span></div>').join('')
+      + '</div></div></div></div>'
+
+  /* --- Bars + alerts --- */
+    + '<div style="display:flex;flex-direction:column;gap:14px;min-width:0">'
+      + '<div class="panel"><div class="panel-h"><div>'
+        + '<h3>จำนวนอุปกรณ์แยกตามประเภท</h3><p>7 ประเภทที่มีมากที่สุด</p></div></div>'
+        + '<div class="panel-b"><div class="bars">'
+        + types.map(t=>'<div class="bar-row" title="'+esc(t[0])+': '+t[1]+' รายการ">'
+            + '<span class="bar-lb">'+esc(t[0])+'</span>'
+            + '<span class="bar-tr"><span class="bar-fl" data-w="'+(t[1]/maxT*100)+'" style="width:0"></span></span>'
+            + '<span class="bar-vl">'+t[1]+'</span></div>').join('')
+        + '</div></div></div>'
+
+      + '<div class="panel"><div class="panel-h"><div>'
+        + '<h3>รายการที่ต้องดำเนินการ</h3><p>เรียงตามความเร่งด่วน</p></div>'
+        + '<button class="chip" onclick="go(\'maintenance\')">ดูทั้งหมด</button></div>'
+        + '<div class="alerts">'
+        + alertRow('crit','alert','อุปกรณ์ชำรุดรอตัดสินใจ','MT-2569-0420 · Dell OptiPlex 7010',c.crit,'maintenance')
+        + alertRow('crit','doc','สัญญา MA กล้องวงจรปิดหมดอายุแล้ว','CT-2567-0019 · เกินกำหนด 297 วัน',1,'contracts')
+        + alertRow('warn','disc','ติดตั้งซอฟต์แวร์เกินสิทธิ์','Adobe Acrobat Pro DC · เกิน 3 สิทธิ์',3,'software')
+        + alertRow('warn','wrench','ใบแจ้งซ่อมค้างเกิน 7 วัน','MT-2569-0419 · MikroTik CRS328-24P',3,'maintenance')
+        + alertRow('info','swap','ใบส่งมอบรออนุมัติ','TF-2569-0186 · iPad 10th Gen',3,'transfer')
+        + '</div></div>'
+    + '</div>'
+  + '</div></div>';
+}
+
+function statTile(icon,label,val,sub,delta,dir,cls){
+  return '<div class="stat '+cls+'">'
+    + '<div class="stat-l">'+ic(icon)+esc(label)+'</div>'
+    + '<div class="stat-v num">'+val+'</div>'
+    + '<div class="stat-s">'+esc(sub)+(delta?' · <span class="delta '+dir+'">'+esc(delta)+'</span>':'')+'</div>'
+    + '</div>';
+}
+function alertRow(lvl,icon,title,sub,n,target){
+  return '<div class="alert" onclick="go(\''+target+'\')">'
+    + '<div class="alert-ic '+lvl+'">'+ic(icon)+'</div>'
+    + '<div class="alert-b"><b>'+esc(title)+'</b><span>'+esc(sub)+'</span></div>'
+    + '<div class="alert-n num">'+n+'</div></div>';
+}
+function animateBars(){
+  requestAnimationFrame(()=>document.querySelectorAll('.bar-fl').forEach(b=>b.style.width=b.dataset.w+'%'));
+}
+
+/* ============================================================
+   10) DRAWER
+   ============================================================ */
+function openDrawer(id){
+  const m=M(); if(!m.cols) return;
+  const key=m.cols[0].k;
+  const row=m.rows.find(r=>String(r[key])===String(id));
+  if(!row) return;
+  const st=m.cols.find(c=>c.ty==='pill');
+  $('#drawer').innerHTML =
+    '<div class="dw-h"><div style="flex:1;min-width:0">'
+      + '<h2>'+esc(row[m.cols[1].k])+'</h2>'
+      + '<span class="mono">'+esc(row[key])+'</span></div>'
+      + (st?cell(row,st):'')
+      + '<button class="icon-btn" onclick="closeDrawer()" aria-label="ปิด">'+ic('x')+'</button></div>'
+    + '<div class="dw-tabs">'
+      + '<button class="subtab on">รายละเอียด</button>'
+      + '<button class="subtab" onclick="toast(\'แท็บประวัติยังไม่ได้เชื่อมข้อมูล\')">ประวัติ</button>'
+      + '<button class="subtab" onclick="toast(\'แท็บเอกสารแนบยังไม่ได้เชื่อมข้อมูล\')">เอกสารแนบ</button></div>'
+    + '<div class="dw-b"><dl class="dl">'
+      + m.cols.map(c=>'<div class="dl-r"><dt>'+esc(c.t)+'</dt><dd>'+cell(row,c)+'</dd></div>').join('')
+      + '</dl></div>'
+    + '<div class="dw-f">'
+      + '<button class="btn btn-primary" onclick="openDetail(\''+String(row[key]).replace(/'/g,'')+'\')">'+ic('expand')+'เปิดหน้าเต็ม</button>'
+      + '<button class="btn btn-ghost" onclick="toast(\'สร้างใบส่งมอบจากรายการนี้\')">'+ic('swap')+'ส่งมอบ</button>'
+      + '<div class="spacer"></div>'
+      + '<button class="icon-btn" onclick="toast(\'ยังไม่ได้เชื่อมการลบ\')" aria-label="ลบ">'+ic('trash')+'</button></div>';
+  $('#drawer').classList.add('on'); $('#drawer').setAttribute('aria-hidden','false');
+  $('#scrim').classList.add('on');
+}
+function closeDrawer(){
+  $('#drawer').classList.remove('on'); $('#drawer').setAttribute('aria-hidden','true');
+  $('#scrim').classList.remove('on');
+}
+
+/* ============================================================
+   11) ACTIONS
+   ============================================================ */
+function go(k){ S.mod=k; S.tab=0; S.page=1; S.sort={k:null,dir:1}; S.colq={}; S.sel.clear(); S.q=''; $('#q').value=''; S.mobOpen=false; S.detail=null; S.dtab=0; S.menu=false; S.sideDim='loc'; syncApp(); render(); }
+
+/* --- หน้ารายละเอียด --- */
+function openDetail(id){ S.detail=id; S.dtab=0; S.menu=false; closeDrawer(); render(); $('#content').scrollTop=0; }
+function closeDetail(){ S.detail=null; render(); }
+function setDTab(i){ S.dtab=i; render(); }
+
+/* --- แผงสรุป / เมนู Options --- */
+function toggleSide(){ S.side=!S.side; render(); }
+function setDim(k){ S.sideDim=k; render(); }
+function toggleMenu(){ S.menu=!S.menu; S.rowMenu=null; render(); }
+function closeMenu(){ S.menu=false; render(); }
+function openRowMenu(e,id){ e.stopPropagation(); S.menu=false; S.rowMenu={id,x:e.clientX,y:e.clientY}; render(); }
+function closeRowMenu(){ S.rowMenu=null; render(); }
+function setPer(n){ S.per=parseInt(n,10); S.page=1; S.menu=false; render(); toast('แสดง '+n+' แถวต่อหน้า'); }
+function setTab(i){ S.tab=i; S.page=1; S.sort={k:null,dir:1}; S.colq={}; S.sel.clear(); render(); }
+function setView(v){ S.view=v; render(); }
+function setColFilter(k,v){ S.colq[k]=v; S.page=1; render(); setTimeout(()=>{const el=document.querySelector('tr.filters input[aria-label="กรอง '+M().cols.find(c=>c.k===k).t+'"]'); if(el){el.focus();el.setSelectionRange(v.length,v.length);}},0); }
+function clearFilters(){ S.colq={}; S.q=''; $('#q').value=''; S.page=1; render(); }
+function sortBy(k){ S.sort = S.sort.k===k ? {k,dir:-S.sort.dir} : {k,dir:1}; render(); }
+function goPage(p){ const t=Math.max(1,Math.ceil(processed().length/S.per)); S.page=Math.min(Math.max(1,p),t); render(); }
+function onSearch(v){ S.q=v; S.page=1; render(); }
+function refresh(){ render(); toast('โหลดข้อมูลใหม่แล้ว','refresh'); }
+
+function selOne(id,on){ on?S.sel.add(id):S.sel.delete(id); render(); }
+function selAll(on){
+  const m=M(),k=m.cols[0].k,rows=processed().slice((S.page-1)*S.per,S.page*S.per);
+  rows.forEach(r=> on?S.sel.add(r[k]):S.sel.delete(r[k]));
+  render();
+}
+function clearSel(){ S.sel.clear(); render(); }
+
+/* ส่งออก CSV — ทำงานเมื่อเปิดไฟล์บนเครื่อง (หน้าพรีวิวบล็อกการดาวน์โหลด) */
+function exportCSV(){
+  const m=M();
+  const rows=processed();
+  const head=m.cols.map(c=>c.t).join(',');
+  const body=rows.map(r=>m.cols.map(c=>'"'+cellText(r,c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob=new Blob(['﻿'+head+'\n'+body],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=S.mod+'-'+new Date().toISOString().slice(0,10)+'.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  toast('ส่งออก '+rows.length+' รายการเป็น CSV','down');
+}
+
+function toggleRail(){ S.collapsed=!S.collapsed; syncApp(); }
+function toggleMobNav(){ S.mobOpen=!S.mobOpen; syncApp(); }
+function syncApp(){
+  const a=$('#app');
+  a.classList.toggle('collapsed',S.collapsed);
+  a.classList.toggle('mob-open',S.mobOpen);
+}
+function toggleTheme(){
+  const cur=document.documentElement.getAttribute('data-theme');
+  const sysDark=window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const next=(cur ? cur==='dark' : sysDark) ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme',next);
+  try{ localStorage.setItem('trr-theme',next); }catch(e){}
+  syncTheme(); render();
+}
+function syncTheme(){
+  const cur=document.documentElement.getAttribute('data-theme');
+  const dark = cur ? cur==='dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+  $('#themeIcon').innerHTML = ic(dark?'sun':'moon');
+  $('#themeLabel').textContent = dark?'โหมดสว่าง':'โหมดมืด';
+}
+
+/* ============================================================
+   12) INIT
+   ============================================================ */
+(function init(){
+  try{ const t=localStorage.getItem('trr-theme'); if(t) document.documentElement.setAttribute('data-theme',t); }catch(e){}
+  $('#mobBtn').innerHTML=ic('menu');
+  $('#railBtn').innerHTML=ic('chevLL');
+  $('#searchIcon').innerHTML=ic('search');
+  $('#bellBtn').innerHTML=ic('bell');
+  syncTheme(); syncApp(); render();
+  document.addEventListener('keydown',e=>{
+    if(e.key!=='Escape') return;
+    if($('#drawer').classList.contains('on')) closeDrawer();
+    else if(S.rowMenu) closeRowMenu();
+    else if(S.menu) closeMenu();
+    else if(S.detail) closeDetail();
+  });
+  /* คลิกที่อื่นเพื่อปิดเมนูที่เปิดค้างอยู่ */
+  document.addEventListener('click',e=>{
+    if(!S.rowMenu && !S.menu) return;
+    if(e.target.closest('.rmenu,.menu,.menu-trigger')) return;
+    S.rowMenu=null; S.menu=false; render();
+  },true);
+})();
+</script>
+</body>
+</html>
