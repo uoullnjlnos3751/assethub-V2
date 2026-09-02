@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Box, Typography, Chip, alpha, useTheme } from '@mui/material';
-import StatusChip from '../../../components/StatusChip';
 import { getTypeIconComponent } from './assetTypeIcon';
 import { calcDepreciation, fmtBaht } from './assetFinance';
+import { EditableStatusChip, EditableFact } from './EditableAssetFields';
+import { useAuth } from '../../../contexts/AuthContext';
+import { assetAPI } from '../../../services/api';
 
 const fmtDate = (d?: string | Date | null) =>
   d ? new Date(d).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
@@ -34,10 +36,39 @@ function Fact({ label, value, sub, mono, accent }: {
   );
 }
 
-export function AssetOverviewCard({ asset }: { asset: any }) {
+interface AssetOverviewCardProps {
+  asset: any;
+  /** Applies one field's new value and reloads the asset. Omit to render every chip read-only (e.g. no role check done yet). */
+  onQuickUpdate?: (field: string, value: string) => Promise<void>;
+}
+
+export function AssetOverviewCard({ asset, onQuickUpdate }: AssetOverviewCardProps) {
   const theme = useTheme();
+  const { user } = useAuth();
   const TypeIcon = getTypeIconComponent(asset.type);
   const dep = calcDepreciation(asset);
+  const canEdit = !!onQuickUpdate && (user?.role === 'IT_ADMIN' || user?.role === 'SUPERADMIN');
+
+  // Master-data option lists for the department/location pickers — fetched
+  // once, only for roles that can actually open an editor with them.
+  const [departmentOptions, setDepartmentOptions] = useState<string[]>([]);
+  const [locationOptions, setLocationOptions] = useState<string[]>([]);
+  useEffect(() => {
+    if (!canEdit) return;
+    assetAPI.departmentOptions().then(res => setDepartmentOptions(res.data || [])).catch(() => {});
+    assetAPI.locationOptions().then(res => setLocationOptions(res.data || [])).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canEdit]);
+
+  const departmentSelectOptions = Array.from(new Set([...departmentOptions, asset.departmentId].filter(Boolean)));
+  const locationSelectOptions = Array.from(new Set([...locationOptions, asset.location].filter(Boolean)));
+
+  const searchOwners = (q: string) =>
+    assetAPI.searchOwners(q).then(res => (res.data || []).map((u: any) => ({
+      label: u.displayName || u.adUsername || '',
+      value: u.displayName || u.adUsername || '',
+      sub: [u.department, u.company].filter(Boolean).join(' · ') || undefined,
+    })));
 
   const warrantyEnd = asset.warrantyEndDate ? new Date(asset.warrantyEndDate) : null;
   const inWarranty = warrantyEnd ? warrantyEnd.getTime() > Date.now() : null;
@@ -84,7 +115,11 @@ export function AssetOverviewCard({ asset }: { asset: any }) {
             }}>
               {asset.assetCode || asset.assetName || '—'}
             </Typography>
-            <StatusChip status={asset.status} />
+            <EditableStatusChip
+              status={asset.status}
+              canEdit={canEdit}
+              onChange={(v) => onQuickUpdate!('status', v)}
+            />
             {inWarranty !== null && (
               <Chip
                 label={inWarranty ? 'ในประกัน' : 'หมดประกันแล้ว'}
@@ -128,12 +163,30 @@ export function AssetOverviewCard({ asset }: { asset: any }) {
         mt: 2.5,
       }}>
         <Fact label="Serial Number" value={asset.serialNo} mono />
-        <Fact label="ผู้ครอบครอง" value={asset.ownerName} />
-        <Fact label="แผนก" value={asset.departmentId} />
-        <Fact
+        <EditableFact
+          label="ผู้ครอบครอง"
+          value={asset.ownerName}
+          canEdit={canEdit}
+          onChange={(v) => onQuickUpdate!('ownerName', v)}
+          searchFn={searchOwners}
+          placeholderEmpty="ไม่มีผู้ครอบครอง"
+        />
+        <EditableFact
+          label="แผนก"
+          value={asset.departmentId}
+          canEdit={canEdit}
+          onChange={(v) => onQuickUpdate!('departmentId', v)}
+          options={departmentSelectOptions}
+          required
+        />
+        <EditableFact
           label="สถานที่"
           value={asset.location}
           sub={asset.floor ? `ชั้น ${asset.floor}` : null}
+          canEdit={canEdit}
+          onChange={(v) => onQuickUpdate!('location', v)}
+          options={locationSelectOptions}
+          placeholderEmpty="ไม่ระบุสถานที่"
         />
         <Fact
           label="วันลงทะเบียน"

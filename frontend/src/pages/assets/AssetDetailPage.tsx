@@ -35,6 +35,27 @@ import { AssetServiceHistoryCard } from './components/AssetServiceHistoryCard';
 import { AssetDocumentsRail } from './components/AssetDocumentsRail';
 import { PillTabBar } from '../../components/PillTabBar';
 
+// Fields the inline-edit chips are allowed to resend on a quick-update PUT —
+// the backend's PUT /assets/:id validates the "required" set (assetName/
+// type/brand/serialNo/departmentId) on every request, even ones only meant
+// to touch one field, so a quick-update payload has to carry the asset's
+// current value for everything else in this list too. Mirrors the backend's
+// own ALLOWED_ASSET_FIELDS (assets.ts) minus id/createdAt/updatedAt/age
+// (never resent) and the *RefId/assignedToUserId FK columns — those are
+// deliberately left out of the payload so the backend's own resolver reruns
+// off whichever free-text field changed; resending a stale FK would suppress
+// that resolution and leave it pointed at the previous owner/department/location.
+const ASSET_WRITABLE_FIELDS = [
+  'assetCode', 'assetName', 'serialNo', 'type', 'brand', 'model', 'cpu', 'ram',
+  'osVersion', 'windowsLicense', 'officeLicense', 'antivirusStatus', 'vendor',
+  'poNumber', 'prNumber', 'purchaseDate', 'purchasePrice', 'warrantyEndDate', 'ownerName', 'departmentId',
+  'location', 'status', 'remark', 'company', 'cpuGeneration', 'domainName',
+  'floor', 'poDate', 'ramDetail', 'gpu', 'osType', 'ramSlot1', 'ramSlot2',
+  'snComputer', 'storage1', 'storage2',
+  'oldAssetCode', 'accountingCode', 'budget', 'image', 'categoryId',
+  'memoryType', 'ramOnboard', 'ramType', 'ramSpeed', 'ramMaxSupported', 'ramAvailableSlots', 'ramUpgradeable',
+] as const;
+
 const TABS = [
   { value: 'overview', label: 'ภาพรวม' },
   { value: 'spec', label: 'สเปก & ซอฟต์แวร์' },
@@ -218,6 +239,22 @@ export default function AssetDetailPage() {
 
   const reloadAsset = () => assetAPI.get(parseInt(id!)).then(res => setAsset(res.data));
 
+  // One field at a time from a header/Fact chip (see EditableAssetFields).
+  // Reloads via GET afterward rather than trusting the PUT response directly
+  // — the PUT handler returns the bare `prisma.asset.update()` row with none
+  // of the relations (category/assetHistory/pmRuns/documents) the GET
+  // include pulls in, and several cards on this page read those.
+  const handleQuickUpdate = async (field: string, value: string) => {
+    if (!id || !asset) return;
+    const payload: Record<string, any> = {};
+    for (const key of ASSET_WRITABLE_FIELDS) {
+      if (asset[key] !== undefined) payload[key] = asset[key];
+    }
+    payload[field] = value;
+    await assetAPI.update(parseInt(id), payload);
+    await reloadAsset();
+  };
+
   const goRepairs = () => {
     setActiveTab('repairs');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -276,14 +313,17 @@ export default function AssetDetailPage() {
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', flexDirection: { xs: 'column', lg: 'row' } }}>
           {/* ── Main column ─────────────────────────────────── */}
           <Box sx={{ flex: 1, minWidth: 0, width: '100%', display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <AssetOverviewCard asset={asset} />
+            <AssetOverviewCard asset={asset} onQuickUpdate={handleQuickUpdate} />
 
             {/* Spec beside finance, as in the handoff. auto-fit keeps them side
                 by side when there's room and stacks them when there isn't —
-                including when AssetFinanceCard hides itself for want of data. */}
+                including when AssetFinanceCard hides itself for want of data.
+                Live agent health moved to the context rail (below) — it's a
+                "does this need attention" signal, not a spec, so it belongs
+                with the rest of the at-a-glance sidebar, not buried a scroll
+                down in the main column. */}
             <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 2, alignItems: 'stretch' }}>
               <AssetSpecMiniCard asset={asset} glpiSpec={glpiSpec} />
-              <AssetLiveStatusCard loading={loadingExternalAgent} agent={externalAgent} />
               <AssetFinanceCard asset={asset} />
             </Box>
 
@@ -305,6 +345,9 @@ export default function AssetDetailPage() {
             flexDirection: 'column',
             gap: 2,
           }}>
+            {/* Leads the rail — "does this machine need attention right now"
+                outranks history/documents/actions in a person's scan order. */}
+            <AssetLiveStatusCard loading={loadingExternalAgent} agent={externalAgent} />
             <AssetTimeline asset={asset} maintenance={maintenance} />
             <AssetDocumentsRail asset={asset} onReload={reloadAsset} />
             <AssetActionsPanel
