@@ -669,18 +669,80 @@ export default function PMRunPage() {
     }
   };
 
+  // Merge detected monitors into the "ตรวจสอบจอ Monitor" device list.
+  //
+  // Shared by the GLPI and Agent paths: both end up filling the same checklist
+  // item, and the merge has to behave identically either way. Serial number is
+  // the key, so pressing a button twice — or pressing it after the technician
+  // already typed a monitor in by hand — never duplicates or wipes their work.
+  // Returns how many rows were actually added, for the toast to be honest.
+  const mergeMonitorsIntoAnswers = (target: Record<string, any>, devices: any[]): number => {
+    if (!devices.length || !pmModal.run) return 0;
+    const monitorItem = getChecklistItems(pmModal.run).find(
+      (item: any) => (item.type || '').toLowerCase() === 'monitor_array'
+    );
+    if (!monitorItem) return 0;
+
+    let existingDevices: any[] = [];
+    const rawExisting = target[monitorItem.key];
+    if (rawExisting && rawExisting !== 'no') {
+      try {
+        const parsed = JSON.parse(rawExisting);
+        if (Array.isArray(parsed)) existingDevices = parsed;
+      } catch { /* start fresh if it wasn't valid device JSON */ }
+    }
+
+    const existingSerials = new Set(
+      existingDevices.map((d) => (d.serialNo || '').trim().toLowerCase()).filter(Boolean)
+    );
+    const fresh = devices.filter(
+      (d) => !d.serialNo || !existingSerials.has(String(d.serialNo).trim().toLowerCase())
+    );
+    if (!fresh.length) return 0;
+
+    target[monitorItem.key] = JSON.stringify([...existingDevices, ...fresh]);
+    return fresh.length;
+  };
+
   // เติมเฉพาะข้อที่ Agent ตอบได้ พร้อมหมายเหตุที่บอกว่าตอบจากอะไร ช่างแก้ทับได้
   // เสมอ — ข้อที่ต้องเดินไปดู (ทำความสะอาด UPS สภาพเครื่อง) ไม่ถูกแตะ
   const applyAgentAnswers = () => {
-    if (!agentCheck?.answers?.length) return;
+    const answerCount = agentCheck?.answers?.length || 0;
+    const monitors = agentCheck?.monitors || [];
+    if (!answerCount && !monitors.length) return;
+
     const next = { ...answers };
-    for (const a of agentCheck.answers) {
+    for (const a of (agentCheck.answers || [])) {
       next[a.key] = a.value;
       if (a.note) next[`${a.key}_note`] = a.note;
     }
+
+    // Agent มองไม่เห็นขนาดจอ (นิ้ว) และลำโพงในตัว จึงไม่ส่ง screenSize/ports/
+    // hasSpeaker มาเลย — ถ้าส่งมาแม้แต่ตัวเดียว ฝั่งบันทึกจะ upsert MonitorDetail
+    // แล้วเขียนอีกสองช่องที่เหลือเป็น null ทับของเดิมที่เคยกรอกไว้
+    const added = mergeMonitorsIntoAnswers(next, monitors.map((m: any) => ({
+      _assetId: m._assetId || undefined,
+      assetCode: m._assetId ? (m.assetCode || '') : undefined,
+      hasMonitor: true,
+      company: m.company || pmModal.run?.asset?.company || '',
+      brand: m.brand || '',
+      model: m.model || '',
+      serialNo: m.serial || '',
+      source: 'agent',
+      connectedPort: m.connectedPort || null,
+      year: m.year || null,
+    })));
+
     setAnswers(next);
     setAgentApplied(true);
-    showToast(`✅ เติมคำตอบจาก Agent ${agentCheck.answers.length} ข้อแล้ว — ตรวจทานได้ก่อนบันทึก`);
+    const parts = [
+      answerCount ? `คำตอบ ${answerCount} ข้อ` : '',
+      added ? `จอ ${added} ตัว` : '',
+    ].filter(Boolean);
+    // กดซ้ำแล้วจอที่ Agent เห็นอยู่ในฟอร์มครบแล้ว — บอกตามจริงดีกว่าขึ้นว่าเติมสำเร็จ
+    showToast(parts.length
+      ? `✅ เติม${parts.join(' และ ')}จาก Agent แล้ว — ตรวจทานได้ก่อนบันทึก`
+      : 'ℹ️ ข้อมูลจาก Agent อยู่ในแบบฟอร์มครบแล้ว ไม่มีอะไรต้องเติมเพิ่ม');
   };
 
   // Applies the previously-fetched GLPI spec into the checklist answers.
@@ -705,54 +767,26 @@ export default function PMRunPage() {
 
     // Pre-fill the "ตรวจสอบจอ Monitor" device list from what GLPI saw
     // connected, so the technician only has to verify/correct it instead of
-    // typing brand/model/S/N by hand. Existing entries are kept — GLPI
-    // monitors are merged in by serial number so re-applying (or applying
-    // after the technician already typed something) never wipes their work.
-    if (glpiSpec.monitors && glpiSpec.monitors.length > 0 && pmModal.run) {
-      const monitorItem = getChecklistItems(pmModal.run).find(
-        (item: any) => (item.type || '').toLowerCase() === 'monitor_array'
-      );
-      if (monitorItem) {
-        let existingDevices: any[] = [];
-        const rawExisting = newAnswers[monitorItem.key];
-        if (rawExisting && rawExisting !== 'no') {
-          try {
-            const parsed = JSON.parse(rawExisting);
-            if (Array.isArray(parsed)) existingDevices = parsed;
-          } catch { /* start fresh if it wasn't valid device JSON */ }
-        }
-
-        const existingSerials = new Set(
-          existingDevices.map((d) => (d.serialNo || '').trim().toLowerCase()).filter(Boolean)
-        );
-
-        const glpiDevices = glpiSpec.monitors
-          .filter((m: any) => !m.serial || !existingSerials.has(String(m.serial).trim().toLowerCase()))
-          .map((m: any) => ({
-            _assetId: m._assetId || undefined,
-            // assetCode มาเป็นรหัสจริงของระเบียนแล้ว (หรือ null ถ้ายังไม่มี)
-            // ไม่ใช่สตริง `ชื่อ / รหัส` ที่เคยพ่วงคำว่า null ติดมาอีกต่อไป
-            // จอที่ยังไม่อยู่ในทะเบียนต้องเป็น undefined เพื่อให้ช่องโชว์รหัส
-            // ที่ระบบเจนให้แทน
-            assetCode: m._assetId ? (m.assetCode || '') : undefined,
-            hasMonitor: true,
-            // บริษัทของเครื่องที่กำลังทำ PM คือคำตอบที่ถูกเสมอสำหรับจอที่ยังไม่มี
-            // ในทะเบียน — GLPI บอกบริษัทไม่ได้ ส่วนจอที่มีแล้วจะติดบริษัทของตัวเองมา
-            company: m.company || pmModal.run.asset?.company || '',
-            brand: m.brand || '',
-            model: m.model || '',
-            serialNo: m.serial || '',
-            source: 'glpi',
-            screenSize: m.screenSize || null,
-            ports: m.ports || null,
-            hasSpeaker: !!m.hasSpeaker,
-          }));
-
-        if (glpiDevices.length > 0) {
-          newAnswers[monitorItem.key] = JSON.stringify([...existingDevices, ...glpiDevices]);
-        }
-      }
-    }
+    // typing brand/model/S/N by hand.
+    mergeMonitorsIntoAnswers(newAnswers, (glpiSpec.monitors || []).map((m: any) => ({
+      _assetId: m._assetId || undefined,
+      // assetCode มาเป็นรหัสจริงของระเบียนแล้ว (หรือ null ถ้ายังไม่มี)
+      // ไม่ใช่สตริง `ชื่อ / รหัส` ที่เคยพ่วงคำว่า null ติดมาอีกต่อไป
+      // จอที่ยังไม่อยู่ในทะเบียนต้องเป็น undefined เพื่อให้ช่องโชว์รหัส
+      // ที่ระบบเจนให้แทน
+      assetCode: m._assetId ? (m.assetCode || '') : undefined,
+      hasMonitor: true,
+      // บริษัทของเครื่องที่กำลังทำ PM คือคำตอบที่ถูกเสมอสำหรับจอที่ยังไม่มี
+      // ในทะเบียน — GLPI บอกบริษัทไม่ได้ ส่วนจอที่มีแล้วจะติดบริษัทของตัวเองมา
+      company: m.company || pmModal.run?.asset?.company || '',
+      brand: m.brand || '',
+      model: m.model || '',
+      serialNo: m.serial || '',
+      source: 'glpi',
+      screenSize: m.screenSize || null,
+      ports: m.ports || null,
+      hasSpeaker: !!m.hasSpeaker,
+    })));
 
     setAnswers(newAnswers);
     setGlpiSpecApplied(true);
@@ -1509,11 +1543,14 @@ export default function PMRunPage() {
                         </Typography>
                       )}
                       <Box sx={{ flex: 1 }} />
-                      {agentCheck.available && agentCheck.answers?.length > 0 && !isReadOnly && (
+                      {agentCheck.available && ((agentCheck.answers?.length > 0) || (agentCheck.monitors?.length > 0)) && !isReadOnly && (
                         <Button size="small" variant={agentApplied ? 'outlined' : 'contained'} color="secondary"
                           onClick={applyAgentAnswers}
                           sx={{ fontSize: 10.5, py: 0.25, textTransform: 'none' }}>
-                          {agentApplied ? `เติมแล้ว (กดซ้ำได้)` : `เติมคำตอบ ${agentCheck.answers.length} ข้อ`}
+                          {agentApplied ? `เติมแล้ว (กดซ้ำได้)` : `เติม${[
+                            agentCheck.answers?.length ? `คำตอบ ${agentCheck.answers.length} ข้อ` : '',
+                            agentCheck.monitors?.length ? `จอ ${agentCheck.monitors.length} ตัว` : '',
+                          ].filter(Boolean).join(' + ')}`}
                         </Button>
                       )}
                     </Box>
@@ -1545,6 +1582,31 @@ export default function PMRunPage() {
                               </Box>
                             );
                           })}
+
+                          {/* จอที่ต่ออยู่: เติมลงฟอร์มได้ ต่างจากเครื่องพิมพ์ เพราะจอ
+                              ผูกกับเครื่องตัวเดียวและมี Serial ของตัวเองให้จับคู่ทะเบียน */}
+                          {agentCheck.monitors?.length > 0 && (
+                            <Box sx={{ mt: 0.75, pt: 0.75, borderTop: '1px dashed', borderColor: 'divider' }}>
+                              <Typography sx={{ fontSize: 10.5, color: 'text.secondary', mb: 0.5 }}>
+                                🖥️ จอที่ต่ออยู่ {agentCheck.monitors.length} ตัว
+                              </Typography>
+                              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                                {agentCheck.monitors.map((m: any, idx: number) => (
+                                  <Chip
+                                    key={idx}
+                                    size="small"
+                                    icon={<MonitorIcon />}
+                                    variant={m._assetId ? 'filled' : 'outlined'}
+                                    color={m._assetId ? 'default' : 'warning'}
+                                    label={`${[m.brand, m.model].filter(Boolean).join(' ') || 'ไม่ทราบรุ่น'}${
+                                      m.serial ? ` (S/N: ${m.serial})` : ' (ไม่มี S/N)'
+                                    }${m._assetId ? ` · ${m.assetCode || 'อยู่ในทะเบียน'}` : ' · ยังไม่มีในทะเบียน'}`}
+                                    sx={{ fontSize: 10 }}
+                                  />
+                                ))}
+                              </Box>
+                            </Box>
+                          )}
 
                           {/* เครื่องพิมพ์: โชว์เฉย ๆ ไม่เติมลงฟอร์ม เพราะตัวที่ใช้ร่วมกัน
                               ทั้งออฟฟิศจะกลายเป็นทรัพย์สินซ้ำบนทุกเครื่องที่ map ไว้ */}

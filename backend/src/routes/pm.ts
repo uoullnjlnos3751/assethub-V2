@@ -8,6 +8,7 @@ import { fetchGLPISpecBySerial } from '../services/glpi';
 import { nextDeviceCode, resolveDevicePrefix } from '../services/deviceCode';
 import { fetchAgentRecord, fetchAllAgentRecords } from '../services/externalAgent';
 import { buildAgentPmCheck } from '../services/agentPmCheck';
+import { buildAgentPmMonitors } from '../services/agentMonitors';
 import { buildProcurementReport } from '../services/pmProcurement';
 import { getCategoryIdByAssetType } from './assets';
 import * as fs from 'fs';
@@ -1176,7 +1177,7 @@ router.get('/runs/:id/agent-check', authenticate, authorize('IT_ADMIN', 'SUPERAD
   try {
     const run = await prisma.pMRun.findUnique({
       where: { id: parseInt(req.params.id) },
-      include: { asset: { select: { assetName: true, serialNo: true, snComputer: true } } },
+      include: { asset: { select: { assetName: true, serialNo: true, snComputer: true, company: true } } },
     });
     if (!run) throw new AppError('ไม่พบรายการ PM', 404);
     const asset = run.asset;
@@ -1195,7 +1196,11 @@ router.get('/runs/:id/agent-check', authenticate, authorize('IT_ADMIN', 'SUPERAD
       }
     }
 
-    res.json(buildAgentPmCheck(record));
+    // จอที่ต่ออยู่แยกออกมาจาก buildAgentPmCheck เพราะต้องอ่านทะเบียนเพื่อจับคู่
+    // ด้วย Serial ส่วนตัว buildAgentPmCheck ตั้งใจให้เป็นฟังก์ชันบริสุทธิ์ที่ไม่แตะ
+    // ฐานข้อมูล — รูปแบบที่ส่งออกไปตรงกับที่ฝั่ง GLPI ส่ง ฟอร์มจึงใช้ตัวเดิมรับได้
+    const monitors = record ? await buildAgentPmMonitors(prisma, record, asset.company) : [];
+    res.json({ ...buildAgentPmCheck(record), monitors });
   } catch (err) { next(err); }
 });
 

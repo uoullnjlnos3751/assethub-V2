@@ -26,10 +26,15 @@ interface PMDeviceData {
   serialNo: string;
   printerType?: string;
   photoFilename?: string;
-  source?: 'glpi' | 'itam' | 'history';
+  source?: 'glpi' | 'itam' | 'history' | 'agent';
   screenSize?: string | null;
   ports?: string | null;
   hasSpeaker?: boolean;
+  /** จาก Agent เท่านั้น: พอร์ตที่เสียบอยู่จริงตอนนี้ คนละความหมายกับ `ports`
+   *  ที่เป็นรายการพอร์ตทั้งหมดที่จอตัวนั้นมี (GLPI) */
+  connectedPort?: string | null;
+  /** ปีที่ผลิตจาก EDID — GLPI ไม่มีข้อมูลนี้ */
+  year?: number | null;
 }
 
 interface PMDeviceArrayInputProps {
@@ -45,10 +50,11 @@ const PRINTER_BRANDS = ['HP', 'Epson', 'Canon', 'Brother', 'FujiXerox', 'Ricoh',
 const PRINTER_TYPES = ['Laser', 'Inkjet', 'Dot Matrix', 'Thermal', 'Label', 'Other'];
 const DEFAULT_COMPANIES = ['TRRHQ', 'TRR', 'TRRCORP', 'TRRT', 'PS', 'SSEC', 'TMI', 'TRM', 'TRRL', 'TRRP', 'TRW', 'TEG', 'TRRSK'];
 
-const SOURCE_META: Record<string, { label: string; colorKey: 'success' | 'info' | 'warning' }> = {
+const SOURCE_META: Record<string, { label: string; colorKey: 'success' | 'info' | 'warning' | 'secondary' }> = {
   glpi: { label: '🟢 จาก GLPI API', colorKey: 'success' },
   itam: { label: '🔵 จาก ITAM DB (คลัง)', colorKey: 'info' },
   history: { label: '🟡 จากประวัติ PM', colorKey: 'warning' },
+  agent: { label: '🤖 จาก Agent', colorKey: 'secondary' },
 };
 
 export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, value, onChange, parentAsset, readOnly = false }) => {
@@ -528,8 +534,8 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
                     <Box component="strong" sx={{ color: theme.palette.text.primary }}>แผนก:</Box> {parentAsset?.departmentId || '-'}
                   </Box>
 
-                  {/* Monitor Specs from GLPI / DB if present */}
-                  {!isPrinter && (d.screenSize || d.ports || d.hasSpeaker) && (
+                  {/* Monitor Specs from GLPI / DB / Agent if present */}
+                  {!isPrinter && (d.screenSize || d.ports || d.hasSpeaker || d.connectedPort || d.year) && (
                     <Box sx={{
                       bgcolor: alpha(theme.palette.info.main, 0.08),
                       border: `1px solid ${alpha(theme.palette.info.main, 0.25)}`,
@@ -538,6 +544,10 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
                       <Box component="strong">🖥️ สเปคจอ:</Box>{' '}
                       {d.screenSize && <Box component="span" sx={{ mr: 1 }}>📐 ขนาด {d.screenSize}</Box>}
                       {d.ports && <Box component="span" sx={{ mr: 1 }}>🔌 พอร์ต: {d.ports}</Box>}
+                      {/* Agent บอกได้แค่พอร์ตที่เสียบอยู่ ไม่ใช่พอร์ตที่จอมีทั้งหมด
+                          จึงเขียนแยกให้ชัด ไม่ปนกับ 'พอร์ต' ด้านบน */}
+                      {d.connectedPort && <Box component="span" sx={{ mr: 1 }}>🔌 เสียบผ่าน {d.connectedPort}</Box>}
+                      {d.year && <Box component="span" sx={{ mr: 1 }}>📅 ผลิตปี {d.year}</Box>}
                       {d.hasSpeaker && <Box component="span">🔊 มีลำโพงในตัว</Box>}
                     </Box>
                   )}
