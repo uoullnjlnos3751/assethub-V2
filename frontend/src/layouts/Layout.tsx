@@ -98,15 +98,11 @@ export default function Layout() {
   const { askAI } = useChatbotContext();
   const navigate = useNavigate();
   const location = useLocation();
-  const currentDrawerWidth = RAIL_WIDTH + (railPinned ? FLYOUT_WIDTH : 0);
-
-  const togglePin = () => {
-    setRailPinned(prev => {
-      const next = !prev;
-      localStorage.setItem('railPinned', next ? '1' : '0');
-      return next;
-    });
-  };
+  // Only reserve the flyout's width when one will actually render — pinned
+  // alone isn't enough; a route with no matching rail module (e.g. /profile)
+  // leaves openRailId null, and reserving the width anyway left a blank
+  // 216px gutter with no menu visible in it.
+  const currentDrawerWidth = RAIL_WIDTH + (railPinned && openRailId ? FLYOUT_WIDTH : 0);
 
   // Live clock — matches the mockup's "ระบบออนไลน์ HH:MM:SS" topbar indicator
   useEffect(() => {
@@ -214,11 +210,30 @@ export default function Layout() {
     return best ? (best as { id: string }).id : null;
   }, [railModules, location.pathname, location.search]);
 
-  // Pinned rail always shows the open page's module; unpinned starts closed and
-  // the flyout is dismissed on navigation.
+  // Syncs the open flyout to whichever module owns the page — but only on an
+  // actual navigation, not merely because railPinned changed. railPinned is
+  // deliberately read via a ref instead of a dependency: a pin/unpin click
+  // fires this same render, and if it re-triggered this sync it would either
+  // slam shut a flyout the user just tried to pin, or jump a floating flyout
+  // the user was peeking at over to whatever module the current *route*
+  // owns — see togglePin below for what SHOULD happen on a pin toggle.
+  const railPinnedRef = useRef(railPinned);
+  useEffect(() => { railPinnedRef.current = railPinned; }, [railPinned]);
   useEffect(() => {
-    setOpenRailId(railPinned ? routeRailId : null);
-  }, [railPinned, routeRailId, location.pathname, location.search]);
+    setOpenRailId(railPinnedRef.current ? routeRailId : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeRailId, location.pathname, location.search]);
+
+  const togglePin = () => {
+    const next = !railPinned;
+    localStorage.setItem('railPinned', next ? '1' : '0');
+    setRailPinned(next);
+    // Pinning with nothing open yet docks to the current page's module (the
+    // sensible default for a freshly-docked rail). Unpinning leaves whatever
+    // is currently open alone — it becomes floating instead of docked,
+    // rather than vanishing.
+    if (next && openRailId === null) setOpenRailId(routeRailId);
+  };
 
   const handleRailOpen = (id: string) => {
     const mod = railModules.find(m => m.id === id);
