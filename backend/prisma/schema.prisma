@@ -22,6 +22,11 @@ model AppUser {
   authType           AuthType            @default(AD)
   passwordHash       String?
   lastLoginAt        DateTime?
+  // หัวหน้างานโดยตรง — ใช้กำหนดว่าใครต้องอนุมัติคำขอยืมของ user นี้ก่อนถึง IT Admin
+  // (มอบหมายมือโดย SUPERADMIN ผ่านหน้าจัดการผู้ใช้ ยังไม่มีการซิงก์จาก AD)
+  managerId          Int?
+  manager            AppUser?            @relation("ManagerHierarchy", fields: [managerId], references: [id], onDelete: SetNull)
+  directReports      AppUser[]           @relation("ManagerHierarchy")
   // บันทึกไว้ตอนล็อกอินสำเร็จ — ก่อนหน้านี้ระบบไม่เก็บอะไรเกี่ยวกับเครื่องเลย
   // จึงตอบไม่ได้ว่าใครเข้าใช้งานจากที่ไหน ทั้งที่ nginx ส่ง X-Real-IP มาให้อยู่แล้ว
   lastLoginIp        String?
@@ -51,6 +56,7 @@ model AppUser {
 
   @@index([role, isActive])
   @@index([department])
+  @@index([managerId])
   @@map("app_users")
 }
 
@@ -703,14 +709,15 @@ model BorrowRequestItem {
 }
 
 model BorrowApproval {
-  id             Int           @id @default(autoincrement())
+  id             Int            @id @default(autoincrement())
   requestId      Int
   approverUserId Int
   action         String
   note           String?
-  actedAt        DateTime      @default(now())
-  approver       AppUser       @relation(fields: [approverUserId], references: [id])
-  request        BorrowRequest @relation(fields: [requestId], references: [id])
+  stage          ApprovalStage  @default(ITAdmin)
+  actedAt        DateTime       @default(now())
+  approver       AppUser        @relation(fields: [approverUserId], references: [id])
+  request        BorrowRequest  @relation(fields: [requestId], references: [id])
 
   @@map("borrow_approvals")
 }
@@ -1021,7 +1028,7 @@ model NotificationSetting {
   enableEmail      Boolean @default(true)
   enableTeams      Boolean @default(false)
   teamsWebhookUrl  String?
-  enabledEventKeys String  @default("borrow_request_pending,borrow_approved,borrow_rejected,checkout_completed,return_recorded,overdue_borrow,extension_pending,extension_approved,extension_rejected,pm_overdue")
+  enabledEventKeys String  @default("borrow_pending_supervisor,borrow_supervisor_approved,borrow_rejected_by_supervisor,borrow_request_pending,borrow_approved,borrow_rejected,checkout_completed,return_recorded,overdue_borrow,extension_pending,extension_approved,extension_rejected,pm_overdue")
 
   // SMTP (can override env vars)
   smtpHost      String?
@@ -1275,6 +1282,7 @@ enum BorrowItemStatus {
 }
 
 enum BorrowRequestStatus {
+  PendingSupervisor
   Pending
   Approved
   Rejected
@@ -1282,6 +1290,11 @@ enum BorrowRequestStatus {
   PartiallyReturned
   Returned
   Cancelled
+}
+
+enum ApprovalStage {
+  Supervisor
+  ITAdmin
 }
 
 enum ExtensionStatus {

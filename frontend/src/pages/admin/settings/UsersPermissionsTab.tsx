@@ -6,7 +6,7 @@ import {
   List, ListItem, ListItemButton, ListItemText, Divider, Tooltip,
   alpha, useTheme,
 } from '@mui/material';
-import { Users, Shield, ServerCog, Search, Download, Settings2, UserPlus, KeyRound, Trash2, Ban, CheckCircle2 } from 'lucide-react';
+import { Users, Shield, ServerCog, Search, Download, Settings2, UserPlus, KeyRound, Trash2, Ban, CheckCircle2, UserCog } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import debounce from 'lodash/debounce';
 import { adminAPI } from '../../../services/api';
@@ -24,6 +24,8 @@ interface AppUser {
   isActive: boolean;
   authType: string;
   lastLoginAt?: string | null;
+  managerId?: number | null;
+  manager?: { id: number; displayName?: string | null; adUsername: string } | null;
 }
 
 const CANONICAL_ROLES = [
@@ -58,6 +60,8 @@ export default function UsersPermissionsTab() {
 
   const [roleDialog, setRoleDialog] = useState<{ open: boolean; user: AppUser | null }>({ open: false, user: null });
   const [newRole, setNewRole] = useState('');
+  const [managerDialog, setManagerDialog] = useState<{ open: boolean; user: AppUser | null }>({ open: false, user: null });
+  const [selectedManagerId, setSelectedManagerId] = useState<number | ''>('');
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ msg: string; severity: 'success' | 'error' } | null>(null);
 
@@ -111,6 +115,23 @@ export default function UsersPermissionsTab() {
   }, [users, search, roleFilter, deptFilter, statusFilter]);
 
   const handleOpenRoleDialog = (u: AppUser) => { setRoleDialog({ open: true, user: u }); setNewRole(u.role); };
+
+  const handleOpenManagerDialog = (u: AppUser) => { setManagerDialog({ open: true, user: u }); setSelectedManagerId(u.managerId ?? ''); };
+
+  const handleUpdateManager = async () => {
+    if (!managerDialog.user) return;
+    setSaving(true);
+    try {
+      await adminAPI.updateManager(managerDialog.user.id, selectedManagerId === '' ? null : Number(selectedManagerId));
+      setManagerDialog({ open: false, user: null });
+      setToast({ msg: `ตั้งหัวหน้างานของ ${managerDialog.user.displayName || managerDialog.user.adUsername} เรียบร้อยแล้ว`, severity: 'success' });
+      fetchUsers();
+    } catch (err: any) {
+      setToast({ msg: err.response?.data?.error || 'เกิดข้อผิดพลาด', severity: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleUpdateRole = async () => {
     if (!roleDialog.user) return;
@@ -377,6 +398,7 @@ export default function UsersPermissionsTab() {
                   <TableCell>แผนก</TableCell>
                   <TableCell>บริษัท</TableCell>
                   <TableCell>บทบาท</TableCell>
+                  <TableCell>หัวหน้างาน</TableCell>
                   <TableCell>ที่มา</TableCell>
                   <TableCell>เข้าใช้ล่าสุด</TableCell>
                   <TableCell align="center">สถานะ</TableCell>
@@ -403,6 +425,9 @@ export default function UsersPermissionsTab() {
                       <Chip size="small" label={u.role} sx={{ fontSize: '0.65rem', fontFamily: 'monospace' }} />
                     </TableCell>
                     <TableCell>
+                      <Typography sx={{ fontSize: '0.72rem' }}>{u.manager?.displayName || u.manager?.adUsername || '—'}</Typography>
+                    </TableCell>
+                    <TableCell>
                       <Typography sx={{ fontSize: '0.7rem', color: theme.palette.text.secondary }}>
                         {u.authType === 'AD' ? '🔒 จาก AD' : 'Local'}
                       </Typography>
@@ -424,6 +449,11 @@ export default function UsersPermissionsTab() {
                         <Tooltip title="ตั้งค่าสิทธิ์">
                           <IconButton size="small" onClick={() => handleOpenRoleDialog(u)} sx={{ color: 'text.secondary' }}>
                             <Settings2 size={15} />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="ตั้งหัวหน้างาน (สำหรับอนุมัติคำขอยืม)">
+                          <IconButton size="small" onClick={() => handleOpenManagerDialog(u)} sx={{ color: 'text.secondary' }}>
+                            <UserCog size={15} />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title={u.authType === 'LOCAL' ? 'เปลี่ยนรหัสผ่าน' : 'ตั้งรหัสผ่าน Local'}>
@@ -475,6 +505,42 @@ export default function UsersPermissionsTab() {
           <Button onClick={() => setRoleDialog({ open: false, user: null })} sx={{ borderRadius: '8px', textTransform: 'none' }}>ยกเลิก</Button>
           <Button
             variant="contained" onClick={handleUpdateRole} disabled={saving}
+            startIcon={saving ? <CircularProgress size={14} color="inherit" /> : undefined}
+            sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 600 }}
+          >
+            บันทึก
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Manager assignment dialog — drives the borrow-approval supervisor stage */}
+      <Dialog open={managerDialog.open} onClose={() => setManagerDialog({ open: false, user: null })} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: '12px' } }}>
+        <DialogTitle sx={{ fontWeight: 700, fontSize: '1rem' }}>
+          ตั้งหัวหน้างาน: {managerDialog.user?.displayName || managerDialog.user?.adUsername}
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontSize: '0.75rem', color: theme.palette.text.secondary, mb: 2 }}>
+            คำขอยืมทรัพย์สินของผู้ใช้นี้จะต้องผ่านการอนุมัติจากหัวหน้างานที่เลือกไว้ก่อน จึงจะเข้าคิวให้ IT Admin จ่ายของ
+            ถ้าไม่ตั้งหัวหน้างาน คำขอจะเข้าคิว IT Admin ทันทีเหมือนเดิม
+          </Typography>
+          <FormControl fullWidth>
+            <InputLabel>หัวหน้างาน</InputLabel>
+            <Select
+              value={selectedManagerId}
+              label="หัวหน้างาน"
+              onChange={e => setSelectedManagerId(e.target.value === '' ? '' : Number(e.target.value))}
+            >
+              <MenuItem value="">— ไม่มี (เข้าคิว IT Admin ทันที) —</MenuItem>
+              {users.filter(u => u.id !== managerDialog.user?.id).map(u => (
+                <MenuItem key={u.id} value={u.id}>{u.displayName || u.adUsername} ({u.adUsername})</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setManagerDialog({ open: false, user: null })} sx={{ borderRadius: '8px', textTransform: 'none' }}>ยกเลิก</Button>
+          <Button
+            variant="contained" onClick={handleUpdateManager} disabled={saving}
             startIcon={saving ? <CircularProgress size={14} color="inherit" /> : undefined}
             sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 600 }}
           >

@@ -160,6 +160,13 @@ router.post('/requests', authenticate, validate(borrowRequestSchema), async (req
 
     const user = await prisma.appUser.findUnique({ where: { id: req.user!.userId } });
 
+    // มีหัวหน้างานผูกไว้ (managerId) -> ต้องรอหัวหน้าอนุมัติก่อน ถึงจะเด้งไปหา IT Admin
+    // ไม่มีหัวหน้างานผูกไว้ -> ข้ามขั้นนี้ไปเข้าคิว IT Admin เหมือนพฤติกรรมเดิมทุกประการ
+    const manager = user?.managerId
+      ? await prisma.appUser.findUnique({ where: { id: user.managerId } })
+      : null;
+    const initialStatus: 'PendingSupervisor' | 'Pending' = manager ? 'PendingSupervisor' : 'Pending';
+
     const request = await prisma.borrowRequest.create({
       data: {
         requestNo: `BR-${Date.now()}`,
@@ -167,7 +174,7 @@ router.post('/requests', authenticate, validate(borrowRequestSchema), async (req
         departmentId: user?.department || '',
         purpose,
         note: notes || null,
-        status: 'Pending',
+        status: initialStatus,
         items: {
           create: [
             ...assets.map((a: any) => ({
@@ -215,18 +222,6 @@ router.post('/requests', authenticate, validate(borrowRequestSchema), async (req
     const borrowDateStr = borrowDate.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
     const dueDateStr = dueDate.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
 
-    // Notify IT Admins
-    const admins = await prisma.appUser.findMany({ where: { role: { in: ['IT_ADMIN', 'SUPERADMIN'] } } });
-    
-    await prisma.appNotification.createMany({
-      data: admins.map(admin => ({
-        userId: admin.id,
-        title: 'คำขอยืมใหม่',
-        message: `คุณ ${user?.displayName || req.user!.adUsername} ได้ส่งคำขอยืมเลขที่ ${request.requestNo}`,
-        type: 'BORROW',
-        link: '/borrow/approval-queue',
-      })),
-    });
     const payload = {
       requestNo: request.requestNo,
       requester: user?.displayName || req.user!.adUsername,
@@ -243,14 +238,43 @@ router.post('/requests', authenticate, validate(borrowRequestSchema), async (req
       itemsTable: '',
       items: itemsPayload,
     };
-    await Promise.all(admins.map(async (admin) => {
-      if (admin.email) {
-        await createNotification('borrow_request_pending', 'EMAIL', admin.email, payload);
+
+    if (initialStatus === 'PendingSupervisor' && manager) {
+      // ขั้นแรก: แจ้งเฉพาะหัวหน้างานของผู้ขอ ยังไม่แจ้ง IT Admin
+      await prisma.appNotification.create({
+        data: {
+          userId: manager.id,
+          title: 'มีคำขอยืมรออนุมัติ',
+          message: `${user?.displayName || req.user!.adUsername} ส่งคำขอยืมเลขที่ ${request.requestNo} รอการอนุมัติจากคุณ`,
+          type: 'BORROW',
+          link: '/borrow/supervisor-queue',
+        },
+      });
+      if (manager.email) {
+        await createNotification('borrow_pending_supervisor', 'EMAIL', manager.email, payload);
       }
-    }));
-    
-    // Notify via LINE Broadcast/Multicast (only once)
-    await createNotification('borrow_request_pending', 'LINE', 'broadcast', payload);
+    } else {
+      // ไม่มีหัวหน้างานผูกไว้ -> แจ้ง IT Admin ตรงเลยเหมือนพฤติกรรมเดิม
+      const admins = await prisma.appUser.findMany({ where: { role: { in: ['IT_ADMIN', 'SUPERADMIN'] } } });
+
+      await prisma.appNotification.createMany({
+        data: admins.map(admin => ({
+          userId: admin.id,
+          title: 'คำขอยืมใหม่',
+          message: `คุณ ${user?.displayName || req.user!.adUsername} ได้ส่งคำขอยืมเลขที่ ${request.requestNo}`,
+          type: 'BORROW',
+          link: '/borrow/approval-queue',
+        })),
+      });
+      await Promise.all(admins.map(async (admin) => {
+        if (admin.email) {
+          await createNotification('borrow_request_pending', 'EMAIL', admin.email, payload);
+        }
+      }));
+
+      // Notify via LINE Broadcast/Multicast (only once)
+      await createNotification('borrow_request_pending', 'LINE', 'broadcast', payload);
+    }
 
     res.status(201).json(request);
   } catch (err) { next(err); }
@@ -332,6 +356,119 @@ router.get('/my-extensions', authenticate, async (req: Request, res: Response, n
   } catch (err) { next(err); }
 });
 
+// ── Supervisor: My team's requests waiting on my approval ──
+// Anyone can be a manager (no dedicated role — managerId on the requester is
+// what grants access), so this only requires being logged in; the where
+// clause itself is the access control.
+router.get('/requests/supervisor-queue', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { page = '1', limit = '20' } = req.query;
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const where = { status: 'PendingSupervisor' as const, requester: { managerId: req.user!.userId } };
+
+    const [data, total] = await Promise.all([
+      prisma.borrowRequest.findMany({
+        where,
+        skip: (pageNum - 1) * limitNum,
+        take: limitNum,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          items: { include: { asset: { include: { category: true } }, inventoryItem: true } },
+          requester: { select: { id: true, displayName: true, adUsername: true, department: true, company: true } },
+        },
+      }),
+      prisma.borrowRequest.count({ where }),
+    ]);
+    res.json({ data, total, page: pageNum, totalPages: Math.ceil(total / limitNum) });
+  } catch (err) { next(err); }
+});
+
+// ── Supervisor: Approve / Reject a direct report's request ──
+router.post('/requests/:id/supervisor-approve', authenticate, validate(approveSchema), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { action, note } = req.body;
+
+    const request = await prisma.borrowRequest.findUnique({
+      where: { id },
+      include: { items: { include: { asset: { include: { category: true } }, inventoryItem: true } }, requester: true },
+    });
+    if (!request) throw new AppError('ไม่พบคำขอ', 404);
+    if (request.status !== 'PendingSupervisor') throw new AppError('คำขอนี้ไม่ได้อยู่ในขั้นรอหัวหน้างานอนุมัติ');
+    if (request.requester.managerId !== req.user!.userId && !['SUPERADMIN'].includes(req.user!.role)) {
+      throw new AppError('ไม่มีสิทธิ์อนุมัติคำขอนี้', 403);
+    }
+
+    const nextStatus = action === 'Approved' ? 'Pending' : 'Rejected';
+
+    await prisma.$transaction(async (tx) => {
+      await tx.borrowApproval.create({
+        data: { requestId: id, approverUserId: req.user!.userId, action, note, stage: 'Supervisor' },
+      });
+      await tx.borrowRequest.update({ where: { id }, data: { status: nextStatus } });
+      if (action === 'Rejected') {
+        await tx.borrowRequestItem.updateMany({ where: { requestId: id }, data: { itemStatus: 'Rejected' } });
+      }
+    });
+
+    if (action === 'Approved') {
+      // เข้าคิว IT Admin ต่อ — แจ้งเตือนแบบเดียวกับตอนสร้างคำขอที่ไม่มีหัวหน้างาน
+      const admins = await prisma.appUser.findMany({ where: { role: { in: ['IT_ADMIN', 'SUPERADMIN'] } } });
+      await prisma.appNotification.createMany({
+        data: admins.map(admin => ({
+          userId: admin.id,
+          title: 'คำขอยืมผ่านการอนุมัติจากหัวหน้างานแล้ว',
+          message: `คำขอยืมเลขที่ ${request.requestNo} ผ่านการอนุมัติจากหัวหน้างานแล้ว รอดำเนินการ`,
+          type: 'BORROW',
+          link: '/borrow/approval-queue',
+        })),
+      });
+      const adminPayload = {
+        requestNo: request.requestNo,
+        requester: request.requester.displayName || request.requester.adUsername,
+        department: request.requester.department || '-',
+        purpose: request.purpose || '-',
+        supervisor: req.user!.displayName || req.user!.adUsername,
+      };
+      await Promise.all(admins.map(async (admin) => {
+        if (admin.email) {
+          await createNotification('borrow_supervisor_approved', 'EMAIL', admin.email, adminPayload);
+        }
+      }));
+    }
+
+    await prisma.appNotification.create({
+      data: {
+        userId: request.requesterUserId,
+        title: action === 'Approved' ? 'หัวหน้างานอนุมัติคำขอยืมแล้ว' : 'คำขอยืมถูกหัวหน้างานปฏิเสธ',
+        message: action === 'Approved'
+          ? `คำขอยืมเลขที่ ${request.requestNo} ผ่านการอนุมัติจากหัวหน้างานแล้ว รอ IT Admin ดำเนินการต่อ`
+          : `คำขอยืมเลขที่ ${request.requestNo} ถูกหัวหน้างานปฏิเสธ${note ? `\nหมายเหตุ: ${note}` : ''}`,
+        type: 'BORROW',
+        link: '/borrow/my-requests',
+      },
+    });
+
+    if (request.requester.email && action === 'Rejected') {
+      await createNotification('borrow_rejected_by_supervisor', 'EMAIL', request.requester.email, {
+        requestNo: request.requestNo,
+        requester: request.requester.displayName || request.requester.adUsername,
+        department: request.requester.department || '-',
+        purpose: request.purpose || '-',
+        note: note || 'ไม่ระบุเหตุผล',
+        supervisor: req.user!.displayName || req.user!.adUsername,
+      });
+    }
+
+    const updated = await prisma.borrowRequest.findUnique({
+      where: { id },
+      include: { items: true, approvals: true, requester: true },
+    });
+    res.json(updated);
+  } catch (err) { next(err); }
+});
+
 // ── IT Admin: Get all requests (approval queue) ──
 router.get('/all-requests', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -379,7 +516,7 @@ router.post('/requests/:id/approve', authenticate, authorize('IT_ADMIN', 'SUPERA
 
     await prisma.$transaction(async (tx) => {
       await tx.borrowApproval.create({
-        data: { requestId: id, approverUserId: req.user!.userId, action, note },
+        data: { requestId: id, approverUserId: req.user!.userId, action, note, stage: 'ITAdmin' },
       });
 
       await tx.borrowRequest.update({
@@ -978,7 +1115,7 @@ router.delete('/requests/:id', authenticate, async (req: Request, res: Response,
     if (request.requesterUserId !== req.user!.userId && !['IT_ADMIN', 'SUPERADMIN'].includes(req.user!.role)) {
       throw new AppError('ไม่มีสิทธิ์ยกเลิกคำขอนี้');
     }
-    if (request.status !== 'Pending') throw new AppError('ไม่สามารถยกเลิกคำขอที่ดำเนินการแล้ว');
+    if (!['Pending', 'PendingSupervisor'].includes(request.status)) throw new AppError('ไม่สามารถยกเลิกคำขอที่ดำเนินการแล้ว');
 
     await prisma.$transaction(async (tx) => {
       await tx.borrowRequestItem.updateMany({

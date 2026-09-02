@@ -42,7 +42,8 @@ export const STATUS_CONFIG: Record<string, StatusConfigEntry> = {
   Lost:        { label: 'สูญหาย',       labelEn: 'Lost',        icon: PackageX,     colorKey: 'error' },
 
   // ── Borrow request statuses ──────────────────────────────────────────────
-  Pending:     { label: 'รออนุมัติ',          labelEn: 'Pending',            icon: Clock,        colorKey: 'warning' },
+  PendingSupervisor: { label: 'รอหัวหน้างานอนุมัติ', labelEn: 'Pending Supervisor', icon: Clock, colorKey: 'warning' },
+  Pending:     { label: 'รอ IT Admin อนุมัติ', labelEn: 'Pending',            icon: Clock,        colorKey: 'warning' },
   Approved:    { label: 'อนุมัติแล้ว',         labelEn: 'Approved',           icon: CheckCircle,  colorKey: 'success' },
   Rejected:    { label: 'ไม่อนุมัติ',          labelEn: 'Rejected',           icon: PackageX,     colorKey: 'error' },
 

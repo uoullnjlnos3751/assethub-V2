@@ -11,6 +11,9 @@ const router = Router();
 
 // Default templates content to restore when requested
 const DEFAULT_TEMPLATES: Record<string, { subjectTh: string, bodyTh: string }> = {
+  borrow_pending_supervisor: { subjectTh: 'มีคำขอยืมรอคุณอนุมัติ', bodyTh: '{{requester}} ส่งคำขอยืมเลขที่ {{requestNo}} รอการอนุมัติจากคุณในฐานะหัวหน้างาน' },
+  borrow_supervisor_approved: { subjectTh: 'คำขอยืมผ่านหัวหน้างานแล้ว รอ IT Admin', bodyTh: 'คำขอเลขที่ {{requestNo}} จาก {{requester}} ผ่านการอนุมัติจากหัวหน้างาน ({{supervisor}}) แล้ว รอ IT Admin ดำเนินการต่อ' },
+  borrow_rejected_by_supervisor: { subjectTh: 'คำขอยืมถูกหัวหน้างานปฏิเสธ', bodyTh: 'คำขอเลขที่ {{requestNo}} ถูกหัวหน้างาน ({{supervisor}}) ปฏิเสธเนื่องจาก {{note}}' },
   borrow_request_pending: { subjectTh: 'คำขอยืมทรัพย์สินใหม่', bodyTh: 'มีคำขอยืมใหม่จาก {{requester}}' },
   borrow_approved: { subjectTh: 'คำขอยืมได้รับการอนุมัติ', bodyTh: 'คำขอเลขที่ {{requestNo}} ได้รับการอนุมัติแล้ว' },
   borrow_rejected: { subjectTh: 'คำขอยืมถูกปฏิเสธ', bodyTh: 'คำขอเลขที่ {{requestNo}} ได้ถูกปฏิเสธเนื่องจาก {{note}}' },
@@ -87,7 +90,7 @@ router.get('/users', authenticate, authorize('SUPERADMIN'), async (req: Request,
         skip: (pageNum - 1) * limitNum,
         take: limitNum,
         orderBy: { createdAt: 'desc' },
-        select: { id: true, adUsername: true, displayName: true, email: true, department: true, company: true, companyThai: true, avatarUrl: true, role: true, isActive: true, authType: true, lastLoginAt: true, createdAt: true },
+        select: { id: true, adUsername: true, displayName: true, email: true, department: true, company: true, companyThai: true, avatarUrl: true, role: true, isActive: true, authType: true, lastLoginAt: true, createdAt: true, managerId: true, manager: { select: { id: true, displayName: true, adUsername: true } } },
       }),
       prisma.appUser.count({ where }),
     ]);
@@ -112,6 +115,38 @@ router.put('/users/:id/role', authenticate, authorize('SUPERADMIN'), async (req:
     console.log(`Changed role of ${user.adUsername} from ${oldRole} to ${role} by user ${req.user!.userId}`);
 
     res.json({ message: 'อัปเดตบทบาทเรียบร้อย' });
+  } catch (err) { next(err); }
+});
+
+// หัวหน้างานโดยตรง — ใช้กำหนดว่าใครต้องอนุมัติคำขอยืมของผู้ใช้นี้ก่อนถึง IT Admin
+router.put('/users/:id/manager', authenticate, authorize('SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { managerId } = req.body;
+
+    const user = await prisma.appUser.findUnique({ where: { id } });
+    if (!user) throw new AppError('ไม่พบผู้ใช้', 404);
+
+    if (managerId === null || managerId === undefined) {
+      await prisma.appUser.update({ where: { id }, data: { managerId: null } });
+      return res.json({ message: 'ยกเลิกการผูกหัวหน้างานเรียบร้อย' });
+    }
+
+    const managerIdNum = parseInt(managerId);
+    if (managerIdNum === id) throw new AppError('ไม่สามารถตั้งตัวเองเป็นหัวหน้างานของตัวเองได้');
+
+    const manager = await prisma.appUser.findUnique({ where: { id: managerIdNum } });
+    if (!manager) throw new AppError('ไม่พบผู้ใช้ที่ต้องการตั้งเป็นหัวหน้างาน', 404);
+    // กันวนเป็นวง: ห้ามตั้งลูกทีมของ user นี้ (ไม่ว่าจะกี่ชั้น) มาเป็นหัวหน้างานของ user นี้
+    let cursor: number | null = manager.managerId;
+    while (cursor !== null) {
+      if (cursor === id) throw new AppError('ไม่สามารถตั้งค่านี้ได้ เนื่องจากจะทำให้เกิดสายบังคับบัญชาแบบวนลูป');
+      const next: { managerId: number | null } | null = await prisma.appUser.findUnique({ where: { id: cursor }, select: { managerId: true } });
+      cursor = next?.managerId ?? null;
+    }
+
+    await prisma.appUser.update({ where: { id }, data: { managerId: managerIdNum } });
+    res.json({ message: `ตั้งหัวหน้างานของ ${user.displayName || user.adUsername} เป็น ${manager.displayName || manager.adUsername} เรียบร้อย` });
   } catch (err) { next(err); }
 });
 
@@ -184,7 +219,7 @@ router.get('/users/:id', authenticate, authorize('SUPERADMIN'), async (req: Requ
     const id = parseInt(req.params.id);
     const user = await prisma.appUser.findUnique({
       where: { id },
-      select: { id: true, adUsername: true, displayName: true, email: true, department: true, role: true, isActive: true, authType: true, lastLoginAt: true, createdAt: true },
+      select: { id: true, adUsername: true, displayName: true, email: true, department: true, role: true, isActive: true, authType: true, lastLoginAt: true, createdAt: true, managerId: true, manager: { select: { id: true, displayName: true, adUsername: true } } },
     });
     if (!user) throw new AppError('ไม่พบผู้ใช้', 404);
     res.json(user);

@@ -213,6 +213,8 @@ export const borrowAPI = {
   requesterHistory: (userId: number) => api.get(`/borrow/requester-history/${userId}`),
   overdue: () => api.get('/borrow/overdue'),
   approve: (id: number, data: any) => api.post(`/borrow/requests/${id}/approve`, data),
+  supervisorQueue: (params?: any) => api.get('/borrow/requests/supervisor-queue', { params }),
+  supervisorApprove: (id: number, data: any) => api.post(`/borrow/requests/${id}/supervisor-approve`, data),
   checkout: (id: number, data: any) => api.post(`/borrow/requests/${id}/checkout`, data),
   returnItem: (itemId: number, data: any) => api.post(`/borrow/items/${itemId}/return`, data),
   uploadCheckoutImage: (checkoutId: number, file: File, description?: string) => {
@@ -340,6 +342,7 @@ export const adminAPI = {
   createLocalUser: (data: { username: string; password: string; displayName: string; role?: string }) => api.post('/admin/users/local', data),
   setLocalPassword: (id: number, password: string) => api.put(`/admin/users/${id}/local-password`, { password }),
   updateRole: (id: number, role: string) => api.put(`/admin/users/${id}/role`, { role }),
+  updateManager: (id: number, managerId: number | null) => api.put(`/admin/users/${id}/manager`, { managerId }),
   toggleActive: (id: number) => api.put(`/admin/users/${id}/toggle-active`),
   deleteUser: (id: number) => api.delete(`/admin/users/${id}`),
 
