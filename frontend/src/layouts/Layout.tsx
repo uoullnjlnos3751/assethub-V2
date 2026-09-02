@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { keyframes } from '@emotion/react';
 import {
@@ -23,18 +23,22 @@ import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import AssignmentReturnIcon from '@mui/icons-material/AssignmentReturn';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
+import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import { useAuth } from '../contexts/AuthContext';
 import { useAppTheme } from '../contexts/ThemeContext';
+import { useChatbotContext } from '../contexts/ChatbotContext';
 import Breadcrumbs from '../components/Breadcrumbs';
 import PageTransition from '../components/PageTransition';
 import QRScannerModal from '../components/QRScannerModal';
 import { notificationAPI, assetAPI, presenceAPI, dashboardAPI } from '../services/api';
-import { adminNav, NavGroup, NavItem, userNavItems } from '../navigation/nav';
+import { adminNav, NavGroup, NavItem, userNavItems, adminRail, userRail, viewerRail, RailModule } from '../navigation/nav';
+import IconRail, { RAIL_WIDTH, FLYOUT_WIDTH } from './IconRail';
 import { APP_VERSION, GIT_COMMIT, BUILD_NUMBER, BUILD_TIME, formatBuildTime } from '../utils/buildInfo';
 
-// ── Sidebar width matching ITSM HTML (210px) ───────────────────────────────
-const drawerWidth = 220;
-const drawerWidthCollapsed = 72;
+// ── Sidebar widths ─────────────────────────────────────────────────────────
+// Desktop runs on the icon rail (RAIL_WIDTH + an optional pinned FLYOUT_WIDTH);
+// `mobileDrawerWidth` still belongs to the temporary drawer, which keeps the
+// full adminNav accordion because a phone has no room for two columns.
 const mobileDrawerWidth = 240;
 const appBarHeight = 50;
 
@@ -73,7 +77,11 @@ export default function Layout() {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const { mode, toggleColorMode } = useAppTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === '1');
+  // Only the mobile drawer still reads this — it renders the full accordion and
+  // never collapses. Desktop collapse is now the rail's pin state below.
+  const [collapsed, setCollapsed] = useState(false);
+  const [railPinned, setRailPinned] = useState(() => localStorage.getItem('railPinned') !== '0');
+  const [openRailId, setOpenRailId] = useState<string | null>(null);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState('');
@@ -87,14 +95,15 @@ export default function Layout() {
   const [pmOverdueCount, setPmOverdueCount] = useState(0);
   const [clock, setClock] = useState(new Date());
   const { user, logout, systemSettings } = useAuth();
+  const { askAI } = useChatbotContext();
   const navigate = useNavigate();
   const location = useLocation();
-  const currentDrawerWidth = collapsed ? drawerWidthCollapsed : drawerWidth;
+  const currentDrawerWidth = RAIL_WIDTH + (railPinned ? FLYOUT_WIDTH : 0);
 
-  const toggleCollapsed = () => {
-    setCollapsed(prev => {
+  const togglePin = () => {
+    setRailPinned(prev => {
       const next = !prev;
-      localStorage.setItem('sidebarCollapsed', next ? '1' : '0');
+      localStorage.setItem('railPinned', next ? '1' : '0');
       return next;
     });
   };
@@ -177,6 +186,57 @@ export default function Layout() {
     if (path.includes('?')) return location.pathname + location.search === path;
     if (path === '/pm') return location.pathname === '/pm';
     return location.pathname === path || (path !== '/' && location.pathname.startsWith(path + '/'));
+  };
+
+  // ── Rail: role-filtered modules, and which one owns the current page ──────
+  const railModules: RailModule[] = useMemo(() => {
+    const source = isAdmin ? adminRail : isViewer ? viewerRail : userRail;
+    const role = user?.role || '';
+    return source
+      .filter(m => !m.roles || m.roles.includes(role))
+      .map(m => ({
+        ...m,
+        sections: m.sections
+          .map(s => ({ ...s, items: s.items.filter(i => !i.roles || i.roles.includes(role)) }))
+          .filter(s => s.items.length > 0),
+      }))
+      .filter(m => m.sections.length > 0);
+  }, [isAdmin, isViewer, user?.role]);
+
+  // Longest matching path wins, so /categories (which sits in both ทรัพย์สิน and
+  // ตั้งค่า) and /pm vs /pm/runs resolve to the module the user actually opened.
+  const routeRailId = useMemo(() => {
+    let best: { id: string; len: number } | null = null;
+    railModules.forEach(m => m.sections.forEach(s => s.items.forEach(item => {
+      if (!item.path || !isActive(item.path)) return;
+      if (!best || item.path.length > best.len) best = { id: m.id, len: item.path.length };
+    })));
+    return best ? (best as { id: string }).id : null;
+  }, [railModules, location.pathname, location.search]);
+
+  // Pinned rail always shows the open page's module; unpinned starts closed and
+  // the flyout is dismissed on navigation.
+  useEffect(() => {
+    setOpenRailId(railPinned ? routeRailId : null);
+  }, [railPinned, routeRailId, location.pathname, location.search]);
+
+  const handleRailOpen = (id: string) => {
+    const mod = railModules.find(m => m.id === id);
+    const items = mod ? mod.sections.flatMap(s => s.items) : [];
+    // A module with one destination is its own link — no point opening a
+    // flyout that holds a single row.
+    if (items.length === 1 && items[0].path) {
+      navigate(items[0].path);
+      setOpenRailId(railPinned ? id : null);
+      return;
+    }
+    if (railPinned) setOpenRailId(id);
+    else setOpenRailId(prev => (prev === id ? null : id));
+  };
+
+  const handleRailNavigate = (path: string) => {
+    navigate(path);
+    if (!railPinned) setOpenRailId(null);
   };
 
   useEffect(() => {
@@ -559,6 +619,104 @@ export default function Layout() {
     </Box>
   );
 
+  // ── Rail brand + footer ──────────────────────────────────────────────────
+  const homePath = railModules[0]?.sections[0]?.items[0]?.path || '/dashboard';
+  const brandMark = (
+    <Tooltip title={systemSettings?.systemName || 'ITAM'} placement="right" arrow>
+      <Box
+        component="button"
+        type="button"
+        onClick={() => navigate(homePath)}
+        aria-label="หน้าแรก"
+        sx={{
+          width: 38,
+          height: 38,
+          p: 0,
+          border: 0,
+          borderRadius: '11px',
+          cursor: 'pointer',
+          overflow: 'hidden',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontWeight: 700,
+          fontSize: '13px',
+          letterSpacing: '-0.02em',
+          color: '#fff',
+          background: systemSettings?.logoUrl
+            ? 'rgba(255,255,255,.08)'
+            : `linear-gradient(140deg, ${theme.palette.primary.main}, ${theme.palette.info.main})`,
+          boxShadow: systemSettings?.logoUrl ? 'none' : `0 8px 20px -8px ${theme.palette.primary.main}`,
+          transition: 'transform .18s ease',
+          '&:hover': { transform: 'scale(1.05)' },
+          '&:focus-visible': { outline: `2px solid ${theme.palette.primary.main}`, outlineOffset: '2px' },
+        }}
+      >
+        {systemSettings?.logoUrl
+          ? <img src={systemSettings.logoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+          : (systemSettings?.systemName || 'IT').substring(0, 2).toUpperCase()}
+      </Box>
+    </Tooltip>
+  );
+
+  const railFooter = (
+    <>
+      <Box
+        component="button"
+        type="button"
+        onClick={() => navigate('/profile')}
+        sx={{
+          width: '100%',
+          border: 0,
+          bgcolor: 'transparent',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '9px',
+          px: '12px',
+          py: '9px',
+          textAlign: 'left',
+          font: 'inherit',
+          '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.04) },
+        }}
+      >
+        <Avatar
+          src={user?.avatarUrl || undefined}
+          sx={{
+            width: 30,
+            height: 30,
+            fontSize: '11px',
+            fontWeight: 700,
+            flexShrink: 0,
+            background: `linear-gradient(140deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+          }}
+        >
+          {!user?.avatarUrl && (user?.displayName?.charAt(0) || 'U')}
+        </Avatar>
+        <Box sx={{ minWidth: 0, flex: 1 }}>
+          <Typography noWrap sx={{ fontSize: '12px', fontWeight: 600, color: theme.palette.text.primary, lineHeight: 1.3 }}>
+            {user?.displayName || user?.adUsername}
+          </Typography>
+          <Typography noWrap sx={{ fontSize: '10px', color: theme.palette.text.secondary, lineHeight: 1.2 }}>
+            {user?.role === 'SUPERADMIN' ? 'ผู้ดูแลระบบสูงสุด' : user?.role === 'IT_ADMIN' ? 'IT Admin' : user?.role === 'VIEWER' ? 'ผู้บริหาร' : 'ผู้ใช้'}
+          </Typography>
+        </Box>
+      </Box>
+      <Tooltip title={`อัปเดตครั้งที่ ${BUILD_NUMBER}${BUILD_TIME ? ` · Built ${formatBuildTime(BUILD_TIME)}` : ''}`} placement="top">
+        <Typography noWrap sx={{
+          fontSize: '9px',
+          fontFamily: 'monospace',
+          letterSpacing: '0.02em',
+          textAlign: 'center',
+          color: theme.palette.text.disabled,
+          pb: '5px',
+        }}>
+          v{APP_VERSION} · #{BUILD_NUMBER} · {GIT_COMMIT}
+        </Typography>
+      </Tooltip>
+    </>
+  );
+
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', position: 'relative', bgcolor: theme.palette.background.default }}>
 
@@ -596,9 +754,9 @@ export default function Layout() {
           </IconButton>
 
           {/* Desktop sidebar collapse toggle */}
-          <Tooltip title={collapsed ? 'ขยายเมนู' : 'ย่อเมนู'}>
+          <Tooltip title={railPinned ? 'ย่อเมนู (ได้พื้นที่เพิ่ม)' : 'ตรึงเมนูไว้'}>
             <IconButton
-              onClick={toggleCollapsed}
+              onClick={togglePin}
               sx={{
                 display: { xs: 'none', md: 'flex' },
                 width: 34,
@@ -609,7 +767,7 @@ export default function Layout() {
                 '&:hover': { borderColor: theme.palette.primary.main, color: theme.palette.primary.main },
               }}
             >
-              {collapsed ? <MenuIcon sx={{ fontSize: 18 }} /> : <MenuOpenIcon sx={{ fontSize: 18 }} />}
+              {railPinned ? <MenuOpenIcon sx={{ fontSize: 18 }} /> : <MenuIcon sx={{ fontSize: 18 }} />}
             </IconButton>
           </Tooltip>
 
@@ -635,7 +793,7 @@ export default function Layout() {
                  fullWidth
                  size="small"
                  variant="outlined"
-                 placeholder="ค้นหาทรัพย์สิน (ชื่อ/รหัส/SN/ผู้ถือครอง)..."
+                 placeholder="ค้นหาทรัพย์สิน หรือถาม AI..."
                  value={searchQuery}
                  onChange={(e) => setSearchQuery(e.target.value)}
                  onFocus={() => { if (searchSuggestions.length > 0) setSearchOpen(true); }}
@@ -690,6 +848,23 @@ export default function Layout() {
                        </ListItemButton>
                      </List>
                    )}
+                   {/* Bridges search to the floating AssetHub Assistant — for
+                       anything that isn't a direct asset match ("ใครถือครอง
+                       M001", "มีโน้ตบุ๊กกี่เครื่อง"), matching the InvGate-style
+                       "search or ask AI" hint in the box's placeholder. */}
+                   <Divider sx={{ borderColor: theme.palette.divider }} />
+                   <List dense disablePadding>
+                     <ListItemButton
+                       onClick={() => { setSearchOpen(false); askAI(searchQuery); }}
+                       sx={{ py: 1, gap: '10px' }}
+                     >
+                       <AutoAwesomeRoundedIcon sx={{ fontSize: 16, color: theme.palette.secondary.main, flexShrink: 0 }} />
+                       <ListItemText
+                         primary={<>ถาม AI: <Box component="span" sx={{ fontWeight: 700 }}>"{searchQuery.trim()}"</Box></>}
+                         primaryTypographyProps={{ fontSize: 12.5, fontWeight: 600, color: theme.palette.secondary.main }}
+                       />
+                     </ListItemButton>
+                   </List>
                  </Paper>
                </Popper>
              </form>
@@ -946,23 +1121,34 @@ export default function Layout() {
           {drawer}
         </Drawer>
 
-        {/* Desktop drawer */}
-        <Drawer
-          variant="permanent"
-          sx={{
+        {/* Desktop icon rail — fixed full height, sits above the AppBar so an
+            unpinned flyout can float over the page instead of under it. */}
+        <ClickAwayListener onClickAway={() => { if (!railPinned) setOpenRailId(null); }}>
+          <Box sx={{
             display: { xs: 'none', md: 'block' },
-            '& .MuiDrawer-paper': {
-              boxSizing: 'border-box',
-              width: currentDrawerWidth,
-              borderRight: `1px solid ${theme.palette.divider}`,
-              overflowX: 'hidden',
-              transition: theme.transitions.create('width', { duration: theme.transitions.duration.shorter }),
-            },
-          }}
-          open
-        >
-          {drawer}
-        </Drawer>
+            position: 'fixed',
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: RAIL_WIDTH,
+            zIndex: (t) => t.zIndex.drawer + 2,
+          }}>
+            <IconRail
+              modules={railModules}
+              openId={openRailId}
+              routeId={routeRailId}
+              onOpen={handleRailOpen}
+              pinned={railPinned}
+              onTogglePin={togglePin}
+              isActive={isActive}
+              onNavigate={handleRailNavigate}
+              badges={{ pm: pmOverdueCount }}
+              onLogout={() => { logout(); navigate('/login'); }}
+              brand={brandMark}
+              footer={railFooter}
+            />
+          </Box>
+        </ClickAwayListener>
       </Box>
 
       {/* ── Main content ─────────────────────────────────────────────── */}

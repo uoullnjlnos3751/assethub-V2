@@ -5,6 +5,7 @@ import Layout from './layouts/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
 import LoginPage from './pages/LoginPage';
 import { Chatbot } from './components/Chatbot';
+import { ChatbotProvider } from './contexts/ChatbotContext';
 
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const AssetListPage = lazy(() => import('./pages/assets/AssetListPage'));
@@ -17,6 +18,7 @@ const MyHistoryPage = lazy(() => import('./pages/borrow/MyHistoryPage'));
 const MyExtensionsPage = lazy(() => import('./pages/borrow/MyExtensionsPage'));
 const AllRequestsPage = lazy(() => import('./pages/borrow/AllRequestsPage'));
 const ApprovalQueuePage = lazy(() => import('./pages/borrow/ApprovalQueuePage'));
+const SupervisorApprovalQueuePage = lazy(() => import('./pages/borrow/SupervisorApprovalQueuePage'));
 const CheckoutPage = lazy(() => import('./pages/borrow/CheckoutPage'));
 const ReturnPage = lazy(() => import('./pages/borrow/ReturnPage'));
 const BorrowHistoryPage = lazy(() => import('./pages/borrow/BorrowHistoryPage'));
@@ -84,6 +86,7 @@ export default function App() {
   if (loading) return null;
 
   return (
+    <ChatbotProvider>
     <Suspense fallback={null}>
       <Routes>
         <Route path="/login" element={user ? <Navigate to={homePathFor(user.role)} /> : <LoginPage />} />
@@ -112,6 +115,8 @@ export default function App() {
           <Route path="borrow/my-items" element={<MyItemsPage />} />
           <Route path="borrow/my-history" element={<MyHistoryPage />} />
           <Route path="borrow/my-extensions" element={<MyExtensionsPage />} />
+          {/* Borrow - Supervisor: no role restriction, any logged-in user can be someone's manager */}
+          <Route path="borrow/supervisor-queue" element={<SupervisorApprovalQueuePage />} />
           {/* Borrow - IT Admin */}
           <Route path="borrow/all-requests" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><AllRequestsPage /></ProtectedRoute>} />
           <Route path="borrow/approval-queue" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><ApprovalQueuePage /></ProtectedRoute>} />
@@ -168,5 +173,6 @@ export default function App() {
       </Routes>
       {user && <Chatbot />}
     </Suspense>
+    </ChatbotProvider>
   );
 }

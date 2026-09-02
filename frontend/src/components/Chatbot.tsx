@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { baseURL } from '../services/api';
+import { useChatbotContext } from '../contexts/ChatbotContext';
 
 interface Message {
   role: 'user' | 'ai';
@@ -7,7 +8,7 @@ interface Message {
 }
 
 export const Chatbot: React.FC = () => {
-  const [isOpen, setIsOpen] = useState(false);
+  const { isOpen, setOpen, queuedQuery, clearQueuedQuery } = useChatbotContext();
   const [messages, setMessages] = useState<Message[]>([
     { role: 'ai', text: 'สวัสดีครับ ผมคือ AssetHub Assistant 🤖\nคุณสามารถถามข้อมูลเกี่ยวกับทรัพย์สินได้เลยครับ เช่น "มีโน้ตบุ๊กกี่เครื่อง", "ใครถือครอง M001"' }
   ]);
@@ -25,13 +26,21 @@ export const Chatbot: React.FC = () => {
     scrollToBottom();
   }, [messages, isOpen, toolStatus]);
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
+  // A question handed in from outside (e.g. the AppBar search box's "ถาม AI"
+  // row) — send it as if the visitor had typed it themselves.
+  useEffect(() => {
+    if (!queuedQuery) return;
+    clearQueuedQuery();
+    sendText(queuedQuery.text);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queuedQuery]);
 
-    const userMessage: Message = { role: 'user', text: input.trim() };
+  const sendText = async (text: string) => {
+    if (!text.trim()) return;
+
+    const userMessage: Message = { role: 'user', text: text.trim() };
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
-    setInput('');
     setIsLoading(true);
     setAwaitingResponse(true);
     setToolStatus(null);
@@ -101,6 +110,12 @@ export const Chatbot: React.FC = () => {
     }
   };
 
+  const handleSend = () => {
+    const text = input;
+    setInput('');
+    sendText(text);
+  };
+
   return (
     // `app-noprint` lets a page's print stylesheet drop the floating bubble;
     // it is chrome, never part of a printed report.
@@ -135,7 +150,7 @@ export const Chatbot: React.FC = () => {
               <span style={{ fontWeight: 600, fontSize: 15 }}>AssetHub Assistant</span>
             </div>
             <button 
-              onClick={() => setIsOpen(false)}
+              onClick={() => setOpen(false)}
               style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 18 }}
             >
               ✕
@@ -239,7 +254,7 @@ export const Chatbot: React.FC = () => {
 
       {/* Floating Button */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => setOpen(!isOpen)}
         style={{
           width: 60,
           height: 60,

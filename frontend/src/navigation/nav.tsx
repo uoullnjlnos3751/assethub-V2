@@ -37,6 +37,14 @@ import GavelIcon from '@mui/icons-material/Gavel';
 import KeyIcon from '@mui/icons-material/Key';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import DeviceHubIcon from '@mui/icons-material/DeviceHub';
+// ── Rail icons (rounded cut — reads better at 21px than the sharp default) ──
+import SpaceDashboardRoundedIcon from '@mui/icons-material/SpaceDashboardRounded';
+import Inventory2RoundedIcon from '@mui/icons-material/Inventory2Rounded';
+import SwapHorizRoundedIcon from '@mui/icons-material/SwapHorizRounded';
+import BuildRoundedIcon from '@mui/icons-material/BuildRounded';
+import RecyclingRoundedIcon from '@mui/icons-material/RecyclingRounded';
+import InsightsRoundedIcon from '@mui/icons-material/InsightsRounded';
+import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
 
 export interface NavItem {
   label: string;
@@ -63,6 +71,9 @@ export const userNavItems: NavItem[] = [
   { label: 'รายการของพร้อมยืม', path: '/assets?status=Available', icon: <CheckCircleOutlineIcon fontSize="small" /> },
   { label: 'ยืมทรัพย์สิน', path: '/borrow/new', icon: <AddBoxIcon fontSize="small" /> },
   { label: 'คำขอของฉัน', path: '/borrow/my-requests', icon: <ListAltIcon fontSize="small" /> },
+  // ทุกคนเป็นหัวหน้างานของใครก็ได้ (ผูกด้วย managerId ไม่ใช่ role) จึงต้องอยู่ในเมนู
+  // ของผู้ใช้ทั่วไป ไม่ใช่ adminNav — หน้านี้เองจะกรองให้เห็นแค่คำขอของลูกทีมตัวเอง
+  { label: 'อนุมัติคำขอยืม (หัวหน้างาน)', path: '/borrow/supervisor-queue', icon: <CheckCircleIcon fontSize="small" /> },
   { label: 'รายการที่ยืม', path: '/borrow/my-items', icon: <ShoppingCartIcon fontSize="small" /> },
   { label: 'คำขอขยายวัน', path: '/borrow/my-extensions', icon: <ExtensionIcon fontSize="small" /> },
   { label: 'ประวัติการยืม', path: '/borrow/my-history', icon: <HistoryIcon fontSize="small" /> },
@@ -105,7 +116,10 @@ export const adminNav: NavEntry[] = [
     section: 'Service Desk',
     children: [
       { label: 'คำขอทั้งหมด', path: '/borrow/all-requests', icon: <ListAltIcon fontSize="small" /> },
-      { label: 'รออนุมัติ', path: '/borrow/approval-queue', icon: <CheckCircleIcon fontSize="small" /> },
+      { label: 'รออนุมัติ (IT Admin)', path: '/borrow/approval-queue', icon: <CheckCircleIcon fontSize="small" /> },
+      // ผู้ใช้ role IT_ADMIN/SUPERADMIN บางคนก็เป็นหัวหน้างานของคนอื่นด้วย — ลิงก์นี้
+      // ซ้ำกับที่อยู่ใน userNavItems เพราะ 2 กลุ่ม role เห็นเมนูคนละชุด (Layout.tsx)
+      { label: 'รออนุมัติ (หัวหน้างาน)', path: '/borrow/supervisor-queue', icon: <CheckCircleIcon fontSize="small" /> },
       { label: 'ส่งมอบ (Check-out)', path: '/borrow/checkout', icon: <HandymanIcon fontSize="small" /> },
       { label: 'รับคืน (Return)', path: '/borrow/return', icon: <AssignmentReturnIcon fontSize="small" /> },
       { label: 'ขยายวัน (Extension)', path: '/borrow/extensions', icon: <ExtensionIcon fontSize="small" /> },
@@ -173,4 +187,287 @@ export const adminNav: NavEntry[] = [
   },
   { label: 'ตั้งค่าระบบ', path: '/admin/settings', icon: <SettingsIcon fontSize="small" />, roles: ['SUPERADMIN', 'IT_ADMIN'] },
   { label: 'Flowchart ขั้นตอนระบบ', path: '/admin/flowcharts', icon: <AccountTreeIcon fontSize="small" />, roles: ['IT_ADMIN', 'SUPERADMIN'] },
+];
+
+// ── Icon rail ─────────────────────────────────────────────────────────────
+// The rail is a *second view* of the same destinations as adminNav/userNavItems
+// above — same paths, same role gates, regrouped so the sidebar never shows
+// more than one module's worth of links at a time. adminNav stays the source
+// for the mobile drawer, which still wants the full accordion.
+
+/** A labelled block of links inside a rail module's flyout. */
+export interface RailSection {
+  /** Small uppercase divider above the links. Omit for the module's first block. */
+  label?: string;
+  items: NavItem[];
+}
+
+export interface RailModule {
+  id: string;
+  /** Two-line-max caption under the rail icon. Keep it to ~8 characters. */
+  label: string;
+  /** Heading at the top of the flyout — may be longer than `label`. */
+  title: string;
+  icon: React.ReactNode;
+  roles?: string[];
+  sections: RailSection[];
+  /** Pushed to the foot of the rail, below the spacer. */
+  atBottom?: boolean;
+}
+
+const ADMINS = ['SUPERADMIN', 'IT_ADMIN'];
+
+export const adminRail: RailModule[] = [
+  {
+    id: 'home',
+    label: 'ภาพรวม',
+    title: 'ภาพรวมระบบ',
+    icon: <SpaceDashboardRoundedIcon />,
+    sections: [
+      { items: [{ label: 'แดชบอร์ด', path: '/dashboard', icon: <DashboardIcon fontSize="small" /> }] },
+    ],
+  },
+  {
+    id: 'assets',
+    label: 'ทรัพย์สิน',
+    title: 'ทรัพย์สินและคลัง',
+    icon: <Inventory2RoundedIcon />,
+    sections: [
+      {
+        label: 'ทะเบียน',
+        items: [
+          { label: 'ทะเบียนทั้งหมด', path: '/assets', icon: <DevicesIcon fontSize="small" /> },
+          { label: 'นำเข้า/ส่งออก ข้อมูล', path: '/assets/import-export', icon: <ImportExportIcon fontSize="small" />, roles: ADMINS },
+          { label: 'พิมพ์ QR สติ๊กเกอร์', path: '/assets/print-qr', icon: <PrintIcon fontSize="small" />, roles: ADMINS },
+          { label: 'ตรวจสอบข้อมูลจาก Agent', path: '/assets/agent-drift', icon: <RouterIcon fontSize="small" />, roles: ADMINS },
+          // /categories deliberately lives only under ตั้งค่า → ข้อมูลหลัก. Listing
+          // it in two modules would make the pinned flyout jump modules when you
+          // open it, because a path resolves to exactly one rail slot.
+        ],
+      },
+      {
+        label: 'คลังวัสดุ',
+        items: [
+          { label: 'ภาพรวมคลังสินค้า', path: '/inventory', icon: <InventoryIcon fontSize="small" /> },
+          { label: 'สายสัญญาณ', path: '/inventory?category=Cable', icon: <CableIcon fontSize="small" /> },
+          { label: 'วัสดุสิ้นเปลือง', path: '/inventory?category=Consumable', icon: <ScienceIcon fontSize="small" /> },
+        ],
+      },
+      {
+        label: 'รับเข้า',
+        items: [
+          { label: 'เครื่องใหม่ & ส่งมอบ', path: '/delivery', icon: <LocalShippingIcon fontSize="small" />, roles: ADMINS },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'service',
+    label: 'ยืม-คืน',
+    title: 'ระบบยืม-คืน',
+    icon: <SwapHorizRoundedIcon />,
+    sections: [
+      {
+        label: 'คำขอ',
+        items: [
+          { label: 'คำขอทั้งหมด', path: '/borrow/all-requests', icon: <ListAltIcon fontSize="small" /> },
+          { label: 'รออนุมัติ (หัวหน้างาน)', path: '/borrow/supervisor-queue', icon: <CheckCircleIcon fontSize="small" /> },
+          { label: 'รออนุมัติ (IT Admin)', path: '/borrow/approval-queue', icon: <CheckCircleIcon fontSize="small" /> },
+        ],
+      },
+      {
+        label: 'หน้างาน',
+        items: [
+          { label: 'ส่งมอบ (Check-out)', path: '/borrow/checkout', icon: <HandymanIcon fontSize="small" /> },
+          { label: 'รับคืน (Return)', path: '/borrow/return', icon: <AssignmentReturnIcon fontSize="small" /> },
+          { label: 'ขยายวัน (Extension)', path: '/borrow/extensions', icon: <ExtensionIcon fontSize="small" /> },
+          { label: 'ยืมเกินกำหนด', path: '/borrow/overdue', icon: <ErrorIcon fontSize="small" /> },
+          { label: 'ประวัติทั้งหมด', path: '/borrow/history', icon: <HistoryIcon fontSize="small" /> },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'pm',
+    label: 'PM',
+    title: 'งานซ่อมบำรุง (PM)',
+    icon: <BuildRoundedIcon />,
+    sections: [
+      {
+        label: 'PM ทรัพย์สิน',
+        items: [
+          { label: 'ภาพรวม PM', path: '/pm', icon: <DashboardIcon fontSize="small" /> },
+          { label: 'กำหนดการ PM', path: '/pm/schedule', icon: <CalendarTodayIcon fontSize="small" /> },
+          { label: 'แผน PM', path: '/pm/plans', icon: <AssignmentIcon fontSize="small" /> },
+          { label: 'ทำ PM ทรัพย์สิน', path: '/pm/runs', icon: <PlayArrowIcon fontSize="small" /> },
+          { label: 'Checklist Template', path: '/pm/templates', icon: <DescriptionIcon fontSize="small" /> },
+        ],
+      },
+      {
+        label: 'หน้างาน',
+        items: [
+          { label: 'แผนผังชั้น PM', path: '/pm/floorplan', icon: <LocationOnIcon fontSize="small" /> },
+          { label: 'ตู้ Switch/Hub', path: '/pm/sw-hub', icon: <DeviceHubIcon fontSize="small" /> },
+          { label: 'สแกนหาเครื่อง', path: '/scan', icon: <QrCodeScannerIcon fontSize="small" /> },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'lifecycle',
+    // "จำหน่ายออก" and "License & สัญญา" were two sidebar sections holding four
+    // links between them; both are end-of-life paperwork for an asset, so they
+    // share one rail slot.
+    label: 'ปลายทาง',
+    title: 'ปลายทางทรัพย์สิน',
+    icon: <RecyclingRoundedIcon />,
+    sections: [
+      {
+        label: 'จำหน่ายออก',
+        items: [
+          { label: 'จำหน่ายออก/บริจาค', path: '/donations', icon: <VolunteerActivismIcon fontSize="small" /> },
+          { label: 'บันทึกการจำหน่ายทรัพย์สิน', path: '/disposals', icon: <DeleteSweepIcon fontSize="small" /> },
+        ],
+      },
+      {
+        label: 'License & สัญญา',
+        items: [
+          { label: 'Software License', path: '/licenses', icon: <KeyIcon fontSize="small" /> },
+          { label: 'สัญญา & Warranty', path: '/contracts', icon: <GavelIcon fontSize="small" /> },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'reports',
+    label: 'รายงาน',
+    title: 'สรุปและรายงาน',
+    icon: <InsightsRoundedIcon />,
+    sections: [
+      {
+        items: [
+          { label: 'รายงานทรัพย์สิน', path: '/reports/assets', icon: <InventoryIcon fontSize="small" /> },
+          { label: 'รายงานยืม-คืน', path: '/reports/borrow', icon: <ReceiptLongIcon fontSize="small" /> },
+          { label: 'รายงาน PM', path: '/reports/pm', icon: <AssessmentIcon fontSize="small" /> },
+          { label: 'รายงานซ่อมบำรุง', path: '/reports/maintenance', icon: <BuildCircleIcon fontSize="small" /> },
+          { label: 'ตรวจสอบทรัพย์สินพนักงาน', path: '/reports/user-clearance', icon: <BadgeIcon fontSize="small" />, roles: ADMINS },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'admin',
+    label: 'ตั้งค่า',
+    title: 'ผู้ดูแลระบบ',
+    icon: <SettingsRoundedIcon />,
+    roles: ADMINS,
+    atBottom: true,
+    sections: [
+      {
+        label: 'ข้อมูลหลัก',
+        items: [
+          { label: 'ประเภท/สถานที่/ผู้จำหน่าย/สถานะ', path: '/admin/master-data', icon: <DomainIcon fontSize="small" /> },
+          { label: 'จัดการหมวดหมู่', path: '/categories', icon: <CategoryIcon fontSize="small" /> },
+        ],
+      },
+      {
+        label: 'ระบบ',
+        items: [
+          { label: 'ตั้งค่าระบบ', path: '/admin/settings', icon: <SettingsIcon fontSize="small" /> },
+          { label: 'Flowchart ขั้นตอนระบบ', path: '/admin/flowcharts', icon: <AccountTreeIcon fontSize="small" /> },
+        ],
+      },
+    ],
+  },
+];
+
+/** Rail for USER — the seven self-service links, split by "ทำรายการ" vs "ติดตาม". */
+export const userRail: RailModule[] = [
+  {
+    id: 'borrow',
+    label: 'ยืมของ',
+    title: 'ยืมทรัพย์สิน',
+    icon: <SwapHorizRoundedIcon />,
+    sections: [
+      {
+        items: [
+          { label: 'รายการของพร้อมยืม', path: '/assets?status=Available', icon: <CheckCircleOutlineIcon fontSize="small" /> },
+          { label: 'ยืมทรัพย์สิน', path: '/borrow/new', icon: <AddBoxIcon fontSize="small" /> },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'mine',
+    label: 'ของฉัน',
+    title: 'รายการของฉัน',
+    icon: <Inventory2RoundedIcon />,
+    sections: [
+      {
+        items: [
+          { label: 'คำขอของฉัน', path: '/borrow/my-requests', icon: <ListAltIcon fontSize="small" /> },
+          { label: 'รายการที่ยืม', path: '/borrow/my-items', icon: <ShoppingCartIcon fontSize="small" /> },
+          { label: 'คำขอขยายวัน', path: '/borrow/my-extensions', icon: <ExtensionIcon fontSize="small" /> },
+          { label: 'ประวัติการยืม', path: '/borrow/my-history', icon: <HistoryIcon fontSize="small" /> },
+        ],
+      },
+    ],
+  },
+  {
+    // Anyone can be someone's manager (it hangs off AppUser.managerId, not off a
+    // role), so this rail slot ships to every USER — the page itself shows an
+    // empty queue to people who have no direct reports.
+    id: 'approve',
+    label: 'อนุมัติ',
+    title: 'อนุมัติคำขอยืม',
+    icon: <CheckCircleIcon />,
+    sections: [
+      {
+        items: [
+          { label: 'คำขอรออนุมัติ (หัวหน้างาน)', path: '/borrow/supervisor-queue', icon: <CheckCircleIcon fontSize="small" /> },
+        ],
+      },
+    ],
+  },
+];
+
+/** Rail for VIEWER — read-only executive access. */
+export const viewerRail: RailModule[] = [
+  {
+    id: 'home',
+    label: 'ภาพรวม',
+    title: 'ภาพรวมระบบ',
+    icon: <SpaceDashboardRoundedIcon />,
+    sections: [{ items: [{ label: 'แดชบอร์ด', path: '/dashboard', icon: <DashboardIcon fontSize="small" /> }] }],
+  },
+  {
+    id: 'reports',
+    label: 'รายงาน',
+    title: 'สรุปและรายงาน',
+    icon: <InsightsRoundedIcon />,
+    sections: [
+      {
+        items: [
+          { label: 'รายงานทรัพย์สิน', path: '/reports/assets', icon: <InventoryIcon fontSize="small" /> },
+          { label: 'รายงานยืม-คืน', path: '/reports/borrow', icon: <ReceiptLongIcon fontSize="small" /> },
+          { label: 'รายงาน PM', path: '/reports/pm', icon: <AssessmentIcon fontSize="small" /> },
+          { label: 'รายงานซ่อมบำรุง', path: '/reports/maintenance', icon: <BuildCircleIcon fontSize="small" /> },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'lifecycle',
+    label: 'สัญญา',
+    title: 'License & สัญญา',
+    icon: <RecyclingRoundedIcon />,
+    sections: [
+      {
+        items: [
+          { label: 'Software License', path: '/licenses', icon: <KeyIcon fontSize="small" /> },
+          { label: 'สัญญา & Warranty', path: '/contracts', icon: <GavelIcon fontSize="small" /> },
+        ],
+      },
+    ],
+  },
 ];
