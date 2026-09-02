@@ -207,10 +207,21 @@ export function EditableFact({
     return () => clearTimeout(t);
   }, [draft, searchFn, open]);
 
+  // MUI's Autocomplete handles Enter on its own root element (selecting
+  // whatever autoHighlight landed on) *in addition to* the custom onKeyDown
+  // below — preventDefault() on the TextField's keydown doesn't stop that,
+  // so a single Enter press can fire commit() twice in the same tick, once
+  // with the raw typed text and once with the resolved option, racing two
+  // PUTs. `saving` (React state) can't catch this — both calls happen before
+  // the first setSaving(true) commits — so a ref (mutated synchronously) is
+  // the guard instead.
+  const commitLockRef = useRef(false);
   const commit = async (next: string) => {
+    if (commitLockRef.current) return;
     const trimmed = next.trim();
     if (required && !trimmed) { setError(`${label} ต้องไม่ว่างเปล่า`); return; }
     if (trimmed === (value || '').trim()) { setOpen(false); return; }
+    commitLockRef.current = true;
     setSaving(true);
     setError(null);
     try {
@@ -220,6 +231,7 @@ export function EditableFact({
       setError(err?.response?.data?.error || err?.message || 'บันทึกไม่สำเร็จ');
     } finally {
       setSaving(false);
+      commitLockRef.current = false;
     }
   };
 
