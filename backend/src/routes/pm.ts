@@ -659,7 +659,22 @@ async function processDeviceAnswers(tx: any, run: any, answers: any[], oldAnswer
                 const dev = devices[i];
                 let existingAsset = null;
                 if (dev.serialNo && dev.serialNo.trim() !== '') {
-                  existingAsset = await tx.asset.findFirst({ where: { serialNo: dev.serialNo.trim() } });
+                  const sNo = dev.serialNo.trim();
+                  // Match on snComputer too, same as buildAgentPmMonitors()'s
+                  // agent-check lookup — some registry rows carry the panel's
+                  // serial there instead of serialNo. Falling back to serialNo
+                  // only here (while agent-check matches both) meant a device
+                  // the agent had already linked would come back unmatched at
+                  // save time, drop out of newAssetIds, and get unlinked
+                  // (status: Available, ownerName cleared) on the run's next
+                  // save — while the monitor was still plugged in.
+                  existingAsset = await tx.asset.findFirst({ where: { OR: [{ serialNo: sNo }, { snComputer: sNo }] } });
+                }
+                // A match already resolved upstream (agent-check's OR lookup,
+                // surfaced to the client as dev._assetId) is authoritative even
+                // when the serial-based re-check above still can't confirm it.
+                if (!existingAsset && dev._assetId) {
+                  existingAsset = await tx.asset.findUnique({ where: { id: Number(dev._assetId) } });
                 }
 
                 if (!existingAsset) {
