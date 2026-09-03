@@ -426,7 +426,7 @@ export default function AssetDetailPage() {
         </Box>
       ) : (
         <Box>
-          {activeTab === 'hardware' && <HardwareTab asset={asset} />}
+          {activeTab === 'hardware' && <HardwareTab asset={asset} agent={externalAgent} />}
           {activeTab === 'spec' && (
             <SpecTab
               asset={asset}

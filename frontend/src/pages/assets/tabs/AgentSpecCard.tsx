@@ -2,12 +2,11 @@ import React, { useMemo, useState } from 'react';
 import {
   Box, Card, CardContent, Typography, Chip, Button, IconButton, CircularProgress,
   Table, TableBody, TableCell, TableHead, TableRow, TableContainer,
-  Accordion, AccordionSummary, AccordionDetails, TextField, InputAdornment,
-  LinearProgress, alpha, useTheme,
+  Accordion, AccordionSummary, AccordionDetails,
+  alpha, useTheme,
 } from '@mui/material';
 import SyncIcon from '@mui/icons-material/Sync';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import SearchIcon from '@mui/icons-material/Search';
 import { useNavigate } from 'react-router-dom';
 import { assetAPI } from '../../../services/api';
 import { MonitorCard, MonitorRow, bucketColors } from '../components/MonitorReconcile';
@@ -69,7 +68,6 @@ export function AgentSpecCard({ agent, spec, asset, syncing, onSync }: {
   onSync?: (field?: string, label?: string) => void;
 }) {
   const theme = useTheme();
-  const [softwareQuery, setSoftwareQuery] = useState('');
 
   const rows = useMemo(
     () => FIELD_LABELS.filter(f => spec?.[f.key] != null).map(f => ({
@@ -81,13 +79,6 @@ export function AgentSpecCard({ agent, spec, asset, syncing, onSync }: {
     [spec, asset],
   );
   const diffCount = rows.filter(r => !r.matches).length;
-
-  const software: { name: string; version?: string }[] = agent?.software || [];
-  const filteredSoftware = useMemo(() => {
-    const q = softwareQuery.trim().toLowerCase();
-    if (!q) return software;
-    return software.filter(s => String(s.name || '').toLowerCase().includes(q));
-  }, [software, softwareQuery]);
 
   /* ── Reconciling the attached monitors ───────────────────────────────
      The table below has always listed what the agent sees. What it could
@@ -113,9 +104,7 @@ export function AgentSpecCard({ agent, spec, asset, syncing, onSync }: {
   const checkFor = (serial: any): MonitorRow | undefined =>
     serial ? (monRows || []).find(r => r.monitor.serial === serial) : undefined;
 
-  const disks = agent?.disks || [];
   const monitors = agent?.monitors || [];
-  const printers = agent?.printers || [];
 
   return (
     <Card sx={{ overflow: 'hidden' }}>
@@ -200,29 +189,10 @@ export function AgentSpecCard({ agent, spec, asset, syncing, onSync }: {
           </Box>
         )}
 
-        {/* ── Read-only monitoring data: real but not the registry's own record ── */}
-        {disks.length > 0 && (
-          <Box sx={{ mt: 2 }}>
-            <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>พื้นที่ดิสก์ (ใช้งานจริง)</Typography>
-            {disks.map((d: any) => {
-              const pct = Number(d.used_pct) || 0;
-              const color = pct >= 90 ? theme.palette.error.main : pct >= 75 ? theme.palette.warning.main : theme.palette.success.main;
-              return (
-                <Box key={d.drive} sx={{ mt: 0.75 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography sx={{ fontSize: '0.75rem' }}>{d.drive} · {d.total_gb} GB (เหลือ {d.free_gb} GB)</Typography>
-                    <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color }}>{pct}%</Typography>
-                  </Box>
-                  <LinearProgress variant="determinate" value={Math.min(100, pct)} sx={{
-                    height: 6, borderRadius: 999, mt: 0.25,
-                    bgcolor: alpha(color, 0.15), '& .MuiLinearProgress-bar': { bgcolor: color, borderRadius: 999 },
-                  }} />
-                </Box>
-              );
-            })}
-          </Box>
-        )}
-
+        {/* ── Read-only monitoring data: disk usage / installed software / printers
+               now live on their own cards (ฮาร์ดแวร์ tab, ซอฟต์แวร์ & Windows tab) —
+               only the monitor reconciliation stays here, since it's an active
+               "does this match the registry" tool, not a plain read-only list. ── */}
         {monitors.length > 0 && (
           <Accordion disableGutters elevation={0} onChange={(_, expanded) => expanded && loadMonitorCheck()}
             sx={{ mt: 1.5, bgcolor: 'transparent', '&:before': { display: 'none' } }}>
@@ -297,80 +267,9 @@ export function AgentSpecCard({ agent, spec, asset, syncing, onSync }: {
           </Accordion>
         )}
 
-        {printers.length > 0 && (
-          <Accordion disableGutters elevation={0} sx={{ bgcolor: 'transparent', '&:before': { display: 'none' } }}>
-            <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ fontSize: 18 }} />} sx={{ minHeight: 0, px: 0, '& .MuiAccordionSummary-content': { my: 1 } }}>
-              <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>เครื่องพิมพ์ที่ติดตั้ง ({printers.length})</Typography>
-            </AccordionSummary>
-            <AccordionDetails sx={{ px: 0, pt: 0 }}>
-              <TableContainer sx={{ maxHeight: 260 }}>
-                <Table size="small" stickyHeader>
-                  <TableHead><TableRow>
-                    <TableCell sx={{ fontSize: '0.7rem' }}>ชื่อ</TableCell>
-                    <TableCell sx={{ fontSize: '0.7rem' }}>ไดรเวอร์</TableCell>
-                    <TableCell sx={{ fontSize: '0.7rem' }}>เครือข่าย</TableCell>
-                  </TableRow></TableHead>
-                  <TableBody>
-                    {printers.map((p: any, i: number) => (
-                      <TableRow key={i}>
-                        <TableCell sx={{ fontSize: '0.75rem' }}>
-                          {p.name || '—'}
-                          {p.is_default ? <Chip label="ค่าเริ่มต้น" size="small" sx={{ ml: 0.75, height: 16, fontSize: '0.62rem' }} /> : null}
-                        </TableCell>
-                        <TableCell sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>{p.driver || '—'}</TableCell>
-                        <TableCell sx={{ fontSize: '0.75rem' }}>{p.is_network ? 'ใช่' : '—'}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </AccordionDetails>
-          </Accordion>
-        )}
-
-        {software.length > 0 && (
-          <Accordion disableGutters elevation={0} sx={{ bgcolor: 'transparent', '&:before': { display: 'none' } }}>
-            <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ fontSize: 18 }} />} sx={{ minHeight: 0, px: 0, '& .MuiAccordionSummary-content': { my: 1 } }}>
-              <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>ซอฟต์แวร์ที่ติดตั้ง ({software.length})</Typography>
-            </AccordionSummary>
-            <AccordionDetails sx={{ px: 0, pt: 0 }}>
-              <TextField
-                size="small" fullWidth placeholder="ค้นหาชื่อโปรแกรม..."
-                value={softwareQuery}
-                onChange={(e) => setSoftwareQuery(e.target.value)}
-                InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 16 }} /></InputAdornment> }}
-                sx={{ mb: 1 }}
-              />
-              <TableContainer sx={{ maxHeight: 320 }}>
-                <Table size="small" stickyHeader>
-                  <TableHead><TableRow>
-                    <TableCell sx={{ fontSize: '0.7rem' }}>ชื่อโปรแกรม</TableCell>
-                    <TableCell sx={{ fontSize: '0.7rem', width: 140 }}>เวอร์ชัน</TableCell>
-                  </TableRow></TableHead>
-                  <TableBody>
-                    {filteredSoftware.length === 0 ? (
-                      <TableRow><TableCell colSpan={2} sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>ไม่พบโปรแกรมที่ค้นหา</TableCell></TableRow>
-                    ) : filteredSoftware.map((s, i) => (
-                      <TableRow key={`${s.name}-${i}`}>
-                        <TableCell sx={{ fontSize: '0.75rem' }}>{s.name}</TableCell>
-                        <TableCell sx={{ fontSize: '0.75rem', fontFamily: 'monospace', color: 'text.secondary' }}>{s.version || '—'}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-              {softwareQuery && (
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                  พบ {filteredSoftware.length} จาก {software.length} รายการ
-                </Typography>
-              )}
-            </AccordionDetails>
-          </Accordion>
-        )}
-
         <Typography sx={{ fontSize: '0.68rem', color: 'text.disabled', mt: 1.5, pt: 1.25, borderTop: '1px solid', borderColor: 'divider' }}>
           ข้อมูลจากระบบ Agent ตรวจสอบเครื่อง (ภายนอก){agent?.collected_at ? ` · เก็บข้อมูลเมื่อ ${new Date(agent.collected_at).toLocaleString('th-TH')}` : ''}
-          {' · '}พื้นที่ดิสก์ / ซอฟต์แวร์ / จอ / เครื่องพิมพ์ เป็นข้อมูลอ่านอย่างเดียว ไม่ได้บันทึกลงทะเบียนทรัพย์สิน
+          {' · '}พื้นที่ดิสก์ / ซอฟต์แวร์ / เครื่องพิมพ์ ย้ายไปอยู่การ์ดของตัวเองแล้ว — ดูที่แท็บฮาร์ดแวร์และซอฟต์แวร์ & Windows
         </Typography>
       </CardContent>
     </Card>

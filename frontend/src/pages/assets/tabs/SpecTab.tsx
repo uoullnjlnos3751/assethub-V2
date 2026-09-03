@@ -18,6 +18,9 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SyncIcon from '@mui/icons-material/Sync';
 import { getStatusLabel } from '../../../config/statusConfig';
 import { AgentSpecCard } from './AgentSpecCard';
+import { WindowsCard } from '../components/WindowsCard';
+import { OfficeCard } from '../components/OfficeCard';
+import { InstalledSoftwareCard } from '../components/InstalledSoftwareCard';
 
 /* ─── Spec item ───────────────────────────────────────────────── */
 function SpecItem({ label, value, mono, colorClass }: {
@@ -152,6 +155,19 @@ export function SpecTab({ asset, glpiSpec, loadingGLPI, syncingGLPI, onSync, age
           onSync={onAgentSync}
         />
       )}
+
+      {/* Windows / Office license & update status, and the installed-software
+          list — all read live from the agent, none of it stored in the
+          registry itself. Each card hides on its own when the agent has
+          nothing to say (no record at all, or an older agent build that
+          doesn't report the Office/Windows fields). */}
+      {agent && (
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 1.5, alignItems: 'start' }}>
+          <WindowsCard agent={agent} />
+          <OfficeCard agent={agent} />
+        </Box>
+      )}
+      {agent && <InstalledSoftwareCard agent={agent} />}
 
       {isComputer && (glpiSpec || loadingGLPI) && (
         <Card sx={{ overflow: 'hidden' }}>
