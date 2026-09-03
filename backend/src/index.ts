@@ -2,6 +2,7 @@ import { createApp } from './app';
 import { startNotificationWorker } from './services/notification';
 import { startOverdueChecker } from './jobs/overdueChecker';
 import { startAgentSpecSync } from './jobs/agentSpecSync';
+import { startComponentChangeDetection } from './jobs/componentChangeDetection';
 import { startAutoBackup } from './services/backup';
 import { validateProductionEnv } from './config/env';
 import { prisma } from './lib/prisma';
@@ -16,6 +17,7 @@ const server = app.listen(Number(PORT), '0.0.0.0', () => {
   startNotificationWorker();
   startOverdueChecker();
   startAgentSpecSync();
+  startComponentChangeDetection();
   startAutoBackup();
 });
 

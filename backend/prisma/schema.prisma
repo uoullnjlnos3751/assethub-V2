@@ -166,6 +166,7 @@ model Asset {
   linkHistoryAsChild  AssetLinkHistory[]   @relation("LinkHistoryChild")
   contractAssets      ContractAsset[]
   deliveryRequests    DeliveryRequest[]
+  componentSnapshot   AssetComponentSnapshot?
 
   @@index([status, departmentId, location])
   @@index([type, brand])
@@ -176,6 +177,23 @@ model Asset {
   @@index([locationRefId])
   @@index([categoryId])
   @@map("assets")
+}
+
+/// สแนปช็อตล่าสุดของ RAM/ดิสก์ที่ Agent เห็นในเครื่องนี้ ใช้เทียบกับรอบถัดไป
+/// เพื่อจับว่ามีการถอด/ใส่อุปกรณ์ — ไม่ใช่ข้อมูลที่ต้องแสดงตรง ๆ กับผู้ใช้
+/// (เหตุการณ์ที่ตรวจจับได้ไปลง AssetHistory แทน อ่านง่ายกว่าและมีอยู่แล้ว)
+/// เก็บแยกจาก Asset เพราะเป็นข้อมูลโครงสร้างภายในของงาน background job
+/// ล้วน ๆ ไม่ใช่ฟิลด์ที่หน้าไหนของแอปอ่าน/แก้ตรง ๆ
+model AssetComponentSnapshot {
+  assetId         Int      @id
+  /// รายการลายนิ้วมือ RAM ที่เห็นล่าสุด (ยี่ห้อ|part|GB|MHz|ชนิด) เก็บซ้ำได้ถ้ามีแถวเดียวกันหลายอัน
+  ramFingerprint  Json
+  /// รายการลายนิ้วมือดิสก์ที่เห็นล่าสุด (ชื่อ|ชนิดสื่อ|GB)
+  diskFingerprint Json
+  updatedAt       DateTime @updatedAt
+  asset           Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@map("asset_component_snapshots")
 }
 
 model ComputerDetail {
