@@ -214,26 +214,11 @@ export function SpecTab({ asset, glpiSpec, loadingGLPI, syncingGLPI, onSync, age
           </AccordionDetails>
         </Accordion>
 
-        {/* Computer Hardware */}
+        {/* Computer OS/license — CPU/RAM/GPU/Storage moved to their own
+            "ฮาร์ดแวร์" tab (per-component cards) so this accordion doesn't
+            repeat the exact same fields in a second shape. */}
         {isComputer && !isMonitor && (
           <>
-            <Accordion defaultExpanded disableGutters elevation={0} sx={{ bgcolor: 'transparent', '&:before': { display: 'none' }, mb: 1 }}>
-              <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ fontSize: 18 }} />} sx={{ minHeight: 0, py: 0.5, px: 0, '& .MuiAccordionSummary-content': { m: 0 } }}>
-                <SectionHeader title="Hardware" />
-              </AccordionSummary>
-              <AccordionDetails sx={{ pt: 1.5, pb: 0.5, px: 0 }}>
-                <Grid container spacing={1}>
-                  <SpecItem label="CPU" value={asset.cpu} />
-                  <SpecItem label="Generation" value={asset.cpuGeneration} />
-                  <SpecItem label="RAM" value={asset.ram} />
-                  <SpecItem label="RAM Slot 1" value={asset.ramSlot1} />
-                  <SpecItem label="RAM Slot 2" value={asset.ramSlot2} />
-                  <SpecItem label="Storage 1" value={asset.storage1} />
-                  <SpecItem label="Storage 2" value={asset.storage2} />
-                  <SpecItem label="GPU" value={asset.gpu} />
-                </Grid>
-              </AccordionDetails>
-            </Accordion>
             <Accordion defaultExpanded disableGutters elevation={0} sx={{ bgcolor: 'transparent', '&:before': { display: 'none' }, mb: 1 }}>
               <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ fontSize: 18 }} />} sx={{ minHeight: 0, py: 0.5, px: 0, '& .MuiAccordionSummary-content': { m: 0 } }}>
                 <SectionHeader title="ระบบปฏิบัติการ" />

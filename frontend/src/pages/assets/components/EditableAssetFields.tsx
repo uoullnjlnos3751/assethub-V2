@@ -7,6 +7,7 @@ import {
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
 import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded';
+import type { LucideIcon } from 'lucide-react';
 import { getStatusMeta } from '../../../config/statusConfig';
 import StatusChip from '../../../components/StatusChip';
 import { assetAPI, catalogAPI } from '../../../services/api';
@@ -21,6 +22,59 @@ import { assetAPI, catalogAPI } from '../../../services/api';
 
 const POPOVER_WIDTH = 260;
 
+/**
+ * Shared "quick-fact pill" chrome for the header row — bordered box, leading
+ * icon, value-over-label (value first, matching the reference header's own
+ * order — everywhere else on this page keeps label-over-value). Only the
+ * trigger's outer shell changes between the pill and inline variants; the
+ * Popper/Autocomplete editing logic underneath is identical either way.
+ */
+function PillShell({ icon: Icon, value, label, onClick, refObj, editable = true }: {
+  icon: LucideIcon;
+  value: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  refObj: React.RefObject<HTMLDivElement>;
+  /** Read-only rendering (no hover affordance) when the viewer can't edit. */
+  editable?: boolean;
+}) {
+  const theme = useTheme();
+  return (
+    <Box
+      ref={refObj}
+      role={editable ? 'button' : undefined}
+      tabIndex={editable ? 0 : undefined}
+      onClick={editable ? onClick : undefined}
+      onKeyDown={editable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
+      className="header-pill-trigger"
+      sx={{
+        display: 'flex', alignItems: 'center', gap: 1,
+        px: 1.5, py: 1, minWidth: 148,
+        borderRadius: '12px', cursor: editable ? 'pointer' : 'default', outline: 'none',
+        border: `1px solid ${theme.palette.divider}`,
+        bgcolor: theme.palette.background.paper,
+        transition: 'border-color .15s, background .15s',
+        '&:hover': editable ? { borderColor: alpha(theme.palette.primary.main, 0.4), bgcolor: alpha(theme.palette.primary.main, 0.03) } : {},
+        '&:focus-visible': { outline: `2px solid ${theme.palette.primary.main}`, outlineOffset: -2 },
+      }}
+    >
+      <Icon size={18} color={theme.palette.primary.main} strokeWidth={2} style={{ flexShrink: 0 }} />
+      <Box sx={{ minWidth: 0, flex: 1 }}>
+        <Box sx={{ fontSize: '0.82rem', fontWeight: 700, color: theme.palette.text.primary, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {value}
+        </Box>
+        <Box sx={{ fontSize: '0.68rem', color: theme.palette.text.disabled, lineHeight: 1.3 }}>{label}</Box>
+      </Box>
+      {editable && (
+        <>
+          <EditRoundedIcon className="edit-affordance" sx={{ fontSize: 14, color: theme.palette.text.disabled, opacity: 0, transition: 'opacity .12s', flexShrink: 0 }} />
+          <style>{`.header-pill-trigger:hover .edit-affordance { opacity: 1; }`}</style>
+        </>
+      )}
+    </Box>
+  );
+}
+
 /* ── Status: closed set, so it's a pick-list rather than a text editor ──── */
 
 interface StatusOption { code: string; label: string }
@@ -29,9 +83,14 @@ interface EditableStatusChipProps {
   status: string;
   canEdit: boolean;
   onChange: (next: string) => Promise<void>;
+  /** 'pill' renders the header quick-fact box (icon + value/label) instead of
+   *  the inline colored StatusChip used everywhere else on this page. */
+  variant?: 'inline' | 'pill';
+  pillIcon?: LucideIcon;
+  pillLabel?: string;
 }
 
-export function EditableStatusChip({ status, canEdit, onChange }: EditableStatusChipProps) {
+export function EditableStatusChip({ status, canEdit, onChange, variant = 'inline', pillIcon, pillLabel }: EditableStatusChipProps) {
   const theme = useTheme();
   const anchorRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -52,7 +111,20 @@ export function EditableStatusChip({ status, canEdit, onChange }: EditableStatus
       .catch(() => setOptions([]));
   }, [open, options, theme]);
 
-  if (!canEdit) return <StatusChip status={status} />;
+  const statusMeta = getStatusMeta(status, theme);
+
+  if (!canEdit) {
+    if (variant === 'pill' && pillIcon) {
+      return (
+        <PillShell
+          icon={pillIcon} refObj={anchorRef} editable={false} onClick={() => {}}
+          label={pillLabel || 'สถานะ'}
+          value={<Box component="span" sx={{ color: statusMeta.color }}>{statusMeta.label}</Box>}
+        />
+      );
+    }
+    return <StatusChip status={status} />;
+  }
 
   const close = () => { if (!saving) setOpen(false); };
 
@@ -72,25 +144,33 @@ export function EditableStatusChip({ status, canEdit, onChange }: EditableStatus
 
   return (
     <>
-      <Box
-        ref={anchorRef}
-        role="button"
-        tabIndex={0}
-        onClick={() => setOpen(v => !v)}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(v => !v); } }}
-        className="editable-chip-trigger"
-        sx={{
-          display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'pointer',
-          borderRadius: 999, outline: 'none',
-          '&:focus-visible': { boxShadow: `0 0 0 2px ${theme.palette.primary.main}` },
-        }}
-      >
-        <StatusChip status={status} />
-        <EditRoundedIcon
-          className="edit-affordance"
-          sx={{ fontSize: 13, color: theme.palette.text.disabled, opacity: 0, transition: 'opacity .12s' }}
+      {variant === 'pill' && pillIcon ? (
+        <PillShell
+          icon={pillIcon} refObj={anchorRef} onClick={() => setOpen(v => !v)}
+          label={pillLabel || 'สถานะ'}
+          value={<Box component="span" sx={{ color: statusMeta.color }}>{statusMeta.label}</Box>}
         />
-      </Box>
+      ) : (
+        <Box
+          ref={anchorRef}
+          role="button"
+          tabIndex={0}
+          onClick={() => setOpen(v => !v)}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(v => !v); } }}
+          className="editable-chip-trigger"
+          sx={{
+            display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'pointer',
+            borderRadius: 999, outline: 'none',
+            '&:focus-visible': { boxShadow: `0 0 0 2px ${theme.palette.primary.main}` },
+          }}
+        >
+          <StatusChip status={status} />
+          <EditRoundedIcon
+            className="edit-affordance"
+            sx={{ fontSize: 13, color: theme.palette.text.disabled, opacity: 0, transition: 'opacity .12s' }}
+          />
+        </Box>
+      )}
       <style>{`.editable-chip-trigger:hover .edit-affordance { opacity: 1; }`}</style>
 
       <Popper open={open} anchorEl={anchorRef.current} placement="bottom-start" transition sx={{ zIndex: 1300 }}>
@@ -172,10 +252,15 @@ interface EditableFactProps {
   /** Backend rejects an empty value for this field — no clear affordance, and Save is disabled on empty. */
   required?: boolean;
   placeholderEmpty?: string;
+  /** 'pill' renders the header quick-fact box (icon + value/label) instead of
+   *  the plain label-over-value cell used in the at-a-glance fact grid. */
+  variant?: 'inline' | 'pill';
+  pillIcon?: LucideIcon;
 }
 
 export function EditableFact({
   label, value, sub, canEdit, onChange, options, searchFn, required, placeholderEmpty = 'ไม่ระบุ',
+  variant = 'inline', pillIcon,
 }: EditableFactProps) {
   const theme = useTheme();
   const anchorRef = useRef<HTMLDivElement>(null);
@@ -238,6 +323,14 @@ export function EditableFact({
   };
 
   if (!canEdit) {
+    if (variant === 'pill' && pillIcon) {
+      return (
+        <PillShell
+          icon={pillIcon} refObj={anchorRef} editable={false} onClick={() => {}}
+          label={label} value={display ?? '—'}
+        />
+      );
+    }
     return (
       <Box sx={{ minWidth: 0 }}>
         <Typography sx={{ fontSize: '0.69rem', color: theme.palette.text.secondary, lineHeight: 1.4 }}>{label}</Typography>
@@ -251,31 +344,39 @@ export function EditableFact({
 
   const listOptions: (string | SearchResult)[] = searchFn ? searchResults : (options || []);
 
+  const pillTrigger = variant === 'pill' && pillIcon && (
+    <PillShell icon={pillIcon} refObj={anchorRef} onClick={startEdit} label={label} value={display ?? placeholderEmpty} />
+  );
+
   return (
     <Box sx={{ minWidth: 0 }}>
-      <Typography sx={{ fontSize: '0.69rem', color: theme.palette.text.secondary, lineHeight: 1.4 }}>{label}</Typography>
-      <Box
-        ref={anchorRef}
-        role="button"
-        tabIndex={0}
-        onClick={startEdit}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startEdit(); } }}
-        className="editable-fact-trigger"
-        sx={{
-          display: 'flex', alignItems: 'center', gap: '4px', mt: '2px', cursor: 'pointer',
-          borderRadius: '6px', outline: 'none', mx: '-4px', px: '4px', py: '1px',
-          '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.045) },
-          '&:focus-visible': { boxShadow: `0 0 0 2px ${theme.palette.primary.main}` },
-        }}
-      >
-        <Typography sx={{
-          fontSize: '0.86rem', fontWeight: 700, color: display ? theme.palette.text.primary : theme.palette.text.disabled,
-          wordBreak: 'break-word', fontStyle: display ? 'normal' : 'italic',
-        }}>
-          {display ?? placeholderEmpty}
-        </Typography>
-        <EditRoundedIcon className="edit-affordance" sx={{ fontSize: 12, color: theme.palette.text.disabled, opacity: 0, transition: 'opacity .12s', flexShrink: 0 }} />
-      </Box>
+      {pillTrigger || (
+        <>
+          <Typography sx={{ fontSize: '0.69rem', color: theme.palette.text.secondary, lineHeight: 1.4 }}>{label}</Typography>
+          <Box
+            ref={anchorRef}
+            role="button"
+            tabIndex={0}
+            onClick={startEdit}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startEdit(); } }}
+            className="editable-fact-trigger"
+            sx={{
+              display: 'flex', alignItems: 'center', gap: '4px', mt: '2px', cursor: 'pointer',
+              borderRadius: '6px', outline: 'none', mx: '-4px', px: '4px', py: '1px',
+              '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.045) },
+              '&:focus-visible': { boxShadow: `0 0 0 2px ${theme.palette.primary.main}` },
+            }}
+          >
+            <Typography sx={{
+              fontSize: '0.86rem', fontWeight: 700, color: display ? theme.palette.text.primary : theme.palette.text.disabled,
+              wordBreak: 'break-word', fontStyle: display ? 'normal' : 'italic',
+            }}>
+              {display ?? placeholderEmpty}
+            </Typography>
+            <EditRoundedIcon className="edit-affordance" sx={{ fontSize: 12, color: theme.palette.text.disabled, opacity: 0, transition: 'opacity .12s', flexShrink: 0 }} />
+          </Box>
+        </>
+      )}
       {sub && <Typography noWrap sx={{ fontSize: '0.7rem', color: theme.palette.text.disabled }}>{sub}</Typography>}
       <style>{`.editable-fact-trigger:hover .edit-affordance { opacity: 1; }`}</style>
 

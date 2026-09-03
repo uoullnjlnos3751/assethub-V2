@@ -17,6 +17,11 @@ import {
 import PrintIcon from '@mui/icons-material/Print';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import QRCode from 'react-qr-code';
+import {
+  LayoutDashboard, Cpu, AppWindow, FileText, Wallet, ClipboardList,
+  ShieldCheck, Wrench, Paperclip, History as HistoryIcon, Link2,
+} from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 import { assetAPI, maintenanceAPI } from '../../services/api';
 import MaintenanceTab from './MaintenanceTab';
 import LinkedAssetsTab from './tabs/LinkedAssetsTab';
@@ -24,8 +29,14 @@ import { SpecTab } from './tabs/SpecTab';
 import { HistoryTab } from './tabs/HistoryTab';
 import { PMTab } from './tabs/PMTab';
 import { DocumentsTab } from './tabs/DocumentsTab';
+import { HardwareTab } from './tabs/HardwareTab';
+import { ContractsTab } from './tabs/ContractsTab';
+import { FinancialsTab } from './tabs/FinancialsTab';
+import { RequestsTab } from './tabs/RequestsTab';
 import { AssetOverviewCard } from './components/AssetOverviewCard';
 import { AssetFinanceCard } from './components/AssetFinanceCard';
+import { AssetHealthStrip } from './components/AssetHealthStrip';
+import { AssetHeaderPills } from './components/AssetHeaderPills';
 import { AssetTimeline } from './components/AssetTimeline';
 import { AssetConnectionHistoryCard } from './components/AssetConnectionHistoryCard';
 import { AssetActionsPanel } from './components/AssetActionsPanel';
@@ -58,13 +69,17 @@ const ASSET_WRITABLE_FIELDS = [
 ] as const;
 
 const TABS = [
-  { value: 'overview', label: 'ภาพรวม' },
-  { value: 'spec', label: 'สเปก & ซอฟต์แวร์' },
-  { value: 'pm', label: 'PM' },
-  { value: 'repairs', label: 'ประวัติการซ่อม' },
-  { value: 'documents', label: 'ไฟล์แนบ' },
-  { value: 'history', label: 'บันทึกกิจกรรม' },
-  { value: 'linked', label: 'อุปกรณ์ที่เชื่อมโยง' },
+  { value: 'overview', label: 'หน้าแรก', icon: LayoutDashboard },
+  { value: 'hardware', label: 'ฮาร์ดแวร์', icon: Cpu },
+  { value: 'spec', label: 'ซอฟต์แวร์ & Windows', icon: AppWindow },
+  { value: 'contracts', label: 'สัญญา', icon: FileText },
+  { value: 'financials', label: 'การเงิน', icon: Wallet },
+  { value: 'requests', label: 'คำขอที่เกี่ยวข้อง', icon: ClipboardList },
+  { value: 'pm', label: 'PM', icon: ShieldCheck },
+  { value: 'repairs', label: 'ประวัติการซ่อม', icon: Wrench },
+  { value: 'documents', label: 'ไฟล์แนบ', icon: Paperclip },
+  { value: 'history', label: 'กิจกรรม', icon: HistoryIcon },
+  { value: 'linked', label: 'อุปกรณ์ที่เชื่อมโยง', icon: Link2 },
 ];
 
 /* ─── Main Page ───────────────────────────────────────────────── */
@@ -72,6 +87,8 @@ export default function AssetDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const theme = useTheme();
+  const { user } = useAuth();
+  const canEdit = user?.role === 'IT_ADMIN' || user?.role === 'SUPERADMIN';
   const [asset, setAsset] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
@@ -300,7 +317,14 @@ export default function AssetDetailPage() {
           <Typography sx={{ fontSize: '1.4rem', fontWeight: 800, color: theme.palette.text.primary, lineHeight: 1.25 }}>
             {[asset.brand, asset.model].filter(Boolean).join(' ') || asset.assetName || asset.assetCode}
           </Typography>
+          {asset.updatedAt && (
+            <Typography sx={{ fontSize: '0.72rem', color: theme.palette.text.disabled, mt: '2px' }}>
+              อัปเดตล่าสุด {new Date(asset.updatedAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
+              {' '}{new Date(asset.updatedAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.
+            </Typography>
+          )}
         </Box>
+        <AssetHeaderPills asset={asset} canEdit={canEdit} onQuickUpdate={handleQuickUpdate} />
         <Button
           variant="outlined"
           color="inherit"
@@ -342,6 +366,7 @@ export default function AssetDetailPage() {
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', flexDirection: { xs: 'column', lg: 'row' } }}>
           {/* ── Main column ─────────────────────────────────── */}
           <Box sx={{ flex: 1, minWidth: 0, width: '100%', display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <AssetHealthStrip asset={asset} agent={externalAgent} loadingAgent={loadingExternalAgent} />
             <AssetOverviewCard asset={asset} onQuickUpdate={handleQuickUpdate} />
 
             {/* Spec beside finance, as in the handoff. auto-fit keeps them side
@@ -401,6 +426,7 @@ export default function AssetDetailPage() {
         </Box>
       ) : (
         <Box>
+          {activeTab === 'hardware' && <HardwareTab asset={asset} />}
           {activeTab === 'spec' && (
             <SpecTab
               asset={asset}
@@ -414,6 +440,9 @@ export default function AssetDetailPage() {
               onAgentSync={handleAgentSync}
             />
           )}
+          {activeTab === 'contracts' && <ContractsTab asset={asset} />}
+          {activeTab === 'financials' && <FinancialsTab asset={asset} />}
+          {activeTab === 'requests' && <RequestsTab asset={asset} />}
           {activeTab === 'pm' && <PMTab asset={asset} />}
           {activeTab === 'repairs' && (
             <MaintenanceTab

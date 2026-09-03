@@ -2294,6 +2294,14 @@ router.get('/:id', authenticate, async (req: Request, res: Response, next: NextF
         category: true,
         documents: { orderBy: { createdAt: 'desc' } },
         catalogItem: { select: { id: true, name: true, jobRole: true } },
+        // สัญญาที่ผูกกับเครื่องนี้ (ประกัน/MA/เช่า) — สำหรับแท็บ "สัญญา" ใหม่
+        contractAssets: { include: { contract: true }, orderBy: { contract: { endDate: 'desc' } } },
+        // คำขอยืมที่เคยมีเครื่องนี้อยู่ในรายการ — สำหรับแท็บ "คำขอที่เกี่ยวข้อง" ใหม่
+        borrowRequestItems: {
+          orderBy: { id: 'desc' },
+          take: 15,
+          include: { request: { select: { requestNo: true, purpose: true, status: true, requester: { select: { displayName: true } } } } },
+        },
       },
     });
     if (!asset) throw new AppError('ไม่พบทรัพย์สิน', 404);
