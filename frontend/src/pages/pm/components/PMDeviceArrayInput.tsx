@@ -317,22 +317,24 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
 
   return (
     <Box sx={{ mt: 1 }}>
-      <Box sx={{ display: 'flex', gap: 0.75, mb: 1.5 }}>
+      {/* ปุ่มแรกที่ต้องกดของทุกข้อชนิด device_array — ขยายจาก size="small" ให้กด
+          ง่ายขึ้นตามที่แจ้งมา หน้าจอนี้ใช้บนคอมพิวเตอร์ระหว่างทำ PM เท่านั้น */}
+      <Box sx={{ display: 'flex', gap: 1, mb: 1.5 }}>
         <Button
           variant={hasAny === 'yes' ? 'contained' : 'outlined'}
           color={hasAny === 'yes' ? 'success' : 'inherit'}
-          size="small"
-          startIcon={<CheckCircleIcon sx={{ fontSize: 16 }} />}
+          startIcon={<CheckCircleIcon sx={{ fontSize: 18 }} />}
           onClick={() => !readOnly && handleToggleYesNo('yes')}
           disabled={readOnly}
+          sx={{ fontSize: 13.5, px: 2.25, py: 0.8 }}
         >{buttonYes}</Button>
         <Button
           variant={hasAny === 'no' ? 'contained' : 'outlined'}
           color={hasAny === 'no' ? 'error' : 'inherit'}
-          size="small"
-          startIcon={<CancelIcon sx={{ fontSize: 16 }} />}
+          startIcon={<CancelIcon sx={{ fontSize: 18 }} />}
           onClick={() => !readOnly && handleToggleYesNo('no')}
           disabled={readOnly}
+          sx={{ fontSize: 13.5, px: 2.25, py: 0.8 }}
         >{buttonNo}</Button>
       </Box>
 
@@ -368,10 +370,14 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
                   )}
                 </Box>
 
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                {/* กว้างพอสำหรับ 2 คอลัมน์บน desktop แล้ว (dialog ขยายเป็น 1040px) —
+                    ช่องที่มีข้อความอธิบาย/คำเตือนต่อท้าย (assetCode, บริษัท, S/N,
+                    ข้อมูลผู้ถือครอง, สเปคจอ) ยังคงเต็มแถวเพื่อไม่ให้ข้อความล้น
+                    ส่วนช่องสั้น ๆ (เลขครุภัณฑ์, ยี่ห้อ, ประเภท, รุ่น) จับคู่กัน 2 ต่อแถว */}
+                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 1.5, alignItems: 'start' }}>
 
                   {/* Photo Upload */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, gridColumn: '1 / -1' }}>
                     {d.photoFilename ? (
                       <Avatar
                         variant="rounded"
@@ -400,7 +406,7 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
                   </Box>
 
                   {/* Fields */}
-                  <Box>
+                  <Box sx={{ gridColumn: '1 / -1' }}>
                     <Typography variant="caption" sx={{ display: 'block', color: theme.palette.text.secondary, mb: 0.5 }}>ชื่อทรัพย์สิน / รหัสทรัพย์สิน</Typography>
                     <Box sx={{ display: 'flex', gap: 0.75 }}>
                       <Box sx={{ flex: 1 }}>
@@ -452,7 +458,7 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
                     />
                   </Box>
 
-                  <Box>
+                  <Box sx={{ gridColumn: '1 / -1' }}>
                     <FormControl size="small" fullWidth disabled={readOnly}>
                       <InputLabel>บริษัท (Company)</InputLabel>
                       <Select label="บริษัท (Company)" value={d.company} onChange={e => updateField(idx, 'company', e.target.value)}>
@@ -473,7 +479,7 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
                     )}
                   </Box>
 
-                  <Box>
+                  <Box sx={{ gridColumn: '1 / -1' }}>
                     <Typography variant="caption" sx={{ display: 'block', color: theme.palette.text.secondary, mb: 0.5 }}>
                       Serial No. <Box component="span" sx={{ color: theme.palette.error.main }}>*</Box>
                     </Typography>
@@ -529,7 +535,7 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
                   />
 
                   {/* Readonly Info */}
-                  <Box sx={{ bgcolor: theme.palette.action.hover, p: 1.25, borderRadius: '8px', fontSize: '0.7rem', color: theme.palette.text.secondary }}>
+                  <Box sx={{ gridColumn: '1 / -1', bgcolor: theme.palette.action.hover, p: 1.25, borderRadius: '8px', fontSize: '0.7rem', color: theme.palette.text.secondary }}>
                     <Box component="strong" sx={{ color: theme.palette.text.primary }}>ผู้ถือครอง:</Box> {parentAsset?.ownerName || '-'}{' '}
                     <Box component="strong" sx={{ color: theme.palette.text.primary }}>แผนก:</Box> {parentAsset?.departmentId || '-'}
                   </Box>
@@ -537,6 +543,7 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
                   {/* Monitor Specs from GLPI / DB / Agent if present */}
                   {!isPrinter && (d.screenSize || d.ports || d.hasSpeaker || d.connectedPort || d.year) && (
                     <Box sx={{
+                      gridColumn: '1 / -1',
                       bgcolor: alpha(theme.palette.info.main, 0.08),
                       border: `1px solid ${alpha(theme.palette.info.main, 0.25)}`,
                       p: 1.25, borderRadius: '8px', fontSize: '0.7rem', color: theme.palette.info.main,

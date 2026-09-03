@@ -124,19 +124,22 @@ function BoolAnswerButtons({
   disabled?: boolean;
   onSelect: (v: string) => void;
 }) {
+  // ปุ่มที่ผู้ใช้กดซ้ำ ๆ มากที่สุดตลอดการตรวจ PM ครั้งหนึ่ง (ทุกข้อในเช็คลิสต์) —
+  // จึงขยายขนาดให้ใหญ่กว่าปุ่มอื่นในหน้าจอ (ไม่ใช่ size="small") ตามที่ผู้ใช้แจ้งว่า
+  // ปุ่มเดิมอึดอัดและกดยาก หน้าจอนี้ใช้บนคอมพิวเตอร์เท่านั้นจึงไม่ต้องหด/ไม่ต้อง
+  // รองรับมือถือ
   const options: { val: string; label: string; icon: React.ReactNode; color: 'success' | 'error' | 'inherit' }[] = [
-    { val: 'yes', label: 'ใช่', icon: <CheckIcon sx={{ fontSize: 14 }} />, color: 'success' },
-    { val: 'no', label: 'ไม่', icon: <CloseIcon sx={{ fontSize: 14 }} />, color: 'error' },
-    { val: 'na', label: 'N/A', icon: <RemoveIcon sx={{ fontSize: 14 }} />, color: 'inherit' },
+    { val: 'yes', label: 'ใช่', icon: <CheckIcon sx={{ fontSize: 17 }} />, color: 'success' },
+    { val: 'no', label: 'ไม่', icon: <CloseIcon sx={{ fontSize: 17 }} />, color: 'error' },
+    { val: 'na', label: 'N/A', icon: <RemoveIcon sx={{ fontSize: 17 }} />, color: 'inherit' },
   ];
   return (
-    <Box sx={{ display: 'flex', gap: 0.75, flexShrink: 0 }}>
+    <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
       {options.map((opt) => {
         const selected = value === opt.val;
         return (
           <Button
             key={opt.val}
-            size="small"
             disabled={disabled}
             onClick={() => onSelect(opt.val)}
             startIcon={opt.icon}
@@ -144,8 +147,10 @@ function BoolAnswerButtons({
             color={selected ? opt.color : 'inherit'}
             sx={{
               borderRadius: 5,
-              px: 1.5,
-              fontSize: 12,
+              px: 2.5,
+              py: 0.9,
+              fontSize: 14,
+              fontWeight: 600,
               opacity: disabled && !selected ? 0.5 : 1,
             }}
           >
@@ -195,10 +200,10 @@ function ChecklistItemRow({
       sx={{
         display: 'flex',
         alignItems: 'flex-start',
-        gap: 1.75,
+        gap: 2,
         flexWrap: 'wrap',
-        px: 2.5,
-        py: 1.5,
+        px: 3,
+        py: 2,
         borderBottom: '1px solid',
         borderColor: 'divider',
         '&:last-of-type': { borderBottom: 'none' },
@@ -206,8 +211,8 @@ function ChecklistItemRow({
     >
       <Box
         sx={{
-          width: 24,
-          height: 24,
+          width: 28,
+          height: 28,
           borderRadius: '50%',
           bgcolor: 'action.hover',
           border: '1px solid',
@@ -215,7 +220,7 @@ function ChecklistItemRow({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: 10,
+          fontSize: 11.5,
           fontWeight: 600,
           color: 'text.secondary',
           flexShrink: 0,
@@ -225,7 +230,7 @@ function ChecklistItemRow({
       </Box>
 
       <Box sx={{ flex: 1, minWidth: 220 }}>
-        <Typography sx={{ fontSize: 13, color: 'text.primary', fontWeight: 500 }}>{item.label}</Typography>
+        <Typography sx={{ fontSize: 14.5, color: 'text.primary', fontWeight: 500 }}>{item.label}</Typography>
 
         {type === 'text' && (
           <TextField
@@ -1451,7 +1456,7 @@ export default function PMRunPage() {
       <Modal
         open={pmModal.open}
         onClose={() => setPMModal({ open: false, run: null, readOnly: false })}
-        maxWidth={760}
+        maxWidth={1040}
         title={`${pmModal.readOnly || pmModal.run?.status === 'COMPLETED' ? 'รายละเอียดข้อมูล' : 'บันทึกข้อมูล'} PM: ${pmModal.run?.asset?.assetName || pmModal.run?.asset?.assetCode || ''} — ${pmModal.run?.asset?.brand || ''} ${pmModal.run?.asset?.model || ''}`}
       >
         {pmModal.run && (() => {
@@ -1624,8 +1629,10 @@ export default function PMRunPage() {
                               ผูกกับเครื่องตัวเดียวและมี Serial ของตัวเองให้จับคู่ทะเบียน */}
                           {agentCheck.monitors?.length > 0 && (
                             <Box sx={{ mt: 0.75, pt: 0.75, borderTop: '1px dashed', borderColor: 'divider' }}>
-                              <Typography sx={{ fontSize: 10.5, color: 'text.secondary', mb: 0.5 }}>
-                                🖥️ จอที่ต่ออยู่ {agentCheck.monitors.length} ตัว
+                              {/* จำนวนจอ ณ ขณะตรวจ คือตัวเลขแรกที่ผู้ใช้ต้องอ่าน — เลยทำให้
+                                  เด่นกว่ารายละเอียดแต่ละจอด้านล่าง ไม่ใช่แค่ label เล็ก ๆ เท่ากัน */}
+                              <Typography sx={{ fontSize: 13, fontWeight: 700, color: 'text.primary', mb: 0.5 }}>
+                                🖥️ จอที่ต่ออยู่ขณะนี้ {agentCheck.monitors.length} ตัว
                               </Typography>
                               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
                                 {agentCheck.monitors.map((m: any, idx: number) => (
@@ -1637,7 +1644,8 @@ export default function PMRunPage() {
                                     color={m._assetId ? 'default' : 'warning'}
                                     label={`${[m.brand, m.model].filter(Boolean).join(' ') || 'ไม่ทราบรุ่น'}${
                                       m.serial ? ` (S/N: ${m.serial})` : ' (ไม่มี S/N)'
-                                    }${m._assetId ? ` · ${m.assetCode || 'อยู่ในทะเบียน'}` : ' · ยังไม่มีในทะเบียน'}`}
+                                    }${m.connectedPort ? ` · พอร์ต ${m.connectedPort}` : ''}${
+                                      m._assetId ? ` · ${m.assetCode || 'อยู่ในทะเบียน'}` : ' · ยังไม่มีในทะเบียน'}`}
                                     sx={{ fontSize: 10 }}
                                   />
                                 ))}
@@ -1726,7 +1734,7 @@ export default function PMRunPage() {
       <Modal
         open={bulkPMModal.open}
         onClose={() => setBulkPMModal({ open: false, templateId: null })}
-        maxWidth={760}
+        maxWidth={1040}
         title={`บันทึก PM แบบกลุ่ม (${selectedRunIds.length} รายการ)`}
       >
         {selectedRunIds.length > 0 && (() => {
