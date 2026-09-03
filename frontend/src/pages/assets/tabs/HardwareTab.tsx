@@ -1,7 +1,10 @@
-import React from 'react';
-import { Box, Typography, Chip, LinearProgress, alpha, useTheme } from '@mui/material';
-import { Cpu, MemoryStick, HardDrive, Layers, Network, CircuitBoard, MonitorSmartphone, Printer } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Box, Typography, Chip, LinearProgress, CircularProgress, alpha, useTheme } from '@mui/material';
+import { Cpu, MemoryStick, HardDrive, Layers, Network, CircuitBoard, MonitorSmartphone, Printer, ChevronRight } from 'lucide-react';
 import { SectionCard } from '../../../components/SectionCard';
+import { assetAPI } from '../../../services/api';
+import type { MonitorRow } from '../components/MonitorReconcile';
 
 /**
  * Per-component hardware cards — CPU / RAM / Storage / GPU / Network /
@@ -75,6 +78,7 @@ function DiskBar({ drive, totalGb, freeGb, usedPct }: { drive: string; totalGb: 
 
 export function HardwareTab({ asset, agent }: { asset: any; agent?: any }) {
   const theme = useTheme();
+  const navigate = useNavigate();
   const a = agent || {};
 
   const ramSlotsLive: any[] = a.ram_slots || [];
@@ -82,6 +86,25 @@ export function HardwareTab({ asset, agent }: { asset: any; agent?: any }) {
   const diskHealthLive: any[] = a.disk_health || [];
   const monitorsLive: any[] = a.monitors || [];
   const printersLive: any[] = a.printers || [];
+
+  // Each monitor's serial, looked up against the asset registry — same
+  // reconciliation the "สเปก & ซอฟต์แวร์" tab already runs, reused here so
+  // this card can show which registered IT asset each attached monitor
+  // actually is, not just what the agent happened to see plugged in.
+  const [monRows, setMonRows] = useState<MonitorRow[] | null>(null);
+  const [monLoading, setMonLoading] = useState(false);
+  useEffect(() => {
+    if (monitorsLive.length === 0 || !asset?.id) return;
+    setMonLoading(true);
+    assetAPI.assetAgentMonitors(asset.id)
+      .then(res => setMonRows(res.data?.rows || []))
+      .catch(() => setMonRows([]))
+      .finally(() => setMonLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asset?.id, monitorsLive.length]);
+
+  const registryMatch = (serial?: string | null) =>
+    serial ? (monRows || []).find(r => r.monitor.serial === serial) : undefined;
 
   const ramRows = ramSlotsLive.length === 0 ? [
     { label: 'ขนาดรวม', value: asset.ram },
@@ -184,17 +207,71 @@ export function HardwareTab({ asset, agent }: { asset: any; agent?: any }) {
       {monitorsLive.length > 0 && (
         <SectionCard title={`มอนิเตอร์ที่ต่ออยู่ (${monitorsLive.length})`} icon={MonitorSmartphone}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            {monitorsLive.map((m: any, i: number) => (
-              <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, py: 0.6, borderBottom: i < monitorsLive.length - 1 ? `1px dashed ${alpha(theme.palette.divider, 0.9)}` : 'none' }}>
-                <Box sx={{ minWidth: 0 }}>
-                  <Typography sx={{ fontSize: '0.78rem', fontWeight: 600 }}>{m.name || '—'}</Typography>
-                  <Typography sx={{ fontSize: '0.7rem', color: theme.palette.text.disabled }}>
-                    {m.type === 'Internal' ? 'จอในตัว' : 'จอนอก'}{m.port ? ` · ${m.port}` : ''}{m.width && m.height ? ` · ${m.width}×${m.height}` : ''}
-                  </Typography>
+            {monitorsLive.map((m: any, i: number) => {
+              const match = registryMatch(m.serial);
+              const registered = match && match.assetId;
+              return (
+                <Box key={i} sx={{ py: 0.6, borderBottom: i < monitorsLive.length - 1 ? `1px dashed ${alpha(theme.palette.divider, 0.9)}` : 'none' }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography sx={{ fontSize: '0.78rem', fontWeight: 600 }}>{m.name || '—'}</Typography>
+                      <Typography sx={{ fontSize: '0.7rem', color: theme.palette.text.disabled }}>
+                        {m.type === 'Internal' ? 'จอในตัว' : 'จอนอก'}{m.port ? ` · ${m.port}` : ''}{m.width && m.height ? ` · ${m.width}×${m.height}` : ''}
+                      </Typography>
+                    </Box>
+                    {m.serial && <Typography sx={{ fontSize: '0.72rem', fontFamily: 'monospace', color: theme.palette.text.secondary, flexShrink: 0 }}>{m.serial}</Typography>}
+                  </Box>
+
+                  {/* จอในตัวไม่ใช่ทรัพย์สินแยกในทะเบียน จึงไม่มีอะไรให้ค้นหา */}
+                  {m.type !== 'Internal' && m.serial && (
+                    monLoading ? (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.5 }}>
+                        <CircularProgress size={11} />
+                        <Typography sx={{ fontSize: '0.68rem', color: theme.palette.text.disabled }}>กำลังค้นในทะเบียน...</Typography>
+                      </Box>
+                    ) : registered ? (
+                      <Box
+                        onClick={() => navigate(`/assets/${match!.assetId}`)}
+                        sx={{
+                          display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5, cursor: 'pointer',
+                          '&:hover .mon-link-text': { textDecoration: 'underline' },
+                        }}
+                      >
+                        <Chip label="ในทะเบียน" size="small" sx={{
+                          height: 16, fontSize: '0.6rem', fontWeight: 700,
+                          bgcolor: alpha(theme.palette.success.main, 0.14), color: theme.palette.success.dark,
+                        }} />
+                        <Typography className="mon-link-text" sx={{ fontSize: '0.72rem', fontWeight: 700, color: theme.palette.primary.main }}>
+                          {match!.assetCode || match!.assetName}
+                        </Typography>
+                        {match!.assetCode && match!.assetName && (
+                          <Typography sx={{ fontSize: '0.7rem', color: theme.palette.text.disabled }}>· {match!.assetName}</Typography>
+                        )}
+                        <ChevronRight size={12} color={theme.palette.text.disabled} />
+                      </Box>
+                    ) : (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+                        <Chip label="ยังไม่มีในทะเบียน" size="small" sx={{
+                          height: 16, fontSize: '0.6rem', fontWeight: 700,
+                          bgcolor: alpha(theme.palette.warning.main, 0.14), color: theme.palette.warning.dark,
+                        }} />
+                        <Typography
+                          onClick={() => navigate(
+                            `/assets/new?type=${encodeURIComponent('Monitor มาตรฐาน')}` +
+                            `&serialNo=${encodeURIComponent(m.serial || '')}` +
+                            `&brand=${encodeURIComponent(m.manufacturer || '')}` +
+                            `&model=${encodeURIComponent(m.name || '')}`,
+                          )}
+                          sx={{ fontSize: '0.7rem', fontWeight: 700, color: theme.palette.primary.main, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+                        >
+                          เพิ่มเข้าทะเบียน
+                        </Typography>
+                      </Box>
+                    )
+                  )}
                 </Box>
-                {m.serial && <Typography sx={{ fontSize: '0.72rem', fontFamily: 'monospace', color: theme.palette.text.secondary, flexShrink: 0 }}>{m.serial}</Typography>}
-              </Box>
-            ))}
+              );
+            })}
           </Box>
         </SectionCard>
       )}
