@@ -1594,6 +1594,8 @@ model CatalogItem {
   brand            String?
   model            String?
   specs            String?
+  /// รูปสินค้า — base64 data URL เก็บตรงในคอลัมน์ เหมือน Asset.image
+  imageUrl         String?
   /// ราคาที่เคยซื้อจริงครั้งล่าสุด — ไม่ใช่ราคาตลาดปัจจุบัน
   recommendedPrice Decimal? @db.Decimal(12, 2)
   vendorName       String?

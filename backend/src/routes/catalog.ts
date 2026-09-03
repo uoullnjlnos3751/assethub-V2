@@ -32,6 +32,17 @@ const docUpload = multer({
   },
 });
 
+// รูปสินค้า — memoryStorage + เก็บเป็น base64 data URL ตรงในคอลัมน์ imageUrl
+// เหมือน Asset.image ทุกประการ ไม่ใช้ disk storage เพราะรูปสินค้าเล็กและมีทีละรูป
+const imageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('รองรับเฉพาะไฟล์รูปภาพ'));
+  },
+});
+
 const assigneeSelect = {
   select: {
     id: true, assetCode: true, assetName: true, type: true, brand: true, model: true,
@@ -162,6 +173,29 @@ router.delete('/:id', authenticate, authorize('SUPERADMIN'), async (req: Request
     }
     await prisma.catalogItem.delete({ where: { id } });
     res.json({ message: 'ลบรายการแคตตาล็อกเรียบร้อย' });
+  } catch (err) { next(err); }
+});
+
+router.post('/:id/image', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), imageUpload.single('image'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const item = await prisma.catalogItem.findUnique({ where: { id } });
+    if (!item) throw new AppError('ไม่พบรายการในแคตตาล็อก', 404);
+    if (!req.file) throw new AppError('ไม่พบไฟล์รูปภาพ', 400);
+
+    const dataUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+    const updated = await prisma.catalogItem.update({ where: { id }, data: { imageUrl: dataUrl } });
+    res.json({ message: 'อัปโหลดรูปภาพเรียบร้อย', imageUrl: updated.imageUrl });
+  } catch (err) { next(err); }
+});
+
+router.delete('/:id/image', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const item = await prisma.catalogItem.findUnique({ where: { id } });
+    if (!item) throw new AppError('ไม่พบรายการในแคตตาล็อก', 404);
+    await prisma.catalogItem.update({ where: { id }, data: { imageUrl: null } });
+    res.json({ message: 'ลบรูปภาพเรียบร้อย' });
   } catch (err) { next(err); }
 });
 

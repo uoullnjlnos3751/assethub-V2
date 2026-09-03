@@ -532,6 +532,9 @@ export const catalogAPI = {
   create: (data: any) => api.post('/catalog', data),
   update: (id: number, data: any) => api.put(`/catalog/${id}`, data),
   delete: (id: number) => api.delete(`/catalog/${id}`),
+  uploadImage: (id: number, formData: FormData) =>
+    api.post(`/catalog/${id}/image`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  deleteImage: (id: number) => api.delete(`/catalog/${id}/image`),
   uploadDocument: (id: number, formData: FormData) =>
     api.post(`/catalog/${id}/documents`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
   downloadDocument: (id: number, docId: number) => {
