@@ -120,7 +120,7 @@ const ALLOWED_ASSET_FIELDS = new Set([
   'location', 'status', 'remark', 'company', 'cpuGeneration', 'domainName',
   'floor', 'poDate', 'ramDetail', 'gpu', 'osType', 'ramSlot1', 'ramSlot2',
   'snComputer', 'storage1', 'storage2', 'createdAt', 'updatedAt',
-  'oldAssetCode', 'accountingCode', 'budget', 'image', 'categoryId',
+  'oldAssetCode', 'accountingCode', 'budget', 'image', 'categoryId', 'catalogItemId',
   'memoryType', 'ramOnboard', 'ramType', 'ramSpeed', 'ramMaxSupported', 'ramAvailableSlots', 'ramUpgradeable',
   'assignedToUserId', 'departmentRefId', 'vendorRefId', 'locationRefId',
 ]);
@@ -2293,6 +2293,7 @@ router.get('/:id', authenticate, async (req: Request, res: Response, next: NextF
         pmRuns: { orderBy: { completedAt: 'desc' }, take: 20, include: { plan: true, performer: true, answers: { include: { item: true } } } },
         category: true,
         documents: { orderBy: { createdAt: 'desc' } },
+        catalogItem: { select: { id: true, name: true, jobRole: true } },
       },
     });
     if (!asset) throw new AppError('ไม่พบทรัพย์สิน', 404);
@@ -2471,6 +2472,9 @@ router.post('/agent/monitor-link', authenticate, authorize('IT_ADMIN', 'SUPERADM
       const exists = await prisma.assetLink.findFirst({ where: { parentId, childId } });
       if (exists) { skipped++; continue; }
       await prisma.assetLink.create({
+        data: { parentId, childId, linkType: 'MONITOR', note: 'ผูกจากข้อมูล Agent' },
+      });
+      await prisma.assetLinkHistory.create({
         data: { parentId, childId, linkType: 'MONITOR', note: 'ผูกจากข้อมูล Agent' },
       });
       await prisma.assetHistory.create({
@@ -3150,6 +3154,45 @@ router.get('/:id/history', authenticate, async (req: Request, res: Response, nex
         hasMore: offset + limit < total,
       },
     });
+  } catch (err) { next(err); }
+});
+
+// จอ ↔ โน้ตบุ๊ก เคยเชื่อมต่อกับอะไรบ้าง — asset นี้อยู่ฝั่ง parent หรือ child ก็ได้
+// (โน้ตบุ๊กดูประวัติจอที่เคยต่อ, จอดูประวัติโน้ตบุ๊กที่เคยถูกเอาไปต่อ ใช้ endpoint เดียวกัน)
+router.get('/:id/link-history', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const asset = await prisma.asset.findUnique({ where: { id } });
+    if (!asset) throw new AppError('ไม่พบทรัพย์สิน', 404);
+
+    const assetSummary = { select: { id: true, assetCode: true, assetName: true, type: true } };
+    const [asParent, asChild] = await Promise.all([
+      prisma.assetLinkHistory.findMany({
+        where: { parentId: id },
+        include: { child: assetSummary },
+        orderBy: { connectedAt: 'desc' },
+      }),
+      prisma.assetLinkHistory.findMany({
+        where: { childId: id },
+        include: { parent: assetSummary },
+        orderBy: { connectedAt: 'desc' },
+      }),
+    ]);
+
+    // ทั้งสองฝั่งรวมเป็นรายการเดียว เรียงตามเวลาเชื่อมต่อ — ฝั่งหน้าเว็บไม่ต้องสนใจว่า
+    // asset นี้เป็น parent หรือ child ของคู่นั้น แค่รู้ว่า "เคยต่อกับอุปกรณ์ไหน ช่วงไหน"
+    const merged = [
+      ...asParent.map((h) => ({
+        id: h.id, linkType: h.linkType, connectedAt: h.connectedAt, disconnectedAt: h.disconnectedAt,
+        note: h.note, otherAsset: h.child,
+      })),
+      ...asChild.map((h) => ({
+        id: h.id, linkType: h.linkType, connectedAt: h.connectedAt, disconnectedAt: h.disconnectedAt,
+        note: h.note, otherAsset: h.parent,
+      })),
+    ].sort((a, b) => new Date(b.connectedAt).getTime() - new Date(a.connectedAt).getTime());
+
+    res.json(merged);
   } catch (err) { next(err); }
 });
 

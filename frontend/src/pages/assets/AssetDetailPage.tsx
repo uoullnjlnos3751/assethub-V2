@@ -27,6 +27,7 @@ import { DocumentsTab } from './tabs/DocumentsTab';
 import { AssetOverviewCard } from './components/AssetOverviewCard';
 import { AssetFinanceCard } from './components/AssetFinanceCard';
 import { AssetTimeline } from './components/AssetTimeline';
+import { AssetConnectionHistoryCard } from './components/AssetConnectionHistoryCard';
 import { AssetActionsPanel } from './components/AssetActionsPanel';
 import { AssetInsightTiles } from './components/AssetInsightTiles';
 import { AssetSpecMiniCard } from './components/AssetSpecMiniCard';
@@ -52,7 +53,7 @@ const ASSET_WRITABLE_FIELDS = [
   'location', 'status', 'remark', 'company', 'cpuGeneration', 'domainName',
   'floor', 'poDate', 'ramDetail', 'gpu', 'osType', 'ramSlot1', 'ramSlot2',
   'snComputer', 'storage1', 'storage2',
-  'oldAssetCode', 'accountingCode', 'budget', 'image', 'categoryId',
+  'oldAssetCode', 'accountingCode', 'budget', 'image', 'categoryId', 'catalogItemId',
   'memoryType', 'ramOnboard', 'ramType', 'ramSpeed', 'ramMaxSupported', 'ramAvailableSlots', 'ramUpgradeable',
 ] as const;
 
@@ -83,6 +84,9 @@ export default function AssetDetailPage() {
   const [externalAgent, setExternalAgent] = useState<any>(null);
   const [agentSpec, setAgentSpec] = useState<Record<string, string | null> | null>(null);
   const [loadingExternalAgent, setLoadingExternalAgent] = useState(false);
+  const [linkHistory, setLinkHistory] = useState<any[]>([]);
+  const [loadingLinkHistory, setLoadingLinkHistory] = useState(false);
+  const [showConnectionHistory, setShowConnectionHistory] = useState(false);
   const [syncingAgent, setSyncingAgent] = useState(false);
   const [toast, setToast] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'warning' | 'info' }>({
     open: false,
@@ -158,6 +162,29 @@ export default function AssetDetailPage() {
       setAgentSpec(null);
     }
   }, [asset?.id, id]);
+
+  // Notebook↔Monitor connection history — only computers and monitors ever
+  // appear on either side of an AssetLink, so gate the fetch to those (same
+  // "is this a computer" style check as GLPI/agent above, plus a monitor check
+  // since a monitor's own detail page also needs to see its notebook history).
+  useEffect(() => {
+    if (!asset || !id || asset.id !== parseInt(id)) return;
+    const t = (asset.type || '').toLowerCase();
+    const cat = (asset.category?.name || '').toLowerCase();
+    const isComputer = ['notebook', 'laptop', 'macbook', 'pc desktop', 'desktop', 'workstation', 'all-in-one', 'mini pc', 'thin client', 'computer'].some(k => t.includes(k)) || cat === 'คอมพิวเตอร์' || t === 'pc';
+    const isMonitor = t.includes('monitor');
+    setShowConnectionHistory(isComputer || isMonitor);
+
+    if (isComputer || isMonitor) {
+      setLoadingLinkHistory(true);
+      assetAPI.linkHistory(parseInt(id))
+        .then((res) => setLinkHistory(Array.isArray(res.data) ? res.data : []))
+        .catch(() => setLinkHistory([]))
+        .finally(() => setLoadingLinkHistory(false));
+    } else {
+      setLinkHistory([]);
+    }
+  }, [asset?.id, asset?.type, id]);
 
   // Apply the agent's reading to the asset — one field, or every differing one.
   const handleAgentSync = async (field?: string, label?: string) => {
@@ -244,7 +271,9 @@ export default function AssetDetailPage() {
   // — the PUT handler returns the bare `prisma.asset.update()` row with none
   // of the relations (category/assetHistory/pmRuns/documents) the GET
   // include pulls in, and several cards on this page read those.
-  const handleQuickUpdate = async (field: string, value: string) => {
+  // ส่วนใหญ่เป็น text แต่ catalogItemId เป็น FK ตัวเลข/null ล้วน (ดู EditableCatalogChip) —
+  // เลยรับ any แทนที่จะบังคับ string เหมือน field อื่น
+  const handleQuickUpdate = async (field: string, value: any) => {
     if (!id || !asset) return;
     const payload: Record<string, any> = {};
     for (const key of ASSET_WRITABLE_FIELDS) {
@@ -364,6 +393,9 @@ export default function AssetDetailPage() {
             </Box>
             <AssetLiveStatusCard loading={loadingExternalAgent} agent={externalAgent} />
             <AssetTimeline asset={asset} maintenance={maintenance} />
+            {showConnectionHistory && (
+              <AssetConnectionHistoryCard loading={loadingLinkHistory} history={linkHistory} />
+            )}
             <AssetDocumentsRail asset={asset} onReload={reloadAsset} />
           </Box>
         </Box>

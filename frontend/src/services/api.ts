@@ -140,6 +140,8 @@ export const assetAPI = {
   assetAgentMonitors: (id: number) => api.get(`/assets/${id}/agent-monitors`),
   monitorSync: (id: number, fields: Record<string, string>) => api.post(`/assets/${id}/monitor-sync`, { fields }),
   monitorLink: (pairs: { parentId: number; childId: number }[]) => api.post('/assets/agent/monitor-link', { pairs }),
+  /** ประวัติการเชื่อมต่อ Notebook↔Monitor ของทรัพย์สินนี้ (ทั้งฝั่งเป็น parent และ child) */
+  linkHistory: (id: number) => api.get(`/assets/${id}/link-history`),
   agentFillBlanks: (assetIds?: number[]) => api.post('/assets/agent/fill-blanks', { assetIds }),
   getAssetHistory: (id: number, params?: any) => api.get(`/assets/${id}/history`, { params }),
   getGlobalHistory: (params?: any) => api.get('/assets/global-history', { params }),
@@ -328,6 +330,9 @@ export const floorPlanAPI = {
   /** โซนแผนกและตารางโต๊ะ — บันทึกทั้งชุดในครั้งเดียว */
   updateZones: (id: number, zones: any[], year: number) =>
     api.put(`/floorplans/${id}/zones`, { zones }, { params: { year } }),
+  /** กรอบอุปกรณ์วาดเอง (Rack/ตู้เครือข่าย ฯลฯ) — บันทึกทั้งชุดในครั้งเดียว เหมือนโซน/ที่นั่ง */
+  updateFrames: (id: number, frames: any[], year: number) =>
+    api.put(`/floorplans/${id}/frames`, { frames }, { params: { year } }),
   /** ผังที่เก็บไว้ใช้ซ้ำกับชั้นอื่น */
   templates: () => api.get('/floorplans/templates/list'),
   saveTemplate: (id: number, data: { name: string; description?: string }) =>
@@ -515,6 +520,24 @@ export const licenseAPI = {
   delete: (id: number) => api.delete(`/licenses/${id}`),
   assign: (id: number, data: { assetId?: number; userId?: number; note?: string }) => api.post(`/licenses/${id}/assign`, data),
   unassign: (assignmentId: number) => api.delete(`/licenses/assignments/${assignmentId}`),
+};
+
+// Standard IT Equipment Catalog — reference specs per job role. USER/VIEWER
+// read-only, IT_ADMIN/SUPERADMIN full CRUD (enforced server-side).
+export const catalogAPI = {
+  list: (params?: { jobRole?: string; q?: string; activeOnly?: boolean }) => api.get('/catalog', { params }),
+  jobRoles: () => api.get('/catalog/job-roles'),
+  get: (id: number) => api.get(`/catalog/${id}`),
+  assets: (id: number) => api.get(`/catalog/${id}/assets`),
+  create: (data: any) => api.post('/catalog', data),
+  update: (id: number, data: any) => api.put(`/catalog/${id}`, data),
+  delete: (id: number) => api.delete(`/catalog/${id}`),
+  uploadDocument: (id: number, formData: FormData) =>
+    api.post(`/catalog/${id}/documents`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  downloadDocument: (id: number, docId: number) => {
+    window.open(`/api/catalog/${id}/documents/${docId}/download`, '_blank');
+  },
+  deleteDocument: (id: number, docId: number) => api.delete(`/catalog/${id}/documents/${docId}`),
 };
 
 // Asset Disposals (Phase 2)

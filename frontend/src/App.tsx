@@ -59,6 +59,8 @@ const MasterDataManagementPage = lazy(() => import('./pages/admin/MasterDataMana
 const AssetHistoryPage = lazy(() => import('./pages/assets/AssetHistoryPage'));
 const ContractsPage = lazy(() => import('./pages/contracts/ContractsPage'));
 const LicensesPage = lazy(() => import('./pages/licenses/LicensesPage'));
+const CatalogListPage = lazy(() => import('./pages/catalog/CatalogListPage'));
+const CatalogDetailPage = lazy(() => import('./pages/catalog/CatalogDetailPage'));
 const DeliveryPage = lazy(() => import('./pages/delivery/DeliveryPage'));
 const DeliveryConfirmPage = lazy(() => import('./pages/delivery/DeliveryConfirmPage'));
 
@@ -162,6 +164,11 @@ export default function App() {
           {/* Contracts & Licenses (Phase 3) */}
           <Route path="contracts" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><ContractsPage /></ProtectedRoute>} />
           <Route path="licenses" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><LicensesPage /></ProtectedRoute>} />
+          {/* USER/VIEWER get view-only access (enforced by canEdit inside the pages
+              themselves + the backend's write-route role gates) — unlike licenses/
+              contracts above, this module is meant to reach every logged-in role. */}
+          <Route path="catalog" element={<ProtectedRoute roles={['SUPERADMIN', 'IT_ADMIN', 'USER', 'VIEWER']}><CatalogListPage /></ProtectedRoute>} />
+          <Route path="catalog/:id" element={<ProtectedRoute roles={['SUPERADMIN', 'IT_ADMIN', 'USER', 'VIEWER']}><CatalogDetailPage /></ProtectedRoute>} />
           <Route path="profile" element={<ProfilePage />} />
           {/* Donations */}
           <Route path="donations" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><DonationListPage /></ProtectedRoute>} />

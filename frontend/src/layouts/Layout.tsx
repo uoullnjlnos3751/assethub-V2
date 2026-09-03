@@ -165,7 +165,7 @@ export default function Layout() {
   }, [isAdmin]);
 
   // VIEWER = read-only executive access: dashboard, license/contract, reports only
-  const viewerVisiblePaths = new Set(['/dashboard', '/contracts', '/licenses']);
+  const viewerVisiblePaths = new Set(['/dashboard', '/contracts', '/licenses', '/catalog']);
   const viewerVisibleLabels = new Set(['License & สัญญา', 'รายงานระบบ']);
 
   const filteredNav = isAdmin

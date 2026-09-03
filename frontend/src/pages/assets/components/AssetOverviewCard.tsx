@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Box, Typography, Chip, alpha, useTheme } from '@mui/material';
 import { getTypeIconComponent } from './assetTypeIcon';
 import { calcDepreciation, fmtBaht } from './assetFinance';
-import { EditableStatusChip, EditableFact } from './EditableAssetFields';
+import { EditableStatusChip, EditableFact, EditableCatalogChip } from './EditableAssetFields';
 import { useAuth } from '../../../contexts/AuthContext';
 import { assetAPI } from '../../../services/api';
 
@@ -38,8 +38,9 @@ function Fact({ label, value, sub, mono, accent }: {
 
 interface AssetOverviewCardProps {
   asset: any;
-  /** Applies one field's new value and reloads the asset. Omit to render every chip read-only (e.g. no role check done yet). */
-  onQuickUpdate?: (field: string, value: string) => Promise<void>;
+  /** Applies one field's new value and reloads the asset. Omit to render every chip read-only (e.g. no role check done yet).
+   *  value is usually a string, except catalogItemId which is a number|null FK — see EditableCatalogChip. */
+  onQuickUpdate?: (field: string, value: any) => Promise<void>;
 }
 
 export function AssetOverviewCard({ asset, onQuickUpdate }: AssetOverviewCardProps) {
@@ -132,6 +133,11 @@ export function AssetOverviewCard({ asset, onQuickUpdate }: AssetOverviewCardPro
                 }}
               />
             )}
+            <EditableCatalogChip
+              catalogItem={asset.catalogItem || null}
+              canEdit={canEdit}
+              onChange={(catalogItemId) => onQuickUpdate!('catalogItemId', catalogItemId)}
+            />
           </Box>
           <Typography sx={{ fontSize: '0.95rem', mt: '2px', color: theme.palette.text.primary }}>
             {[asset.brand, asset.model].filter(Boolean).join(' ') || '—'}

@@ -37,12 +37,14 @@ import GavelIcon from '@mui/icons-material/Gavel';
 import KeyIcon from '@mui/icons-material/Key';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import DeviceHubIcon from '@mui/icons-material/DeviceHub';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
 // ── Rail icons (rounded cut — reads better at 21px than the sharp default) ──
 import SpaceDashboardRoundedIcon from '@mui/icons-material/SpaceDashboardRounded';
 import Inventory2RoundedIcon from '@mui/icons-material/Inventory2Rounded';
 import SwapHorizRoundedIcon from '@mui/icons-material/SwapHorizRounded';
 import BuildRoundedIcon from '@mui/icons-material/BuildRounded';
 import RecyclingRoundedIcon from '@mui/icons-material/RecyclingRounded';
+import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded';
 import InsightsRoundedIcon from '@mui/icons-material/InsightsRounded';
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
 
@@ -68,6 +70,7 @@ export interface NavGroup {
 export type NavEntry = NavItem | NavGroup;
 
 export const userNavItems: NavItem[] = [
+  { label: 'แคตตาล็อกอุปกรณ์มาตรฐาน', path: '/catalog', icon: <MenuBookIcon fontSize="small" /> },
   { label: 'รายการของพร้อมยืม', path: '/assets?status=Available', icon: <CheckCircleOutlineIcon fontSize="small" /> },
   { label: 'ยืมทรัพย์สิน', path: '/borrow/new', icon: <AddBoxIcon fontSize="small" /> },
   { label: 'คำขอของฉัน', path: '/borrow/my-requests', icon: <ListAltIcon fontSize="small" /> },
@@ -162,6 +165,12 @@ export const adminNav: NavEntry[] = [
       { label: 'Software License', path: '/licenses', icon: <KeyIcon fontSize="small" /> },
       { label: 'สัญญา & Warranty', path: '/contracts', icon: <GavelIcon fontSize="small" /> },
     ],
+  },
+  {
+    label: 'แคตตาล็อกอุปกรณ์มาตรฐาน',
+    path: '/catalog',
+    icon: <MenuBookIcon fontSize="small" />,
+    section: 'License & สัญญา',
   },
   {
     label: 'รายงานระบบ',
@@ -339,6 +348,15 @@ export const adminRail: RailModule[] = [
     ],
   },
   {
+    id: 'catalog',
+    label: 'แคตตาล็อก',
+    title: 'แคตตาล็อกอุปกรณ์มาตรฐาน',
+    icon: <MenuBookRoundedIcon />,
+    sections: [
+      { items: [{ label: 'สเปคมาตรฐานตามตำแหน่งงาน', path: '/catalog', icon: <MenuBookIcon fontSize="small" /> }] },
+    ],
+  },
+  {
     id: 'reports',
     label: 'รายงาน',
     title: 'สรุปและรายงาน',
@@ -383,6 +401,15 @@ export const adminRail: RailModule[] = [
 
 /** Rail for USER — the seven self-service links, split by "ทำรายการ" vs "ติดตาม". */
 export const userRail: RailModule[] = [
+  {
+    id: 'catalog',
+    label: 'แคตตาล็อก',
+    title: 'แคตตาล็อกอุปกรณ์มาตรฐาน',
+    icon: <MenuBookRoundedIcon />,
+    sections: [
+      { items: [{ label: 'สเปคมาตรฐานตามตำแหน่งงาน', path: '/catalog', icon: <MenuBookIcon fontSize="small" /> }] },
+    ],
+  },
   {
     id: 'borrow',
     label: 'ยืมของ',
@@ -466,6 +493,7 @@ export const viewerRail: RailModule[] = [
         items: [
           { label: 'Software License', path: '/licenses', icon: <KeyIcon fontSize="small" /> },
           { label: 'สัญญา & Warranty', path: '/contracts', icon: <GavelIcon fontSize="small" /> },
+          { label: 'แคตตาล็อกอุปกรณ์มาตรฐาน', path: '/catalog', icon: <MenuBookIcon fontSize="small" /> },
         ],
       },
     ],

@@ -1,13 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Popper, Paper, Fade, ClickAwayListener, TextField, Autocomplete,
-  CircularProgress, Button, alpha, useTheme,
+  CircularProgress, Button, Chip, alpha, useTheme,
 } from '@mui/material';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
+import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded';
 import { getStatusMeta } from '../../../config/statusConfig';
 import StatusChip from '../../../components/StatusChip';
-import { assetAPI } from '../../../services/api';
+import { assetAPI, catalogAPI } from '../../../services/api';
 
 /**
  * Inline-editable versions of the Asset Detail header/Fact chips — click the
@@ -371,5 +373,160 @@ export function EditableFact({
         )}
       </Popper>
     </Box>
+  );
+}
+
+/* ── Catalog tag: manual link to a Standard IT Equipment Catalog spec ────
+   Not built on EditableFact — that component always allows committing raw
+   typed text (freeSolo whenever a searchFn is given), which is right for
+   owner name but wrong here: the value must be a real CatalogItem id, never
+   arbitrary text, so this picks from search results only. */
+
+interface CatalogOption { id: number; name: string; jobRole?: string | null }
+
+interface EditableCatalogChipProps {
+  catalogItem: CatalogOption | null;
+  canEdit: boolean;
+  onChange: (catalogItemId: number | null) => Promise<void>;
+}
+
+export function EditableCatalogChip({ catalogItem, canEdit, onChange }: EditableCatalogChipProps) {
+  const theme = useTheme();
+  const navigate = useNavigate();
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<CatalogOption[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setSearching(true);
+    const t = setTimeout(() => {
+      catalogAPI.list({ q: query.trim() || undefined, activeOnly: true })
+        .then(res => setResults(res.data || []))
+        .catch(() => setResults([]))
+        .finally(() => setSearching(false));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [open, query]);
+
+  // ไม่มีทั้งค่าและสิทธิ์แก้ — ไม่ต้องแสดงอะไรเลย กันรกจอสำหรับสินทรัพย์ที่ยังไม่ผูก
+  if (!canEdit && !catalogItem) return null;
+
+  if (!canEdit) {
+    return (
+      <Chip
+        label={catalogItem!.name}
+        icon={<MenuBookRoundedIcon sx={{ fontSize: '14px !important' }} />}
+        size="small"
+        clickable
+        onClick={() => navigate(`/catalog/${catalogItem!.id}`)}
+        sx={{ height: 22, fontSize: '0.7rem', fontWeight: 700 }}
+      />
+    );
+  }
+
+  const close = () => { if (!saving) setOpen(false); };
+
+  const pick = async (item: CatalogOption | null) => {
+    if (item?.id === catalogItem?.id) { setOpen(false); return; }
+    setSaving(true);
+    setError(null);
+    try {
+      await onChange(item ? item.id : null);
+      setOpen(false);
+    } catch (err: any) {
+      setError(err?.response?.data?.error || err?.message || 'บันทึกไม่สำเร็จ');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <Box
+        ref={anchorRef}
+        role="button"
+        tabIndex={0}
+        onClick={() => { setQuery(''); setOpen(v => !v); }}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(v => !v); } }}
+        className="editable-chip-trigger"
+        sx={{
+          display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'pointer',
+          borderRadius: 999, outline: 'none',
+          '&:focus-visible': { boxShadow: `0 0 0 2px ${theme.palette.primary.main}` },
+        }}
+      >
+        <Chip
+          label={catalogItem ? catalogItem.name : 'ผูกแคตตาล็อก'}
+          icon={<MenuBookRoundedIcon sx={{ fontSize: '14px !important' }} />}
+          size="small"
+          variant={catalogItem ? 'filled' : 'outlined'}
+          color={catalogItem ? 'default' : undefined}
+          sx={{ height: 22, fontSize: '0.7rem', fontWeight: 700 }}
+        />
+        <EditRoundedIcon className="edit-affordance" sx={{ fontSize: 13, color: theme.palette.text.disabled, opacity: 0, transition: 'opacity .12s' }} />
+      </Box>
+      <style>{`.editable-chip-trigger:hover .edit-affordance { opacity: 1; }`}</style>
+
+      <Popper open={open} anchorEl={anchorRef.current} placement="bottom-start" transition sx={{ zIndex: 1300 }}>
+        {({ TransitionProps }) => (
+          <Fade {...TransitionProps} timeout={120}>
+            <Paper elevation={6} sx={{ mt: '6px', width: 260, borderRadius: '12px', border: `1px solid ${theme.palette.divider}`, p: '10px' }}>
+              <ClickAwayListener onClickAway={close}>
+                <Box>
+                  <TextField
+                    fullWidth autoFocus size="small" placeholder="ค้นชื่อสเปคในแคตตาล็อก..."
+                    value={query} onChange={(e) => setQuery(e.target.value)}
+                    disabled={saving}
+                    InputProps={{ endAdornment: searching ? <CircularProgress size={14} /> : undefined }}
+                  />
+                  <Box sx={{ maxHeight: 220, overflowY: 'auto', mt: '6px' }}>
+                    {results.length === 0 ? (
+                      <Typography sx={{ fontSize: '0.76rem', color: theme.palette.text.secondary, px: '6px', py: 1 }}>
+                        {searching ? 'กำลังค้นหา...' : 'ไม่พบสเปคที่ตรงกัน'}
+                      </Typography>
+                    ) : results.map((opt) => (
+                      <Box
+                        key={opt.id}
+                        onClick={() => !saving && pick(opt)}
+                        sx={{
+                          px: '9px', py: '7px', borderRadius: '8px', cursor: saving ? 'default' : 'pointer',
+                          bgcolor: opt.id === catalogItem?.id ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
+                          '&:hover': { bgcolor: saving ? undefined : alpha(theme.palette.text.primary, 0.05) },
+                        }}
+                      >
+                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 600 }}>{opt.name}</Typography>
+                        {opt.jobRole && (
+                          <Typography sx={{ fontSize: '0.7rem', color: theme.palette.text.secondary }}>{opt.jobRole}</Typography>
+                        )}
+                      </Box>
+                    ))}
+                  </Box>
+
+                  {error && (
+                    <Typography sx={{ fontSize: '0.72rem', color: theme.palette.error.main, mt: '6px' }}>{error}</Typography>
+                  )}
+
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: '8px' }}>
+                    {catalogItem ? (
+                      <Button size="small" onClick={() => pick(null)} disabled={saving} sx={{ fontSize: '0.7rem', textTransform: 'none', color: theme.palette.text.secondary, minWidth: 0, px: '4px' }}>
+                        เลิกผูก
+                      </Button>
+                    ) : <Box />}
+                    <Button size="small" onClick={close} disabled={saving} sx={{ fontSize: '0.72rem', textTransform: 'none', minWidth: 0, px: '10px' }}>
+                      ปิด
+                    </Button>
+                  </Box>
+                </Box>
+              </ClickAwayListener>
+            </Paper>
+          </Fade>
+        )}
+      </Popper>
+    </>
   );
 }
