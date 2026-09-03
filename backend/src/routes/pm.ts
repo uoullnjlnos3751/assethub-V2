@@ -838,6 +838,12 @@ async function processDeviceAnswers(tx: any, run: any, answers: any[], oldAnswer
                   // ถอดสายใน CMDB ด้วย ไม่งั้นแท็บ 'อุปกรณ์ที่เชื่อมโยง' จะยังโชว์จอ
                   // ที่ช่างเพิ่งบอกว่าไม่ได้ต่ออยู่แล้ว
                   if (run.assetId) {
+                    // ปิดประวัติการเชื่อมต่อที่ยังเปิดอยู่ ก่อนลบ asset_links ทิ้ง —
+                    // ไม่งั้นจะไม่เหลือร่องรอยว่าเคยเชื่อมต่อกันมาก่อนเลย
+                    await tx.assetLinkHistory.updateMany({
+                      where: { parentId: run.assetId, childId: Number(oldDev._assetId), disconnectedAt: null },
+                      data: { disconnectedAt: new Date() },
+                    });
                     await tx.assetLink.deleteMany({
                       where: { parentId: run.assetId, childId: Number(oldDev._assetId) },
                     });
@@ -859,11 +865,22 @@ async function processDeviceAnswers(tx: any, run: any, answers: any[], oldAnswer
             const linkType = itemTypeUpper === 'PRINTER_ARRAY' ? 'PRINTER' : 'MONITOR';
             for (const childId of newAssetIds) {
               if (childId === run.assetId) continue;   // กันเครื่องผูกกับตัวเอง
+              // เช็กว่ามี asset_links แถวนี้อยู่แล้วหรือไม่ ก่อน upsert — ใช้บอกว่า
+              // นี่คือการเชื่อมต่อครั้งใหม่จริงๆ (สร้างแถวประวัติ) หรือแค่ยืนยันซ้ำ
+              // ของที่เชื่อมต่ออยู่แล้ว (ไม่ต้องเปิดประวัติซ้ำ)
+              const existingLink = await tx.assetLink.findUnique({
+                where: { parentId_childId: { parentId: run.assetId, childId } },
+              });
               await tx.assetLink.upsert({
                 where: { parentId_childId: { parentId: run.assetId, childId } },
                 create: { parentId: run.assetId, childId, linkType, note: 'ยืนยันจากการทำ PM' },
                 update: { linkType },
               });
+              if (!existingLink) {
+                await tx.assetLinkHistory.create({
+                  data: { parentId: run.assetId, childId, linkType, note: 'ยืนยันจากการทำ PM' },
+                });
+              }
             }
           }
         }
