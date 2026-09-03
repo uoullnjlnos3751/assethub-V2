@@ -24,6 +24,7 @@ import AssignmentReturnIcon from '@mui/icons-material/AssignmentReturn';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
+import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded';
 import { useAuth } from '../contexts/AuthContext';
 import { useAppTheme } from '../contexts/ThemeContext';
 import { useChatbotContext } from '../contexts/ChatbotContext';
@@ -32,13 +33,14 @@ import PageTransition from '../components/PageTransition';
 import QRScannerModal from '../components/QRScannerModal';
 import { notificationAPI, assetAPI, presenceAPI, dashboardAPI } from '../services/api';
 import { adminNav, NavGroup, NavItem, userNavItems, adminRail, userRail, viewerRail, RailModule } from '../navigation/nav';
-import IconRail, { RAIL_WIDTH, FLYOUT_WIDTH } from './IconRail';
+import SidebarNav, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from './SidebarNav';
 import { APP_VERSION, GIT_COMMIT, BUILD_NUMBER, BUILD_TIME, formatBuildTime } from '../utils/buildInfo';
 
 // ── Sidebar widths ─────────────────────────────────────────────────────────
-// Desktop runs on the icon rail (RAIL_WIDTH + an optional pinned FLYOUT_WIDTH);
-// `mobileDrawerWidth` still belongs to the temporary drawer, which keeps the
-// full adminNav accordion because a phone has no room for two columns.
+// Desktop runs on a single flat sidebar (SIDEBAR_WIDTH, or the icons-only
+// SIDEBAR_COLLAPSED_WIDTH); `mobileDrawerWidth` still belongs to the temporary
+// drawer, which keeps the full adminNav accordion because a phone has no room
+// for a permanent column.
 const mobileDrawerWidth = 240;
 const appBarHeight = 50;
 
@@ -80,8 +82,10 @@ export default function Layout() {
   // Only the mobile drawer still reads this — it renders the full accordion and
   // never collapses. Desktop collapse is now the rail's pin state below.
   const [collapsed, setCollapsed] = useState(false);
-  const [railPinned, setRailPinned] = useState(() => localStorage.getItem('railPinned') !== '0');
-  const [openRailId, setOpenRailId] = useState<string | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === '1');
+  // Which accordion groups are open. Several can be at once — the user opens
+  // and shuts them freely; only the route's own group is opened for them.
+  const [openNavIds, setOpenNavIds] = useState<Record<string, boolean>>({});
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState('');
@@ -98,11 +102,7 @@ export default function Layout() {
   const { askAI } = useChatbotContext();
   const navigate = useNavigate();
   const location = useLocation();
-  // Only reserve the flyout's width when one will actually render — pinned
-  // alone isn't enough; a route with no matching rail module (e.g. /profile)
-  // leaves openRailId null, and reserving the width anyway left a blank
-  // 216px gutter with no menu visible in it.
-  const currentDrawerWidth = RAIL_WIDTH + (railPinned && openRailId ? FLYOUT_WIDTH : 0);
+  const currentDrawerWidth = sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
 
   // Live clock — matches the mockup's "ระบบออนไลน์ HH:MM:SS" topbar indicator
   useEffect(() => {
@@ -210,48 +210,29 @@ export default function Layout() {
     return best ? (best as { id: string }).id : null;
   }, [railModules, location.pathname, location.search]);
 
-  // Syncs the open flyout to whichever module owns the page — but only on an
-  // actual navigation, not merely because railPinned changed. railPinned is
-  // deliberately read via a ref instead of a dependency: a pin/unpin click
-  // fires this same render, and if it re-triggered this sync it would either
-  // slam shut a flyout the user just tried to pin, or jump a floating flyout
-  // the user was peeking at over to whatever module the current *route*
-  // owns — see togglePin below for what SHOULD happen on a pin toggle.
-  const railPinnedRef = useRef(railPinned);
-  useEffect(() => { railPinnedRef.current = railPinned; }, [railPinned]);
+  // Opens the group that owns the page, without shutting anything the user
+  // opened themselves — navigating shouldn't collapse the rest of the menu
+  // out from under them.
   useEffect(() => {
-    setOpenRailId(railPinnedRef.current ? routeRailId : null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeRailId, location.pathname, location.search]);
+    if (!routeRailId) return;
+    setOpenNavIds(prev => (prev[routeRailId] ? prev : { ...prev, [routeRailId]: true }));
+  }, [routeRailId]);
 
-  const togglePin = () => {
-    const next = !railPinned;
-    localStorage.setItem('railPinned', next ? '1' : '0');
-    setRailPinned(next);
-    // Pinning with nothing open yet docks to the current page's module (the
-    // sensible default for a freshly-docked rail). Unpinning leaves whatever
-    // is currently open alone — it becomes floating instead of docked,
-    // rather than vanishing.
-    if (next && openRailId === null) setOpenRailId(routeRailId);
+  const toggleSidebar = () => {
+    const next = !sidebarCollapsed;
+    localStorage.setItem('sidebarCollapsed', next ? '1' : '0');
+    setSidebarCollapsed(next);
   };
 
-  const handleRailOpen = (id: string) => {
-    const mod = railModules.find(m => m.id === id);
-    const items = mod ? mod.sections.flatMap(s => s.items) : [];
-    // A module with one destination is its own link — no point opening a
-    // flyout that holds a single row.
-    if (items.length === 1 && items[0].path) {
-      navigate(items[0].path);
-      setOpenRailId(railPinned ? id : null);
-      return;
-    }
-    if (railPinned) setOpenRailId(id);
-    else setOpenRailId(prev => (prev === id ? null : id));
+  const toggleNavGroup = (id: string) => {
+    setOpenNavIds(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const handleRailNavigate = (path: string) => {
-    navigate(path);
-    if (!railPinned) setOpenRailId(null);
+  /** Clicking an icon in the collapsed sidebar reopens it onto that group. */
+  const expandOnto = (id: string) => {
+    localStorage.setItem('sidebarCollapsed', '0');
+    setSidebarCollapsed(false);
+    setOpenNavIds(prev => ({ ...prev, [id]: true }));
   };
 
   useEffect(() => {
@@ -637,19 +618,33 @@ export default function Layout() {
   // ── Rail brand + footer ──────────────────────────────────────────────────
   const homePath = railModules[0]?.sections[0]?.items[0]?.path || '/dashboard';
   const brandMark = (
-    <Tooltip title={systemSettings?.systemName || 'ITAM'} placement="right" arrow>
+    <Tooltip title={sidebarCollapsed ? (systemSettings?.systemName || 'ITAM') : ''} placement="right" arrow>
       <Box
         component="button"
         type="button"
         onClick={() => navigate(homePath)}
         aria-label="หน้าแรก"
         sx={{
+          width: sidebarCollapsed ? 'auto' : '100%',
+          border: 0,
+          bgcolor: 'transparent',
+          p: 0,
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          textAlign: 'left',
+          font: 'inherit',
+          minWidth: 0,
+          '&:focus-visible': { outline: `2px solid ${theme.palette.primary.main}`, outlineOffset: '2px', borderRadius: '10px' },
+          '&:hover .brand-tile': { transform: 'scale(1.05)' },
+        }}
+      >
+        <Box className="brand-tile" sx={{
           width: 38,
           height: 38,
-          p: 0,
-          border: 0,
+          flexShrink: 0,
           borderRadius: '11px',
-          cursor: 'pointer',
           overflow: 'hidden',
           display: 'flex',
           alignItems: 'center',
@@ -659,19 +654,89 @@ export default function Layout() {
           letterSpacing: '-0.02em',
           color: '#fff',
           background: systemSettings?.logoUrl
-            ? 'rgba(255,255,255,.08)'
+            ? alpha(theme.palette.primary.main, 0.1)
             : `linear-gradient(140deg, ${theme.palette.primary.main}, ${theme.palette.info.main})`,
-          boxShadow: systemSettings?.logoUrl ? 'none' : `0 8px 20px -8px ${theme.palette.primary.main}`,
+          boxShadow: systemSettings?.logoUrl ? 'none' : `0 8px 20px -10px ${theme.palette.primary.main}`,
           transition: 'transform .18s ease',
-          '&:hover': { transform: 'scale(1.05)' },
-          '&:focus-visible': { outline: `2px solid ${theme.palette.primary.main}`, outlineOffset: '2px' },
-        }}
-      >
-        {systemSettings?.logoUrl
-          ? <img src={systemSettings.logoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-          : (systemSettings?.systemName || 'IT').substring(0, 2).toUpperCase()}
+        }}>
+          {systemSettings?.logoUrl
+            ? <img src={systemSettings.logoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            : (systemSettings?.systemName || 'IT').substring(0, 2).toUpperCase()}
+        </Box>
+        {!sidebarCollapsed && (
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Typography noWrap sx={{ fontSize: '14px', fontWeight: 700, color: theme.palette.text.primary, lineHeight: 1.3 }}>
+              {systemSettings?.systemName || 'ITAM'}
+            </Typography>
+            <Typography noWrap sx={{ fontSize: '10.5px', color: theme.palette.text.secondary, lineHeight: 1.3 }}>
+              {systemSettings?.organizationName || 'ระบบจัดการทรัพย์สิน IT'}
+            </Typography>
+          </Box>
+        )}
       </Box>
     </Tooltip>
+  );
+
+  // Status card above the user block — the live signals we actually have
+  // (clock + the PM overdue count already fetched for the nav badge), not a
+  // decorative "all systems operational" that nothing measures.
+  const sidebarStatus = (
+    <Box sx={{
+      borderRadius: '11px',
+      border: `1px solid ${theme.palette.divider}`,
+      bgcolor: alpha(theme.palette.text.primary, 0.02),
+      px: '11px',
+      py: '9px',
+    }}>
+      <Typography sx={{ fontSize: '10.5px', fontWeight: 700, color: theme.palette.text.secondary, mb: '5px' }}>
+        สถานะระบบ
+      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+        <Box sx={{
+          width: 7,
+          height: 7,
+          borderRadius: '50%',
+          bgcolor: theme.palette.success.main,
+          animation: `${pulseKeyframes} 2s infinite`,
+          flexShrink: 0,
+        }} />
+        <Typography sx={{ fontSize: '12px', fontWeight: 600, color: theme.palette.success.main }}>
+          ระบบออนไลน์
+        </Typography>
+        <Box sx={{ flex: 1 }} />
+        <Typography sx={{ fontSize: '10.5px', fontFamily: 'monospace', color: theme.palette.text.disabled }}>
+          {clock.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
+        </Typography>
+      </Box>
+      {isAdmin && pmOverdueCount > 0 && (
+        <Box
+          component="button"
+          type="button"
+          onClick={() => navigate('/pm')}
+          sx={{
+            mt: '7px',
+            width: '100%',
+            border: 0,
+            cursor: 'pointer',
+            font: 'inherit',
+            textAlign: 'left',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            px: '8px',
+            py: '5px',
+            borderRadius: '7px',
+            bgcolor: alpha(theme.palette.error.main, 0.1),
+            '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.16) },
+          }}
+        >
+          <WarningAmberRoundedIcon sx={{ fontSize: 14, color: theme.palette.error.main, flexShrink: 0 }} />
+          <Typography sx={{ fontSize: '11px', fontWeight: 600, color: theme.palette.error.main }}>
+            PM เลยกำหนด {pmOverdueCount} แผน
+          </Typography>
+        </Box>
+      )}
+    </Box>
   );
 
   const railFooter = (
@@ -769,9 +834,9 @@ export default function Layout() {
           </IconButton>
 
           {/* Desktop sidebar collapse toggle */}
-          <Tooltip title={railPinned ? 'ย่อเมนู (ได้พื้นที่เพิ่ม)' : 'ตรึงเมนูไว้'}>
+          <Tooltip title={sidebarCollapsed ? 'ขยายเมนู' : 'ย่อเมนู (ได้พื้นที่เพิ่ม)'}>
             <IconButton
-              onClick={togglePin}
+              onClick={toggleSidebar}
               sx={{
                 display: { xs: 'none', md: 'flex' },
                 width: 34,
@@ -782,7 +847,7 @@ export default function Layout() {
                 '&:hover': { borderColor: theme.palette.primary.main, color: theme.palette.primary.main },
               }}
             >
-              {railPinned ? <MenuOpenIcon sx={{ fontSize: 18 }} /> : <MenuIcon sx={{ fontSize: 18 }} />}
+              {sidebarCollapsed ? <MenuIcon sx={{ fontSize: 18 }} /> : <MenuOpenIcon sx={{ fontSize: 18 }} />}
             </IconButton>
           </Tooltip>
 
@@ -1136,34 +1201,33 @@ export default function Layout() {
           {drawer}
         </Drawer>
 
-        {/* Desktop icon rail — fixed full height, sits above the AppBar so an
-            unpinned flyout can float over the page instead of under it. */}
-        <ClickAwayListener onClickAway={() => { if (!railPinned) setOpenRailId(null); }}>
-          <Box sx={{
-            display: { xs: 'none', md: 'block' },
-            position: 'fixed',
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: RAIL_WIDTH,
-            zIndex: (t) => t.zIndex.drawer + 2,
-          }}>
-            <IconRail
-              modules={railModules}
-              openId={openRailId}
-              routeId={routeRailId}
-              onOpen={handleRailOpen}
-              pinned={railPinned}
-              onTogglePin={togglePin}
-              isActive={isActive}
-              onNavigate={handleRailNavigate}
-              badges={{ pm: pmOverdueCount }}
-              onLogout={() => { logout(); navigate('/login'); }}
-              brand={brandMark}
-              footer={railFooter}
-            />
-          </Box>
-        </ClickAwayListener>
+        {/* Desktop sidebar — fixed full height, above the AppBar so the brand
+            block lines up with the top of the window as in the reference. */}
+        <Box sx={{
+          display: { xs: 'none', md: 'block' },
+          position: 'fixed',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: currentDrawerWidth,
+          zIndex: (t) => t.zIndex.drawer + 2,
+          transition: theme.transitions.create('width', { duration: theme.transitions.duration.shorter }),
+        }}>
+          <SidebarNav
+            modules={railModules}
+            routeId={routeRailId}
+            openIds={openNavIds}
+            onToggleGroup={toggleNavGroup}
+            isActive={isActive}
+            onNavigate={navigate}
+            badges={{ pm: pmOverdueCount }}
+            collapsed={sidebarCollapsed}
+            onExpandOnto={expandOnto}
+            brand={brandMark}
+            status={sidebarStatus}
+            footer={railFooter}
+          />
+        </Box>
       </Box>
 
       {/* ── Main content ─────────────────────────────────────────────── */}
