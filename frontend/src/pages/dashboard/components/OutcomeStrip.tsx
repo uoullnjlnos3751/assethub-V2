@@ -33,7 +33,7 @@ export function OutcomeStrip({ outcome, year, navigate }: {
     <Box sx={{
       bgcolor: 'background.paper',
       border: `1px solid ${theme.palette.divider}`,
-      borderRadius: '14px', p: '14px 18px', mb: 2,
+      borderRadius: '14px', p: '14px 18px', mb: 1.5,
       boxShadow: theme.palette.mode === 'dark' ? '0 6px 18px rgba(0,0,0,.35)' : '0 6px 18px rgba(16,24,40,.06)',
     }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5, gap: 1, flexWrap: 'wrap' }}>

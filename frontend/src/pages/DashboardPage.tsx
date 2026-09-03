@@ -278,7 +278,7 @@ export default function DashboardPage() {
       {/* ── Row 1: 4 KPI cards — เลือกเฉพาะตัวที่เปลี่ยนแปลงและมีความหมาย
               ตัวที่เคยเป็น "กำลังยืม" ถูกแทนด้วย OS ล้าสมัย เพราะโมดูลยืม-คืน
               เป็นศูนย์ทั้งปี ส่วน OS ล้าสมัยคือ 34% ของฟลีตที่ไม่เคยขึ้นหน้าแรก ── */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 1.5, mb: 2 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 1.25, mb: 1.5 }}>
         <KpiCard
           icon={Boxes} label="ทรัพย์สิน IT ทั้งหมด" value={total}
           sub={`ใช้งานอยู่ ${(byStatus.find(s => s.status === 'InUse')?._count || 0)} · พร้อมใช้ ${available}`}
@@ -309,7 +309,7 @@ export default function DashboardPage() {
       <LifecycleStrip stages={stages} navigate={navigate} />
 
       {/* ── สิ่งที่ต้องลงมือ เรียงตามความเร่งด่วน ── */}
-      <Box sx={{ mb: 2 }}>
+      <Box sx={{ mb: 1.5 }}>
         <AttentionQueue items={attention} navigate={navigate} />
       </Box>
 
@@ -317,7 +317,7 @@ export default function DashboardPage() {
       <OutcomeStrip outcome={outcome} year={new Date().getFullYear()} navigate={navigate} />
 
       {/* ── Row 2: IT Operations Room (live) + Donut ─────────────── */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '7fr 5fr' }, gap: 1.5, mb: 2 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '7fr 5fr' }, gap: 1.25, mb: 1.5 }}>
         <OpsRoomCard
           onlineNow={onlineNow}
           currentUserId={user?.id}
@@ -330,18 +330,17 @@ export default function DashboardPage() {
         <CategoryDonutCard byCategory={byCategory} total={total} onNavigate={() => navigate('/assets')} />
       </Box>
 
-      {/* ── Row 3: ทางลัด + สัดส่วนหมวด + Agent ─────────────────────
-              กราฟแนวโน้มยืม-คืนกับกิจกรรมล่าสุดถูกถอดออก ทั้งคู่เป็นศูนย์ตลอด 12
-              เดือนของปีนี้ กราฟที่ไม่มีเส้นกินพื้นที่เท่ากับกราฟที่มีข้อมูล
-              โมดูลยืม-คืนไปปรากฏในแถบวงจรชีวิตแทน ซึ่งบอกได้ว่า "ยังไม่เริ่มใช้" ── */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', lg: externalAgentsSummary ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)' }, gap: 1.5, mb: 2 }}>
+      {/* ── Row 3: การ์ดรายละเอียดทั้งหมดในกริดเดียว ─────────────────
+              เดิมแยกเป็นสองแถวตายตัว (ทางลัด+สัดส่วนหมวด+Agent แล้วค่อยรายละเอียด
+              สถานะ/สถานที่/ประกัน) ทำให้แถวแรกเหลือช่องว่างเวลาไม่มีข้อมูล Agent
+              และมีรอยต่อ mb ระหว่างสองแถวโดยไม่จำเป็น รวมเป็นกริด auto-fit เดียว
+              การ์ดจะเรียงเต็มความกว้างเสมอไม่ว่าจะมีกี่ใบ เหมือนกริดของการ์ดในภาพ
+              อ้างอิง — กราฟแนวโน้มยืม-คืนกับกิจกรรมล่าสุดยังไม่กลับมา ทั้งคู่เป็นศูนย์
+              ตลอด 12 เดือนของปีนี้ โมดูลยืม-คืนไปปรากฏในแถบวงจรชีวิตแทน ── */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 1.25, mb: 1.5 }}>
         <CategoryUtilizationCard categories={categoryUtilization} onNavigate={() => navigate('/assets')} />
         <ExternalAgentsSummaryCard summary={externalAgentsSummary} />
         <QuickActionsPanel onNavigate={navigate} />
-      </Box>
-
-      {/* ── Row 4: รายละเอียดที่ยังต้องดูเป็นตาราง ── */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 1.5, mb: 2 }}>
         <AssetStatusBreakdownCard byStatus={byStatus} total={total} onNavigate={() => navigate('/assets')} />
         <LocationBreakdownCard byLocation={byLocation} total={total} onNavigate={() => navigate('/assets')} />
         <WarrantyAlertsCard warrantyData={warrantyData} navigate={navigate} />

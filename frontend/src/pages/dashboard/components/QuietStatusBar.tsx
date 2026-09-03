@@ -23,7 +23,7 @@ export function QuietStatusBar({ ok, notStarted }: {
       display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap',
       bgcolor: alpha(theme.palette.success.main, 0.07),
       border: `1px solid ${alpha(theme.palette.success.main, 0.25)}`,
-      borderRadius: '14px', px: 2.25, py: 1.5, mb: 2,
+      borderRadius: '14px', px: 2.25, py: 1.5, mb: 1.5,
     }}>
       <CheckCircle2 size={17} color={theme.palette.success.main} />
       <Typography sx={{ fontSize: 13, fontWeight: 700, color: theme.palette.success.dark }}>

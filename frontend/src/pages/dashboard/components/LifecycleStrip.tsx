@@ -34,7 +34,7 @@ export function LifecycleStrip({ stages, navigate }: {
       border: `1px solid ${theme.palette.divider}`,
       borderRadius: '14px',
       p: '14px 18px',
-      mb: 2,
+      mb: 1.5,
       boxShadow: theme.palette.mode === 'dark' ? '0 6px 18px rgba(0,0,0,.35)' : '0 6px 18px rgba(16,24,40,.06)',
     }}>
       <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, letterSpacing: '.08em',
