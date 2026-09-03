@@ -16,6 +16,7 @@ import {
 } from '@mui/material';
 import PrintIcon from '@mui/icons-material/Print';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import QRCode from 'react-qr-code';
 import {
   LayoutDashboard, Cpu, AppWindow, FileText, Wallet, ClipboardList,
@@ -345,17 +346,13 @@ export default function AssetDetailPage() {
           พิมพ์สติ๊กเกอร์
         </Button>
         <Button
-          variant="contained"
+          variant="outlined"
+          startIcon={<EditRoundedIcon sx={{ fontSize: 16 }} />}
           onClick={() => navigate(`/assets/${id}/edit`)}
           size="small"
-          sx={{
-            borderRadius: '10px', textTransform: 'none', fontWeight: 700,
-            background: `linear-gradient(120deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-            boxShadow: 'none',
-            '&:hover': { boxShadow: 'none', filter: 'brightness(1.05)' },
-          }}
+          sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600 }}
         >
-          โอนย้าย / จ่ายใหม่
+          แก้ไข
         </Button>
       </Box>
 
