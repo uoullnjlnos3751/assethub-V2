@@ -359,6 +359,70 @@ router.put('/:id/seats', authorize('IT_ADMIN', 'SUPERADMIN'), async (req, res) =
   }
 });
 
+/**
+ * บันทึกกรอบอุปกรณ์ทั้งแปลนในครั้งเดียว — เหมือน /zones และ /seats
+ *
+ * แทนที่ทั้งชุดทุกครั้ง เพราะหน้าจอวาดกรอบแก้ทั้งชุดแล้วค่อยกดบันทึกครั้งเดียว
+ * เหมือนโซน/ที่นั่ง ไม่ใช่ endpoint แบบเพิ่มทีละกรอบ
+ */
+router.put('/:id/frames', authorize('IT_ADMIN', 'SUPERADMIN'), async (req, res) => {
+  try {
+    const planId = Number(req.params.id);
+    const rows = Array.isArray(req.body?.frames) ? req.body.frames : [];
+
+    const num = (v: any, min: number, max: number, dflt: number) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : dflt;
+    };
+
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.floorPlanFrame.findMany({ where: { floorPlanId: planId } });
+      const keep = new Set<number>();
+
+      for (const r of rows) {
+        const data = {
+          x: num(r.x, 0, 100, 0),
+          y: num(r.y, 0, 100, 0),
+          w: num(r.w, 0.5, 100, 5),
+          h: num(r.h, 0.5, 100, 5),
+          label: String(r.label ?? '').trim() || null,
+          color: String(r.color ?? '').trim() || null,
+        };
+        const assetIds: number[] = Array.isArray(r.assetIds)
+          ? Array.from(new Set<number>(
+              r.assetIds.map((a: any) => Number(a)).filter((n: number) => Number.isInteger(n)),
+            ))
+          : [];
+
+        const found = r.id > 0 ? existing.find(f => f.id === Number(r.id)) : undefined;
+        const frame = found
+          ? await tx.floorPlanFrame.update({ where: { id: found.id }, data })
+          : await tx.floorPlanFrame.create({ data: { ...data, floorPlanId: planId } });
+        keep.add(frame.id);
+
+        // แทนที่ชุดอุปกรณ์ของกรอบนี้ทั้งหมด ง่ายกว่า diff ทีละแถวและกรอบหนึ่งมี
+        // อุปกรณ์ไม่กี่ชิ้น ต้นทุนลบ-สร้างใหม่ต่ำกว่าความซับซ้อนของการ diff
+        await tx.floorPlanFrameAsset.deleteMany({ where: { frameId: frame.id } });
+        if (assetIds.length) {
+          await tx.floorPlanFrameAsset.createMany({
+            data: assetIds.map(assetId => ({ frameId: frame.id, assetId })),
+          });
+        }
+      }
+
+      const gone = existing.filter(f => !keep.has(f.id)).map(f => f.id);
+      if (gone.length) await tx.floorPlanFrame.deleteMany({ where: { id: { in: gone } } });
+    });
+
+    const parsedYear = Number(req.query.year);
+    const year = Number.isInteger(parsedYear) ? parsedYear : new Date().getFullYear();
+    res.json(await buildLiveFloorPlan(prisma, planId, year));
+  } catch (error) {
+    console.error('Update frames error:', error);
+    res.status(500).json({ error: 'Failed to update frames' });
+  }
+});
+
 // Get floor plan by ID (with pins and asset basic info)
 router.get('/:id', async (req, res) => {
   try {
