@@ -40,7 +40,7 @@ import { AssetHealthStrip } from './components/AssetHealthStrip';
 import { AssetHeaderPills } from './components/AssetHeaderPills';
 import { AssetTimeline } from './components/AssetTimeline';
 import { AssetConnectionHistoryCard } from './components/AssetConnectionHistoryCard';
-import { AssetActionsPanel } from './components/AssetActionsPanel';
+import { AssetActionsMenu } from './components/AssetActionsMenu';
 import { AssetInsightTiles } from './components/AssetInsightTiles';
 import { AssetSpecMiniCard } from './components/AssetSpecMiniCard';
 import { AssetLiveStatusCard } from './components/AssetLiveStatusCard';
@@ -354,6 +354,14 @@ export default function AssetDetailPage() {
         >
           แก้ไข
         </Button>
+        <AssetActionsMenu
+          onTransfer={() => navigate(`/assets/${id}/edit`)}
+          onReportRepair={goRepairs}
+          onBorrow={() => navigate('/borrow/new')}
+          onShowQR={() => setShowQR(true)}
+          onReportDamage={() => navigate(`/assets/${id}/edit`)}
+          onProposeDisposal={() => navigate('/disposals')}
+        />
       </Box>
 
       <PillTabBar tabs={TABS} value={activeTab} onChange={setActiveTab} />
@@ -385,16 +393,13 @@ export default function AssetDetailPage() {
           </Box>
 
           {/* ── Context rail ────────────────────────────────── */}
-          {/* The rail as a whole is deliberately not sticky: with timeline +
-              documents stacked below, it runs taller than the viewport, and a
-              sticky block taller than its viewport pins its overflow
-              off-screen where it can't be scrolled to. Actions is the
-              exception — on its own it's well under viewport height, it's
-              what someone comes to this page to actually DO, and it used to
-              sit dead last after timeline+documents, so reaching it meant
-              scrolling past everything else first. Leading the rail AND
-              staying pinned as the page scrolls means it's never more than a
-              glance away. */}
+          {/* Deliberately not sticky: with timeline + documents stacked
+              below, it runs taller than the viewport, and a sticky block
+              taller than its viewport pins its overflow off-screen where it
+              can't be scrolled to. The actions that used to anchor this rail
+              (transfer/repair/borrow/QR/damage/disposal) now live in the
+              header's gear-menu instead — reachable without scrolling at
+              all, which a sticky sidebar card could only approximate. */}
           <Box sx={{
             width: { xs: '100%', lg: 340 },
             flex: 'none',
@@ -402,17 +407,6 @@ export default function AssetDetailPage() {
             flexDirection: 'column',
             gap: 2,
           }}>
-            <Box sx={{ position: 'sticky', top: '66px', zIndex: 1 }}>
-              <AssetActionsPanel
-                onEdit={() => navigate(`/assets/${id}/edit`)}
-                onTransfer={() => navigate(`/assets/${id}/edit`)}
-                onReportRepair={goRepairs}
-                onBorrow={() => navigate('/borrow/new')}
-                onShowQR={() => setShowQR(true)}
-                onReportDamage={() => navigate(`/assets/${id}/edit`)}
-                onProposeDisposal={() => navigate('/disposals')}
-              />
-            </Box>
             <AssetLiveStatusCard loading={loadingExternalAgent} agent={externalAgent} />
             <AssetTimeline asset={asset} maintenance={maintenance} />
             {showConnectionHistory && (
