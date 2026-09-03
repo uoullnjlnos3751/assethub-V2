@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Typography, alpha, useTheme } from '@mui/material';
+import { Box, Typography, Select, MenuItem, alpha, useTheme } from '@mui/material';
 import {
   LayoutDashboard, Boxes, ShoppingCart, Wrench,
   CheckCircle2, Clock, Shield, ClipboardList,
@@ -24,6 +24,7 @@ import { AttentionQueue, AttentionItem } from './dashboard/components/AttentionQ
 import { LifecycleStrip, Stage } from './dashboard/components/LifecycleStrip';
 import { QuietStatusBar } from './dashboard/components/QuietStatusBar';
 import { OutcomeStrip } from './dashboard/components/OutcomeStrip';
+import { TrendStrip, MetricPoint } from './dashboard/components/TrendStrip';
 import { now, pct } from './dashboard/dashboardHelpers';
 
 // ── Main Dashboard ──────────────────────────────────────────────────────────
@@ -49,6 +50,9 @@ export default function DashboardPage() {
   const [stages, setStages] = useState<Stage[]>([]);
   const [outcome, setOutcome] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [companyOptions, setCompanyOptions] = useState<string[]>([]);
+  const [selectedCompany, setSelectedCompany] = useState<string>('');
+  const [metricHistory, setMetricHistory] = useState<MetricPoint[]>([]);
 
   useEffect(() => {
     if (user?.role === 'IT_ADMIN' || user?.role === 'SUPERADMIN' || user?.role === 'VIEWER') {
@@ -63,7 +67,7 @@ export default function DashboardPage() {
        * ก้อนที่ล้มจะมาเป็น null ไม่ลากทั้งหน้าลงไปด้วย — เดิมแต่ละก้อนมี
        * .catch() ของตัวเองอยู่แล้ว ที่นี่ย้ายไปทำฝั่ง server แทน
        */
-      dashboardAPI.overview(year, 60)
+      dashboardAPI.overview(year, 60, selectedCompany || undefined)
         .then(({ data: d }) => {
           setAssetSummary(d.assets);
           setBorrowSummary(d.borrow);
@@ -79,6 +83,11 @@ export default function DashboardPage() {
           setExternalAgentsSummary(d.agents?.available ? d.agents.data : null);
           setStages(d.stages || []);
           setOutcome(d.outcome);
+          // ตัวเลือกตัวกรองบริษัท เอาจากรอบ "ไม่กรอง" เท่านั้น ไม่งั้นเลือกไปแล้ว
+          // รายชื่อบริษัทอื่นจะหายไปจาก dropdown เพราะเห็นแค่บริษัทที่เลือกอยู่
+          if (!selectedCompany) {
+            setCompanyOptions((d.assets?.byCompany || []).map((c: any) => c.company).filter(Boolean).sort());
+          }
         })
         .catch(() => {})
         .finally(() => setLoading(false));
@@ -91,6 +100,14 @@ export default function DashboardPage() {
     } else {
       setLoading(false);
     }
+  }, [user, selectedCompany]);
+
+  // แนวโน้มย้อนหลัง — เป็นค่าระดับฟลีตทั้งหมด ไม่ผูกกับตัวกรองบริษัท (ตาราง
+  // สแนปช็อตรายวันเก็บแค่ค่ารวม ไม่ได้แยกราย บริษัท) จึงดึงครั้งเดียว ไม่ต้อง
+  // ดึงซ้ำตอนสลับตัวกรอง
+  useEffect(() => {
+    if (!(user?.role === 'IT_ADMIN' || user?.role === 'SUPERADMIN' || user?.role === 'VIEWER')) return;
+    dashboardAPI.history(60).then(r => setMetricHistory(r.data || [])).catch(() => {});
   }, [user]);
 
   // Team presence — refreshed on its own faster cadence than the rest of the
@@ -264,14 +281,36 @@ export default function DashboardPage() {
             ข้อมูล ณ {now()}
           </Typography>
         </Box>
-        <Box sx={{
-          display: 'flex', alignItems: 'center', gap: 0.75,
-          bgcolor: alpha(theme.palette.success.main, 0.10), color: theme.palette.success.main,
-          fontSize: '0.72rem', fontWeight: 600, px: 1.25, py: 0.5,
-          borderRadius: '999px', border: `1px solid ${alpha(theme.palette.success.main, 0.25)}`,
-        }}>
-          <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: theme.palette.success.main }} />
-          Live
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          {/* ตัวกรองบริษัท — กรองทุกการ์ดพร้อมกัน (ยกเว้นก้อนที่ไม่มีขอบเขตบริษัทของ
+              ตัวเอง เช่น สต๊อกวัสดุ/Agent ภายนอก ซึ่งคงค่าฟลีตทั้งหมดไว้เสมอ) */}
+          {companyOptions.length > 1 && (
+            <Select
+              size="small"
+              value={selectedCompany}
+              displayEmpty
+              onChange={(e) => setSelectedCompany(e.target.value)}
+              sx={{
+                fontSize: '0.75rem', height: 30, borderRadius: '999px',
+                bgcolor: theme.palette.background.paper,
+                '& .MuiSelect-select': { py: '4px', pl: '14px' },
+              }}
+            >
+              <MenuItem value="" sx={{ fontSize: '0.78rem' }}>ทุกบริษัท</MenuItem>
+              {companyOptions.map(c => (
+                <MenuItem key={c} value={c} sx={{ fontSize: '0.78rem' }}>{c}</MenuItem>
+              ))}
+            </Select>
+          )}
+          <Box sx={{
+            display: 'flex', alignItems: 'center', gap: 0.75,
+            bgcolor: alpha(theme.palette.success.main, 0.10), color: theme.palette.success.main,
+            fontSize: '0.72rem', fontWeight: 600, px: 1.25, py: 0.5,
+            borderRadius: '999px', border: `1px solid ${alpha(theme.palette.success.main, 0.25)}`,
+          }}>
+            <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: theme.palette.success.main }} />
+            Live
+          </Box>
         </Box>
       </Box>
 
@@ -304,6 +343,10 @@ export default function DashboardPage() {
           onClick={() => navigate('/assets?status=Maintenance')}
         />
       </Box>
+
+      {/* ── แนวโน้มย้อนหลัง: ตอบว่า "ดีขึ้นไหม" ซึ่งการ์ดด้านบนตอบไม่ได้ ──
+              ซ่อนตัวเองจนกว่าจะมีข้อมูลอย่างน้อย 3 วัน (ดูใน TrendStrip) */}
+      <TrendStrip history={metricHistory} />
 
       {/* ── วงจรชีวิต: ช่วงที่ยังไม่เริ่มบันทึกจะจางและเขียนบอกตรง ๆ ── */}
       <LifecycleStrip stages={stages} navigate={navigate} />

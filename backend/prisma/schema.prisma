@@ -196,6 +196,26 @@ model AssetComponentSnapshot {
   @@map("asset_component_snapshots")
 }
 
+/// หนึ่งแถวต่อวัน — ค่า KPI หลักของแดชบอร์ด ณ วันนั้น ใช้วาดกราฟแนวโน้มเทียบเวลา
+/// (ตัวแดชบอร์ดเดิมทุกใบตอบได้แค่ "ตอนนี้เท่าไร" ไม่มีใบไหนตอบ "ดีขึ้นไหม")
+/// คอลัมน์คงที่แทนตาราง key-value ทั่วไป เพราะชุด KPI ที่ต้องเก็บนิ่งและรู้ล่วงหน้า
+/// อยู่แล้ว อ่านง่ายกว่าและกรอง/รวมข้อมูลตรงไปตรงมากว่า
+model DailyMetricSnapshot {
+  id                Int      @id @default(autoincrement())
+  /// เก็บเป็นเที่ยงคืนของวันนั้น (เวลาเซิร์ฟเวอร์) — unique กันงานรันซ้ำวันเดียวกันไม่แตกแถว
+  date              DateTime @unique @db.Date
+  assetsTotal       Int
+  pmDonePct         Float
+  osOutdatedCount   Int
+  borrowOverdueCount Int
+  /// null เมื่อบริการ Agent ภายนอกเรียกไม่ได้วันนั้น ไม่ใช่ 0 เครื่องออฟไลน์จริง
+  agentOfflineCount Int?
+  warrantyExpiredCount Int
+  createdAt         DateTime @default(now())
+
+  @@map("daily_metric_snapshots")
+}
+
 model ComputerDetail {
   id              Int     @id @default(autoincrement())
   assetId         Int     @unique

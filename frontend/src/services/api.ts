@@ -411,8 +411,13 @@ export const departmentAPI = {
 // Dashboard
 export const dashboardAPI = {
   /** ทุกก้อนของแดชบอร์ดในคำขอเดียว — endpoint รายก้อนยังอยู่ให้หน้าอื่นเรียก */
-  overview: (year: number, warrantyDays = 60) =>
-    api.get('/dashboard/overview', { params: { year, warrantyDays } }),
+  overview: (year: number, warrantyDays = 60, company?: string) =>
+    api.get('/dashboard/overview', { params: { year, warrantyDays, company } }),
+  /** ค่า KPI รายวันย้อนหลัง สำหรับกราฟแนวโน้ม */
+  history: (days = 90) => api.get('/dashboard/history', { params: { days } }),
+  /** ไล่ชั้น บริษัท → สถานที่ → ชั้น ทีละคลิก */
+  locationBreakdown: (company?: string, location?: string) =>
+    api.get('/dashboard/location-breakdown', { params: { company, location } }),
   assetSummary: () => api.get('/dashboard/asset-summary'),
   dataHealth: () => api.get('/dashboard/data-health'),
   borrowSummary: () => api.get('/dashboard/borrow-summary'),
