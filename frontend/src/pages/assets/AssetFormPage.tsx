@@ -26,11 +26,15 @@ import {
   Autocomplete,
   Accordion,
   AccordionSummary,
-  AccordionDetails
+  AccordionDetails,
+  Dialog,
+  Tooltip
 } from '@mui/material';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
+import ZoomOutMapIcon from '@mui/icons-material/ZoomOutMap';
+import CloseIcon from '@mui/icons-material/Close';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { assetAPI } from '../../services/api';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
@@ -113,6 +117,9 @@ export default function AssetFormPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
   const [imageError, setImageError] = useState('');
+  /* ดูรูปเต็ม — รูปในกรอบย่อสูงราว 200px อ่านเลขทะเบียนบนป้ายไม่ออก ต้องกาง
+     เต็มจอถึงจะรู้ว่าถ่ายติดชัดหรือถ่ายผิดเครื่อง */
+  const [imageZoom, setImageZoom] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Change tracking (for unsaved banner / changelog)
@@ -588,7 +595,13 @@ export default function AssetFormPage() {
 
   const handleImageDelete = async () => {
     if (!id) return;
-    try { await assetAPI.deleteImage(parseInt(id)); setImagePreview(null); if (fileInputRef.current) fileInputRef.current.value = ''; }
+    try {
+      await assetAPI.deleteImage(parseInt(id));
+      setImagePreview(null);
+      // ปิดหน้าดูรูปเต็มด้วย ไม่งั้นจะค้างอยู่กับรูปที่เพิ่งลบไป
+      setImageZoom(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
     catch (err: any) { setImageError(err.response?.data?.error || 'ไม่สามารถลบรูปภาพได้'); }
   };
 
@@ -2355,6 +2368,69 @@ export default function AssetFormPage() {
             </Grid>
           </SectionCard>
 
+          {/* ดูรูปเต็มจอ พร้อมเปลี่ยน/ลบได้จากตรงนี้เลย — จุดประสงค์ของการกาง
+              รูปคือตรวจว่าถ่ายถูกและอ่านออกไหม ถ้าไม่ผ่านก็ต้องแก้ได้ทันที
+              ไม่ใช่ปิดหน้าต่างแล้วไปหาปุ่มอีกที */}
+          <Dialog
+            open={imageZoom && !!imagePreview}
+            onClose={() => setImageZoom(false)}
+            maxWidth={false}
+            PaperProps={{
+              sx: {
+                bgcolor: 'rgba(0,0,0,0.92)', backgroundImage: 'none', boxShadow: 'none',
+                m: 2, maxWidth: 'calc(100vw - 32px)', maxHeight: 'calc(100vh - 32px)',
+                display: 'flex', flexDirection: 'column',
+              },
+            }}
+          >
+            <Box sx={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              gap: 2, px: 2, py: 1.25, color: '#fff',
+              borderBottom: '1px solid rgba(255,255,255,0.15)',
+            }}>
+              <Typography sx={{ fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                รูปทะเบียนทรัพย์สิน{form.assetCode ? ` · ${form.assetCode}` : ''}
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+                <Button
+                  size="small" variant="outlined" startIcon={<PhotoCameraIcon sx={{ fontSize: 16 }} />}
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={imageUploading}
+                  /* ธีมตั้งพื้นหลังปุ่ม outlined เป็นสีขาวไว้ ถ้าไม่ล้างทิ้งจะได้
+                     ตัวอักษรขาวบนพื้นขาวบนฉากมืดของหน้าดูรูป */
+                  sx={{
+                    color: '#fff', bgcolor: 'transparent', borderColor: 'rgba(255,255,255,0.4)',
+                    '&:hover': { bgcolor: 'rgba(255,255,255,0.12)', borderColor: '#fff' },
+                    '&.Mui-disabled': { color: 'rgba(255,255,255,0.5)', bgcolor: 'transparent' },
+                  }}
+                >
+                  {imageUploading ? 'กำลังอัพโหลด...' : 'เปลี่ยนรูป'}
+                </Button>
+                <Button
+                  size="small" variant="outlined" color="error" startIcon={<DeleteIcon sx={{ fontSize: 16 }} />}
+                  onClick={handleImageDelete}
+                  sx={{ bgcolor: 'transparent', '&:hover': { bgcolor: 'rgba(220,38,38,0.14)' } }}
+                >
+                  ลบรูป
+                </Button>
+                <IconButton size="small" onClick={() => setImageZoom(false)} sx={{ color: '#fff' }}>
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              </Box>
+            </Box>
+            <Box sx={{
+              flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              overflow: 'auto', p: 1,
+            }}>
+              <Box
+                component="img"
+                src={imagePreview || ''}
+                alt="รูปทะเบียนทรัพย์สินขนาดเต็ม"
+                sx={{ maxWidth: '100%', maxHeight: 'calc(100vh - 130px)', objectFit: 'contain', display: 'block' }}
+              />
+            </Box>
+          </Dialog>
+
           {/* ⑥ รูปภาพ */}
           <SectionCard title="รูปภาพทะเบียนทรัพย์สิน" barColor={`linear-gradient(180deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`}>
             {imageError && (
@@ -2365,7 +2441,11 @@ export default function AssetFormPage() {
             <Grid container spacing={3}>
               <Grid item xs={12} sm={6}>
                 <Box
-                  onClick={() => fileInputRef.current?.click()}
+                  /* มีรูปแล้ว = คลิกเพื่อดูใหญ่ ยังไม่มีรูป = คลิกเพื่อเลือกไฟล์
+                     ของเดิมคลิกที่รูปแล้วเด้งหน้าเลือกไฟล์ทันที ซึ่งสวนกับสิ่งที่
+                     คนคาดหวังเมื่อคลิกรูป และทำให้เผลอทับรูปเดิมได้ง่าย
+                     (ปุ่มกล้องมุมขวายังเปลี่ยนรูปได้เหมือนเดิม) */
+                  onClick={() => (imagePreview ? setImageZoom(true) : fileInputRef.current?.click())}
                   onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) handleImageUpload(f); }}
                   onDragOver={e => e.preventDefault()}
                   sx={{
@@ -2392,12 +2472,21 @@ export default function AssetFormPage() {
                     <>
                       <Box component="img" src={imagePreview} alt="Asset" sx={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                       <Box sx={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 0.5 }} onClick={e => e.stopPropagation()}>
-                        <IconButton size="small" onClick={() => fileInputRef.current?.click()} sx={{ bgcolor: alpha(theme.palette.background.paper, 0.9), '&:hover': { bgcolor: theme.palette.background.paper } }}>
-                          <PhotoCameraIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                        <IconButton size="small" onClick={handleImageDelete} sx={{ bgcolor: alpha(theme.palette.background.paper, 0.9), color: 'error.main', '&:hover': { bgcolor: theme.palette.background.paper } }}>
-                          <DeleteIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
+                        <Tooltip title="ดูรูปขนาดเต็ม">
+                          <IconButton size="small" onClick={() => setImageZoom(true)} sx={{ bgcolor: alpha(theme.palette.background.paper, 0.9), '&:hover': { bgcolor: theme.palette.background.paper } }}>
+                            <ZoomOutMapIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="เปลี่ยนรูป">
+                          <IconButton size="small" onClick={() => fileInputRef.current?.click()} sx={{ bgcolor: alpha(theme.palette.background.paper, 0.9), '&:hover': { bgcolor: theme.palette.background.paper } }}>
+                            <PhotoCameraIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="ลบรูป">
+                          <IconButton size="small" onClick={handleImageDelete} sx={{ bgcolor: alpha(theme.palette.background.paper, 0.9), color: 'error.main', '&:hover': { bgcolor: theme.palette.background.paper } }}>
+                            <DeleteIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </Tooltip>
                       </Box>
                     </>
                   ) : (
