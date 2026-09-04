@@ -1431,14 +1431,19 @@ router.post('/runs/adhoc', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), as
     if (!asset) throw new AppError('ไม่พบทรัพย์สิน', 404);
 
     const year = new Date().getFullYear();
+    // isAdhoc is what the rest of the app filters on (the coverage-gap map and
+    // the dashboard's per-source split both read it), so it is the flag that
+    // has to be set and matched on. The 'Ad-hoc' strings stay because they are
+    // what the schedule and plan list actually display for these rows.
     let plan = await prisma.pMPlan.findFirst({
-      where: { year, site: 'Ad-hoc', deptTask: 'Ad-hoc', company: 'Ad-hoc', deviceType: asset.type },
+      where: { year, isAdhoc: true, deviceType: asset.type },
     });
 
     if (!plan) {
       plan = await prisma.pMPlan.create({
         data: {
           year,
+          isAdhoc: true,
           site: 'Ad-hoc',
           deptTask: 'Ad-hoc',
           company: 'Ad-hoc',
