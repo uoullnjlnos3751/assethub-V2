@@ -64,10 +64,15 @@ const PM_EXCLUDED_STATUSES: AssetStatus[] = ['Retired', 'Lost', 'Damaged', 'Main
 // Shown wherever an asset has no company / type / department recorded.
 const UNSPECIFIED = '(ไม่ระบุ)';
 
+// Company is matched exactly, site and department by prefix/substring.
+// The difference is deliberate: company codes share prefixes (TRR is its own
+// company, not a parent of TRRCORP/TRRT/TRRP/TRRL/TRRSK), so `contains` on
+// company swept five sibling companies into every TRR plan. Site and
+// department names, by contrast, do read as a hierarchy people search into.
 function buildPMAssetWhere(plan: { company?: string | null; site?: string | null; deptTask?: string | null; deviceType?: string | null }) {
   return {
     status: { notIn: PM_EXCLUDED_STATUSES },
-    ...(plan.company ? { company: { contains: plan.company } } : {}),
+    ...(plan.company ? { company: plan.company } : {}),
     ...(plan.site ? { location: { contains: plan.site } } : {}),
     ...(plan.deptTask ? { departmentId: { contains: plan.deptTask } } : {}),
     ...(plan.deviceType ? { type: plan.deviceType } : {}),
