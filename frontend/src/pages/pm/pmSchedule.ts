@@ -24,6 +24,10 @@ export interface RawPlan {
   isAdhoc: boolean;
   totalCount: number;
   completedCount: number;
+  /** แผนกจริงของงานที่สร้างไว้แล้วในแผนนี้ พร้อมจำนวนของแต่ละแผนก มาจาก
+   *  /pm/plans — จำเป็นสำหรับแผนที่เลือก "ทุกแผนก" ไว้ เพราะตัวแผนเองไม่ได้เก็บ
+   *  ว่ากินแผนกไหนบ้าง รู้ได้จากงานที่สร้างจริงเท่านั้น */
+  deptBreakdown?: { dept: string; total: number; done: number }[];
 }
 
 export type PlanState = 'DONE' | 'OVERDUE' | 'RUNNING' | 'IDLE';
@@ -80,9 +84,11 @@ export interface SchedPlan {
   end: string | null;
   isAdhoc: boolean;
   state: PlanState;
+  deptBreakdown?: { dept: string; total: number; done: number }[];
 }
 
 const UNSET_COMPANY = '(ไม่ระบุบริษัท)';
+const ALL_DEPTS = 'ทุกแผนก';
 
 export function normalise(raw: RawPlan[], today: Date): SchedPlan[] {
   return raw.map(p => {
@@ -96,8 +102,13 @@ export function normalise(raw: RawPlan[], today: Date): SchedPlan[] {
     return {
       id: p.id,
       company: p.company || UNSET_COMPANY,
-      dept: p.deptTask || p.site || `แผน #${p.id}`,
+      /* แผนที่ไม่ระบุแผนกคือแผนที่ครอบคลุมทุกแผนก ไม่ใช่แผน "ไม่มีชื่อ" ที่ต้องไป
+         หยิบชื่อสถานที่มาใช้แทน — ของเดิมตกไปใช้ site ทำให้แผนของบริษัท TRR ที่
+         เลือกทุกแผนกไว้ ขึ้นเป็นแถวชื่อ "HQ" แถวเดียว อ่านได้เป็นว่ามีแค่แผนก HQ
+         ทั้งที่ไม่มีแผนกชื่อนี้อยู่จริง (HQ เป็นสถานที่) */
+      dept: p.deptTask || (p.isAdhoc ? `แผน #${p.id}` : ALL_DEPTS),
       site: p.site,
+      deptBreakdown: p.deptBreakdown,
       deviceType: p.deviceType,
       lead: p.lead,
       total,
@@ -180,6 +191,32 @@ export function rollup(plans: SchedPlan[], key: 'company' | 'dept'): SchedGroup[
     if (p.end > g.end) g.end = p.end;
   }
   return [...map.values()].sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
+}
+
+/**
+ * เหมือน rollup(plans, 'dept') แต่กางแผนที่เลือก "ทุกแผนก" ออกเป็นรายแผนกจริง
+ *
+ * แผนหนึ่งใบที่ครอบคลุมทุกแผนกเคยได้แถวเดียวในตารางรายแผนก ทั้งที่ข้างในมีงาน
+ * กระจายอยู่ 27 แผนก ซึ่งเป็นข้อมูลที่หน้านี้มีไว้เพื่อแสดงโดยเฉพาะ ที่นี่จึงตัดแผน
+ * แบบนั้นเป็นชิ้นละแผนกตามงานที่สร้างจริง แต่ละชิ้นถือจำนวนของแผนกตัวเอง แถบ
+ * ในกราฟจึงยาวตามความคืบหน้าของแผนกนั้นจริง ๆ ไม่ใช่ของทั้งแผน
+ *
+ * เป้าหมาย (target) ของชิ้นย่อยตั้งเท่ากับจำนวนงานที่สร้างแล้วของแผนกนั้น เพราะ
+ * เป้าหมายเป็นตัวเลขระดับแผน ไม่มีการตั้งแยกรายแผนก การเฉลี่ยลงไปจะเป็นการแต่ง
+ * ตัวเลขที่ไม่มีอยู่จริง — ส่วนเป้าหมายจริงของแผนยังอ่านได้จากตารางรายบริษัทและ
+ * ชีต "รายแผน" ซึ่งยังใช้ตัวแผนเต็มใบเหมือนเดิม
+ */
+export function rollupDepartments(plans: SchedPlan[]): SchedGroup[] {
+  const expanded: SchedPlan[] = [];
+  for (const p of plans) {
+    // กางเฉพาะแผนที่เป็น "ทุกแผนก" จริง ๆ และมีงานสร้างไว้แล้ว — แผนที่ยังไม่ได้
+    // generate ไม่มีงานให้ดูว่าตกแผนกไหน จึงคงเป็นแถวเดียวชื่อ "ทุกแผนก" ตามเดิม
+    if (p.dept !== ALL_DEPTS || !p.deptBreakdown?.length) { expanded.push(p); continue; }
+    for (const d of p.deptBreakdown) {
+      expanded.push({ ...p, dept: d.dept, done: d.done, total: d.total, target: d.total });
+    }
+  }
+  return rollup(expanded, 'dept');
 }
 
 /**

@@ -20,7 +20,7 @@ import {
 import {
   PLAN_STATES, RawPlan, SchedGroup, SchedSelection, buildTimeline,
   emptySchedSelection, groupState, matchesPlan, normalise, pct, planStateColors,
-  rollup, schedScopeSummary, schedSelectionActive, thDate,
+  rollup, rollupDepartments, schedScopeSummary, schedSelectionActive, thDate,
 } from './pmSchedule';
 import { buildScheduleReports, exportScheduleCsv, exportScheduleWorkbook } from './pmScheduleExport';
 
@@ -397,7 +397,10 @@ export default function PMSchedulePage() {
                 <GanttAxis tl={timeline} today={today} />
                 {byCompany.map(co => {
                   const open = !collapsed[co.name];
-                  const depts: SchedGroup[] = rollup(co.plans, 'dept');
+                  const depts: SchedGroup[] = rollupDepartments(co.plans);
+                  // นับแผนแบบไม่ซ้ำ — แผน "ทุกแผนก" หนึ่งใบถูกกางเป็นหลายแถว
+                  // การนับตรง ๆ จะได้จำนวนแผนเกินจริงหลายเท่า
+                  const planCount = new Set(co.plans.map(p => p.id)).size;
                   return (
                     <React.Fragment key={co.name}>
                       <GanttRow sx={{
@@ -415,7 +418,7 @@ export default function PMSchedulePage() {
                             transform: open ? 'none' : 'rotate(-90deg)', transition: 'transform .18s',
                           }} />
                           <Typography sx={{ ...nameSx, fontWeight: 700, fontSize: 11 }}>{co.name}</Typography>
-                          <Typography sx={subSx}>{depts.length} แผนก · {co.plans.length} แผน</Typography>
+                          <Typography sx={subSx}>{depts.length} แผนก · {planCount} แผน</Typography>
                         </Box>
                         <GanttTrack tl={timeline} today={today} height={ROW_H.group} />
                         <Box sx={metaSx}><MetaCount done={co.done} total={co.total} /></Box>

@@ -266,28 +266,53 @@ router.get('/plans', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (r
       orderBy: [{ year: 'desc' }, { site: 'asc' }],
     });
     const planIds = plans.map(p => p.id);
-    let runStats: any[] = [];
-    if (planIds.length > 0) {
-      runStats = await (prisma.pMRun.groupBy as any)({
-        by: ['planId', 'status'],
-        // Exclude runs whose asset has since left service (retired/lost/
-        // damaged/under maintenance) — same rule /pm/dashboard and /pm/runs
-        // already apply. Without it, a run stuck in DRAFT because nobody
-        // will ever perform PM on a retired device keeps the plan's count
-        // below 100% forever, showing "เกินกำหนด" even once every device
-        // still in service has actually been completed.
+    // Runs are read row-by-row rather than grouped in SQL because the
+    // per-department split below needs asset.departmentId, which Prisma's
+    // groupBy cannot reach across the relation. One year of runs is bounded
+    // by the fleet size (hundreds), so this stays a single cheap query that
+    // now produces the totals AND the breakdown instead of two passes.
+    //
+    // Excludes runs whose asset has since left service (retired/lost/
+    // damaged/under maintenance) — same rule /pm/dashboard and /pm/runs
+    // already apply. Without it, a run stuck in DRAFT because nobody
+    // will ever perform PM on a retired device keeps the plan's count
+    // below 100% forever, showing "เกินกำหนด" even once every device
+    // still in service has actually been completed.
+    const runRows = planIds.length > 0
+      ? await prisma.pMRun.findMany({
         where: { planId: { in: planIds }, asset: { status: { notIn: PM_EXCLUDED_STATUSES } } },
-        _count: { id: true },
-      });
+        select: { planId: true, status: true, asset: { select: { departmentId: true } } },
+      })
+      : [];
+
+    type Tally = { total: number; done: number };
+    const perPlan = new Map<number, Tally & { depts: Map<string, Tally> }>();
+    for (const run of runRows) {
+      let entry = perPlan.get(run.planId);
+      if (!entry) { entry = { total: 0, done: 0, depts: new Map() }; perPlan.set(run.planId, entry); }
+      const done = run.status === 'COMPLETED';
+      entry.total++;
+      if (done) entry.done++;
+
+      const dept = run.asset?.departmentId || UNSPECIFIED;
+      let deptEntry = entry.depts.get(dept);
+      if (!deptEntry) { deptEntry = { total: 0, done: 0 }; entry.depts.set(dept, deptEntry); }
+      deptEntry.total++;
+      if (done) deptEntry.done++;
     }
+
     const plansWithCounts = plans.map(plan => {
-      const planStats = runStats.filter(s => s.planId === plan.id);
-      const totalCount = planStats.reduce((acc, curr) => acc + curr._count.id, 0);
-      const completedCount = planStats.filter(s => s.status === 'COMPLETED').reduce((acc, curr) => acc + curr._count.id, 0);
+      const entry = perPlan.get(plan.id);
       return {
         ...plan,
-        totalCount,
-        completedCount
+        totalCount: entry?.total ?? 0,
+        completedCount: entry?.done ?? 0,
+        /* แผนที่ไม่ได้ระบุแผนก (= ครอบคลุมทุกแผนก) มองจากตัวแผนอย่างเดียวจะไม่รู้ว่า
+           กินแผนกไหนบ้าง ต้องดูจากงานที่สร้างจริงเท่านั้น — หน้าตารางแผนงานใช้ค่านี้
+           กางแถว "ทุกแผนก" ออกเป็นรายแผนกจริง */
+        deptBreakdown: [...(entry?.depts ?? new Map<string, Tally>())]
+          .map(([dept, t]) => ({ dept, total: t.total, done: t.done }))
+          .sort((a, b) => b.total - a.total),
       };
     });
     res.json(plansWithCounts);

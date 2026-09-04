@@ -1,5 +1,6 @@
 import {
-  PLAN_STATE_LABEL, SchedPlan, SchedSelection, groupState, pct, rollup, schedScopeBits,
+  PLAN_STATE_LABEL, SchedPlan, SchedSelection, groupState, pct, rollup, rollupDepartments,
+  schedScopeBits,
 } from './pmSchedule';
 import { Rows, stamp, writeCsv, writeWorkbook } from '../../utils/spreadsheet';
 
@@ -54,8 +55,11 @@ export function buildScheduleReports(
     ['บริษัท', 'แผนก', 'จำนวนแผน', 'เป้าหมาย (เครื่อง)', 'สร้างงานแล้ว', 'ทำเสร็จ', 'คงเหลือ',
       '% คืบหน้า', 'เริ่ม', 'สิ้นสุด', 'สถานะ'],
   ];
+  // rollupDepartments (ไม่ใช่ rollup ธรรมดา) เพื่อให้ชีตนี้ตรงกับกราฟ — แผน
+  // "ทุกแผนก" ถูกกางเป็นรายแผนกจริงเหมือนกัน ส่วนชีตรายบริษัทกับรายแผนยังใช้
+  // ตัวแผนเต็มใบ เป้าหมายระดับแผนจึงไม่เพี้ยน
   for (const co of companies) {
-    for (const dp of rollup(co.plans, 'dept')) {
+    for (const dp of rollupDepartments(co.plans)) {
       deptRows.push([
         co.name, dp.name, dp.plans.length, dp.target, dp.total, dp.done, dp.total - dp.done,
         `${pct(dp.done, dp.total)}%`, dp.start, dp.end, PLAN_STATE_LABEL[groupState(dp)],
