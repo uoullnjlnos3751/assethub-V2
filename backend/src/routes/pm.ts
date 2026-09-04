@@ -286,24 +286,43 @@ router.get('/plans', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (r
     const runRows = planIds.length > 0
       ? await prisma.pMRun.findMany({
         where: { planId: { in: planIds }, asset: { status: { notIn: PM_EXCLUDED_STATUSES } } },
-        select: { planId: true, status: true, asset: { select: { departmentId: true } } },
+        select: {
+          planId: true, status: true, scheduledDate: true,
+          asset: { select: { departmentId: true } },
+        },
       })
       : [];
 
-    type Tally = { total: number; done: number };
+    /* วันนัดจริงของกลุ่มงาน — ช่วงที่ทีมจองไว้ว่าจะลงหน้างานวันไหนถึงวันไหน
+       ต่างจาก startDate/endDate ของแผนซึ่งเป็นกรอบของทั้งแผนรวมกัน กราฟใน
+       หน้ากำหนดการวาดตามช่วงนี้เมื่อมีการนัดแล้ว และ `scheduled` บอกว่านัดไป
+       กี่เครื่องจากทั้งหมด เพื่อไม่ให้แท่งที่นัดไว้ 12 จาก 56 เครื่องอ่านเหมือน
+       ว่าทั้งแผนกจบในวันเดียว */
+    type Tally = { total: number; done: number; scheduled: number; schedStart: Date | null; schedEnd: Date | null };
+    const newTally = (): Tally => ({ total: 0, done: 0, scheduled: 0, schedStart: null, schedEnd: null });
+    const addRun = (t: Tally, done: boolean, sched: Date | null) => {
+      t.total++;
+      if (done) t.done++;
+      if (!sched) return;
+      t.scheduled++;
+      if (!t.schedStart || sched < t.schedStart) t.schedStart = sched;
+      if (!t.schedEnd || sched > t.schedEnd) t.schedEnd = sched;
+    };
+    // วันนัดถูกเก็บเป็นเที่ยงคืนเวลาไทย จึงต้องตัดเป็นสตริงวันที่ในโซนไทยด้วย
+    // ไม่งั้น toISOString() จะคายวันก่อนหน้าออกมา
+    const dayStr = (d: Date | null) => (d ? d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }) : null);
+
     const perPlan = new Map<number, Tally & { depts: Map<string, Tally> }>();
     for (const run of runRows) {
       let entry = perPlan.get(run.planId);
-      if (!entry) { entry = { total: 0, done: 0, depts: new Map() }; perPlan.set(run.planId, entry); }
+      if (!entry) { entry = { ...newTally(), depts: new Map() }; perPlan.set(run.planId, entry); }
       const done = run.status === 'COMPLETED';
-      entry.total++;
-      if (done) entry.done++;
+      addRun(entry, done, run.scheduledDate);
 
       const dept = run.asset?.departmentId || UNSPECIFIED;
       let deptEntry = entry.depts.get(dept);
-      if (!deptEntry) { deptEntry = { total: 0, done: 0 }; entry.depts.set(dept, deptEntry); }
-      deptEntry.total++;
-      if (done) deptEntry.done++;
+      if (!deptEntry) { deptEntry = newTally(); entry.depts.set(dept, deptEntry); }
+      addRun(deptEntry, done, run.scheduledDate);
     }
 
     const plansWithCounts = plans.map(plan => {
@@ -312,11 +331,17 @@ router.get('/plans', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (r
         ...plan,
         totalCount: entry?.total ?? 0,
         completedCount: entry?.done ?? 0,
+        scheduledCount: entry?.scheduled ?? 0,
+        schedStart: dayStr(entry?.schedStart ?? null),
+        schedEnd: dayStr(entry?.schedEnd ?? null),
         /* แผนที่ไม่ได้ระบุแผนก (= ครอบคลุมทุกแผนก) มองจากตัวแผนอย่างเดียวจะไม่รู้ว่า
            กินแผนกไหนบ้าง ต้องดูจากงานที่สร้างจริงเท่านั้น — หน้าตารางแผนงานใช้ค่านี้
            กางแถว "ทุกแผนก" ออกเป็นรายแผนกจริง */
         deptBreakdown: [...(entry?.depts ?? new Map<string, Tally>())]
-          .map(([dept, t]) => ({ dept, total: t.total, done: t.done }))
+          .map(([dept, t]) => ({
+            dept, total: t.total, done: t.done,
+            scheduled: t.scheduled, schedStart: dayStr(t.schedStart), schedEnd: dayStr(t.schedEnd),
+          }))
           .sort((a, b) => b.total - a.total),
       };
     });
