@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box, Button, TextField, Select, MenuItem, InputLabel, FormControl,
-  Typography, Avatar, Chip, alpha, useTheme,
+  Typography, Avatar, Chip, IconButton, Tooltip, alpha, useTheme,
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import SyncIcon from '@mui/icons-material/Sync';
 import SearchIcon from '@mui/icons-material/Search';
@@ -263,14 +265,39 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
     } as any]);
   };
 
+  /**
+   * ลบเครื่องออกหนึ่งตัว ตัวที่อยู่ถัดไปเลื่อนขึ้นมาแทนทั้งชุด
+   *
+   * Agent มักรายงานจอมาเกินกว่าที่ตั้งอยู่หน้างานจริง (จอที่เคยเสียบไว้ยังค้าง
+   * อยู่ใน EDID) ช่างจึงต้องลบตัวที่ไม่มีอยู่จริงออกได้ทุกตำแหน่ง รวมทั้งตัวแรก
+   * — ของเดิมซ่อนปุ่มลบของจอที่ 1 ไว้ ทำให้ต้องไปแก้ข้อมูลทับเอาเองทีละช่อง
+   *
+   * previewCodes ต้องตัดตามด้วย มันอ้างด้วยลำดับล้วน ๆ ถ้าไม่ตัด รหัสทรัพย์สิน
+   * ที่จองไว้ให้ตัวที่ถูกลบจะตกไปติดกับตัวที่เลื่อนขึ้นมาแทน
+   */
   const removeDevice = (index: number) => {
     const newD = [...devices];
     newD.splice(index, 1);
+    setPreviewCodes(prev => { const c = [...prev]; c.splice(index, 1); return c; });
     updateParent(newD);
     if (newD.length === 0) {
       setHasAny(null);
       onChange('');
     }
+  };
+
+  /** สลับลำดับกับตัวข้างบน/ข้างล่าง พาข้อมูลไปทั้งชุด รวมรหัสที่จองไว้ */
+  const moveDevice = (index: number, dir: -1 | 1) => {
+    const to = index + dir;
+    if (to < 0 || to >= devices.length) return;
+    const newD = [...devices];
+    [newD[index], newD[to]] = [newD[to], newD[index]];
+    setPreviewCodes(prev => {
+      const c = [...prev];
+      [c[index], c[to]] = [c[to], c[index]];
+      return c;
+    });
+    updateParent(newD);
   };
 
   const updateField = (index: number, field: keyof PMDeviceData, val: any) => {
@@ -359,14 +386,30 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
                       />
                     )}
                   </Box>
-                  {!readOnly && idx > 0 && (
-                    <Button
-                      size="small"
-                      color="error"
-                      startIcon={<DeleteOutlineIcon sx={{ fontSize: 16 }} />}
-                      onClick={() => removeDevice(idx)}
-                      sx={{ minHeight: 'auto', py: 0.25 }}
-                    >ลบเครื่องนี้</Button>
+                  {!readOnly && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+                      <Tooltip title={idx === 0 ? '' : `ย้ายขึ้นเป็นลำดับที่ ${idx}`}>
+                        <span>
+                          <IconButton size="small" disabled={idx === 0} onClick={() => moveDevice(idx, -1)}>
+                            <ArrowUpwardIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                      <Tooltip title={idx === devices.length - 1 ? '' : `ย้ายลงเป็นลำดับที่ ${idx + 2}`}>
+                        <span>
+                          <IconButton size="small" disabled={idx === devices.length - 1} onClick={() => moveDevice(idx, 1)}>
+                            <ArrowDownwardIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                      <Button
+                        size="small"
+                        color="error"
+                        startIcon={<DeleteOutlineIcon sx={{ fontSize: 16 }} />}
+                        onClick={() => removeDevice(idx)}
+                        sx={{ minHeight: 'auto', py: 0.25, ml: 0.5 }}
+                      >ลบเครื่องนี้</Button>
+                    </Box>
                   )}
                 </Box>
 

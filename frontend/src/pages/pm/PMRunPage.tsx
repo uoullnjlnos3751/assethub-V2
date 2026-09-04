@@ -1563,7 +1563,7 @@ export default function PMRunPage() {
       <Modal
         open={pmModal.open}
         onClose={() => setPMModal({ open: false, run: null, readOnly: false })}
-        maxWidth={1040}
+        fullScreen
         title={`${pmModal.readOnly || pmModal.run?.status === 'COMPLETED' ? 'รายละเอียดข้อมูล' : 'บันทึกข้อมูล'} PM: ${pmModal.run?.asset?.assetName || pmModal.run?.asset?.assetCode || ''} — ${pmModal.run?.asset?.brand || ''} ${pmModal.run?.asset?.model || ''}`}
       >
         {pmModal.run && (() => {
@@ -1577,10 +1577,59 @@ export default function PMRunPage() {
           };
 
           return (
-            <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '80vh' }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+              {/* Progress & Actions — เต็มความกว้าง ค้างอยู่บนสุดเสมอ เพราะเป็น
+                  ตัวเลขที่ต้องเห็นตลอดว่าเหลืออีกกี่ข้อ */}
+              <Box sx={{ p: '10px 24px', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, flexWrap: 'wrap', gap: 1.5, bgcolor: 'action.hover' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1, minWidth: 220 }}>
+                  <Typography sx={{ fontSize: 12, fontWeight: 600 }}>ความคืบหน้า</Typography>
+                  <LinearProgress variant="determinate" value={checkPct} color="success" sx={{ flex: 1, height: 6, borderRadius: 99 }} />
+                  <Typography sx={{ fontSize: 12, fontWeight: 700, color: 'success.main', minWidth: 40 }}>{checkPct}%</Typography>
+                </Box>
+                {!isReadOnly && (
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button size="small" variant="outlined" startIcon={<CheckIcon />} onClick={() => setAll('yes')}>ทำทั้งหมด (Yes)</Button>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<RestartAltIcon />}
+                      onClick={() => {
+                        setAnswers({ staff_name: user?.displayName || user?.adUsername || '' });
+                        localStorage.removeItem(`pm_draft_${pmModal.run.id}`);
+                      }}
+                    >
+                      ล้างข้อมูล
+                    </Button>
+                  </Box>
+                )}
+              </Box>
+
+              {/* ── สองคอลัมน์ ────────────────────────────────────────────
+                  ซ้าย = เช็คลิสต์ที่ต้องกรอก เลื่อนของตัวเอง
+                  ขวา = ข้อมูลเครื่องกับผลตรวจ Agent ที่ต้องเห็นระหว่างกรอก
+                  ของเดิมวางเรียงลงมาชั้นเดียว ผลตรวจ Agent จึงเลื่อนหายไปพอดี
+                  ตอนที่ช่างเริ่มกรอกเช็คลิสต์ ทั้งที่เป็นข้อมูลที่ต้องใช้อ้างอิง
+
+                  แถบเลื่อนแยกคอลัมน์เฉพาะจอกว้าง จอแคบปล่อยให้เลื่อนทั้งหน้า
+                  เป็นแถบเดียว ไม่งั้นจะได้กล่องเลื่อนสองกล่องซ้อนกันบนมือถือ */}
+              <Box sx={{
+                flex: 1, minHeight: 0,
+                display: 'grid',
+                gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) 400px' },
+                overflowY: { xs: 'auto', lg: 'hidden' },
+              }}>
+
+              {/* ── คอลัมน์ขวา: ข้อมูลเครื่อง + ผลตรวจ ── */}
+              <Box sx={{
+                gridColumn: { lg: 2 }, gridRow: { lg: 1 },
+                order: { xs: -1, lg: 0 },
+                overflowY: { xs: 'visible', lg: 'auto' },
+                borderLeft: { lg: '1px solid' }, borderColor: { lg: 'divider' },
+                display: 'flex', flexDirection: 'column',
+              }}>
               {/* Header Info */}
-              <Box sx={{ borderBottom: '1px solid', borderColor: 'divider', p: '12px 24px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '12px 24px', flexShrink: 0 }}>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '12px 24px' }}>
+              <Box sx={{ borderBottom: '1px solid', borderColor: 'divider', p: '12px 20px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '12px 20px', flexShrink: 0 }}>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '12px 20px' }}>
                   {[
                     { lbl: 'ผู้ถือครอง', val: pmModal.run.asset?.ownerName || '—' },
                     { lbl: 'แผนก', val: pmModal.run.asset?.departmentId || pmModal.run.plan?.deptTask || '—' },
@@ -1608,33 +1657,8 @@ export default function PMRunPage() {
                 )}
               </Box>
 
-              {/* Progress & Actions */}
-              <Box sx={{ p: '10px 24px', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, flexWrap: 'wrap', gap: 1.5, bgcolor: 'action.hover' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1, minWidth: 220 }}>
-                  <Typography sx={{ fontSize: 12, fontWeight: 600 }}>ความคืบหน้า</Typography>
-                  <LinearProgress variant="determinate" value={checkPct} color="success" sx={{ flex: 1, height: 6, borderRadius: 99 }} />
-                  <Typography sx={{ fontSize: 12, fontWeight: 700, color: 'success.main', minWidth: 40 }}>{checkPct}%</Typography>
-                </Box>
-                {!isReadOnly && (
-                  <Box sx={{ display: 'flex', gap: 1 }}>
-                    <Button size="small" variant="outlined" startIcon={<CheckIcon />} onClick={() => setAll('yes')}>ทำทั้งหมด (Yes)</Button>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={<RestartAltIcon />}
-                      onClick={() => {
-                        setAnswers({ staff_name: user?.displayName || user?.adUsername || '' });
-                        localStorage.removeItem(`pm_draft_${pmModal.run.id}`);
-                      }}
-                    >
-                      ล้างข้อมูล
-                    </Button>
-                  </Box>
-                )}
-              </Box>
-
               {/* Photo Upload Section */}
-              <Box sx={{ p: '10px 24px', borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
+              <Box sx={{ p: '10px 20px', borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
                 <Box sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary', mb: 1, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   <PhotoCameraIcon sx={{ fontSize: 14 }} /> รูปถ่ายขณะทำ PM (Photo attachment)
                 </Box>
@@ -1666,7 +1690,7 @@ export default function PMRunPage() {
                   วางไว้เหนือ checklist เพราะเป็นเรื่องที่ต้องรู้ก่อนเริ่มตรวจ
                   และหลายข้อ (แบตเสื่อม ดิสก์เต็ม) มองด้วยตาไม่เห็น */}
               {agentCheck && (
-                <Box sx={{ px: 3, pt: 2 }}>
+                <Box sx={{ px: 2.5, py: 2 }}>
                   <Box sx={{
                     borderRadius: '12px', overflow: 'hidden',
                     border: '1px solid', borderColor: 'divider',
@@ -1773,8 +1797,15 @@ export default function PMRunPage() {
                   </Box>
                 </Box>
               )}
-              {/* Checklist Scrollable Body */}
-              <Box sx={{ p: '16px 24px', overflowY: 'auto', flex: 1, bgcolor: 'action.hover' }}>
+              </Box>{/* ── จบคอลัมน์ขวา ── */}
+
+              {/* ── คอลัมน์ซ้าย: เช็คลิสต์ ── */}
+              <Box sx={{
+                gridColumn: { lg: 1 }, gridRow: { lg: 1 },
+                p: '16px 24px',
+                overflowY: { xs: 'visible', lg: 'auto' },
+                bgcolor: 'action.hover',
+              }}>
                 {glpiSpec && (
                   <Alert severity="success" icon={<SensorsIcon fontSize="inherit" />} sx={{ mb: 2 }}>
                     <Typography sx={{ fontWeight: 600, fontSize: 12, mb: 0.75 }}>ข้อมูลฮาร์ดแวร์สแกนอัตโนมัติจาก GLPI:</Typography>
@@ -1816,10 +1847,12 @@ export default function PMRunPage() {
                 )}
 
                 <ChecklistGroups items={items} answers={answers} setAnswers={setAnswers} readOnly={isReadOnly} asset={pmModal.run.asset} />
-              </Box>
+              </Box>{/* ── จบคอลัมน์ซ้าย ── */}
+
+              </Box>{/* ── จบสองคอลัมน์ ── */}
 
               {/* Footer Actions */}
-              <Box sx={{ p: '16px 24px', borderTop: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'flex-end', gap: 1.25, flexShrink: 0 }}>
+              <Box sx={{ p: '12px 24px', borderTop: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'flex-end', gap: 1.25, flexShrink: 0, bgcolor: 'background.paper' }}>
                 <Button variant="outlined" onClick={() => setPMModal({ open: false, run: null, readOnly: false })}>ปิด</Button>
                 {!isReadOnly && (
                   <>
