@@ -1175,9 +1175,21 @@ export default function PMPlanListPage() {
       {/* ── Generate Workload Modal ── */}
       <Modal open={generateModal.open} onClose={() => setGenerateModal({ open: false, plan: null })} title="Generate งาน PM">
         <Box sx={{ p: '18px 20px' }}>
+          {/* บอกขอบเขตของแผนให้ครบทุกเงื่อนไข ไม่ใช่หยิบมาโชว์ค่าเดียว
+              เดิมเขียน `deptTask || site` ซึ่งเวลาเลือก "ทุกแผนก" (deptTask ว่าง)
+              จะตกไปโชว์ชื่อสถานที่แทน กลายเป็นข้อความว่า "แผน: HQ" ทั้งที่แผนนั้น
+              ครอบคลุมทุกแผนกใน HQ อยู่แล้ว ทำให้เข้าใจผิดว่าระบบกรองเหลือแค่ HQ */}
           <Alert severity="info" icon={<EventIcon fontSize="inherit" />} sx={{ mb: 1.5 }}>
             <Typography sx={{ fontSize: 12.5, fontWeight: 700, mb: 0.5 }}>
-              แผน: {generateModal.plan?.deptTask || generateModal.plan?.site || 'ทั่วไป'}
+              ขอบเขตของแผนนี้
+            </Typography>
+            <Typography sx={{ fontSize: 11.5, mb: 0.5 }}>
+              {[
+                `บริษัท: ${generateModal.plan?.company || 'ทุกบริษัท'}`,
+                `สถานที่: ${generateModal.plan?.site || 'ทุกสถานที่'}`,
+                `แผนก: ${generateModal.plan?.deptTask || 'ทุกแผนก'}`,
+                `ประเภทอุปกรณ์: ${generateModal.plan?.deviceType || 'ทุกประเภท'}`,
+              ].join(' · ')}
             </Typography>
             <Typography sx={{ fontSize: 11 }}>
               {fmtDate(generateModal.plan?.startDate)} → {fmtDate(generateModal.plan?.endDate)} · เป้าหมาย {generateModal.plan?.plannedDeviceCount} เครื่อง
@@ -1186,7 +1198,7 @@ export default function PMPlanListPage() {
           {generateEligibility && <Box sx={{ mb: 1.5 }}><EligibilityStats data={generateEligibility} /></Box>}
           <Typography sx={{ fontSize: 12, color: 'text.secondary', lineHeight: 1.6 }}>
             ระบบจะสร้างรายการงาน PM สำหรับทรัพย์สินที่<strong>ยังไม่เคย PM</strong>ในปีนี้
-            โดยกรองตาม{generateModal.plan?.deptTask ? 'แผนก' : 'Location'}ที่กำหนดในแผน
+            และตรงกับขอบเขตข้างบนทุกข้อ — ช่องที่เป็น "ทุก…" คือไม่กรองด้วยเงื่อนไขนั้น
           </Typography>
           {genMsg && (
             <Alert severity={genMsg.includes('ผิดพลาด') ? 'error' : 'success'} sx={{ mt: 1.5 }}>{genMsg}</Alert>
