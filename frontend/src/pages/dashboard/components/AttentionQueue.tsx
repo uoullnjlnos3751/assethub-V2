@@ -1,8 +1,7 @@
 import React from 'react';
 import { Box, Typography, alpha, useTheme } from '@mui/material';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, AlertTriangle } from 'lucide-react';
 import { SectionCard } from './SectionCard';
-import { AlertTriangle } from 'lucide-react';
 
 /**
  * คิวงานที่ต้องลงมือ เรียงตามความเร่งด่วน
@@ -15,6 +14,15 @@ import { AlertTriangle } from 'lucide-react';
  *
  * รายการที่เป็นศูนย์ไม่แสดง ไม่ใช่แสดงเลขศูนย์ — แดชบอร์ดที่เต็มไปด้วยศูนย์
  * สอนให้คนเลิกอ่านมัน
+ *
+ * วางเป็นกริดการ์ดย่อย ไม่ใช่รายการเรียงลงมาแถวละบรรทัด — แบบเดิมแต่ละแถวสูง
+ * ~57px แต่ใช้ความกว้างจริงไม่ถึงครึ่ง พอมี 8 เรื่องจึงกินความสูงเกือบ 460px
+ * ทั้งที่ครึ่งขวาว่างเปล่า แบบกริดใช้ความกว้างที่มีอยู่แล้วแทน ความสูงเหลือ
+ * ราวหนึ่งในสาม โดยไม่ต้องซ่อนเรื่องไหนไว้ใต้ปุ่ม "ดูเพิ่ม" — ทุกเรื่องในนี้คือ
+ * งานที่ต้องทำ การซ่อนคือการทำให้ลืม
+ *
+ * แถบสีซ้ายแทนจุดกลม: ในกริดหลายคอลัมน์ ลำดับความรุนแรงอ่านจากตำแหน่งไม่ได้
+ * เหมือนรายการเรียงลงมา สีจึงต้องเด่นพอให้กวาดตาเห็นทั้งกริดพร้อมกัน
  */
 
 export type Severity = 'crit' | 'warn' | 'info';
@@ -33,6 +41,7 @@ export interface AttentionItem {
 }
 
 const RANK: Record<Severity, number> = { crit: 3, warn: 2, info: 1 };
+const SEVERITY_LABEL: Record<Severity, string> = { crit: 'ด่วน', warn: 'ควรทำ', info: 'ทั่วไป' };
 
 export function AttentionQueue({ items, navigate }: {
   items: AttentionItem[];
@@ -60,50 +69,67 @@ export function AttentionQueue({ items, navigate }: {
     );
   }
 
+  /* สรุปหัวการ์ดเป็นจำนวนแยกตามความรุนแรง แทนที่จะบอกแค่ผลรวม — "ด่วน 2"
+     บอกได้ทันทีว่าต้องรีบแค่ไหน ซึ่ง "8 เรื่อง" เฉย ๆ บอกไม่ได้ */
+  const subtitle = (['crit', 'warn', 'info'] as Severity[])
+    .map(s => ({ s, n: sorted.filter(i => i.severity === s).length }))
+    .filter(x => x.n > 0)
+    .map(x => `${SEVERITY_LABEL[x.s]} ${x.n}`)
+    .join(' · ');
+
   return (
-    <SectionCard title="ต้องจัดการ" icon={AlertTriangle} subtitle={`${sorted.length} เรื่องที่รอการตัดสินใจ`}>
-      <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+    <SectionCard title="ต้องจัดการ" icon={AlertTriangle} subtitle={subtitle}>
+      {/* minmax(0, …) กันช่องกริดกว้างตาม min-content ของข้อความ noWrap ข้างใน
+          ซึ่งจะดันให้ล้นกรอบที่จอแคบ */}
+      <Box sx={{
+        display: 'grid',
+        gridTemplateColumns: {
+          xs: 'minmax(0, 1fr)',
+          sm: 'repeat(2, minmax(0, 1fr))',
+          lg: 'repeat(3, minmax(0, 1fr))',
+        },
+        gap: 1,
+      }}>
         {sorted.map(it => {
           const col = tone(it.severity);
           const share = it.of ? Math.round((it.count / it.of) * 100) : 0;
           return (
             <Box key={it.key} onClick={() => navigate(it.href)}
+              // รายละเอียดย้ายมาเป็น tooltip — เป็นคำอธิบายที่อ่านครั้งเดียวจำได้
+              // ไม่คุ้มกับการกินอีกบรรทัดในทุกใบตลอดไป
+              title={it.detail}
               sx={{
-                display: 'grid',
-                gridTemplateColumns: { xs: '1fr auto', sm: '1fr 150px 76px 18px' },
-                alignItems: 'center', gap: 1.5,
-                px: 1.25, py: 1.25, borderRadius: 2, cursor: 'pointer',
+                p: 1.25, borderRadius: 2, cursor: 'pointer', minWidth: 0,
+                border: `1px solid ${theme.palette.divider}`,
+                borderLeft: `3px solid ${col}`,
                 transition: 'background .13s',
                 '&:hover': { bgcolor: alpha(col, 0.06) },
               }}>
-              <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'flex-start', minWidth: 0 }}>
-                <Box sx={{
-                  width: 8, height: 8, borderRadius: '50%', bgcolor: col,
-                  mt: '6px', flexShrink: 0,
-                }} />
-                <Box sx={{ minWidth: 0 }}>
-                  <Typography sx={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.4 }}>{it.title}</Typography>
-                  <Typography sx={{ fontSize: 12, color: 'text.secondary', lineHeight: 1.5 }}>{it.detail}</Typography>
-                </Box>
-              </Box>
-
-              <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
-                <Box sx={{ height: 6, borderRadius: 3, bgcolor: 'action.hover', overflow: 'hidden' }}>
-                  <Box sx={{ height: '100%', width: `${Math.max(2, share)}%`, bgcolor: col, borderRadius: 3 }} />
-                </Box>
-                <Typography sx={{ fontSize: 10.5, color: 'text.disabled', mt: 0.5 }}>
-                  {it.count.toLocaleString()} / {it.of.toLocaleString()} · {share}% {it.ofLabel}
+              <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 1 }}>
+                <Typography noWrap sx={{ fontSize: 13, fontWeight: 600, minWidth: 0 }}>
+                  {it.title}
                 </Typography>
-              </Box>
-
-              <Box sx={{ textAlign: 'right' }}>
-                <Typography sx={{ fontSize: 17, fontWeight: 700, color: col, lineHeight: 1.2, fontVariantNumeric: 'tabular-nums' }}>
+                <Typography sx={{
+                  fontSize: 16, fontWeight: 700, color: col, lineHeight: 1.2,
+                  fontVariantNumeric: 'tabular-nums', flexShrink: 0,
+                }}>
                   {it.count.toLocaleString()}
                 </Typography>
-                <Typography sx={{ fontSize: 10.5, color: 'text.disabled' }}>{it.actionLabel}</Typography>
               </Box>
 
-              <ChevronRight size={15} style={{ color: theme.palette.text.disabled }} />
+              <Box sx={{ height: 4, borderRadius: 2, bgcolor: 'action.hover', overflow: 'hidden', mt: 0.75 }}>
+                <Box sx={{ height: '100%', width: `${Math.max(2, share)}%`, bgcolor: col, borderRadius: 2 }} />
+              </Box>
+
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mt: 0.5 }}>
+                <Typography noWrap sx={{ fontSize: 10.5, color: 'text.disabled', minWidth: 0 }}>
+                  {it.count.toLocaleString()}/{it.of.toLocaleString()} · {share}% {it.ofLabel}
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', flexShrink: 0, color: col }}>
+                  <Typography sx={{ fontSize: 10.5, fontWeight: 700 }}>{it.actionLabel}</Typography>
+                  <ChevronRight size={13} />
+                </Box>
+              </Box>
             </Box>
           );
         })}

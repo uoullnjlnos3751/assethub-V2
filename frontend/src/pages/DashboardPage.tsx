@@ -23,7 +23,7 @@ import { CategoryUtilizationCard } from './dashboard/components/CategoryUtilizat
 import { AttentionQueue, AttentionItem } from './dashboard/components/AttentionQueue';
 import { LifecycleStrip, Stage } from './dashboard/components/LifecycleStrip';
 import { QuietStatusBar } from './dashboard/components/QuietStatusBar';
-import { OutcomeStrip } from './dashboard/components/OutcomeStrip';
+import { OutcomeStrip, hasOutcome } from './dashboard/components/OutcomeStrip';
 import { TrendStrip, MetricPoint } from './dashboard/components/TrendStrip';
 import { now, pct } from './dashboard/dashboardHelpers';
 
@@ -348,16 +348,31 @@ export default function DashboardPage() {
               ซ่อนตัวเองจนกว่าจะมีข้อมูลอย่างน้อย 3 วัน (ดูใน TrendStrip) */}
       <TrendStrip history={metricHistory} />
 
-      {/* ── วงจรชีวิต: ช่วงที่ยังไม่เริ่มบันทึกจะจางและเขียนบอกตรง ๆ ── */}
-      <LifecycleStrip stages={stages} navigate={navigate} />
-
-      {/* ── สิ่งที่ต้องลงมือ เรียงตามความเร่งด่วน ── */}
+      {/* ── สิ่งที่ต้องลงมือ เรียงตามความเร่งด่วน ──
+              อยู่ก่อนวงจรชีวิตเพราะเป็นงานที่ต้องทำ ไม่ใช่ภาพรวมไว้ดูเฉย ๆ
+              เดิมอยู่ใต้วงจรชีวิต ทำให้ของที่ต้องลงมือหล่นไปอยู่แถวสี่ของหน้า */}
       <Box sx={{ mb: 1.5 }}>
         <AttentionQueue items={attention} navigate={navigate} />
       </Box>
 
-      {/* ── ผลลัพธ์จากการตรวจ PM ── */}
-      <OutcomeStrip outcome={outcome} year={new Date().getFullYear()} navigate={navigate} />
+      {/* ── วงจรชีวิต + ผลจากการตรวจ PM วางคู่กัน ──
+              เดิมเป็นสองแถบเต็มความกว้างซ้อนกัน กินรวม ~290px ทั้งที่ผลตรวจ PM มี
+              แค่สามตัวเลข พอจับคู่เหลือแถวเดียว ส่วนตอนที่ยังไม่มีผลตรวจ (การ์ด
+              ซ่อนตัวเอง) วงจรชีวิตกลับไปกินเต็มความกว้างเหมือนเดิม ไม่ทิ้งช่องว่าง */}
+      {/* minmax(0, …) ไม่ใช่ 1fr เปล่า ๆ — ค่า 1fr มีขั้นต่ำเป็น min-content ของ
+          สิ่งที่อยู่ข้างใน พอในการ์ดมีข้อความ noWrap ช่องจะกว้างตามข้อความนั้นและ
+          ดันล้นออกนอกกรอบที่จอมือถือ (วัดได้ล้น 14px ก่อนแก้) */}
+      <Box sx={{
+        display: 'grid',
+        gridTemplateColumns: {
+          xs: 'minmax(0, 1fr)',
+          lg: hasOutcome(outcome) ? 'minmax(0, 8fr) minmax(0, 4fr)' : 'minmax(0, 1fr)',
+        },
+        gap: 1.25, mb: 1.5, alignItems: 'stretch',
+      }}>
+        <LifecycleStrip stages={stages} navigate={navigate} />
+        <OutcomeStrip outcome={outcome} year={new Date().getFullYear()} navigate={navigate} />
+      </Box>
 
       {/* ── Row 2: IT Operations Room (live) + Donut ─────────────── */}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '7fr 5fr' }, gap: 1.25, mb: 1.5 }}>
