@@ -15,6 +15,7 @@ import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import { pmAPI, assetAPI } from '../../../services/api';
 import { resolveMediaUrl } from '../../../utils/mediaUrl';
 import imageCompression from 'browser-image-compression';
+import { ImageLightbox } from '../../../components/ImageLightbox';
 
 interface PMDeviceData {
   _assetId?: number;
@@ -64,6 +65,8 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
   const [devices, setDevices] = useState<PMDeviceData[]>([]);
   const [hasAny, setHasAny] = useState<'yes' | 'no' | null>(null);
   const [previewCodes, setPreviewCodes] = useState<string[]>([]);
+  /** ลำดับของเครื่องที่กำลังเปิดดูรูปเต็มอยู่ — null คือไม่ได้เปิด */
+  const [photoZoom, setPhotoZoom] = useState<number | null>(null);
   const [companies, setCompanies] = useState<string[]>(DEFAULT_COMPANIES);
   const [displayFormat, setDisplayFormat] = useState<string>('{AssetName} / {AssetCode}');
 
@@ -422,12 +425,19 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
                   {/* Photo Upload */}
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, gridColumn: '1 / -1' }}>
                     {d.photoFilename ? (
-                      <Avatar
-                        variant="rounded"
-                        src={resolveMediaUrl(`/uploads/pm/${d.photoFilename}`)}
-                        alt={labelSingular}
-                        sx={{ width: 60, height: 60, borderRadius: '8px', border: `1px solid ${theme.palette.divider}` }}
-                      />
+                      <Tooltip title="คลิกเพื่อดูรูปขนาดเต็ม">
+                        <Avatar
+                          variant="rounded"
+                          src={resolveMediaUrl(`/uploads/pm/${d.photoFilename}`)}
+                          alt={labelSingular}
+                          onClick={() => setPhotoZoom(idx)}
+                          sx={{
+                            width: 60, height: 60, borderRadius: '8px',
+                            border: `1px solid ${theme.palette.divider}`, cursor: 'zoom-in',
+                            '&:hover': { borderColor: theme.palette.primary.main },
+                          }}
+                        />
+                      </Tooltip>
                     ) : (
                       <Box sx={{
                         width: 60, height: 60, bgcolor: theme.palette.action.hover, borderRadius: '8px',
@@ -445,6 +455,13 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
                           }
                         }} />
                       </Button>
+                    )}
+                    {d.photoFilename && !readOnly && (
+                      <Button
+                        size="small" color="error" startIcon={<DeleteOutlineIcon sx={{ fontSize: 16 }} />}
+                        onClick={() => updateField(idx, 'photoFilename', undefined)}
+                        sx={{ fontSize: '0.75rem' }}
+                      >ลบรูป</Button>
                     )}
                   </Box>
 
@@ -623,6 +640,20 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
           )}
         </Box>
       )}
+
+      {/* หน้าดูรูปเต็มตัวเดียวใช้ร่วมกันทุกเครื่อง อ่านรูปจากลำดับที่กำลังเปิดอยู่ */}
+      <ImageLightbox
+        open={photoZoom !== null}
+        onClose={() => setPhotoZoom(null)}
+        src={photoZoom !== null && devices[photoZoom]?.photoFilename
+          ? resolveMediaUrl(`/uploads/pm/${devices[photoZoom]!.photoFilename}`)
+          : null}
+        title={photoZoom !== null ? `${labelHeader} ${photoZoom + 1}` : ''}
+        onDelete={readOnly || photoZoom === null ? undefined : () => {
+          updateField(photoZoom, 'photoFilename', undefined);
+          setPhotoZoom(null);
+        }}
+      />
     </Box>
   );
 };

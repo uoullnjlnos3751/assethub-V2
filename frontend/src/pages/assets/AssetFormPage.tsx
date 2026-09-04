@@ -27,20 +27,19 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
-  Dialog,
   Tooltip
 } from '@mui/material';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import ZoomOutMapIcon from '@mui/icons-material/ZoomOutMap';
-import CloseIcon from '@mui/icons-material/Close';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { assetAPI } from '../../services/api';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
 import LoadingSkeleton from '../../components/LoadingSkeleton';
 import { getTypeIcon, SectionCard, ToggleWrap, getBrandSuggestionsForType } from './components/AssetFormHelpers';
+import { ImageLightbox } from '../../components/ImageLightbox';
 
 /* ─── Types / Defaults ─────────────────────────────────────────── */
 const initialData = {
@@ -2369,67 +2368,16 @@ export default function AssetFormPage() {
           </SectionCard>
 
           {/* ดูรูปเต็มจอ พร้อมเปลี่ยน/ลบได้จากตรงนี้เลย — จุดประสงค์ของการกาง
-              รูปคือตรวจว่าถ่ายถูกและอ่านออกไหม ถ้าไม่ผ่านก็ต้องแก้ได้ทันที
-              ไม่ใช่ปิดหน้าต่างแล้วไปหาปุ่มอีกที */}
-          <Dialog
-            open={imageZoom && !!imagePreview}
+              รูปคือตรวจว่าถ่ายถูกและอ่านออกไหม ถ้าไม่ผ่านก็ต้องแก้ได้ทันที */}
+          <ImageLightbox
+            open={imageZoom}
             onClose={() => setImageZoom(false)}
-            maxWidth={false}
-            PaperProps={{
-              sx: {
-                bgcolor: 'rgba(0,0,0,0.92)', backgroundImage: 'none', boxShadow: 'none',
-                m: 2, maxWidth: 'calc(100vw - 32px)', maxHeight: 'calc(100vh - 32px)',
-                display: 'flex', flexDirection: 'column',
-              },
-            }}
-          >
-            <Box sx={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              gap: 2, px: 2, py: 1.25, color: '#fff',
-              borderBottom: '1px solid rgba(255,255,255,0.15)',
-            }}>
-              <Typography sx={{ fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                รูปทะเบียนทรัพย์สิน{form.assetCode ? ` · ${form.assetCode}` : ''}
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
-                <Button
-                  size="small" variant="outlined" startIcon={<PhotoCameraIcon sx={{ fontSize: 16 }} />}
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={imageUploading}
-                  /* ธีมตั้งพื้นหลังปุ่ม outlined เป็นสีขาวไว้ ถ้าไม่ล้างทิ้งจะได้
-                     ตัวอักษรขาวบนพื้นขาวบนฉากมืดของหน้าดูรูป */
-                  sx={{
-                    color: '#fff', bgcolor: 'transparent', borderColor: 'rgba(255,255,255,0.4)',
-                    '&:hover': { bgcolor: 'rgba(255,255,255,0.12)', borderColor: '#fff' },
-                    '&.Mui-disabled': { color: 'rgba(255,255,255,0.5)', bgcolor: 'transparent' },
-                  }}
-                >
-                  {imageUploading ? 'กำลังอัพโหลด...' : 'เปลี่ยนรูป'}
-                </Button>
-                <Button
-                  size="small" variant="outlined" color="error" startIcon={<DeleteIcon sx={{ fontSize: 16 }} />}
-                  onClick={handleImageDelete}
-                  sx={{ bgcolor: 'transparent', '&:hover': { bgcolor: 'rgba(220,38,38,0.14)' } }}
-                >
-                  ลบรูป
-                </Button>
-                <IconButton size="small" onClick={() => setImageZoom(false)} sx={{ color: '#fff' }}>
-                  <CloseIcon fontSize="small" />
-                </IconButton>
-              </Box>
-            </Box>
-            <Box sx={{
-              flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              overflow: 'auto', p: 1,
-            }}>
-              <Box
-                component="img"
-                src={imagePreview || ''}
-                alt="รูปทะเบียนทรัพย์สินขนาดเต็ม"
-                sx={{ maxWidth: '100%', maxHeight: 'calc(100vh - 130px)', objectFit: 'contain', display: 'block' }}
-              />
-            </Box>
-          </Dialog>
+            src={imagePreview}
+            title={`รูปทะเบียนทรัพย์สิน${form.assetCode ? ` · ${form.assetCode}` : ''}`}
+            onReplace={() => fileInputRef.current?.click()}
+            replacing={imageUploading}
+            onDelete={handleImageDelete}
+          />
 
           {/* ⑥ รูปภาพ */}
           <SectionCard title="รูปภาพทะเบียนทรัพย์สิน" barColor={`linear-gradient(180deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`}>

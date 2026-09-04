@@ -44,6 +44,7 @@ import MonitorIcon from '@mui/icons-material/Monitor';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import PersonIcon from '@mui/icons-material/Person';
 import EventIcon from '@mui/icons-material/Event';
+import ZoomOutMapIcon from '@mui/icons-material/ZoomOutMap';
 import SyncAltIcon from '@mui/icons-material/SyncAlt';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
@@ -64,6 +65,7 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { pmAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { PMDeviceArrayInput } from './components/PMDeviceArrayInput';
+import { ImageLightbox } from '../../components/ImageLightbox';
 import { Modal } from './components/Modal';
 import { StarRating } from './components/StarRating';
 import { getRatingCategory, RATING_RUBRIC, suggestRating } from './components/pmRatingRubric';
@@ -564,6 +566,8 @@ export default function PMRunPage() {
   const [savingNote, setSavingNote] = useState(false);
   const [schedModal, setSchedModal] = useState<{ open: boolean; value: string }>({ open: false, value: '' });
   const [savingSched, setSavingSched] = useState(false);
+  const [pmPhotoZoom, setPmPhotoZoom] = useState(false);
+  const pmPhotoInputRef = React.useRef<HTMLInputElement>(null);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2800); };
 
@@ -1664,9 +1668,26 @@ export default function PMRunPage() {
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                   {pmModal.run.photoUrl ? (
-                    <Box sx={{ width: 64, height: 64, borderRadius: 1, border: '1px solid', borderColor: 'divider', overflow: 'hidden', bgcolor: 'action.hover' }}>
-                      <img src={`/uploads/pm/${pmModal.run.photoUrl}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="PM Attachment" />
-                    </Box>
+                    /* รูปย่อ 64px ถูกครอบ (objectFit: cover) จึงบอกไม่ได้เลยว่าถ่าย
+                       ติดครบหรือชัดไหม — คลิกเพื่อกางเต็มจอ */
+                    <Tooltip title="คลิกเพื่อดูรูปขนาดเต็ม">
+                      <Box
+                        onClick={() => setPmPhotoZoom(true)}
+                        sx={{
+                          width: 64, height: 64, borderRadius: 1, border: '1px solid', borderColor: 'divider',
+                          overflow: 'hidden', bgcolor: 'action.hover', cursor: 'zoom-in', position: 'relative',
+                          '&:hover .zoom-hint': { opacity: 1 },
+                        }}
+                      >
+                        <img src={`/uploads/pm/${pmModal.run.photoUrl}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="PM Attachment" />
+                        <Box className="zoom-hint" sx={{
+                          position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          bgcolor: 'rgba(0,0,0,0.45)', color: '#fff', opacity: 0, transition: 'opacity .15s',
+                        }}>
+                          <ZoomOutMapIcon sx={{ fontSize: 20 }} />
+                        </Box>
+                      </Box>
+                    </Tooltip>
                   ) : (
                     <Box sx={{ width: 64, height: 64, borderRadius: 1, border: '1px dashed', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'text.disabled', bgcolor: 'action.hover' }}>
                       {isReadOnly ? <Typography sx={{ fontSize: 11 }}>ไม่มีรูปถ่าย</Typography> : <PhotoCameraIcon />}
@@ -1674,10 +1695,13 @@ export default function PMRunPage() {
                   )}
                   {!isReadOnly && (
                     <Box>
-                      <Button component="label" variant="outlined" size="small" startIcon={<PhotoCameraIcon />} disabled={uploadingPhoto}>
+                      <Button variant="outlined" size="small" startIcon={<PhotoCameraIcon />} disabled={uploadingPhoto}
+                        onClick={() => pmPhotoInputRef.current?.click()}>
                         {uploadingPhoto ? 'กำลังอัปโหลด...' : 'เลือกรูปภาพ'}
-                        <input type="file" accept="image/*" hidden onChange={handlePhotoUpload} disabled={uploadingPhoto} />
                       </Button>
+                      {/* input แยกออกมาถือ ref ไว้ ปุ่ม "เปลี่ยนรูป" ในหน้าดูรูปเต็ม
+                          จะได้เรียกใช้ตัวเดียวกันนี้ได้ */}
+                      <input ref={pmPhotoInputRef} type="file" accept="image/*" hidden onChange={handlePhotoUpload} disabled={uploadingPhoto} />
                       <Typography sx={{ fontSize: 10, color: 'text.secondary', mt: 0.75 }}>
                         รองรับไฟล์ JPG, PNG, GIF, WEBP ขนาดไม่เกิน 10MB
                       </Typography>
@@ -1850,6 +1874,16 @@ export default function PMRunPage() {
               </Box>{/* ── จบคอลัมน์ซ้าย ── */}
 
               </Box>{/* ── จบสองคอลัมน์ ── */}
+
+              {/* ไม่มีปุ่มลบ เพราะยังไม่มี API ลบรูป PM — ทับด้วยรูปใหม่ได้อย่างเดียว */}
+              <ImageLightbox
+                open={pmPhotoZoom}
+                onClose={() => setPmPhotoZoom(false)}
+                src={pmModal.run.photoUrl ? `/uploads/pm/${pmModal.run.photoUrl}` : null}
+                title={`รูปถ่ายขณะทำ PM · ${pmModal.run.asset?.assetCode || pmModal.run.asset?.assetName || ''}`}
+                onReplace={isReadOnly ? undefined : () => pmPhotoInputRef.current?.click()}
+                replacing={uploadingPhoto}
+              />
 
               {/* Footer Actions */}
               <Box sx={{ p: '12px 24px', borderTop: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'flex-end', gap: 1.25, flexShrink: 0, bgcolor: 'background.paper' }}>
