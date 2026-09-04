@@ -263,6 +263,12 @@ export const pmAPI = {
   performRun: (runId: number, data: any) => api.post(`/pm/runs/${runId}/perform`, data),
   deleteRun: (id: number) => api.delete(`/pm/runs/${id}`),
   updateRunNotes: (id: number, notes: string) => api.patch(`/pm/runs/${id}/notes`, { notes }),
+  /** วันนัดลงหน้างานของงาน PM — ส่ง null เพื่อล้างนัด วันที่เป็น 'YYYY-MM-DD' */
+  setRunSchedule: (id: number, scheduledDate: string | null) =>
+    api.patch(`/pm/runs/${id}/schedule`, { scheduledDate }),
+  /** ตั้งวันนัดทีเดียวทั้งชุด — วิธีที่ใช้จริงคือเลือกทั้งแผนกแล้วจองเป็นของวันหนึ่ง */
+  bulkSetRunSchedule: (runIds: number[], scheduledDate: string | null) =>
+    api.post('/pm/runs/bulk-schedule', { runIds, scheduledDate }),
   dashboard: (params?: any) => api.get('/pm/dashboard', { params }),
   // Per-asset PM coverage for the dashboard — see backend/src/routes/pm.ts.
   coverage: (params?: { year?: number }) => api.get('/pm/coverage', { params }),

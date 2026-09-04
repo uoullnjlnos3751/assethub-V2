@@ -112,6 +112,51 @@ const STATUS_CHIP: Record<string, { color: 'success' | 'info' | 'warning' | 'def
   DRAFT: { color: 'warning', label: 'รอดำเนินการ' },
 };
 
+/**
+ * งานที่เลยวันนัดมาแล้วแต่ยังไม่ได้ทำ
+ *
+ * แยกจาก "เกินกำหนด" ของแผน ซึ่งดูวันสิ้นสุดของทั้งแผน — ตัวนี้เตือนได้ตั้งแต่
+ * วันรุ่งขึ้นหลังวันนัด แทนที่จะต้องรอจนสิ้นแผนถึงจะรู้ว่าตกหล่น
+ */
+const schedLate = (run: any) => {
+  if (!run?.scheduledDate || run.status === 'COMPLETED') return false;
+  return new Date(run.scheduledDate).getTime() < new Date().setHours(0, 0, 0, 0);
+};
+
+/**
+ * แปลงวันนัดเป็นค่าของ <input type="date"> (YYYY-MM-DD) ตามเวลาเครื่องผู้ใช้
+ *
+ * ตัดสตริง ISO ตรง ๆ ไม่ได้ เพราะฝั่งเซิร์ฟเวอร์เก็บเป็นเที่ยงคืนเวลาไทย ซึ่ง
+ * ใน UTC คือห้าโมงเย็นของ "วันก่อนหน้า" — การ slice(0, 10) จึงได้วันที่ย้อนไป
+ * หนึ่งวันทุกครั้ง
+ */
+const toDateInput = (value: any): string => {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+/** ตัวกรองวันนัด — ตอบสี่คำถามที่ช่างถามจริงตอนเริ่มวัน */
+const SCHED_FILTERS = [
+  { key: 'TODAY', label: 'นัดวันนี้' },
+  { key: 'WEEK', label: '7 วันข้างหน้า' },
+  { key: 'LATE', label: 'เลยวันนัด' },
+  { key: 'NONE', label: 'ยังไม่นัด' },
+];
+
+function matchesSchedFilter(run: any, key: string) {
+  const today = new Date().setHours(0, 0, 0, 0);
+  if (key === 'NONE') return !run.scheduledDate && run.status !== 'COMPLETED';
+  if (key === 'LATE') return schedLate(run);
+  if (!run.scheduledDate) return false;
+  const d = new Date(run.scheduledDate).setHours(0, 0, 0, 0);
+  if (key === 'TODAY') return d === today;
+  if (key === 'WEEK') return d >= today && d <= today + 6 * 86_400_000;
+  return true;
+}
+
 /* ─────────────────────────────────────────────────────────────
    Shared bits used by both the single-run and bulk checklist modals
 ───────────────────────────────────────────────────────────────── */
@@ -488,6 +533,7 @@ export default function PMRunPage() {
   const [filterType, setFilterType] = useState('');
   const [filterStaff, setFilterStaff] = useState('');
   const [filterCompany, setFilterCompany] = useState('');
+  const [filterSched, setFilterSched] = useState('');
   const [plans, setPlans] = useState<any[]>([]);
 
   const [pmModal, setPMModal] = useState<{ open: boolean; run: any; readOnly?: boolean }>({ open: false, run: null, readOnly: false });
@@ -516,6 +562,8 @@ export default function PMRunPage() {
   const [agentApplied, setAgentApplied] = useState(false);
   const [noteModal, setNoteModal] = useState<{ open: boolean; run: any; value: string }>({ open: false, run: null, value: '' });
   const [savingNote, setSavingNote] = useState(false);
+  const [schedModal, setSchedModal] = useState<{ open: boolean; value: string }>({ open: false, value: '' });
+  const [savingSched, setSavingSched] = useState(false);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2800); };
 
@@ -600,7 +648,8 @@ export default function PMRunPage() {
     const matchType = !filterType || r.asset?.type === filterType;
     const matchStaff = !filterStaff || (r.performer?.displayName || r.staffName) === filterStaff;
     const matchCompany = !filterCompany || r.asset?.company === filterCompany;
-    return matchQ && matchStatus && matchPlan && matchType && matchStaff && matchCompany;
+    const matchSched = !filterSched || matchesSchedFilter(r, filterSched);
+    return matchQ && matchStatus && matchPlan && matchType && matchStaff && matchCompany && matchSched;
   });
 
   const sortedRuns = [...filtered].sort((a, b) => {
@@ -1019,6 +1068,30 @@ export default function PMRunPage() {
     }
   };
 
+  /* ── วันนัดลงหน้างาน ──
+     ตั้งทีเดียวทั้งชุดเสมอ เพราะงานจริงคือ "แผนก SAL ทั้งแผนก ลงวันจันทร์"
+     ไม่ใช่การไล่ตั้งทีละเครื่อง 56 ครั้ง */
+  const handleSaveSchedule = async (clear = false) => {
+    if (selectedRunIds.length === 0) return;
+    const value = clear ? null : schedModal.value;
+    if (!clear && !value) return;
+    setSavingSched(true);
+    try {
+      const res = await pmAPI.bulkSetRunSchedule(selectedRunIds, value);
+      const ids = new Set(selectedRunIds);
+      setRuns(prev => prev.map(r => (
+        ids.has(r.id) && r.status !== 'COMPLETED' ? { ...r, scheduledDate: value } : r
+      )));
+      setSchedModal({ open: false, value: '' });
+      setSelectedRunIds([]);
+      showToast(`✅ ${res.data.message}`);
+    } catch (err: any) {
+      alert(err.response?.data?.message || err.message || 'เกิดข้อผิดพลาดในการตั้งวันนัด');
+    } finally {
+      setSavingSched(false);
+    }
+  };
+
   /* ── Export Excel ── */
   const handleExport = async () => {
     setExporting(true);
@@ -1036,6 +1109,7 @@ export default function PMRunPage() {
           'Location': r.asset?.location || r.plan?.site || '',
           'แผน PM': r.plan?.deptTask || r.plan?.site || '',
           'สถานะ': r.status === 'COMPLETED' ? 'เสร็จแล้ว' : r.status === 'IN_PROGRESS' ? 'กำลังทำ' : 'รอดำเนินการ',
+          'วันนัด': r.scheduledDate ? new Date(r.scheduledDate).toLocaleDateString('th-TH') : '',
           'ผู้ทำ PM': r.performer?.displayName || '',
           'วันที่ PM': r.performedAt ? new Date(r.performedAt).toLocaleDateString('th-TH') : '',
         };
@@ -1087,9 +1161,9 @@ export default function PMRunPage() {
 
   const clearFilters = () => {
     setSearch(''); setFilterStatus(''); setFilterPlan(''); setFilterType('');
-    setFilterStaff(''); setFilterCompany(''); setCurrentPage(1);
+    setFilterStaff(''); setFilterCompany(''); setFilterSched(''); setCurrentPage(1);
   };
-  const anyFilter = !!(search || filterStatus || filterPlan || filterType || filterStaff || filterCompany);
+  const anyFilter = !!(search || filterStatus || filterPlan || filterType || filterStaff || filterCompany || filterSched);
 
   /** Counts ignore the filter they belong to, so a chip never zeroes itself out. */
   const countBy = (fn: (r: any) => boolean) => runs.filter(fn).length;
@@ -1234,6 +1308,13 @@ export default function PMRunPage() {
             label={<>{s.label} <Box component="span" sx={{ fontSize: 9.5, opacity: 0.7 }}>{s.n}</Box></>} />
         )))}
 
+        {chipRow('วันนัด', SCHED_FILTERS.map(f => (
+          <Chip key={f.key} variant="outlined" size="small"
+            onClick={() => { setFilterSched(filterSched === f.key ? '' : f.key); setCurrentPage(1); }}
+            sx={chipSx(filterSched === f.key, f.key === 'LATE' ? theme.palette.warning.main : undefined)}
+            label={<>{f.label} <Box component="span" sx={{ fontSize: 9.5, opacity: 0.7 }}>{countBy(r => matchesSchedFilter(r, f.key))}</Box></>} />
+        )))}
+
         {uniqueCompanies.length > 1 && chipRow('บริษัท', uniqueCompanies.map(c => (
           <Chip key={c} variant="outlined" size="small"
             onClick={() => { setFilterCompany(filterCompany === c ? '' : c); setCurrentPage(1); }}
@@ -1278,6 +1359,7 @@ export default function PMRunPage() {
                   <TableCell sx={{ fontSize: 11, fontWeight: 700, color: 'text.secondary' }}>สถานะ</TableCell>
                   <TableCell sx={{ fontSize: 11, fontWeight: 700, color: 'text.secondary' }}>รหัสทรัพย์สิน / ชื่ออุปกรณ์</TableCell>
                   <TableCell sx={{ fontSize: 11, fontWeight: 700, color: 'text.secondary' }}>แผนก / ผู้ถือครอง</TableCell>
+                  <TableCell sx={{ fontSize: 11, fontWeight: 700, color: 'text.secondary' }}>วันนัด</TableCell>
                   <TableCell sx={{ fontSize: 11, fontWeight: 700, color: 'text.secondary' }}>แผน PM (กำหนดเสร็จ)</TableCell>
                   <TableCell sx={{ fontSize: 11, fontWeight: 700, color: 'text.secondary' }}>ประเภท</TableCell>
                   <TableCell sx={{ fontSize: 11, fontWeight: 700, color: 'text.secondary', textAlign: 'right' }}>จัดการ</TableCell>
@@ -1331,7 +1413,20 @@ export default function PMRunPage() {
                         </Box>
                       </TableCell>
                       <TableCell sx={{ fontSize: 11 }}>
-                        <Typography sx={{ fontWeight: 500, fontSize: 11 }}>{r.plan?.deptTask || r.plan?.site || `Plan #${r.plan?.id}`}</Typography>
+                        {r.scheduledDate ? (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontWeight: 600, color: schedLate(r) ? 'warning.main' : 'text.primary' }}>
+                            <EventIcon sx={{ fontSize: 13 }} />
+                            {new Date(r.scheduledDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })}
+                          </Box>
+                        ) : (
+                          <Box sx={{ color: 'text.disabled' }}>ยังไม่นัด</Box>
+                        )}
+                        {schedLate(r) && (
+                          <Box sx={{ fontSize: 10, color: 'warning.main', mt: 0.25 }}>เลยวันนัดแล้ว</Box>
+                        )}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: 11 }}>
+                        <Typography sx={{ fontWeight: 500, fontSize: 11 }}>{r.plan?.deptTask || (r.plan?.isAdhoc ? 'Ad-hoc' : 'ทุกแผนก')}</Typography>
                         <Box sx={{ color: isOverdue ? 'error.main' : 'text.secondary', mt: 0.25, display: 'flex', alignItems: 'center', gap: 0.5 }}>
                           <EventIcon sx={{ fontSize: 12 }} />
                           สิ้นสุด {r.plan?.endDate ? new Date(r.plan.endDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' }) : '—'}
@@ -1445,6 +1540,18 @@ export default function PMRunPage() {
             }}
           >
             ทำ PM พร้อมกัน
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<EventIcon />}
+            onClick={() => {
+              // ตั้งค่าเริ่มต้นเป็นวันนัดเดิมของรายการแรกที่เลือก ถ้ามี — การแก้วันนัด
+              // ทั้งแผนกที่จองไว้แล้วเป็นเรื่องปกติพอ ๆ กับการตั้งครั้งแรก
+              const first = runs.find(r => r.id === selectedRunIds[0]);
+              setSchedModal({ open: true, value: toDateInput(first?.scheduledDate) });
+            }}
+          >
+            ตั้งวันนัด
           </Button>
           <Button variant="outlined" onClick={() => setSelectedRunIds([])}>
             ยกเลิก
@@ -1812,6 +1919,40 @@ export default function PMRunPage() {
           <Button variant="contained" startIcon={<SaveIcon />} onClick={handleSaveNote} disabled={savingNote}>
             {savingNote ? 'กำลังบันทึก...' : 'บันทึกโน้ต'}
           </Button>
+        </Box>
+      </Modal>
+
+      <Modal open={schedModal.open} onClose={() => setSchedModal({ open: false, value: '' })} title="ตั้งวันนัดลงหน้างาน" maxWidth={440}>
+        <Box sx={{ p: 3 }}>
+          <Typography sx={{ fontSize: 13, fontWeight: 600, mb: 0.5 }}>
+            {selectedRunIds.length} รายการที่เลือก
+          </Typography>
+          <Typography sx={{ fontSize: 11, color: 'text.secondary', mb: 2 }}>
+            วันที่ทีมจะเข้าไปตรวจเครื่องกลุ่มนี้ ต่างจาก "สิ้นสุด" ของแผน ซึ่งเป็นกำหนดของทั้งแผนรวมกัน
+          </Typography>
+          <TextField
+            autoFocus
+            fullWidth
+            type="date"
+            label="วันนัด"
+            InputLabelProps={{ shrink: true }}
+            value={schedModal.value}
+            onChange={e => setSchedModal(p => ({ ...p, value: e.target.value }))}
+          />
+          <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 1.5 }}>
+            งานที่ทำเสร็จแล้วจะถูกข้ามโดยอัตโนมัติ
+          </Typography>
+        </Box>
+        <Box sx={{ p: '16px 24px', borderTop: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', gap: 1.25 }}>
+          <Button color="inherit" onClick={() => handleSaveSchedule(true)} disabled={savingSched}>
+            ล้างวันนัด
+          </Button>
+          <Box sx={{ display: 'flex', gap: 1.25 }}>
+            <Button variant="outlined" onClick={() => setSchedModal({ open: false, value: '' })}>ยกเลิก</Button>
+            <Button variant="contained" startIcon={<SaveIcon />} onClick={() => handleSaveSchedule()} disabled={savingSched || !schedModal.value}>
+              {savingSched ? 'กำลังบันทึก...' : 'บันทึกวันนัด'}
+            </Button>
+          </Box>
         </Box>
       </Modal>
 

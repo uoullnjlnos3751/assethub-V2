@@ -931,6 +931,12 @@ model PMRun {
   assetId     Int
   year        Int
   status      PMRunStatus   @default(DRAFT)
+  // The day this machine is meant to be visited. A plan only carries a start
+  // and end date for the whole batch, which is too coarse to work from: with
+  // 188 machines across 22 departments in one plan, the team needs to know
+  // which department is booked for which day. Technicians were recording that
+  // in the free-text note field, where nothing could sort or count it.
+  scheduledDate DateTime?
   performedBy Int?
   performedAt DateTime?
   completedAt DateTime?
@@ -948,6 +954,7 @@ model PMRun {
   @@index([assetId, year])
   @@index([status, performedAt])
   @@index([year, status])
+  @@index([scheduledDate, status])
   @@map("pm_runs")
 }
 

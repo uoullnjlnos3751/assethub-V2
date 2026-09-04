@@ -1316,6 +1316,70 @@ router.patch('/runs/:id/notes', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'
   } catch (err) { next(err); }
 });
 
+/**
+ * อ่านวันนัดที่ส่งมาเป็น 'YYYY-MM-DD' ให้เป็นเที่ยงคืนของวันนั้นตามเวลาไทย
+ *
+ * ต้องตรึงเวลาไว้ที่เที่ยงคืนเอง ไม่งั้น `new Date('2026-09-14')` จะได้
+ * เที่ยงคืน UTC ซึ่งคือ 07:00 ของวันเดียวกันในไทย แต่ถ้าเซิร์ฟเวอร์อยู่โซน
+ * ตะวันตกของ UTC มันจะกลายเป็นวันก่อนหน้า — วันนัดเลื่อนไปเองหนึ่งวัน
+ */
+function parseScheduledDate(input: any): Date | null {
+  const raw = String(input ?? '').trim();
+  if (!raw) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+  if (!m) throw new AppError('รูปแบบวันที่ไม่ถูกต้อง (ต้องเป็น YYYY-MM-DD)', 400);
+  const [, y, mo, d] = m;
+  const date = new Date(`${y}-${mo}-${d}T00:00:00+07:00`);
+  if (Number.isNaN(date.getTime())) throw new AppError('วันที่ไม่ถูกต้อง', 400);
+  return date;
+}
+
+// วันนัดลงหน้างานของงาน PM หนึ่งรายการ ส่ง scheduledDate เป็น null เพื่อล้างนัด
+router.patch('/runs/:id/schedule', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const scheduledDate = parseScheduledDate(req.body.scheduledDate);
+    const run = await prisma.pMRun.findUnique({ where: { id } });
+    if (!run) throw new AppError('ไม่พบงาน PM', 404);
+    const updated = await prisma.pMRun.update({ where: { id }, data: { scheduledDate } });
+    res.json(updated);
+  } catch (err) { next(err); }
+});
+
+/**
+ * ตั้งวันนัดให้งาน PM หลายรายการพร้อมกัน
+ *
+ * นี่คือวิธีที่ใช้จริง: เลือกทั้งแผนกแล้วจองเป็นของวันหนึ่ง การไล่ตั้งทีละ
+ * เครื่องสำหรับแผนกที่มี 56 เครื่องไม่มีใครทำไหว
+ *
+ * งานที่ทำเสร็จแล้วถูกข้าม ไม่ใช่ปฏิเสธทั้งชุด — คนเลือกทั้งแผนกย่อมติดเครื่อง
+ * ที่ทำไปแล้วมาด้วยเป็นปกติ และการล้มทั้งคำขอเพราะเหตุนี้จะกลายเป็นว่าต้องมา
+ * ไล่เลือกใหม่ให้ถูกเอง
+ */
+router.post('/runs/bulk-schedule', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const runIds: number[] = Array.isArray(req.body.runIds)
+      ? req.body.runIds.map((n: any) => parseInt(String(n), 10)).filter((n: number) => Number.isFinite(n))
+      : [];
+    if (runIds.length === 0) throw new AppError('ไม่ได้เลือกงาน PM', 400);
+    const scheduledDate = parseScheduledDate(req.body.scheduledDate);
+
+    const result = await prisma.pMRun.updateMany({
+      where: { id: { in: runIds }, status: { not: 'COMPLETED' } },
+      data: { scheduledDate },
+    });
+
+    const skipped = runIds.length - result.count;
+    res.json({
+      updated: result.count,
+      skipped,
+      message: scheduledDate
+        ? `ตั้งวันนัด ${result.count} รายการ${skipped > 0 ? ` (ข้ามที่ทำเสร็จแล้ว ${skipped} รายการ)` : ''}`
+        : `ล้างวันนัด ${result.count} รายการ${skipped > 0 ? ` (ข้ามที่ทำเสร็จแล้ว ${skipped} รายการ)` : ''}`,
+    });
+  } catch (err) { next(err); }
+});
+
 // ── Helpers for PM Components ──
 router.post('/upload-temp', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), pmPhotoUpload.single('file'), (req: Request, res: Response, next: NextFunction) => {
   try {
