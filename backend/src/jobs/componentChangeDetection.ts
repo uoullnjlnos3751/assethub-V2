@@ -25,8 +25,7 @@
  */
 import { prisma } from '../lib/prisma';
 import { fetchAllAgentRecords, fetchAgentRecord, matchAssetForAgent } from '../services/externalAgent';
-
-const DAY_MS = 24 * 60 * 60 * 1000;
+import { scheduleDaily } from './dailySchedule';
 
 interface RamSlot { manufacturer?: string | null; part_number?: string | null; size_gb?: number | null; speed_mhz?: number | null; type?: string | null }
 interface DiskHealth { name?: string | null; media_type?: string | null; size_gb?: number | null }
@@ -153,10 +152,11 @@ export function startComponentChangeDetection(): void {
     return;
   }
 
-  // Staggered behind the spec-autofill job's own 60s delay so the two don't
-  // both hammer the agent service the moment the server comes up.
-  setTimeout(() => { void runComponentChangeDetection(); }, 120_000);
-  setInterval(() => { void runComponentChangeDetection(); }, DAY_MS);
-
-  console.log('[ComponentChange] Scheduled daily RAM/disk change detection (interval: 24h)');
+  // 02:00 — หลัง AgentAutofill (01:30) เพื่อให้เทียบกับสเปคที่เพิ่งเติมล่าสุด
+  // และไม่ยิงหา agent service พร้อมกัน
+  scheduleDaily({
+    name: 'ComponentChange',
+    hour: 2,
+    run: runComponentChangeDetection,
+  });
 }

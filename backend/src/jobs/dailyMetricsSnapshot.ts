@@ -6,8 +6,7 @@
  */
 import { prisma } from '../lib/prisma';
 import { captureDailySnapshot } from '../services/dashboardHistory';
-
-const DAY_MS = 24 * 60 * 60 * 1000;
+import { scheduleDaily } from './dailySchedule';
 
 export async function runDailyMetricsSnapshot(): Promise<void> {
   try {
@@ -19,10 +18,10 @@ export async function runDailyMetricsSnapshot(): Promise<void> {
 }
 
 export function startDailyMetricsSnapshot(): void {
-  // Staggered behind the other startup jobs (60s / 120s) so all three don't
-  // hit the database in the same instant.
-  setTimeout(() => { void runDailyMetricsSnapshot(); }, 30_000);
-  setInterval(() => { void runDailyMetricsSnapshot(); }, DAY_MS);
-
-  console.log('[DailyMetrics] Scheduled daily dashboard KPI snapshot (interval: 24h)');
+  // 01:00 — เก็บยอดของวันก่อนหน้าให้ปิดครบก่อน job อื่นเริ่มแก้ข้อมูล
+  scheduleDaily({
+    name: 'DailyMetrics',
+    hour: 1,
+    run: runDailyMetricsSnapshot,
+  });
 }
