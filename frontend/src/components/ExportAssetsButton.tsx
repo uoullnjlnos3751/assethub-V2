@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Button, Menu, MenuItem, CircularProgress, Alert } from '@mui/material';
 import { Download } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { assetAPI } from '../services/api';
+
+// xlsx ~419 KB โหลดตอนกดส่งออกจริงเท่านั้น ไม่ใช่ตอนเปิดหน้า
+const loadXlsx = () => import('xlsx');
 
 interface Asset {
   id: number; assetCode: string; serialNo: string; type: string; brand: string; model: string;

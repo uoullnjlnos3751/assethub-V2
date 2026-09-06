@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Box, Typography, Button, Select, MenuItem, alpha, useTheme } from '@mui/material';
-import * as XLSX from 'xlsx';
 import ImportAssetsButton from '../../components/ImportAssetsButton';
 import { assetAPI } from '../../services/api';
+
+// xlsx ~419 KB โหลดตอนกดส่งออกจริงเท่านั้น ไม่ใช่ตอนเปิดหน้า
+const loadXlsx = () => import('xlsx');
 
 /* ─────────────────────────────────────────────────────────────────
    Export columns - synced with backend export headers
@@ -94,7 +96,8 @@ const buildRows = (assets: any[], dateFormat: 'iso' | 'thai' = 'iso') => assets.
   return row;
 });
 
-const writeWorkbook = (sheetsData: Record<string, Record<string, any>[]>, fileName: string) => {
+const writeWorkbook = async (sheetsData: Record<string, Record<string, any>[]>, fileName: string) => {
+  const XLSX = await loadXlsx();
   const wb = XLSX.utils.book_new();
   const emptyRow = Object.fromEntries(exportColumns.map(([, label]) => [label, '']));
   for (const [sheetName, rows] of Object.entries(sheetsData)) {

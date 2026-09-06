@@ -105,7 +105,7 @@ export function buildScheduleReports(
 export function exportScheduleWorkbook(
   year: number, plans: SchedPlan[], sel: SchedSelection, today: Date,
 ) {
-  writeWorkbook(
+  void writeWorkbook(
     buildScheduleReports(year, plans, sel, today).map(r => ({ name: r.label, rows: r.rows })),
     `PM-schedule-${year + 543}-${stamp()}.xlsx`,
   );

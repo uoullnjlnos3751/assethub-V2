@@ -7,11 +7,13 @@ import {
   alpha, useTheme,
 } from '@mui/material';
 import { Users, Shield, ServerCog, Search, Download, Settings2, UserPlus, KeyRound, Trash2, Ban, CheckCircle2, UserCog } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import debounce from 'lodash/debounce';
 import { adminAPI } from '../../../services/api';
 import { SectionCard } from '../../../components/SectionCard';
 import { useConfirm } from '../../../contexts/ConfirmContext';
+
+// xlsx ~419 KB โหลดตอนกดส่งออกจริงเท่านั้น ไม่ใช่ตอนเปิดหน้า
+const loadXlsx = () => import('xlsx');
 
 interface AppUser {
   id: number;
@@ -259,7 +261,8 @@ export default function UsersPermissionsTab() {
     }
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
+    const XLSX = await loadXlsx();
     const rows = filteredUsers.map(u => ({
       Username: u.adUsername,
       'ชื่อ - นามสกุล': u.displayName || '',

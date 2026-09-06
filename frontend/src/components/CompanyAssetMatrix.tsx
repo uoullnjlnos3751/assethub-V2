@@ -4,8 +4,10 @@ import {
   Popover, IconButton, Paper, Divider, Chip, alpha, useTheme
 } from '@mui/material';
 import { Filter, Download, Settings2 } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { assetAPI } from '../services/api';
+
+// xlsx ~419 KB โหลดตอนกดส่งออกจริงเท่านั้น ไม่ใช่ตอนเปิดหน้า
+const loadXlsx = () => import('xlsx');
 
 const STATUS_BUCKETS = [
   { id: 'InUse', label: 'InUse - ใช้งาน' },
@@ -142,7 +144,8 @@ export default function CompanyAssetMatrix({ assets }: { assets: any[] }) {
   }, [assets, allCompanies, selectedTypes, selectedBuckets, codeToCanonical]);
 
   // Handle Export to Excel
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
+    const XLSX = await loadXlsx();
     const wsData: any[][] = [];
     
     // Header Row 1: Types
@@ -204,7 +207,7 @@ export default function CompanyAssetMatrix({ assets }: { assets: any[] }) {
     const ws = XLSX.utils.aoa_to_sheet(wsData);
 
     // Merge Cells Logic
-    const merges: XLSX.Range[] = [];
+    const merges: import('xlsx').Range[] = [];
     let startCol = 1; // After company col
     selectedTypes.forEach(() => {
       merges.push({ s: { r: 0, c: startCol }, e: { r: 0, c: startCol + selectedBuckets.length } });

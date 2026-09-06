@@ -25,7 +25,6 @@ import {
 import { alpha } from '@mui/material/styles';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
-import * as XLSX from 'xlsx';
 import HubIcon from '@mui/icons-material/Hub';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import PrintIcon from '@mui/icons-material/Print';
@@ -50,6 +49,9 @@ import { pmSwHubPlanService, PMSwHubPlan, pmSwHubTemplateService } from '../../s
 import { formatDate } from '../../utils/dateUtils';
 import { Modal } from './components/Modal';
 import { useConfirm } from '../../contexts/ConfirmContext';
+
+// xlsx ~419 KB โหลดตอนกดส่งออกจริงเท่านั้น ไม่ใช่ตอนเปิดหน้า
+const loadXlsx = () => import('xlsx');
 
 function fmtDate(d: string | Date | null) {
   if (!d) return '—';
@@ -327,6 +329,7 @@ export default function PMSwHubPlanListPage() {
 
   // Excel Export Handler
   const handleExportExcel = async () => {
+    const XLSX = await loadXlsx();
     try {
       setExporting(true);
 

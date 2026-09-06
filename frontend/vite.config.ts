@@ -111,10 +111,12 @@ export default defineConfig(({ mode }) => {
             react: ['react', 'react-dom', 'react-router-dom'],
             mui: ['@mui/material', '@mui/icons-material', '@emotion/react', '@emotion/styled'],
             charts: ['recharts'],
-            spreadsheet: ['xlsx'],
-            pdf: ['jspdf'],
-            capture: ['html2canvas'],
-            scanners: ['html5-qrcode', 'react-qr-code'],
+            // xlsx / jspdf / html2canvas / html5-qrcode ไม่อยู่ในนี้แล้ว —
+            // ทั้งสี่ถูก import แบบ dynamic ตอนกดใช้งาน ปล่อยให้ Vite แยกก้อน
+            // ตามจุดที่เรียกเอง การบังคับชื่อก้อนไว้ทำให้มันถูกลากไปรวมกับของที่
+            // import ตรง ๆ (react-qr-code อยู่ก้อนเดียวกับ html5-qrcode หน้า
+            // ทะเบียนทรัพย์สินจึงโหลดตัวสแกน 383 KB ทั้งที่ไม่ได้เปิดกล้อง)
+            qr: ['react-qr-code'],
           },
         },
       },

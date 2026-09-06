@@ -158,7 +158,7 @@ const modeTag = (mode: SourceMode) => (mode === 'ALL' ? '' : `-${mode.toLowerCas
 
 /** One .xlsx holding every report as its own sheet. */
 export function exportWorkbook(data: CoveragePayload, sel: Selection, mode: SourceMode) {
-  writeWorkbook(
+  void writeWorkbook(
     REPORTS.map(rep => ({ name: rep.label, rows: rep.build(data, sel, mode) as Rows })),
     `PM-report-${data.year + 543}${modeTag(mode)}-${stamp()}.xlsx`,
   );
@@ -166,7 +166,7 @@ export function exportWorkbook(data: CoveragePayload, sel: Selection, mode: Sour
 
 export function exportSheet(data: CoveragePayload, sel: Selection, mode: SourceMode, key: ReportKey) {
   const rep = reportByKey(key);
-  writeWorkbook([{ name: rep.label, rows: rep.build(data, sel, mode) as Rows }],
+  void writeWorkbook([{ name: rep.label, rows: rep.build(data, sel, mode) as Rows }],
     `PM-${key}${modeTag(mode)}-${stamp()}.xlsx`);
 }
 

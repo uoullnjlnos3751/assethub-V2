@@ -60,8 +60,6 @@ import ExtensionIcon from '@mui/icons-material/Extension';
 import ComputerIcon from '@mui/icons-material/Computer';
 import SensorsIcon from '@mui/icons-material/Sensors';
 import PushPinIcon from '@mui/icons-material/PushPin';
-import * as XLSX from 'xlsx';
-import { Html5Qrcode } from 'html5-qrcode';
 import { pmAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { PMDeviceArrayInput } from './components/PMDeviceArrayInput';
@@ -70,6 +68,12 @@ import { Modal } from './components/Modal';
 import { StarRating } from './components/StarRating';
 import { getRatingCategory, RATING_RUBRIC, suggestRating } from './components/pmRatingRubric';
 import { useConfirm } from '../../contexts/ConfirmContext';
+
+// html5-qrcode ~382 KB โหลดตอนเปิดกล้องสแกนจริงเท่านั้น
+const loadQr = async () => (await import('html5-qrcode')).Html5Qrcode;
+
+// xlsx ~419 KB โหลดตอนกดส่งออกจริงเท่านั้น ไม่ใช่ตอนเปิดหน้า
+const loadXlsx = () => import('xlsx');
 
 /* ─────────────────────────────────────────────────────────────
    Types & Constants
@@ -604,12 +608,13 @@ export default function PMRunPage() {
   useEffect(() => {
     if (!qrModalOpen) return;
 
-    let html5QrCode: Html5Qrcode | null = null;
+    let html5QrCode: InstanceType<Awaited<ReturnType<typeof loadQr>>> | null = null;
 
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       const element = document.getElementById('qr-reader');
       if (!element) return;
 
+      const Html5Qrcode = await loadQr();
       html5QrCode = new Html5Qrcode('qr-reader');
       html5QrCode.start(
         { facingMode: 'environment' },
@@ -1104,6 +1109,7 @@ export default function PMRunPage() {
 
   /* ── Export Excel ── */
   const handleExport = async () => {
+    const XLSX = await loadXlsx();
     setExporting(true);
     try {
       const exportRows = filtered.map((r, idx) => {

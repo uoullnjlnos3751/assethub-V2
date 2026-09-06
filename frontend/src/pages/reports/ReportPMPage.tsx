@@ -3,12 +3,17 @@ import { Box, Typography, Card, CardContent, Grid, CircularProgress, Chip, MenuI
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { dashboardAPI, pmAPI, assetAPI } from '../../services/api';
 import { Wrench, CheckCircle2, Clock, ArrowRight, FolderOpen, Building2, Download, Search, Filter, FileText, Star, AlertTriangle, ShieldAlert, Check } from 'lucide-react';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 import ReportHeaderTabs from './ReportHeaderTabs';
 import ProcurementPanel from './components/ProcurementPanel';
-import * as XLSX from 'xlsx';
 import { PieChart as ReChartsPieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
+
+// jspdf ~382 KB โหลดตอนกดออก PDF จริงเท่านั้น
+const loadJsPdf = async () => (await import('jspdf')).default;
+// html2canvas ~198 KB ใช้คู่กับ jspdf ตอนออก PDF เท่านั้น
+const loadHtml2Canvas = async () => (await import('html2canvas')).default;
+
+// xlsx ~419 KB โหลดตอนกดส่งออกจริงเท่านั้น ไม่ใช่ตอนเปิดหน้า
+const loadXlsx = () => import('xlsx');
 
 const CAT_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16'];
 const statusLabels: Record<string, string> = { COMPLETED: 'เสร็จสิ้น', IN_PROGRESS: 'กำลังตรวจ', DRAFT: 'รอดำเนินการ' };
@@ -55,6 +60,7 @@ export default function ReportPMPage() {
       setExportingPDF(true);
       const element = document.getElementById('report-content');
       if (!element) return;
+      const html2canvas = await loadHtml2Canvas();
       const canvas = await html2canvas(element, { 
         scale: 3, 
         useCORS: true, 
@@ -62,6 +68,7 @@ export default function ReportPMPage() {
         logging: false
       });
       const imgData = canvas.toDataURL('image/png');
+      const jsPDF = await loadJsPdf();
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
@@ -206,7 +213,8 @@ export default function ReportPMPage() {
   }, [completedRuns]);
 
   // Client-side Excel Export
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
+    const XLSX = await loadXlsx();
     const exportData = filteredRuns.map(row => ({
       'ปีงบประมาณ': row.year || '-',
       'แผน PM': row.plan?.deptTask || '-',
