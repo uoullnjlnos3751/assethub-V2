@@ -30,6 +30,9 @@ interface Props {
   onToggleGroup: (id: string) => void;
   isActive: (path: string) => boolean;
   onNavigate: (path: string) => void;
+  /** เมนูที่สั่งงานแทนการเปิดหน้า (NavItem.action) — ตัวนี้ไม่รู้ว่าแต่ละรหัส
+   *  หมายถึงอะไร ส่งต่อให้ผู้เรียกตัดสิน */
+  onAction?: (action: string) => void;
   /** Red count bubbles keyed by module id. */
   badges?: Record<string, number>;
   collapsed: boolean;
@@ -42,7 +45,7 @@ interface Props {
 }
 
 export default function SidebarNav({
-  modules, routeId, openIds, onToggleGroup, isActive, onNavigate,
+  modules, routeId, openIds, onToggleGroup, isActive, onNavigate, onAction,
   badges = {}, collapsed, onExpandOnto, brand, status, footer,
 }: Props) {
   const theme = useTheme();
@@ -278,7 +281,10 @@ export default function SidebarNav({
                     {row({
                       active: item.path ? isActive(item.path) : false,
                       depth: 1,
-                      onClick: () => item.path && onNavigate(item.path),
+                      onClick: () => {
+                        if (item.action) onAction?.(item.action);
+                        else if (item.path) onNavigate(item.path);
+                      },
                       icon: item.icon,
                       label: item.label,
                     })}

@@ -455,7 +455,12 @@ export default function Layout() {
         const itemButton = (
           <ListItemButton
             selected={active}
-            onClick={() => { navigate(item.path || ''); setMobileOpen(false); }}
+            onClick={() => {
+              // เมนูสั่งงาน (เช่น ผู้ช่วย AI) ไม่ได้พาไปหน้าไหน แค่เปิดแผงขึ้นมา
+              if (item.action === 'assistant') askAI('');
+              else navigate(item.path || '');
+              setMobileOpen(false);
+            }}
             sx={{
               borderRadius: '9px',
               mx: '8px',
@@ -1220,6 +1225,7 @@ export default function Layout() {
             onToggleGroup={toggleNavGroup}
             isActive={isActive}
             onNavigate={navigate}
+            onAction={a => { if (a === 'assistant') askAI(''); }}
             badges={{ pm: pmOverdueCount }}
             collapsed={sidebarCollapsed}
             onExpandOnto={expandOnto}

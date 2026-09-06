@@ -40,6 +40,7 @@ import DeviceHubIcon from '@mui/icons-material/DeviceHub';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 // ── Rail icons (rounded cut — reads better at 21px than the sharp default) ──
 import SpaceDashboardRoundedIcon from '@mui/icons-material/SpaceDashboardRounded';
+import SmartToyRoundedIcon from '@mui/icons-material/SmartToyRounded';
 import Inventory2RoundedIcon from '@mui/icons-material/Inventory2Rounded';
 import SwapHorizRoundedIcon from '@mui/icons-material/SwapHorizRounded';
 import BuildRoundedIcon from '@mui/icons-material/BuildRounded';
@@ -51,6 +52,9 @@ import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
 export interface NavItem {
   label: string;
   path?: string;
+  /** เมนูที่สั่งงานแทนการเปิดหน้า — Layout เป็นคนแปลรหัสนี้เป็นการกระทำจริง
+   *  (ไฟล์นี้เป็นข้อมูลล้วน เรียก context เองไม่ได้) ใส่แทน path ไม่ใช่ใส่คู่กัน */
+  action?: 'assistant';
   icon?: React.ReactNode;
   roles?: string[];
   isHeader?: boolean;
@@ -70,6 +74,7 @@ export interface NavGroup {
 export type NavEntry = NavItem | NavGroup;
 
 export const userNavItems: NavItem[] = [
+  { label: 'ถามผู้ช่วย AI', action: 'assistant', icon: <SmartToyRoundedIcon fontSize="small" /> },
   { label: 'แคตตาล็อกอุปกรณ์มาตรฐาน', path: '/catalog', icon: <MenuBookIcon fontSize="small" /> },
   { label: 'รายการของพร้อมยืม', path: '/assets?status=Available', icon: <CheckCircleOutlineIcon fontSize="small" /> },
   { label: 'ยืมทรัพย์สิน', path: '/borrow/new', icon: <AddBoxIcon fontSize="small" /> },
@@ -233,7 +238,10 @@ export const adminRail: RailModule[] = [
     title: 'ภาพรวมระบบ',
     icon: <SpaceDashboardRoundedIcon />,
     sections: [
-      { items: [{ label: 'แดชบอร์ด', path: '/dashboard', icon: <DashboardIcon fontSize="small" /> }] },
+      { items: [
+        { label: 'แดชบอร์ด', path: '/dashboard', icon: <DashboardIcon fontSize="small" /> },
+        { label: 'ถามผู้ช่วย AI', action: 'assistant', icon: <SmartToyRoundedIcon fontSize="small" /> },
+      ] },
     ],
   },
   {
@@ -353,7 +361,10 @@ export const adminRail: RailModule[] = [
     title: 'แคตตาล็อกอุปกรณ์มาตรฐาน',
     icon: <MenuBookRoundedIcon />,
     sections: [
-      { items: [{ label: 'สเปคมาตรฐานตามตำแหน่งงาน', path: '/catalog', icon: <MenuBookIcon fontSize="small" /> }] },
+      { items: [
+        { label: 'สเปคมาตรฐานตามตำแหน่งงาน', path: '/catalog', icon: <MenuBookIcon fontSize="small" /> },
+        { label: 'ถามผู้ช่วย AI', action: 'assistant', icon: <SmartToyRoundedIcon fontSize="small" /> },
+      ] },
     ],
   },
   {
@@ -465,7 +476,10 @@ export const viewerRail: RailModule[] = [
     label: 'ภาพรวม',
     title: 'ภาพรวมระบบ',
     icon: <SpaceDashboardRoundedIcon />,
-    sections: [{ items: [{ label: 'แดชบอร์ด', path: '/dashboard', icon: <DashboardIcon fontSize="small" /> }] }],
+    sections: [{ items: [
+      { label: 'แดชบอร์ด', path: '/dashboard', icon: <DashboardIcon fontSize="small" /> },
+      { label: 'ถามผู้ช่วย AI', action: 'assistant', icon: <SmartToyRoundedIcon fontSize="small" /> },
+    ] }],
   },
   {
     id: 'reports',
