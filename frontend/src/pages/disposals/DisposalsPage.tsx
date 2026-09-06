@@ -8,6 +8,7 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { disposalAPI, assetAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 const METHODS = ['DONATE', 'SELL', 'DESTROY', 'RETURN', 'TRANSFER'];
 const METHOD_LABELS: Record<string, string> = {
@@ -74,8 +75,14 @@ export default function DisposalsPage() {
     load();
   };
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('ยกเลิกรายการจำหน่ายนี้? (ทรัพย์สินจะกลับเป็นสถานะพร้อมใช้งาน)')) return;
+  const confirm = useConfirm();
+  const handleDelete = async (id: number, label?: string) => {
+    if (!await confirm({
+      title: 'ยกเลิกรายการจำหน่าย',
+      target: label,
+      detail: 'ทรัพย์สินในรายการนี้จะกลับเป็นสถานะพร้อมใช้งาน',
+      confirmLabel: 'ยกเลิกรายการ',
+    })) return;
     await disposalAPI.delete(id);
     load();
   };
@@ -131,7 +138,7 @@ export default function DisposalsPage() {
                 <TableCell>{d.createdBy?.displayName || d.createdBy?.adUsername || '—'}</TableCell>
                 <TableCell>
                   {isSuperAdmin && (
-                    <Tooltip title="ยกเลิกรายการ"><IconButton size="small" color="error" onClick={() => handleDelete(d.id)}><DeleteIcon fontSize="small" /></IconButton></Tooltip>
+                    <Tooltip title="ยกเลิกรายการ"><IconButton size="small" color="error" onClick={() => handleDelete(d.id, d.disposalNo || d.asset?.assetCode)}><DeleteIcon fontSize="small" /></IconButton></Tooltip>
                   )}
                 </TableCell>
               </TableRow>

@@ -6,6 +6,7 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import 'dayjs/locale/en-gb'; // en-gb uses DD/MM/YYYY format
 import { AuthProvider } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
+import { ConfirmProvider } from './contexts/ConfirmContext';
 import { ThemeContextProvider } from './contexts/ThemeContext';
 import './styles/pm-theme.css';
 import App from './App';
@@ -53,7 +54,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <ThemeContextProvider>
           <AuthProvider>
             <ToastProvider>
-              <App />
+              <ConfirmProvider>
+                <App />
+              </ConfirmProvider>
             </ToastProvider>
           </AuthProvider>
         </ThemeContextProvider>

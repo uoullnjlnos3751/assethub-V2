@@ -7,6 +7,7 @@ import {
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { Sync as SyncIcon, Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import { adminAPI, assetAPI } from '../../services/api';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 export default function CompaniesPage({ embedded }: { embedded?: boolean }) {
   const [companies, setCompanies] = useState<any[]>([]);
@@ -32,8 +33,13 @@ export default function CompaniesPage({ embedded }: { embedded?: boolean }) {
 
   useEffect(() => { fetchCompanies(); }, []);
 
+  const confirm = useConfirm();
   const handleSyncAD = async () => {
-    if (!window.confirm('คุณต้องการดึงข้อมูลบริษัททั้งหมดจากระบบ Intra-tools ใช่หรือไม่?')) return;
+    if (!await confirm({
+      title: 'ดึงข้อมูลบริษัทจาก Intra-tools',
+      detail: 'ข้อมูลบริษัทที่มีอยู่จะถูกปรับให้ตรงกับ Intra-tools',
+      confirmLabel: 'ดึงข้อมูล', danger: false,
+    })) return;
     
     setSyncing(true);
     try {
@@ -100,7 +106,7 @@ export default function CompaniesPage({ embedded }: { embedded?: boolean }) {
   };
 
   const handleDelete = async (id: number, name: string) => {
-    if (window.confirm(`ยืนยันการลบบริษัท ${name} ใช่หรือไม่?`)) {
+    if (await confirm({ title: 'ลบบริษัท', target: name })) {
       try {
         await assetAPI.deleteCompany(id);
         fetchCompanies();

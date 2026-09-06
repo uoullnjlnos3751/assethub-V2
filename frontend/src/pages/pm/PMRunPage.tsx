@@ -69,6 +69,7 @@ import { ImageLightbox } from '../../components/ImageLightbox';
 import { Modal } from './components/Modal';
 import { StarRating } from './components/StarRating';
 import { getRatingCategory, RATING_RUBRIC, suggestRating } from './components/pmRatingRubric';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 /* ─────────────────────────────────────────────────────────────
    Types & Constants
@@ -1045,8 +1046,13 @@ export default function PMRunPage() {
   };
 
   /* ── Delete Run ── */
+  const confirm = useConfirm();
   const handleDeleteRun = async (id: number) => {
-    if (!window.confirm('คุณแน่ใจหรือไม่ว่าต้องการลบงาน PM นี้?')) return;
+    if (!await confirm({
+      title: 'ลบงาน PM',
+      target: runs.find(r => r.id === id)?.asset?.assetCode,
+      detail: 'ผลตรวจและรูปถ่ายที่บันทึกไว้ในงานนี้จะถูกลบไปด้วย',
+    })) return;
     try {
       await pmAPI.deleteRun(id);
       setRuns(prev => prev.filter(r => r.id !== id));

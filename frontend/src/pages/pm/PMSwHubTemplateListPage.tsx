@@ -13,6 +13,7 @@ import ToggleOnIcon from '@mui/icons-material/ToggleOn';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import { pmSwHubTemplateService, PMSwHubTemplate } from '../../services/pmSwHub';
 import { Modal } from './components/Modal';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 export default function PMSwHubTemplateListPage() {
   const navigate = useNavigate();
@@ -36,8 +37,9 @@ export default function PMSwHubTemplateListPage() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('ยืนยันการลบ Template นี้?')) return;
+  const confirm = useConfirm();
+  const handleDelete = async (id: number, label?: string) => {
+    if (!await confirm({ title: 'ลบ Template', target: label })) return;
     try {
       await pmSwHubTemplateService.delete(id);
       loadTemplates();
@@ -95,7 +97,7 @@ export default function PMSwHubTemplateListPage() {
                 <Button size="small" variant="outlined" fullWidth startIcon={<VisibilityIcon />} onClick={() => navigate(`/pm/sw-hub/template/${t.id}`)}>Preview</Button>
                 <Button size="small" variant="outlined" fullWidth startIcon={<EditIcon />} onClick={() => navigate(`/pm/sw-hub/template/${t.id}/edit`)}>แก้ไข</Button>
                 {!t.isActive && (
-                  <IconButton size="small" color="error" onClick={() => handleDelete(t.id)}><DeleteIcon fontSize="small" /></IconButton>
+                  <IconButton size="small" color="error" onClick={() => handleDelete(t.id, t.name)}><DeleteIcon fontSize="small" /></IconButton>
                 )}
               </Box>
             </Box>

@@ -11,6 +11,7 @@ import * as XLSX from 'xlsx';
 import debounce from 'lodash/debounce';
 import { adminAPI } from '../../../services/api';
 import { SectionCard } from '../../../components/SectionCard';
+import { useConfirm } from '../../../contexts/ConfirmContext';
 
 interface AppUser {
   id: number;
@@ -158,8 +159,13 @@ export default function UsersPermissionsTab() {
     }
   };
 
+  const confirm = useConfirm();
   const handleDeleteUser = async (u: AppUser) => {
-    if (!window.confirm(`ยืนยันการลบผู้ใช้งาน ${u.displayName} (${u.adUsername}) ใช่หรือไม่?\n\n*หมายเหตุ: จะลบไม่ได้หากมีประวัติการใช้งานในระบบ`)) return;
+    if (!await confirm({
+      title: 'ลบผู้ใช้งาน',
+      target: `${u.displayName || u.adUsername} (${u.adUsername})`,
+      detail: 'ลบไม่ได้หากผู้ใช้รายนี้มีประวัติการใช้งานในระบบอยู่แล้ว',
+    })) return;
     try {
       await adminAPI.deleteUser(u.id);
       setToast({ msg: `ลบผู้ใช้ ${u.displayName || u.adUsername} แล้ว`, severity: 'success' });

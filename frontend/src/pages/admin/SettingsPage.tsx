@@ -26,6 +26,7 @@ import BackupTab from './settings/BackupTab';
 import AuditLogTab from './settings/AuditLogTab';
 import { SectionCard } from '../../components/SectionCard';
 import type { SystemSettings, NotificationTemplate, HealthCheckResult, NotificationLog } from './settings/types';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 // Mirrors SECRET_MASK in backend/src/routes/admin.ts — the API sends this in
 // place of a stored credential, and treats it coming back as "unchanged".
@@ -80,6 +81,7 @@ const ALL_TABS = TAB_GROUPS.flatMap(g => g.items.map(i => ({ ...i, group: g.labe
 
 export default function SettingsPage() {
   const toast = useToast();
+  const confirm = useConfirm();
   const { user, refreshSettings } = useAuth();
   const theme = useTheme();
   const [searchParams] = useSearchParams();
@@ -628,7 +630,7 @@ export default function SettingsPage() {
               <Divider sx={{ mb: 2 }} />
               <Typography variant="subtitle2" fontWeight={700} color="error" sx={{ mb: 1 }}>ยกเลิกเซสชันทั้งหมด</Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>ทุกคนในระบบจะต้องล็อกอินใหม่ทันที</Typography>
-              <Button variant="contained" color="error" size="small" onClick={async () => { if (window.confirm('ยืนยัน? ทุกคนจะต้องล็อกอินใหม่')) { try { await adminAPI.forceLogoutAll(); toast.success('ยกเลิกเซสชันทั้งหมดแล้ว'); } catch { toast.error('เกิดข้อผิดพลาด'); } } }}>
+              <Button variant="contained" color="error" size="small" onClick={async () => { if (await confirm({ title: 'ยกเลิกเซสชันทั้งหมด', detail: 'ผู้ใช้ทุกคนที่กำลังใช้งานอยู่จะถูกบังคับออกจากระบบ และต้องล็อกอินใหม่', confirmLabel: 'บังคับออกจากระบบ' })) { try { await adminAPI.forceLogoutAll(); toast.success('ยกเลิกเซสชันทั้งหมดแล้ว'); } catch { toast.error('เกิดข้อผิดพลาด'); } } }}>
                 บังคับยกเลิกเซสชัน
               </Button>
             </SectionCard>

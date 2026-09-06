@@ -18,6 +18,7 @@ import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import DownloadIcon from '@mui/icons-material/Download';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { assetAPI } from '../../../services/api';
+import { useConfirm } from '../../../contexts/ConfirmContext';
 
 /* ─── Documents tab ───────────────────────────────────────────── */
 export function DocumentsTab({ asset, onReload }: { asset: any; onReload: () => void }) {
@@ -51,8 +52,9 @@ export function DocumentsTab({ asset, onReload }: { asset: any; onReload: () => 
     }
   };
 
+  const confirm = useConfirm();
   const handleDelete = async (docId: number) => {
-    if (!window.confirm('ยืนยันการลบเอกสารนี้?')) return;
+    if (!await confirm({ title: 'ลบเอกสารแนบ', target: docs.find((d: any) => d.id === docId)?.fileName })) return;
     try {
       await assetAPI.deleteDocument(asset.id, docId);
       onReload();

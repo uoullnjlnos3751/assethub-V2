@@ -10,6 +10,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { contractAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 const CONTRACT_TYPES = ['WARRANTY', 'MA', 'LEASE', 'INSURANCE', 'SUPPORT'];
 const TYPE_LABELS: Record<string, string> = {
@@ -74,8 +75,9 @@ export default function ContractsPage() {
     load();
   };
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('ลบสัญญานี้?')) return;
+  const confirm = useConfirm();
+  const handleDelete = async (id: number, label?: string) => {
+    if (!await confirm({ title: 'ลบสัญญา', target: label })) return;
     await contractAPI.delete(id);
     load();
   };
@@ -155,7 +157,7 @@ export default function ContractsPage() {
                 <TableCell>
                   <Tooltip title="แก้ไข"><IconButton size="small" onClick={() => openEdit(c)}><EditIcon fontSize="small" /></IconButton></Tooltip>
                   {isSuperAdmin && (
-                    <Tooltip title="ลบ"><IconButton size="small" color="error" onClick={() => handleDelete(c.id)}><DeleteIcon fontSize="small" /></IconButton></Tooltip>
+                    <Tooltip title="ลบ"><IconButton size="small" color="error" onClick={() => handleDelete(c.id, c.contractNo || c.name)}><DeleteIcon fontSize="small" /></IconButton></Tooltip>
                   )}
                 </TableCell>
               </TableRow>

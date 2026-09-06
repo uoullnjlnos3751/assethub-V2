@@ -5,6 +5,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { Paperclip } from 'lucide-react';
 import { SectionCard } from '../../../components/SectionCard';
 import { assetAPI } from '../../../services/api';
+import { useConfirm } from '../../../contexts/ConfirmContext';
 
 const extOf = (name: string) => (name.split('.').pop() || '').toUpperCase().slice(0, 4);
 
@@ -54,8 +55,9 @@ export function AssetDocumentsRail({ asset, onReload }: { asset: any; onReload: 
     }
   };
 
+  const confirm = useConfirm();
   const handleDelete = async (docId: number) => {
-    if (!window.confirm('ยืนยันการลบเอกสารนี้?')) return;
+    if (!await confirm({ title: 'ลบเอกสารแนบ', target: docs.find((d: any) => d.id === docId)?.fileName })) return;
     try {
       await assetAPI.deleteDocument(asset.id, docId);
       onReload();

@@ -47,6 +47,7 @@ import { AssetLiveStatusCard } from './components/AssetLiveStatusCard';
 import { AssetServiceHistoryCard } from './components/AssetServiceHistoryCard';
 import { AssetDocumentsRail } from './components/AssetDocumentsRail';
 import { PillTabBar } from '../../components/PillTabBar';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 // Fields the inline-edit chips are allowed to resend on a quick-update PUT —
 // the backend's PUT /assets/:id validates the "required" set (assetName/
@@ -205,12 +206,15 @@ export default function AssetDetailPage() {
   }, [asset?.id, asset?.type, id]);
 
   // Apply the agent's reading to the asset — one field, or every differing one.
+  const confirm = useConfirm();
   const handleAgentSync = async (field?: string, label?: string) => {
     if (!id) return;
-    const confirmMsg = field
-      ? `อัปเดต "${label}" ของทรัพย์สินนี้ตามข้อมูลจากระบบ Agent หรือไม่?`
-      : 'อัปเดตทุกช่องที่ไม่ตรงกันตามข้อมูลจากระบบ Agent หรือไม่? (ค่าเดิมจะถูกเขียนทับ)';
-    if (!window.confirm(confirmMsg)) return;
+    if (!await confirm({
+      title: 'อัปเดตข้อมูลจากระบบ Agent',
+      target: field ? label : 'ทุกช่องที่ไม่ตรงกัน',
+      detail: field ? undefined : 'ค่าเดิมในช่องที่ไม่ตรงกันจะถูกเขียนทับ',
+      confirmLabel: 'อัปเดต', danger: !field,
+    })) return;
 
     setSyncingAgent(true);
     try {
@@ -232,11 +236,12 @@ export default function AssetDetailPage() {
   const handleGLPISync = async (field?: string, label?: string) => {
     if (!id || !asset) return;
 
-    const confirmMsg = field
-      ? `คุณต้องการอัปเดต "${label}" ของทรัพย์สินนี้ตามข้อมูลใน GLPI หรือไม่?`
-      : 'ปรับปรุงสเปคของเครื่องนี้ตาม GLPI?\n\nจะเติมเฉพาะช่องที่ว่าง และช่องที่ GLPI ให้ข้อมูลละเอียดกว่าเท่านั้น — ค่าที่ขัดกันจะไม่ถูกแตะ ต้องกดรับทีละช่องเอง';
-
-    if (!window.confirm(confirmMsg)) return;
+    if (!await confirm({
+      title: 'ปรับปรุงสเปคตามข้อมูลใน GLPI',
+      target: field ? label : 'ทุกช่องที่เติมได้',
+      detail: field ? undefined : 'เติมเฉพาะช่องที่ว่างและช่องที่ GLPI ให้ข้อมูลละเอียดกว่า — ค่าที่ขัดกันจะไม่ถูกแตะ ต้องกดรับทีละช่องเอง',
+      confirmLabel: 'ปรับปรุง', danger: false,
+    })) return;
 
     setSyncingGLPI(true);
     try {

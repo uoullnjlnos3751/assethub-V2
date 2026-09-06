@@ -16,6 +16,7 @@ import { inventoryAPI } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 import LoadingSkeleton from '../../components/LoadingSkeleton';
 import EmptyState from '../../components/EmptyState';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 export default function InventoryPage() {
   const theme = useTheme();
@@ -85,8 +86,9 @@ export default function InventoryPage() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('ต้องการลบรายการนี้ใช่หรือไม่?')) return;
+  const confirm = useConfirm();
+  const handleDelete = async (id: number, label?: string) => {
+    if (!await confirm({ title: 'ลบรายการคลัง', target: label })) return;
     try {
       await inventoryAPI.delete(id);
       toast.success('ลบรายการเรียบร้อย');
@@ -219,7 +221,7 @@ export default function InventoryPage() {
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="ลบ">
-                          <IconButton size="small" color="error" onClick={() => handleDelete(item.id)}>
+                          <IconButton size="small" color="error" onClick={() => handleDelete(item.id, item.name || item.code)}>
                             <DeleteIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>

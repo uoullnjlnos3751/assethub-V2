@@ -53,6 +53,7 @@ import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import PushPinIcon from '@mui/icons-material/PushPin';
 import { pmSwHubService, pmSwHubTemplateService, pmSwHubPlanService, PMSwHubTemplateItem } from '../../services/pmSwHub';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 /* ─────────────────────────────────────────────────────────────
    GROUP_INFO: Icon + Label per group key
@@ -325,8 +326,13 @@ export default function PMSwHubFormPage() {
     setAnswers(newAns);
   };
 
-  const handleClear = () => {
-    if (window.confirm('ยืนยันการล้างข้อมูลทั้งหมด?')) {
+  const confirm = useConfirm();
+  const handleClear = async () => {
+    if (await confirm({
+      title: 'ล้างข้อมูลที่กรอกไว้ทั้งหมด',
+      detail: 'คำตอบและรูปถ่ายที่ยังไม่ได้บันทึกจะหายไป',
+      confirmLabel: 'ล้างข้อมูล',
+    })) {
       setAnswers({});
       setRemark('');
       setPhotoBeforeFile(null);

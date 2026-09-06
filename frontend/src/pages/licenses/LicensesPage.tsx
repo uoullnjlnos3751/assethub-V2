@@ -10,6 +10,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { licenseAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 const LICENSE_TYPES = ['PERPETUAL', 'SUBSCRIPTION', 'OEM', 'VOLUME'];
 const TYPE_LABELS: Record<string, string> = {
@@ -88,8 +89,9 @@ export default function LicensesPage() {
     load();
   };
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('ลบ License นี้?')) return;
+  const confirm = useConfirm();
+  const handleDelete = async (id: number, label?: string) => {
+    if (!await confirm({ title: 'ลบ License', target: label })) return;
     await licenseAPI.delete(id);
     load();
   };
@@ -172,7 +174,7 @@ export default function LicensesPage() {
                   <TableCell>
                     <Tooltip title="แก้ไข"><IconButton size="small" onClick={() => openEdit(l)}><EditIcon fontSize="small" /></IconButton></Tooltip>
                     {isSuperAdmin && (
-                      <Tooltip title="ลบ"><IconButton size="small" color="error" onClick={() => handleDelete(l.id)}><DeleteIcon fontSize="small" /></IconButton></Tooltip>
+                      <Tooltip title="ลบ"><IconButton size="small" color="error" onClick={() => handleDelete(l.id, l.name || l.licenseKey)}><DeleteIcon fontSize="small" /></IconButton></Tooltip>
                     )}
                   </TableCell>
                 </TableRow>

@@ -40,6 +40,7 @@ import dayjs from 'dayjs';
 import LoadingSkeleton from '../../components/LoadingSkeleton';
 import { getTypeIcon, SectionCard, ToggleWrap, getBrandSuggestionsForType } from './components/AssetFormHelpers';
 import { ImageLightbox } from '../../components/ImageLightbox';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 /* ─── Types / Defaults ─────────────────────────────────────────── */
 const initialData = {
@@ -576,6 +577,23 @@ export default function AssetFormPage() {
     } finally { setLoading(false); }
   };
 
+  /**
+   * ออกจากฟอร์ม ถามก่อนเฉพาะตอนมีของที่ยังไม่ได้บันทึก
+   *
+   * ปุ่มยกเลิกมีสองที่ (หัวและท้ายฟอร์ม) เคยเขียนเงื่อนไขซ้ำกันคนละชุด
+   * รวมมาไว้ที่เดียวจะได้ถามเหมือนกันเสมอ
+   */
+  const confirm = useConfirm();
+
+  const leaveForm = async () => {
+    if (hasChanges && !await confirm({
+      title: 'ออกจากหน้านี้โดยไม่บันทึก',
+      detail: `การแก้ไขที่ค้างอยู่ ${changeCount} รายการจะหายไป`,
+      confirmLabel: 'ออกโดยไม่บันทึก',
+    })) return;
+    navigate(-1);
+  };
+
   /* ─── Image handlers ─── */
   const handleImageUpload = async (file: File) => {
     if (!id) { setImageError('กรุณาบันทึกทรัพย์สินก่อนอัพโหลดรูปภาพ'); return; }
@@ -690,10 +708,7 @@ export default function AssetFormPage() {
                 variant="outlined"
                 color="inherit"
                 size="small"
-                onClick={() => {
-                  if (hasChanges) { if (window.confirm('ยืนยันยกเลิกการแก้ไข? การเปลี่ยนแปลงทั้งหมดจะหายไป')) navigate(-1); }
-                  else navigate(-1);
-                }}
+                onClick={() => { void leaveForm(); }}
                 sx={{ borderRadius: '10px', color: 'text.secondary', borderColor: 'divider', fontWeight: 600 }}
               >
                 ย้อนกลับ
@@ -2505,10 +2520,7 @@ export default function AssetFormPage() {
         <Button
           variant="outlined"
           color="error"
-          onClick={() => {
-            if (hasChanges) { if (window.confirm('ยืนยันยกเลิกการแก้ไข? การเปลี่ยนแปลงทั้งหมดจะหายไป')) navigate(-1); }
-            else navigate(-1);
-          }}
+          onClick={() => { void leaveForm(); }}
           sx={{ borderRadius: '10px', fontWeight: 600 }}
         >
           ↩ ยกเลิก

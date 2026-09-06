@@ -30,6 +30,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import SyncIcon from '@mui/icons-material/Sync';
 import { departmentAPI } from '../../services/api';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 interface Department {
   id: number;
@@ -111,8 +112,9 @@ export default function DepartmentManagementPage() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('ยืนยันการลบแผนกนี้?')) return;
+  const confirm = useConfirm();
+  const handleDelete = async (id: number, name?: string) => {
+    if (!await confirm({ title: 'ลบแผนก', target: name })) return;
 
     try {
       setError('');
@@ -126,7 +128,11 @@ export default function DepartmentManagementPage() {
   };
 
   const handleSyncAD = async () => {
-    if (!window.confirm('คุณต้องการดึงข้อมูลแผนกและบริษัททั้งหมดจากระบบ Intra-tools ใช่หรือไม่?')) return;
+    if (!await confirm({
+      title: 'ดึงข้อมูลแผนกและบริษัทจาก Intra-tools',
+      detail: 'ข้อมูลที่มีอยู่จะถูกปรับให้ตรงกับ Intra-tools',
+      confirmLabel: 'ดึงข้อมูล', danger: false,
+    })) return;
     
     setSyncing(true);
     setError('');
@@ -243,7 +249,7 @@ export default function DepartmentManagementPage() {
                         </IconButton>
                         <IconButton
                           size="small"
-                          onClick={() => handleDelete(dept.id)}
+                          onClick={() => handleDelete(dept.id, dept.name)}
                           color="error"
                         >
                           <DeleteIcon fontSize="small" />

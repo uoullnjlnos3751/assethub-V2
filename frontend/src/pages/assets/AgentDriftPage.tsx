@@ -11,6 +11,7 @@ import { RadioTower, Wand2, TriangleAlert, Monitor as MonitorIcon } from 'lucide
 import { assetAPI } from '../../services/api';
 import { SectionCard } from '../../components/SectionCard';
 import { MonitorCard, MonitorLinkList, MonitorRow, bucketColors } from './components/MonitorReconcile';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 interface DriftField { field: string; label: string; value?: string; current?: string; incoming?: string }
 interface Machine {
@@ -58,8 +59,14 @@ export default function AgentDriftPage() {
 
   useEffect(load, []);
 
+  const confirm = useConfirm();
   const handleFillBlanks = async () => {
-    if (!window.confirm(`เติมข้อมูลในช่องที่ยังว่าง ${totals?.blanks ?? 0} ช่อง จากระบบ Agent?\n\nจะเติมเฉพาะช่องที่ว่างอยู่เท่านั้น ค่าที่มีอยู่แล้วจะไม่ถูกแก้`)) return;
+    if (!await confirm({
+      title: 'เติมข้อมูลจาก Agent',
+      target: `ช่องที่ยังว่าง ${totals?.blanks ?? 0} ช่อง`,
+      detail: 'เติมเฉพาะช่องที่ว่างอยู่ ค่าที่กรอกไว้แล้วจะไม่ถูกแก้',
+      confirmLabel: 'เติมข้อมูล', danger: false,
+    })) return;
     setFilling(true);
     try {
       const res = await assetAPI.agentFillBlanks();

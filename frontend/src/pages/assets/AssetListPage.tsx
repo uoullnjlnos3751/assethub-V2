@@ -81,6 +81,7 @@ import {
   VIEW_MODE_KEY,
   DENSITY_KEY,
 } from './assetListConfig';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 export default function AssetListPage() {
   const { user } = useAuth();
@@ -298,8 +299,13 @@ export default function AssetListPage() {
     }
   }, [isAvailableOnlyView, user]);
 
+  const confirm = useConfirm();
   const handleDelete = async (id: number) => {
-    if (window.confirm('ต้องการลบทรัพย์สินนี้ใช่หรือไม่?')) {
+    if (await confirm({
+      title: 'ลบทรัพย์สิน',
+      target: assets.find(a => a.id === id)?.assetCode || `#${id}`,
+      detail: 'ประวัติการยืม ประวัติ PM และเอกสารแนบของเครื่องนี้จะถูกลบไปด้วย',
+    })) {
       try {
         await assetAPI.delete(id);
         toast.success('ลบทรัพย์สินเรียบร้อย');

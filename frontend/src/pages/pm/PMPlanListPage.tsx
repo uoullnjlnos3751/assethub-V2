@@ -56,6 +56,7 @@ import { PlanGapPanel, GapPrefill } from './components/PlanGapPanel';
 import { PlanGap } from './pmPlanGaps';
 import { formatDate } from '../../utils/dateUtils';
 import { Modal } from './components/Modal';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 /* ─────────────────────────────────────────────────────────────
    Types
@@ -299,6 +300,7 @@ function PlanFormFields({
    Main Page
 ───────────────────────────────────────────────────────────────── */
 export default function PMPlanListPage() {
+  const confirm = useConfirm();
   const navigate = useNavigate();
   const [plans, setPlans] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
@@ -632,7 +634,12 @@ export default function PMPlanListPage() {
   };
 
   const handleDelete = async (planId: number) => {
-    if (!window.confirm('⚠️ คุณแน่ใจหรือไม่ว่าต้องการลบแผน PM นี้?\nการลบจะลบข้อมูลงาน PM ทั้งหมด (รวมถึงงานที่เสร็จสิ้นแล้ว) ในแผนงานนี้ด้วย และไม่สามารถกู้คืนได้')) {
+    const p = plans.find(x => x.id === planId);
+    if (!await confirm({
+      title: 'ลบแผน PM',
+      target: p ? `${p.company || ''} ${p.deptTask || 'ทุกแผนก'} · ${p.deviceType || ''}`.trim() : `แผน #${planId}`,
+      detail: `งาน PM ทั้งหมดในแผนนี้${p?.totalCount ? ` (${p.totalCount} รายการ` + (p.completedCount ? `, ทำเสร็จแล้ว ${p.completedCount}` : '') + ')' : ''} จะถูกลบไปด้วย และกู้คืนไม่ได้`,
+    })) {
       return;
     }
 
@@ -779,7 +786,11 @@ export default function PMPlanListPage() {
               startIcon={<BoltIcon />}
               disabled={saving}
               onClick={async () => {
-                if (!window.confirm(`⚡ ยืนยัน Generate งาน PM ทั้ง ${plansNeedGenerate.length} แผนที่ยังไม่ได้สร้างงาน?`)) return;
+                if (!await confirm({
+                  title: 'สร้างงาน PM ให้แผนที่ยังไม่ได้เจน',
+                  target: `${plansNeedGenerate.length} แผน`,
+                  confirmLabel: 'สร้างงาน', danger: false,
+                })) return;
                 setSaving(true);
                 let ok = 0, fail = 0;
                 for (const plan of plansNeedGenerate) {

@@ -6,6 +6,7 @@ import {
 import AddLinkIcon from '@mui/icons-material/AddLink';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
 import { assetLinkAPI, assetAPI } from '../../../services/api';
+import { useConfirm } from '../../../contexts/ConfirmContext';
 
 const LINK_TYPES = ['COMPONENT', 'CONNECTED', 'DEPENDS_ON'];
 const LINK_TYPE_LABELS: Record<string, string> = {
@@ -57,8 +58,13 @@ export default function AssetLinksPanel({ assetId, canEdit }: Props) {
     load();
   };
 
+  const confirm = useConfirm();
   const handleRemove = async (linkId: number) => {
-    if (!window.confirm('ยกเลิกการเชื่อมโยงนี้?')) return;
+    if (!await confirm({
+      title: 'ยกเลิกการเชื่อมโยงอุปกรณ์',
+      detail: 'ทรัพย์สินทั้งสองยังอยู่ในระบบ แต่จะไม่ผูกกันอีกต่อไป',
+      confirmLabel: 'ยกเลิกการเชื่อมโยง',
+    })) return;
     await assetLinkAPI.delete(linkId);
     load();
   };

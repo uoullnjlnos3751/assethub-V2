@@ -17,6 +17,7 @@ import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import MenuItem from '@mui/material/MenuItem';
 import { catalogAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 const fmtBaht = (v: number) => `฿${v.toLocaleString('th-TH', { maximumFractionDigits: 0 })}`;
 const fmtSize = (bytes: number) =>
@@ -106,9 +107,14 @@ export default function CatalogDetailPage() {
     }
   };
 
+  const confirm = useConfirm();
   const handleDelete = async () => {
     if (!item) return;
-    if (!window.confirm(`ลบสเปค "${item.name}" ออกจากแคตตาล็อก? ทรัพย์สินที่เคยผูกไว้ (${item._count?.assets ?? 0} เครื่อง) จะไม่ถูกลบ แต่จะหลุดการผูก`)) return;
+    if (!await confirm({
+      title: 'ลบสเปคออกจากแคตตาล็อก',
+      target: item.name,
+      detail: `ทรัพย์สินที่ผูกไว้ ${item._count?.assets ?? 0} เครื่องจะไม่ถูกลบ แต่จะหลุดการผูกกับสเปคนี้`,
+    })) return;
     await catalogAPI.delete(item.id);
     navigate('/catalog');
   };
@@ -132,7 +138,8 @@ export default function CatalogDetailPage() {
   };
 
   const handleDeleteDoc = async (docId: number) => {
-    if (!item || !window.confirm('ลบเอกสารนี้?')) return;
+    if (!item) return;
+    if (!await confirm({ title: 'ลบเอกสารแนบ', target: item.documents?.find((d: any) => d.id === docId)?.fileName })) return;
     await catalogAPI.deleteDocument(item.id, docId);
     await load();
   };
@@ -156,7 +163,8 @@ export default function CatalogDetailPage() {
   };
 
   const handleDeleteImage = async () => {
-    if (!item || !window.confirm('ลบรูปสินค้านี้?')) return;
+    if (!item) return;
+    if (!await confirm({ title: 'ลบรูปสินค้า', target: item.name })) return;
     await catalogAPI.deleteImage(item.id);
     await load();
   };

@@ -49,6 +49,7 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import { pmSwHubPlanService, PMSwHubPlan, pmSwHubTemplateService } from '../../services/pmSwHub';
 import { formatDate } from '../../utils/dateUtils';
 import { Modal } from './components/Modal';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 function fmtDate(d: string | Date | null) {
   if (!d) return '—';
@@ -216,8 +217,13 @@ export default function PMSwHubPlanListPage() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('ยืนยันการลบแผน PM SW/Hub Room นี้?')) return;
+  const confirm = useConfirm();
+  const handleDelete = async (id: number, label?: string) => {
+    if (!await confirm({
+      title: 'ลบแผน PM SW/Hub Room',
+      target: label,
+      detail: 'งานตรวจทั้งหมดในแผนนี้จะถูกลบไปด้วย',
+    })) return;
     setSaving(true);
     try {
       await pmSwHubPlanService.delete(id);
@@ -673,7 +679,7 @@ export default function PMSwHubPlanListPage() {
                     )}
 
                     <IconButton size="small" onClick={() => handleEditPlan(plan)} title="แก้ไขข้อมูลแผน"><EditIcon fontSize="small" /></IconButton>
-                    <IconButton size="small" color="error" onClick={() => handleDelete(plan.id)} disabled={saving} title="ลบแผน"><DeleteIcon fontSize="small" /></IconButton>
+                    <IconButton size="small" color="error" onClick={() => handleDelete(plan.id, `ชั้น ${plan.floor} · ${plan.period}`)} disabled={saving} title="ลบแผน"><DeleteIcon fontSize="small" /></IconButton>
                   </Box>
                 </Box>
               </Card>
