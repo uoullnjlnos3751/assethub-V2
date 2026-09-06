@@ -328,7 +328,7 @@ export default function DeliveryPage() {
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Typography sx={{ fontSize: 15, fontWeight: 700 }}>เพิ่มรายการส่งมอบใหม่</Typography>
-          <IconButton size="small" onClick={() => setCreateOpen(false)}><CloseIcon fontSize="small" /></IconButton>
+          <IconButton aria-label="ปิด" size="small" onClick={() => setCreateOpen(false)}><CloseIcon fontSize="small" /></IconButton>
         </DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 0.5 }}>
@@ -395,7 +395,7 @@ export default function DeliveryPage() {
                   <TextField size="small" placeholder="รายการ" value={p.itemName} onChange={e => updatePeripheral(idx, 'itemName', e.target.value)} sx={{ flex: 1 }} />
                   <TextField size="small" placeholder="Serial" value={p.serialNo} onChange={e => updatePeripheral(idx, 'serialNo', e.target.value)} sx={{ width: 110 }} />
                   <TextField size="small" type="number" value={p.qty} onChange={e => updatePeripheral(idx, 'qty', Number(e.target.value) || 1)} sx={{ width: 70 }} />
-                  <IconButton size="small" onClick={() => removePeripheral(idx)}><CloseIcon fontSize="small" /></IconButton>
+                  <IconButton aria-label="ปิด" size="small" onClick={() => removePeripheral(idx)}><CloseIcon fontSize="small" /></IconButton>
                 </Box>
               ))}
             </Box>

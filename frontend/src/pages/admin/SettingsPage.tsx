@@ -601,10 +601,10 @@ export default function SettingsPage() {
             </TableContainer>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1, px: 2, py: 1 }}>
               <Typography variant="caption" color="text.secondary">หน้า {logPage} / {logTotalPages}</Typography>
-              <IconButton size="small" disabled={logLoading || logPage <= 1} onClick={() => fetchLogs(logPage - 1)}>
+              <IconButton aria-label="ก่อนหน้า" size="small" disabled={logLoading || logPage <= 1} onClick={() => fetchLogs(logPage - 1)}>
                 <ChevronLeft size={16} />
               </IconButton>
-              <IconButton size="small" disabled={logLoading || logPage >= logTotalPages} onClick={() => fetchLogs(logPage + 1)}>
+              <IconButton aria-label="ถัดไป" size="small" disabled={logLoading || logPage >= logTotalPages} onClick={() => fetchLogs(logPage + 1)}>
                 <ChevronRight size={16} />
               </IconButton>
             </Box>

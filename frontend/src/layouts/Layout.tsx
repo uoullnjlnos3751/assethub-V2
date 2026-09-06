@@ -589,7 +589,7 @@ export default function Layout() {
                 {user?.role === 'SUPERADMIN' ? 'Super Admin' : user?.role === 'IT_ADMIN' ? 'IT Admin' : 'User'}
               </Typography>
             </Box>
-            <IconButton
+            <IconButton aria-label="ออกจากระบบ"
               size="small"
               onClick={() => { logout(); navigate('/login'); }}
               sx={{ color: theme.palette.text.secondary, p: '4px', '&:hover': { color: theme.palette.error.main, bgcolor: alpha(theme.palette.error.main, 0.08) } }}
@@ -829,7 +829,7 @@ export default function Layout() {
           }}
         >
           {/* Mobile hamburger */}
-          <IconButton
+          <IconButton aria-label="เปิด/ปิดเมนู"
             color="inherit"
             edge="start"
             onClick={() => setMobileOpen(!mobileOpen)}
@@ -840,7 +840,7 @@ export default function Layout() {
 
           {/* Desktop sidebar collapse toggle */}
           <Tooltip title={sidebarCollapsed ? 'ขยายเมนู' : 'ย่อเมนู (ได้พื้นที่เพิ่ม)'}>
-            <IconButton
+            <IconButton aria-label="เปิด/ปิดเมนู"
               onClick={toggleSidebar}
               sx={{
                 display: { xs: 'none', md: 'flex' },
@@ -983,7 +983,7 @@ export default function Layout() {
            <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
 
             {/* QR Scanner Button (Desktop only since mobile has BottomNav) */}
-            <IconButton
+            <IconButton aria-label="สแกน QR"
               size="small"
               onClick={() => setQrOpen(true)}
               sx={{
@@ -1001,7 +1001,7 @@ export default function Layout() {
 
             {/* Dark Mode Toggle */}
             <Tooltip title={mode === 'dark' ? 'โหมดสว่าง' : 'โหมดมืด'}>
-              <IconButton
+              <IconButton aria-label="สลับโหมดสว่าง/มืด"
                 size="small"
                 onClick={toggleColorMode}
                 sx={{
@@ -1018,7 +1018,7 @@ export default function Layout() {
             </Tooltip>
 
             {/* Notification bell */}
-            <IconButton
+            <IconButton aria-label="การแจ้งเตือน"
               size="small"
               onClick={(e) => setAnchorElNotif(e.currentTarget)}
               sx={{

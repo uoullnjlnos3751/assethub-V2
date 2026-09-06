@@ -130,7 +130,7 @@ export default function AssetCard({ asset, variant, onView, onBorrow, onMenu }: 
               เปิดดู
             </Button>
             <Tooltip title="จัดการเพิ่มเติม">
-              <IconButton
+              <IconButton aria-label="จัดการเพิ่มเติม"
                 size="small"
                 onClick={(e) => onMenu?.(e, asset)}
                 sx={{

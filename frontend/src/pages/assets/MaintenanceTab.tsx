@@ -398,7 +398,7 @@ export default function MaintenanceTab({ assetId, onUpdate }: MaintenanceTabProp
                     <TextField size="small" label="ราคา" type="number" value={p.price} onChange={e => {
                       const newParts = [...parts]; newParts[idx].price = Number(e.target.value); setParts(newParts);
                     }} sx={{ width: 100 }} />
-                    <IconButton color="error" onClick={() => setParts(parts.filter((_, i) => i !== idx))}><DeleteIcon /></IconButton>
+                    <IconButton aria-label="ลบ" color="error" onClick={() => setParts(parts.filter((_, i) => i !== idx))}><DeleteIcon /></IconButton>
                   </Box>
                 ))}
                 <Button size="small" startIcon={<AddIcon />} onClick={() => setParts([...parts, { partName: '', quantity: 1, price: 0 }])}>เพิ่มรายการอะไหล่</Button>
@@ -461,7 +461,7 @@ export default function MaintenanceTab({ assetId, onUpdate }: MaintenanceTabProp
                         <Typography variant="caption" display="block">
                           {img.imageType === 'BEFORE' ? 'ก่อนซ่อม' : img.imageType === 'AFTER' ? 'หลังซ่อม' : 'ใบเสร็จ'}
                         </Typography>
-                        <IconButton 
+                        <IconButton aria-label="ลบ" 
                           size="small" 
                           color="error" 
                           onClick={() => handleDeleteImage(img.id)}

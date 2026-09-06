@@ -137,7 +137,7 @@ export default function CompaniesPage({ embedded }: { embedded?: boolean }) {
           <Button size="small" color={row.isActive ? 'error' : 'success'} variant="outlined" sx={{ mr: 1 }} onClick={() => handleToggleActive(row.id, row.isActive)}>
             {row.isActive ? 'ปิด' : 'เปิด'}
           </Button>
-          <IconButton color="error" size="small" onClick={() => handleDelete(row.id, row.name)}>
+          <IconButton aria-label="ลบ" color="error" size="small" onClick={() => handleDelete(row.id, row.name)}>
             <DeleteIcon />
           </IconButton>
         </Box>

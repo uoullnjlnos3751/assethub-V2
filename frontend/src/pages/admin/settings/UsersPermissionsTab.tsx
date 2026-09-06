@@ -453,27 +453,27 @@ export default function UsersPermissionsTab() {
                     <TableCell align="right">
                       <Box sx={{ display: 'flex', gap: 0.4, justifyContent: 'flex-end' }}>
                         <Tooltip title="ตั้งค่าสิทธิ์">
-                          <IconButton size="small" onClick={() => handleOpenRoleDialog(u)} sx={{ color: 'text.secondary' }}>
+                          <IconButton aria-label="ตั้งค่าสิทธิ์" size="small" onClick={() => handleOpenRoleDialog(u)} sx={{ color: 'text.secondary' }}>
                             <Settings2 size={15} />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="ตั้งหัวหน้างาน (สำหรับอนุมัติคำขอยืม)">
-                          <IconButton size="small" onClick={() => handleOpenManagerDialog(u)} sx={{ color: 'text.secondary' }}>
+                          <IconButton aria-label="ตั้งหัวหน้างาน (สำหรับอนุมัติคำขอยืม)" size="small" onClick={() => handleOpenManagerDialog(u)} sx={{ color: 'text.secondary' }}>
                             <UserCog size={15} />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title={u.authType === 'LOCAL' ? 'เปลี่ยนรหัสผ่าน' : 'ตั้งรหัสผ่าน Local'}>
-                          <IconButton size="small" onClick={() => { setPasswordDialog({ open: true, user: u }); setNewPassword(''); }} sx={{ color: 'text.secondary' }}>
+                          <IconButton aria-label="รีเซ็ตรหัสผ่าน" size="small" onClick={() => { setPasswordDialog({ open: true, user: u }); setNewPassword(''); }} sx={{ color: 'text.secondary' }}>
                             <KeyRound size={15} />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title={u.isActive ? 'ปิดการใช้งาน' : 'เปิดการใช้งาน'}>
-                          <IconButton size="small" onClick={() => handleToggleActive(u)} sx={{ color: u.isActive ? 'error.main' : 'success.main' }}>
+                          <IconButton aria-label="ระงับการใช้งาน" size="small" onClick={() => handleToggleActive(u)} sx={{ color: u.isActive ? 'error.main' : 'success.main' }}>
                             {u.isActive ? <Ban size={15} /> : <CheckCircle2 size={15} />}
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="ลบผู้ใช้">
-                          <IconButton size="small" onClick={() => handleDeleteUser(u)} sx={{ color: 'error.main' }}>
+                          <IconButton aria-label="ลบผู้ใช้" size="small" onClick={() => handleDeleteUser(u)} sx={{ color: 'error.main' }}>
                             <Trash2 size={15} />
                           </IconButton>
                         </Tooltip>

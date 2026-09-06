@@ -217,7 +217,7 @@ export default function SystemSettingsTab() {
                               />
                             </TableCell>
                             <TableCell align="center">
-                              <IconButton size="small" color="error" onClick={() => removePrefixRow(index)}>
+                              <IconButton aria-label="ลบ" size="small" color="error" onClick={() => removePrefixRow(index)}>
                                 <Trash2 size={18} />
                               </IconButton>
                             </TableCell>

@@ -140,15 +140,15 @@ export default function BackupTab() {
                     <TableCell sx={{ fontSize: '0.78rem' }}>{formatSize(b.size)}</TableCell>
                     <TableCell sx={{ fontSize: '0.78rem' }}>{formatDateTime(b.createdAt)}</TableCell>
                     <TableCell align="right">
-                      <IconButton size="small" color="primary" onClick={() => systemBackupAPI.download(b.filename)} title="ดาวน์โหลด">
+                      <IconButton aria-label="ดาวน์โหลด" size="small" color="primary" onClick={() => systemBackupAPI.download(b.filename)} title="ดาวน์โหลด">
                         <DownloadIcon fontSize="small" />
                       </IconButton>
                       {canDestroy && (
                         <>
-                          <IconButton size="small" color="warning" onClick={() => setConfirmDialog({ open: true, action: 'restore', filename: b.filename })} title="กู้คืนข้อมูล">
+                          <IconButton aria-label="กู้คืน" size="small" color="warning" onClick={() => setConfirmDialog({ open: true, action: 'restore', filename: b.filename })} title="กู้คืนข้อมูล">
                             <RestoreIcon fontSize="small" />
                           </IconButton>
-                          <IconButton size="small" color="error" onClick={() => setConfirmDialog({ open: true, action: 'delete', filename: b.filename })} title="ลบ">
+                          <IconButton aria-label="ลบ" size="small" color="error" onClick={() => setConfirmDialog({ open: true, action: 'delete', filename: b.filename })} title="ลบ">
                             <DeleteIcon fontSize="small" />
                           </IconButton>
                         </>

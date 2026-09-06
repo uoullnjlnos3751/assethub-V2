@@ -240,14 +240,14 @@ export default function DepartmentManagementPage() {
                       </TableCell>
                       <TableCell>{dept.description || '—'}</TableCell>
                       <TableCell align="right">
-                        <IconButton
+                        <IconButton aria-label="แก้ไข"
                           size="small"
                           onClick={() => handleOpenDialog(dept)}
                           color="primary"
                         >
                           <EditIcon fontSize="small" />
                         </IconButton>
-                        <IconButton
+                        <IconButton aria-label="ลบ"
                           size="small"
                           onClick={() => handleDelete(dept.id, dept.name)}
                           color="error"

@@ -346,7 +346,7 @@ export default function ReportMaintenancePage() {
                   Ticket No: {selectedRecord.ticketNo}
                 </Typography>
               </Box>
-              <IconButton onClick={handleCloseDialog} sx={{ color: 'text.secondary' }}>
+              <IconButton aria-label="ปิด" onClick={handleCloseDialog} sx={{ color: 'text.secondary' }}>
                 <CloseIcon />
               </IconButton>
             </DialogTitle>

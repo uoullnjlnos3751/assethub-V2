@@ -478,7 +478,7 @@ export default function PMSwHubPlanListPage() {
             </ToggleButtonGroup>
 
             <Box sx={{ display: 'flex', gap: 0.5 }}>
-              <IconButton
+              <IconButton aria-label="ก่อนหน้า"
                 size="small"
                 onClick={() => {
                   if (viewMode === 'monthly') setFilterYear(prev => prev - 1);
@@ -487,7 +487,7 @@ export default function PMSwHubPlanListPage() {
               >
                 <ChevronLeftIcon fontSize="small" />
               </IconButton>
-              <IconButton
+              <IconButton aria-label="รีเซ็ต"
                 size="small"
                 onClick={() => {
                   setTimeOffset(0);
@@ -496,7 +496,7 @@ export default function PMSwHubPlanListPage() {
               >
                 <RestartAltIcon fontSize="small" />
               </IconButton>
-              <IconButton
+              <IconButton aria-label="ถัดไป"
                 size="small"
                 onClick={() => {
                   if (viewMode === 'monthly') setFilterYear(prev => prev + 1);
@@ -678,8 +678,8 @@ export default function PMSwHubPlanListPage() {
                       </Button>
                     )}
 
-                    <IconButton size="small" onClick={() => handleEditPlan(plan)} title="แก้ไขข้อมูลแผน"><EditIcon fontSize="small" /></IconButton>
-                    <IconButton size="small" color="error" onClick={() => handleDelete(plan.id, `ชั้น ${plan.floor} · ${plan.period}`)} disabled={saving} title="ลบแผน"><DeleteIcon fontSize="small" /></IconButton>
+                    <IconButton aria-label="แก้ไข" size="small" onClick={() => handleEditPlan(plan)} title="แก้ไขข้อมูลแผน"><EditIcon fontSize="small" /></IconButton>
+                    <IconButton aria-label="ลบ" size="small" color="error" onClick={() => handleDelete(plan.id, `ชั้น ${plan.floor} · ${plan.period}`)} disabled={saving} title="ลบแผน"><DeleteIcon fontSize="small" /></IconButton>
                   </Box>
                 </Box>
               </Card>

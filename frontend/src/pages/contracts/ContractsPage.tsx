@@ -155,9 +155,9 @@ export default function ContractsPage() {
                 <TableCell><ExpiryChip endDate={c.endDate} /></TableCell>
                 <TableCell>{c.value ? c.value.toLocaleString('th-TH', { style: 'currency', currency: 'THB', minimumFractionDigits: 0 }) : '—'}</TableCell>
                 <TableCell>
-                  <Tooltip title="แก้ไข"><IconButton size="small" onClick={() => openEdit(c)}><EditIcon fontSize="small" /></IconButton></Tooltip>
+                  <Tooltip title="แก้ไข"><IconButton aria-label="แก้ไข" size="small" onClick={() => openEdit(c)}><EditIcon fontSize="small" /></IconButton></Tooltip>
                   {isSuperAdmin && (
-                    <Tooltip title="ลบ"><IconButton size="small" color="error" onClick={() => handleDelete(c.id, c.contractNo || c.name)}><DeleteIcon fontSize="small" /></IconButton></Tooltip>
+                    <Tooltip title="ลบ"><IconButton aria-label="ลบ" size="small" color="error" onClick={() => handleDelete(c.id, c.contractNo || c.name)}><DeleteIcon fontSize="small" /></IconButton></Tooltip>
                   )}
                 </TableCell>
               </TableRow>

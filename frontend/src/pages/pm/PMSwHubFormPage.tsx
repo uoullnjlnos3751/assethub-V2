@@ -676,7 +676,7 @@ export default function PMSwHubFormPage() {
                             </Button>
                           );
                         })}
-                        <IconButton
+                        <IconButton aria-label="ถ่ายภาพหรืออัปโหลดรูป"
                           size="small"
                           component="label"
                           title="แนบรูปถ่าย"
@@ -707,7 +707,7 @@ export default function PMSwHubFormPage() {
                           />
                         </IconButton>
                         {item.key.startsWith('custom_') && (
-                          <IconButton size="small" color="error" title="ลบรายการนี้" onClick={() => handleRemoveCustomItem(item.key)}>
+                          <IconButton aria-label="ลบ" size="small" color="error" title="ลบรายการนี้" onClick={() => handleRemoveCustomItem(item.key)}>
                             <DeleteIcon fontSize="small" />
                           </IconButton>
                         )}
@@ -747,7 +747,7 @@ export default function PMSwHubFormPage() {
                               }}>
                                 <ZoomOutMapIcon sx={{ fontSize: 24 }} />
                               </Box>
-                              <IconButton
+                              <IconButton aria-label="ปิด"
                                 size="small"
                                 onClick={e => { e.stopPropagation(); const n = { ...answers }; delete n[`${item.key}_photo`]; setAnswers(n); }}
                                 sx={{ position: 'absolute', top: 2, right: 2, bgcolor: 'error.main', color: '#fff', width: 20, height: 20, zIndex: 1, '&:hover': { bgcolor: 'error.dark' } }}
@@ -823,7 +823,7 @@ export default function PMSwHubFormPage() {
                 {(slot.url || slot.file) ? (
                   <Box sx={{ position: 'relative', borderRadius: 1.5, overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}>
                     <Box component="img" src={slot.file ? URL.createObjectURL(slot.file) : resolveMediaUrl(slot.url)!} alt={slot.type} sx={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
-                    <IconButton size="small" onClick={slot.onRemove} sx={{ position: 'absolute', top: 8, right: 8, bgcolor: 'error.main', color: '#fff', '&:hover': { bgcolor: 'error.dark' } }}>
+                    <IconButton aria-label="ปิด" size="small" onClick={slot.onRemove} sx={{ position: 'absolute', top: 8, right: 8, bgcolor: 'error.main', color: '#fff', '&:hover': { bgcolor: 'error.dark' } }}>
                       <CloseIcon sx={{ fontSize: 16 }} />
                     </IconButton>
                   </Box>

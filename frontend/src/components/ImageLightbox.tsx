@@ -74,7 +74,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
             ลบรูป
           </Button>
         )}
-        <IconButton size="small" onClick={onClose} sx={{ color: '#fff' }}>
+        <IconButton aria-label="ปิด" size="small" onClick={onClose} sx={{ color: '#fff' }}>
           <CloseIcon fontSize="small" />
         </IconButton>
       </Box>

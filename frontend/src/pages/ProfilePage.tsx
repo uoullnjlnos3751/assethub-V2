@@ -239,7 +239,7 @@ export default function ProfilePage() {
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
-                    <IconButton size="small" onClick={() => setShowCurrent(!showCurrent)} edge="end">
+                    <IconButton aria-label="แสดง/ซ่อนรหัสผ่าน" size="small" onClick={() => setShowCurrent(!showCurrent)} edge="end">
                       {showCurrent ? <EyeOff size={16} /> : <Eye size={16} />}
                     </IconButton>
                   </InputAdornment>
@@ -261,7 +261,7 @@ export default function ProfilePage() {
                 InputProps={{
                   endAdornment: (
                     <InputAdornment position="end">
-                      <IconButton size="small" onClick={() => setShowNew(!showNew)} edge="end">
+                      <IconButton aria-label="แสดง/ซ่อนรหัสผ่าน" size="small" onClick={() => setShowNew(!showNew)} edge="end">
                         {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
                       </IconButton>
                     </InputAdornment>
@@ -311,7 +311,7 @@ export default function ProfilePage() {
                 InputProps={{
                   endAdornment: (
                     <InputAdornment position="end">
-                      <IconButton size="small" onClick={() => setShowConfirm(!showConfirm)} edge="end">
+                      <IconButton aria-label="แสดง/ซ่อนรหัสผ่าน" size="small" onClick={() => setShowConfirm(!showConfirm)} edge="end">
                         {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
                       </IconButton>
                     </InputAdornment>

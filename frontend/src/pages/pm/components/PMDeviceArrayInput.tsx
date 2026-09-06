@@ -396,14 +396,14 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
                       <Tooltip title={idx === 0 ? '' : `ย้ายขึ้นเป็นลำดับที่ ${idx}`}>
                         <span>
-                          <IconButton size="small" disabled={idx === 0} onClick={() => moveDevice(idx, -1)}>
+                          <IconButton aria-label="ย้ายขึ้น" size="small" disabled={idx === 0} onClick={() => moveDevice(idx, -1)}>
                             <ArrowUpwardIcon sx={{ fontSize: 16 }} />
                           </IconButton>
                         </span>
                       </Tooltip>
                       <Tooltip title={idx === devices.length - 1 ? '' : `ย้ายลงเป็นลำดับที่ ${idx + 2}`}>
                         <span>
-                          <IconButton size="small" disabled={idx === devices.length - 1} onClick={() => moveDevice(idx, 1)}>
+                          <IconButton aria-label="ย้ายลง" size="small" disabled={idx === devices.length - 1} onClick={() => moveDevice(idx, 1)}>
                             <ArrowDownwardIcon sx={{ fontSize: 16 }} />
                           </IconButton>
                         </span>

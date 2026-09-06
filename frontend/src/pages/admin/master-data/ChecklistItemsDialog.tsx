@@ -102,7 +102,7 @@ export default function ChecklistItemsDialog({
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Typography sx={{ fontSize: 14, fontWeight: 700 }}>📋 จัดการหัวข้อ — {setName}</Typography>
-        <IconButton size="small" onClick={onClose}><CloseIcon fontSize="small" /></IconButton>
+        <IconButton aria-label="ปิด" size="small" onClick={onClose}><CloseIcon fontSize="small" /></IconButton>
       </DialogTitle>
       <DialogContent>
         {loading ? (
@@ -184,7 +184,7 @@ export default function ChecklistItemsDialog({
       <Dialog open={Boolean(deleteConfirm)} onClose={() => setDeleteConfirm(null)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Typography sx={{ fontSize: 14, fontWeight: 700 }}>🗑 ยืนยันการลบ</Typography>
-          <IconButton size="small" onClick={() => setDeleteConfirm(null)}><CloseIcon fontSize="small" /></IconButton>
+          <IconButton aria-label="ปิด" size="small" onClick={() => setDeleteConfirm(null)}><CloseIcon fontSize="small" /></IconButton>
         </DialogTitle>
         <DialogContent>
           <Typography sx={{ fontSize: 13 }}>ต้องการลบหัวข้อ <strong>"{deleteConfirm?.itemText}"</strong> ใช่หรือไม่?</Typography>

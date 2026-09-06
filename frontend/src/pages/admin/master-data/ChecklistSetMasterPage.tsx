@@ -174,7 +174,7 @@ export default function ChecklistSetMasterPage() {
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Typography sx={{ fontSize: 14, fontWeight: 700 }}>{editingItem ? '✏️ แก้ไขชุด Checklist' : '➕ เพิ่มชุด Checklist'}</Typography>
-          <IconButton size="small" onClick={() => setDialogOpen(false)}><CloseIcon fontSize="small" /></IconButton>
+          <IconButton aria-label="ปิด" size="small" onClick={() => setDialogOpen(false)}><CloseIcon fontSize="small" /></IconButton>
         </DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, pt: 0.5 }}>
@@ -211,7 +211,7 @@ export default function ChecklistSetMasterPage() {
       <Dialog open={Boolean(deleteConfirm)} onClose={() => setDeleteConfirm(null)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Typography sx={{ fontSize: 14, fontWeight: 700 }}>🗑 ยืนยันการลบ</Typography>
-          <IconButton size="small" onClick={() => setDeleteConfirm(null)}><CloseIcon fontSize="small" /></IconButton>
+          <IconButton aria-label="ปิด" size="small" onClick={() => setDeleteConfirm(null)}><CloseIcon fontSize="small" /></IconButton>
         </DialogTitle>
         <DialogContent>
           <Typography sx={{ fontSize: 13, color: theme.palette.text.primary }}>

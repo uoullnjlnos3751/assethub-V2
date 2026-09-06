@@ -2436,17 +2436,17 @@ export default function AssetFormPage() {
                       <Box component="img" src={imagePreview} alt="Asset" sx={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                       <Box sx={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 0.5 }} onClick={e => e.stopPropagation()}>
                         <Tooltip title="ดูรูปขนาดเต็ม">
-                          <IconButton size="small" onClick={() => setImageZoom(true)} sx={{ bgcolor: alpha(theme.palette.background.paper, 0.9), '&:hover': { bgcolor: theme.palette.background.paper } }}>
+                          <IconButton aria-label="ดูรูปขนาดเต็ม" size="small" onClick={() => setImageZoom(true)} sx={{ bgcolor: alpha(theme.palette.background.paper, 0.9), '&:hover': { bgcolor: theme.palette.background.paper } }}>
                             <ZoomOutMapIcon sx={{ fontSize: 16 }} />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="เปลี่ยนรูป">
-                          <IconButton size="small" onClick={() => fileInputRef.current?.click()} sx={{ bgcolor: alpha(theme.palette.background.paper, 0.9), '&:hover': { bgcolor: theme.palette.background.paper } }}>
+                          <IconButton aria-label="เปลี่ยนรูป" size="small" onClick={() => fileInputRef.current?.click()} sx={{ bgcolor: alpha(theme.palette.background.paper, 0.9), '&:hover': { bgcolor: theme.palette.background.paper } }}>
                             <PhotoCameraIcon sx={{ fontSize: 16 }} />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="ลบรูป">
-                          <IconButton size="small" onClick={handleImageDelete} sx={{ bgcolor: alpha(theme.palette.background.paper, 0.9), color: 'error.main', '&:hover': { bgcolor: theme.palette.background.paper } }}>
+                          <IconButton aria-label="ลบรูป" size="small" onClick={handleImageDelete} sx={{ bgcolor: alpha(theme.palette.background.paper, 0.9), color: 'error.main', '&:hover': { bgcolor: theme.palette.background.paper } }}>
                             <DeleteIcon sx={{ fontSize: 16 }} />
                           </IconButton>
                         </Tooltip>

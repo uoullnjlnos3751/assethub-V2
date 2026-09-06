@@ -94,12 +94,12 @@ export function AssetDocumentsRail({ asset, onReload }: { asset: any; onReload: 
                 </Typography>
               </Box>
               <Tooltip title="ดาวน์โหลด">
-                <IconButton size="small" onClick={() => assetAPI.downloadDocument(asset.id, doc.id)}>
+                <IconButton aria-label="ดาวน์โหลด" size="small" onClick={() => assetAPI.downloadDocument(asset.id, doc.id)}>
                   <DownloadIcon sx={{ fontSize: 16 }} color="primary" />
                 </IconButton>
               </Tooltip>
               <Tooltip title="ลบ">
-                <IconButton size="small" onClick={() => handleDelete(doc.id)}>
+                <IconButton aria-label="ลบ" size="small" onClick={() => handleDelete(doc.id)}>
                   <DeleteOutlineIcon sx={{ fontSize: 16 }} color="error" />
                 </IconButton>
               </Tooltip>

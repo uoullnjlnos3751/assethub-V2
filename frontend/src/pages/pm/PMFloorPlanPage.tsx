@@ -966,7 +966,7 @@ export default function PMFloorPlanPage() {
                         <TextField size="small" value={z.name ?? ''} label="ชื่อ" fullWidth
                           onChange={e => patchZone(z.id, { name: e.target.value })}
                           sx={{ '& input': { fontSize: 12, py: 0.6 } }} />
-                        <IconButton size="small" color="error" onClick={() => removeZone(z.id)}>
+                        <IconButton aria-label="ปิด" size="small" color="error" onClick={() => removeZone(z.id)}>
                           <CloseIcon sx={{ fontSize: 16 }} />
                         </IconButton>
                       </Box>
@@ -1125,7 +1125,7 @@ export default function PMFloorPlanPage() {
                           {seat.departmentId || '—'} · {seat.devices.length ? `${seat.devices.length} ชิ้น` : 'ยังไม่พบอุปกรณ์'}
                         </Box>
                       </Box>
-                      <IconButton size="small" color="error" onClick={() => setDraftSeats(p => p.filter((_, j) => j !== i))}>
+                      <IconButton aria-label="ปิด" size="small" color="error" onClick={() => setDraftSeats(p => p.filter((_, j) => j !== i))}>
                         <CloseIcon sx={{ fontSize: 16 }} />
                       </IconButton>
                     </Box>
@@ -1168,7 +1168,7 @@ export default function PMFloorPlanPage() {
                           <Box sx={{ color: 'text.secondary', fontSize: 10 }}>{sp.type}</Box>
                         </Box>
                       </Box>
-                      <IconButton size="small" color="error" onClick={() => setDraftSpots(p => p.filter((_, j) => j !== i))}>
+                      <IconButton aria-label="ปิด" size="small" color="error" onClick={() => setDraftSpots(p => p.filter((_, j) => j !== i))}>
                         <CloseIcon sx={{ fontSize: 16 }} />
                       </IconButton>
                     </Box>
@@ -1201,7 +1201,7 @@ export default function PMFloorPlanPage() {
                             placeholder="เช่น Rack ชั้น 3"
                             onChange={e => patchFrame(f.id, { label: e.target.value })}
                             sx={{ '& input': { fontSize: 12, py: 0.6 } }} />
-                          <IconButton size="small" color="error" onClick={() => removeFrame(f.id)}>
+                          <IconButton aria-label="ปิด" size="small" color="error" onClick={() => removeFrame(f.id)}>
                             <CloseIcon sx={{ fontSize: 16 }} />
                           </IconButton>
                         </Box>
@@ -1251,7 +1251,7 @@ export default function PMFloorPlanPage() {
                                   <Box sx={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                     {a.assetName || a.assetCode}
                                   </Box>
-                                  <IconButton size="small" color="error" onClick={() => removeDeviceFromFrame(f.id, a.assetId)}>
+                                  <IconButton aria-label="ปิด" size="small" color="error" onClick={() => removeDeviceFromFrame(f.id, a.assetId)}>
                                     <CloseIcon sx={{ fontSize: 14 }} />
                                   </IconButton>
                                 </Box>
@@ -1609,7 +1609,7 @@ export default function PMFloorPlanPage() {
                     : `${selectedSpot!.type} · อุปกรณ์ส่วนกลาง`}
                 </Typography>
               </Box>
-              <IconButton size="small" onClick={() => setSelected(null)}><CloseIcon sx={{ fontSize: 17 }} /></IconButton>
+              <IconButton aria-label="ปิด" size="small" onClick={() => setSelected(null)}><CloseIcon sx={{ fontSize: 17 }} /></IconButton>
             </Box>
 
             {selectedSeat?.looksLikeStorage && (
@@ -1693,7 +1693,7 @@ export default function PMFloorPlanPage() {
                 onClick={() => handleApplyTemplate(t)} sx={{ fontSize: 11.5 }}>
                 ใช้ผังนี้
               </Button>
-              <IconButton size="small" color="error" onClick={() => handleDeleteTemplate(t)}>
+              <IconButton aria-label="ปิด" size="small" color="error" onClick={() => handleDeleteTemplate(t)}>
                 <CloseIcon sx={{ fontSize: 17 }} />
               </IconButton>
             </Box>

@@ -394,7 +394,7 @@ export default function AssetListPage() {
                 )
               ) : (
                 <Tooltip title="ดูรายละเอียด">
-                  <IconButton size="small" onClick={() => navigate(`/assets/${row.id}`)} color="primary">
+                  <IconButton aria-label="ดูรายละเอียด" size="small" onClick={() => navigate(`/assets/${row.id}`)} color="primary">
                     <PageviewIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
@@ -402,7 +402,7 @@ export default function AssetListPage() {
 
               {/* Secondary Actions (More Menu) */}
               <Tooltip title="จัดการเพิ่มเติม">
-                <IconButton
+                <IconButton aria-label="จัดการเพิ่มเติม"
                   size="small"
                   onClick={(e) => handleMenuOpen(e, row)}
                   sx={{
@@ -459,7 +459,7 @@ export default function AssetListPage() {
         </Box>
         <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: isMobile ? 1 : 0, width: isMobile ? '100%' : 'auto' }}>
           {isAdmin && (
-            <IconButton
+            <IconButton aria-label="ตั้งค่า"
               onClick={(e) => handleMenuOpen(e, { isHeaderMenu: true })}
               sx={{
                 display: { xs: 'flex', sm: 'none' },
@@ -670,7 +670,7 @@ export default function AssetListPage() {
         {savedViews.map((v) => (
           <MenuItem key={v.id} onClick={() => applySavedView(v)} sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
             <span>{v.name}</span>
-            <IconButton
+            <IconButton aria-label="ลบ"
               size="small"
               onClick={(e) => { e.stopPropagation(); setSavedViews(deleteFilterView(v.id)); }}
             >

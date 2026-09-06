@@ -91,7 +91,7 @@ export default function AssetLinksPanel({ assetId, canEdit }: Props) {
               <Typography variant="caption" color="text.secondary">({LINK_TYPE_LABELS[l.linkType] || l.linkType})</Typography>
               {canEdit && (
                 <Tooltip title="ยกเลิกเชื่อมโยง">
-                  <IconButton size="small" onClick={() => handleRemove(l.id)}><LinkOffIcon fontSize="small" /></IconButton>
+                  <IconButton aria-label="ยกเลิกเชื่อมโยง" size="small" onClick={() => handleRemove(l.id)}><LinkOffIcon fontSize="small" /></IconButton>
                 </Tooltip>
               )}
             </Box>
@@ -102,7 +102,7 @@ export default function AssetLinksPanel({ assetId, canEdit }: Props) {
               <Typography variant="caption" color="text.secondary">({LINK_TYPE_LABELS[l.linkType] || l.linkType})</Typography>
               {canEdit && (
                 <Tooltip title="ยกเลิกเชื่อมโยง">
-                  <IconButton size="small" onClick={() => handleRemove(l.id)}><LinkOffIcon fontSize="small" /></IconButton>
+                  <IconButton aria-label="ยกเลิกเชื่อมโยง" size="small" onClick={() => handleRemove(l.id)}><LinkOffIcon fontSize="small" /></IconButton>
                 </Tooltip>
               )}
             </Box>

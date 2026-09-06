@@ -137,7 +137,7 @@ export default function MyRequestsPage() {
           startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 18, color: 'text.disabled' }} /></InputAdornment>,
           endAdornment: searchTerm && (
             <InputAdornment position="end">
-              <IconButton size="small" onClick={() => setSearchTerm('')}><CloseIcon sx={{ fontSize: 16 }} /></IconButton>
+              <IconButton aria-label="ปิด" size="small" onClick={() => setSearchTerm('')}><CloseIcon sx={{ fontSize: 16 }} /></IconButton>
             </InputAdornment>
           ),
         }}
@@ -260,7 +260,7 @@ export default function MyRequestsPage() {
               </Box>
               <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                 <StatusChip status={detailReq.status} />
-                <IconButton size="small" onClick={() => setDetailReq(null)}><CloseIcon sx={{ fontSize: 18 }} /></IconButton>
+                <IconButton aria-label="ปิด" size="small" onClick={() => setDetailReq(null)}><CloseIcon sx={{ fontSize: 18 }} /></IconButton>
               </Box>
             </DialogTitle>
 

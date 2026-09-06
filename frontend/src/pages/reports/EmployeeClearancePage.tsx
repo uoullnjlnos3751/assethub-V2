@@ -174,7 +174,7 @@ export default function EmployeeClearancePage() {
                         </TableCell>
                         <TableCell align="center" className="no-print">
                           <Tooltip title="ดูรายละเอียด">
-                            <IconButton size="small" color="primary" onClick={() => navigate(`/assets/${asset.id}`)}>
+                            <IconButton aria-label="ดูรายละเอียด" size="small" color="primary" onClick={() => navigate(`/assets/${asset.id}`)}>
                               <OpenInNewIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>

@@ -132,7 +132,7 @@ export function SpecTab({ asset, glpiSpec, loadingGLPI, syncingGLPI, onSync, age
             )}
           </Box>
           {f.state !== 'same' && onSync && (
-            <IconButton size="small" onClick={() => onSync(f.key, f.label)} disabled={syncingGLPI}
+            <IconButton aria-label="ซิงก์ข้อมูล" size="small" onClick={() => onSync(f.key, f.label)} disabled={syncingGLPI}
               sx={{ color: 'primary.main', flex: 'none' }} title={`ปรับปรุงเฉพาะ ${f.label}`}>
               <SyncIcon sx={{ fontSize: 16 }} />
             </IconButton>

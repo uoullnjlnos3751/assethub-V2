@@ -1288,7 +1288,7 @@ export default function PMRunPage() {
             onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
           />
           <Tooltip title="สแกน QR Code">
-            <IconButton size="small" onClick={() => setQrModalOpen(true)}><QrCodeScannerIcon fontSize="small" /></IconButton>
+            <IconButton aria-label="สแกน QR Code" size="small" onClick={() => setQrModalOpen(true)}><QrCodeScannerIcon fontSize="small" /></IconButton>
           </Tooltip>
           <Select size="small" sx={{ minWidth: 150 }} displayEmpty value={filterPlan}
             onChange={e => { setFilterPlan(e.target.value); setCurrentPage(1); }}>
@@ -1457,25 +1457,25 @@ export default function PMRunPage() {
                         <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
                           <Tooltip title="ดูรายละเอียด PM">
                             <span>
-                              <IconButton size="small" color="primary" onClick={() => openPM(r, true)} disabled={!r.plan?.template?.templateItems?.length}>
+                              <IconButton aria-label="ดูรายละเอียด PM" size="small" color="primary" onClick={() => openPM(r, true)} disabled={!r.plan?.template?.templateItems?.length}>
                                 <VisibilityIcon fontSize="small" />
                               </IconButton>
                             </span>
                           </Tooltip>
                           <Tooltip title="แก้ไข / บันทึกผล PM">
                             <span>
-                              <IconButton size="small" color="success" onClick={() => openPM(r, false)} disabled={!r.plan?.template?.templateItems?.length}>
+                              <IconButton aria-label="แก้ไข / บันทึกผล PM" size="small" color="success" onClick={() => openPM(r, false)} disabled={!r.plan?.template?.templateItems?.length}>
                                 <EditIcon fontSize="small" />
                               </IconButton>
                             </span>
                           </Tooltip>
                           <Tooltip title={r.notes ? 'แก้ไขโน้ต' : 'เพิ่มโน้ต (เช่น เจ้าของเครื่องไม่ว่าง จะนัดทำ PM วันไหน)'}>
-                            <IconButton size="small" color={r.notes ? 'primary' : 'default'} onClick={() => openNoteModal(r)}>
+                            <IconButton aria-label="แก้ไขโน้ต" size="small" color={r.notes ? 'primary' : 'default'} onClick={() => openNoteModal(r)}>
                               <EditNoteIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
                           <Tooltip title="ลบข้อมูล">
-                            <IconButton size="small" color="error" onClick={() => handleDeleteRun(r.id)}>
+                            <IconButton aria-label="ลบข้อมูล" size="small" color="error" onClick={() => handleDeleteRun(r.id)}>
                               <DeleteIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
@@ -1993,7 +1993,7 @@ export default function PMRunPage() {
                         {/* เหลือเครื่องเดียวแล้วเอาออกไม่ได้ บันทึกกลุ่มที่ว่างเปล่าไม่มีความหมาย */}
                         <Tooltip title={selectedRunIds.length <= 1 ? 'ต้องเหลืออย่างน้อย 1 รายการ' : 'เอาออกจากชุดนี้'}>
                           <span>
-                            <IconButton
+                            <IconButton aria-label="ปิด"
                               size="small"
                               disabled={selectedRunIds.length <= 1}
                               onClick={() => setSelectedRunIds(prev => prev.filter(x => x !== id))}

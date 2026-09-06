@@ -172,9 +172,9 @@ export default function LicensesPage() {
                     }
                   </TableCell>
                   <TableCell>
-                    <Tooltip title="แก้ไข"><IconButton size="small" onClick={() => openEdit(l)}><EditIcon fontSize="small" /></IconButton></Tooltip>
+                    <Tooltip title="แก้ไข"><IconButton aria-label="แก้ไข" size="small" onClick={() => openEdit(l)}><EditIcon fontSize="small" /></IconButton></Tooltip>
                     {isSuperAdmin && (
-                      <Tooltip title="ลบ"><IconButton size="small" color="error" onClick={() => handleDelete(l.id, l.name || l.licenseKey)}><DeleteIcon fontSize="small" /></IconButton></Tooltip>
+                      <Tooltip title="ลบ"><IconButton aria-label="ลบ" size="small" color="error" onClick={() => handleDelete(l.id, l.name || l.licenseKey)}><DeleteIcon fontSize="small" /></IconButton></Tooltip>
                     )}
                   </TableCell>
                 </TableRow>

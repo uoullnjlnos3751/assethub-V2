@@ -37,7 +37,7 @@ export const Modal: React.FC<ModalProps> = ({
         <Typography variant="subtitle1" fontWeight={600} component="span">
           {title}
         </Typography>
-        <IconButton onClick={onClose} size="small">
+        <IconButton aria-label="ปิด" onClick={onClose} size="small">
           <CloseIcon fontSize="small" />
         </IconButton>
       </DialogTitle>

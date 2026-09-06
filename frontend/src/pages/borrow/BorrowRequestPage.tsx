@@ -651,19 +651,19 @@ export default function BorrowRequestPage() {
                           <Typography sx={{ fontWeight: 700, fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.assetCode}</Typography>
                           <Typography variant="caption" color="text.secondary">{a.brand} {a.model}</Typography>
                         </Box>
-                        <IconButton size="small" onClick={() => removeAsset(a.id)}><CloseIcon sx={{ fontSize: 16 }} /></IconButton>
+                        <IconButton aria-label="ปิด" size="small" onClick={() => removeAsset(a.id)}><CloseIcon sx={{ fontSize: 16 }} /></IconButton>
                       </Box>
                     ))}
                     {selectedInventory.map(({ item, qty }) => (
                       <Box key={item.id} sx={{ p: '10px 12px', bgcolor: alpha(theme.palette.success.main, 0.05), border: `1px solid ${alpha(theme.palette.success.main, 0.25)}`, borderRadius: '9px' }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.75 }}>
                           <Typography sx={{ fontWeight: 700, fontSize: '0.85rem' }}>{item.name}</Typography>
-                          <IconButton size="small" onClick={() => setSelectedInventory(prev => prev.filter(s => s.item.id !== item.id))}><CloseIcon sx={{ fontSize: 16 }} /></IconButton>
+                          <IconButton aria-label="ปิด" size="small" onClick={() => setSelectedInventory(prev => prev.filter(s => s.item.id !== item.id))}><CloseIcon sx={{ fontSize: 16 }} /></IconButton>
                         </Box>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <IconButton size="small" onClick={() => updateQty(item.id, qty - 1)} sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: '6px', width: 24, height: 24 }}><RemoveIcon sx={{ fontSize: 14 }} /></IconButton>
+                          <IconButton aria-label="ลดจำนวน" size="small" onClick={() => updateQty(item.id, qty - 1)} sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: '6px', width: 24, height: 24 }}><RemoveIcon sx={{ fontSize: 14 }} /></IconButton>
                           <Typography sx={{ fontWeight: 700, minWidth: 24, textAlign: 'center' }}>{qty}</Typography>
-                          <IconButton size="small" onClick={() => updateQty(item.id, qty + 1)} sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: '6px', width: 24, height: 24 }}><AddIcon sx={{ fontSize: 14 }} /></IconButton>
+                          <IconButton aria-label="เพิ่ม" size="small" onClick={() => updateQty(item.id, qty + 1)} sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: '6px', width: 24, height: 24 }}><AddIcon sx={{ fontSize: 14 }} /></IconButton>
                           <Typography variant="caption" color="text.secondary">{item.unit} (คงเหลือ {item.availableQuantity})</Typography>
                         </Box>
                       </Box>

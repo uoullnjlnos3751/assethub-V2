@@ -307,7 +307,7 @@ export default function DonationFormPage() {
                             objectFit: 'cover', border: '1px solid', borderColor: 'divider',
                           }}
                         />
-                        <IconButton
+                        <IconButton aria-label="ปิด"
                           size="small"
                           onClick={() => removeBatchFile(i)}
                           sx={{
@@ -542,7 +542,7 @@ export default function DonationFormPage() {
                                       }}
                                     />
                                   ) : (
-                                    <IconButton
+                                    <IconButton aria-label="ถ่ายภาพหรืออัปโหลดรูป"
                                       size="small"
                                       onClick={() => itemInputRefs.current[a.id]?.click()}
                                       sx={{ color: theme.palette.primary.main }}

@@ -357,13 +357,13 @@ export default function CatalogDetailPage() {
                     </Typography>
                   </Box>
                   <Tooltip title="ดาวน์โหลด">
-                    <IconButton size="small" onClick={() => catalogAPI.downloadDocument(item.id, doc.id)}>
+                    <IconButton aria-label="ดาวน์โหลด" size="small" onClick={() => catalogAPI.downloadDocument(item.id, doc.id)}>
                       <DownloadIcon sx={{ fontSize: 16 }} color="primary" />
                     </IconButton>
                   </Tooltip>
                   {canEdit && (
                     <Tooltip title="ลบ">
-                      <IconButton size="small" onClick={() => handleDeleteDoc(doc.id)}>
+                      <IconButton aria-label="ลบ" size="small" onClick={() => handleDeleteDoc(doc.id)}>
                         <DeleteOutlineIcon sx={{ fontSize: 16 }} color="error" />
                       </IconButton>
                     </Tooltip>

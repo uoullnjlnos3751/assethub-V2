@@ -69,7 +69,7 @@ export default function QRScannerModal({ open, onClose, onScan }: Props) {
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
       <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2 }}>
         <Typography variant="subtitle1" fontWeight={600}>สแกน QR Code ทรัพย์สิน</Typography>
-        <IconButton onClick={onClose} size="small"><CloseIcon /></IconButton>
+        <IconButton aria-label="ปิด" onClick={onClose} size="small"><CloseIcon /></IconButton>
       </DialogTitle>
       <DialogContent sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <Box id="reader" sx={{ width: '100%', maxWidth: '300px', mx: 'auto' }}></Box>

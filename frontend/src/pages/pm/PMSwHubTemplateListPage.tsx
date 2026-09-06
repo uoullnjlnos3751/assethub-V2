@@ -97,7 +97,7 @@ export default function PMSwHubTemplateListPage() {
                 <Button size="small" variant="outlined" fullWidth startIcon={<VisibilityIcon />} onClick={() => navigate(`/pm/sw-hub/template/${t.id}`)}>Preview</Button>
                 <Button size="small" variant="outlined" fullWidth startIcon={<EditIcon />} onClick={() => navigate(`/pm/sw-hub/template/${t.id}/edit`)}>แก้ไข</Button>
                 {!t.isActive && (
-                  <IconButton size="small" color="error" onClick={() => handleDelete(t.id, t.name)}><DeleteIcon fontSize="small" /></IconButton>
+                  <IconButton aria-label="ลบ" size="small" color="error" onClick={() => handleDelete(t.id, t.name)}><DeleteIcon fontSize="small" /></IconButton>
                 )}
               </Box>
             </Box>

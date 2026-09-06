@@ -84,7 +84,7 @@ function Lightbox({ images, index, open, onClose, onPrev, onNext }: LightboxProp
   return (
     <Backdrop open={open} sx={{ zIndex: 9999, bgcolor: 'rgba(0,0,0,0.92)', flexDirection: 'column' }} onClick={onClose}>
       {/* Close button */}
-      <IconButton
+      <IconButton aria-label="ปิด"
         onClick={onClose}
         sx={{ position: 'absolute', top: 16, right: 16, color: '#fff', bgcolor: alpha('#fff', 0.1), '&:hover': { bgcolor: alpha('#fff', 0.2) } }}
       >
@@ -99,13 +99,13 @@ function Lightbox({ images, index, open, onClose, onPrev, onNext }: LightboxProp
       {/* Nav arrows */}
       {images.length > 1 && (
         <>
-          <IconButton
+          <IconButton aria-label="ก่อนหน้า"
             onClick={e => { e.stopPropagation(); onPrev(); }}
             sx={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: '#fff', bgcolor: alpha('#fff', 0.1), '&:hover': { bgcolor: alpha('#fff', 0.2) } }}
           >
             <ChevronLeftIcon />
           </IconButton>
-          <IconButton
+          <IconButton aria-label="ถัดไป"
             onClick={e => { e.stopPropagation(); onNext(); }}
             sx={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', color: '#fff', bgcolor: alpha('#fff', 0.1), '&:hover': { bgcolor: alpha('#fff', 0.2) } }}
           >
@@ -435,7 +435,7 @@ export default function DonationDetailPage() {
                     sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
                   <Tooltip title="ลบรูปภาพ">
-                    <IconButton
+                    <IconButton aria-label="ลบรูปภาพ"
                       className="delete-btn"
                       size="small"
                       onClick={(e) => { e.stopPropagation(); handleBatchDelete(img.id); }}
@@ -563,7 +563,7 @@ export default function DonationDetailPage() {
                             }}
                           />
                           <Tooltip title="ลบรูป">
-                            <IconButton
+                            <IconButton aria-label="ลบรูป"
                               size="small"
                               onClick={() => handleItemDelete(item.id)}
                               sx={{ width: 20, height: 20, color: 'text.disabled', '&:hover': { color: 'error.main' } }}
@@ -575,7 +575,7 @@ export default function DonationDetailPage() {
                       ) : (
                         <>
                           <Tooltip title="เพิ่มรูปสภาพอุปกรณ์">
-                            <IconButton
+                            <IconButton aria-label="เพิ่มรูปสภาพอุปกรณ์"
                               size="small"
                               onClick={() => itemFileRefs.current[item.id]?.click()}
                               sx={{ color: 'text.disabled', '&:hover': { color: theme.palette.secondary.main } }}

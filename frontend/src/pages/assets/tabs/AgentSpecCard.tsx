@@ -172,7 +172,7 @@ export function AgentSpecCard({ agent, spec, asset, syncing, onSync }: {
                         </Typography>
                       </Box>
                       {onSync && (
-                        <IconButton
+                        <IconButton aria-label="ซิงก์ข้อมูล"
                           size="small" disabled={syncing}
                           onClick={() => onSync(r.key, r.label)}
                           sx={{ color: 'success.main', flexShrink: 0 }}

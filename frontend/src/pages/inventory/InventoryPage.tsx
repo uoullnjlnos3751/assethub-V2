@@ -206,22 +206,22 @@ export default function InventoryPage() {
                     <TableCell sx={{ textAlign: 'center' }}>
                       <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
                         <Tooltip title="เพิ่มสต็อก">
-                          <IconButton size="small" color="success" onClick={() => openCheckin(item)}>
+                          <IconButton aria-label="เพิ่มสต็อก" size="small" color="success" onClick={() => openCheckin(item)}>
                             <AddCircleIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="เบิกออก">
-                          <IconButton size="small" color="warning" onClick={() => openCheckout(item)}>
+                          <IconButton aria-label="เบิกออก" size="small" color="warning" onClick={() => openCheckout(item)}>
                             <RemoveCircleIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="แก้ไข">
-                          <IconButton size="small" onClick={() => openEdit(item)}>
+                          <IconButton aria-label="แก้ไข" size="small" onClick={() => openEdit(item)}>
                             <EditIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="ลบ">
-                          <IconButton size="small" color="error" onClick={() => handleDelete(item.id, item.name || item.code)}>
+                          <IconButton aria-label="ลบ" size="small" color="error" onClick={() => handleDelete(item.id, item.name || item.code)}>
                             <DeleteIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>

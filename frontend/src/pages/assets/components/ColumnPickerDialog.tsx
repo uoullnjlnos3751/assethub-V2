@@ -134,10 +134,10 @@ export default function ColumnPickerDialog({
                   }
                 />
                 <Box sx={{ display: 'flex', gap: 0.5 }}>
-                  <IconButton size="small" onClick={() => moveColumn(config.field, 'up')} disabled={index === 0}>
+                  <IconButton aria-label="ย้ายขึ้น" size="small" onClick={() => moveColumn(config.field, 'up')} disabled={index === 0}>
                     <ArrowUpwardIcon fontSize="small" />
                   </IconButton>
-                  <IconButton size="small" onClick={() => moveColumn(config.field, 'down')} disabled={index === columnConfig.length - 1}>
+                  <IconButton aria-label="ย้ายลง" size="small" onClick={() => moveColumn(config.field, 'down')} disabled={index === columnConfig.length - 1}>
                     <ArrowDownwardIcon fontSize="small" />
                   </IconButton>
                 </Box>

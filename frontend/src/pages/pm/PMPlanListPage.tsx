@@ -987,10 +987,10 @@ export default function PMPlanListPage() {
                           </Button>
                         )}
                         <Tooltip title="แก้ไข">
-                          <IconButton size="small" onClick={() => handleOpenEdit(plan)}><EditIcon fontSize="small" /></IconButton>
+                          <IconButton aria-label="แก้ไข" size="small" onClick={() => handleOpenEdit(plan)}><EditIcon fontSize="small" /></IconButton>
                         </Tooltip>
                         <Tooltip title="ลบ">
-                          <IconButton size="small" color="error" onClick={() => handleDelete(plan.id)}><DeleteIcon fontSize="small" /></IconButton>
+                          <IconButton aria-label="ลบ" size="small" color="error" onClick={() => handleDelete(plan.id)}><DeleteIcon fontSize="small" /></IconButton>
                         </Tooltip>
                       </Box>
                     </TableCell>
@@ -1072,13 +1072,13 @@ export default function PMPlanListPage() {
                       </Button>
                     )}
                     <Tooltip title="ดู Dashboard">
-                      <IconButton size="small" onClick={() => navigate('/pm')}><BarChartIcon fontSize="small" /></IconButton>
+                      <IconButton aria-label="ดู Dashboard" size="small" onClick={() => navigate('/pm')}><BarChartIcon fontSize="small" /></IconButton>
                     </Tooltip>
                     <Tooltip title="แก้ไขแผน PM">
-                      <IconButton size="small" onClick={() => handleOpenEdit(plan)}><EditIcon fontSize="small" /></IconButton>
+                      <IconButton aria-label="แก้ไขแผน PM" size="small" onClick={() => handleOpenEdit(plan)}><EditIcon fontSize="small" /></IconButton>
                     </Tooltip>
                     <Tooltip title="ลบแผน PM (ระวัง: ลบข้อมูลที่ตรวจแล้วด้วย)">
-                      <IconButton size="small" color="error" onClick={() => handleDelete(plan.id)}><DeleteIcon fontSize="small" /></IconButton>
+                      <IconButton aria-label="ลบแผน PM (ระวัง: ลบข้อมูลที่ตรวจแล้วด้วย)" size="small" color="error" onClick={() => handleDelete(plan.id)}><DeleteIcon fontSize="small" /></IconButton>
                     </Tooltip>
                   </Box>
                 </Box>

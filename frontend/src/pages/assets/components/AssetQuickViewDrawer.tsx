@@ -20,7 +20,7 @@ export default function AssetQuickViewDrawer({ open, asset, onClose, onViewFull 
               <Typography variant="h6" fontWeight={800} noWrap>{asset.assetCode}</Typography>
               <Typography variant="body2" color="text.secondary" noWrap>{asset.assetName}</Typography>
             </Box>
-            <IconButton onClick={onClose}><CloseIcon /></IconButton>
+            <IconButton aria-label="ปิด" onClick={onClose}><CloseIcon /></IconButton>
           </Box>
           <StatusChip status={asset.status} sx={{ alignSelf: 'flex-start', mb: 2 }} />
           <Divider sx={{ mb: 2 }} />

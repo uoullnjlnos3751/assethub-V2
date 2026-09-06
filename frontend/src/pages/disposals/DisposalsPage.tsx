@@ -138,7 +138,7 @@ export default function DisposalsPage() {
                 <TableCell>{d.createdBy?.displayName || d.createdBy?.adUsername || '—'}</TableCell>
                 <TableCell>
                   {isSuperAdmin && (
-                    <Tooltip title="ยกเลิกรายการ"><IconButton size="small" color="error" onClick={() => handleDelete(d.id, d.disposalNo || d.asset?.assetCode)}><DeleteIcon fontSize="small" /></IconButton></Tooltip>
+                    <Tooltip title="ยกเลิกรายการ"><IconButton aria-label="ยกเลิกรายการ" size="small" color="error" onClick={() => handleDelete(d.id, d.disposalNo || d.asset?.assetCode)}><DeleteIcon fontSize="small" /></IconButton></Tooltip>
                   )}
                 </TableCell>
               </TableRow>

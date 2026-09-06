@@ -110,7 +110,7 @@ function RequestRow({ group, onReturn, defaultOpen = false }: { group: RequestGr
         }}
       >
         <TableCell>
-          <IconButton size="small" onClick={() => setOpen(!open)}>
+          <IconButton aria-label="ย่อ/ขยาย" size="small" onClick={() => setOpen(!open)}>
             {open ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
           </IconButton>
         </TableCell>

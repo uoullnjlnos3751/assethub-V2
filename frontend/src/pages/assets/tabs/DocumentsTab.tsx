@@ -111,12 +111,12 @@ export function DocumentsTab({ asset, onReload }: { asset: any; onReload: () => 
                   </Box>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                     <Tooltip title="ดาวน์โหลด">
-                      <IconButton size="small" onClick={() => assetAPI.downloadDocument(asset.id, doc.id)}>
+                      <IconButton aria-label="ดาวน์โหลด" size="small" onClick={() => assetAPI.downloadDocument(asset.id, doc.id)}>
                         <DownloadIcon fontSize="small" color="primary" />
                       </IconButton>
                     </Tooltip>
                     <Tooltip title="ลบ">
-                      <IconButton size="small" onClick={() => handleDelete(doc.id)}>
+                      <IconButton aria-label="ลบ" size="small" onClick={() => handleDelete(doc.id)}>
                         <DeleteOutlineIcon fontSize="small" color="error" />
                       </IconButton>
                     </Tooltip>
