@@ -121,15 +121,20 @@ export const Chatbot: React.FC = () => {
     sendText(text);
   };
 
+  // ปุ่มลอยถูกถอดออกแล้ว ทางเข้าเดียวคือ "ถาม AI" ในช่องค้นหาบนแถบด้านบน
+  // (askAI() ใน ChatbotContext เป็นตัวสั่งเปิด) ปิดอยู่ก็ไม่ต้องเรนเดอร์อะไร
+  // ทิ้งไว้ให้ทับหน้าจอ
+  if (!isOpen) return null;
+
   return (
-    // `app-noprint` lets a page's print stylesheet drop the floating bubble;
-    // it is chrome, never part of a printed report.
+    // `app-noprint` lets a page's print stylesheet drop the panel; it is
+    // chrome, never part of a printed report.
     <div className="app-noprint" style={{ position: 'fixed', bottom: 30, right: 30, zIndex: 9999 }}>
       {/* Chat Window */}
       {isOpen && (
         <div style={{
           position: 'absolute',
-          bottom: 70,
+          bottom: 0,
           right: 0,
           width: 360,
           height: 500,
@@ -257,28 +262,6 @@ export const Chatbot: React.FC = () => {
         </div>
       )}
 
-      {/* Floating Button */}
-      <button
-        onClick={() => setOpen(!isOpen)}
-        style={{
-          width: 60,
-          height: 60,
-          borderRadius: '50%',
-          backgroundColor: '#2563eb',
-          color: '#fff',
-          border: 'none',
-          boxShadow: '0 4px 14px rgba(37,99,235,0.4)',
-          cursor: 'pointer',
-          fontSize: 28,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          transition: 'transform 0.2s',
-          transform: isOpen ? 'scale(0.9)' : 'scale(1)',
-        }}
-      >
-        {isOpen ? '✕' : '💬'}
-      </button>
     </div>
   );
 };
