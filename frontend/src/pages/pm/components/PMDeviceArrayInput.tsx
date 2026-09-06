@@ -67,6 +67,9 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
   const [previewCodes, setPreviewCodes] = useState<string[]>([]);
   /** ลำดับของเครื่องที่กำลังเปิดดูรูปเต็มอยู่ — null คือไม่ได้เปิด */
   const [photoZoom, setPhotoZoom] = useState<number | null>(null);
+  /** input เลือกไฟล์ของแต่ละแถว เก็บไว้ให้ปุ่ม "เปลี่ยนรูป" ในหน้าดูรูปเต็ม
+   *  เรียกใช้ตัวเดียวกับปุ่มในแถวได้ ไม่ต้องมีตัวจัดการอัปโหลดสองชุด */
+  const photoInputs = React.useRef<Record<number, HTMLInputElement | null>>({});
   const [companies, setCompanies] = useState<string[]>(DEFAULT_COMPANIES);
   const [displayFormat, setDisplayFormat] = useState<string>('{AssetName} / {AssetCode}');
 
@@ -449,11 +452,15 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
                     {!readOnly && (
                       <Button component="label" size="small" variant="outlined" sx={{ fontSize: '0.75rem' }}>
                         ถ่ายภาพหรืออัปโหลด
-                        <input type="file" accept="image/*" hidden onChange={(e) => {
-                          if (e.target.files && e.target.files[0]) {
-                            handlePhotoUpload(idx, e.target.files[0]);
-                          }
-                        }} />
+                        <input
+                          ref={el => { photoInputs.current[idx] = el; }}
+                          type="file" accept="image/*" hidden
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              handlePhotoUpload(idx, e.target.files[0]);
+                            }
+                          }}
+                        />
                       </Button>
                     )}
                     {d.photoFilename && !readOnly && (
@@ -649,6 +656,7 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
           ? resolveMediaUrl(`/uploads/pm/${devices[photoZoom]!.photoFilename}`)
           : null}
         title={photoZoom !== null ? `${labelHeader} ${photoZoom + 1}` : ''}
+        onReplace={readOnly || photoZoom === null ? undefined : () => photoInputs.current[photoZoom]?.click()}
         onDelete={readOnly || photoZoom === null ? undefined : () => {
           updateField(photoZoom, 'photoFilename', undefined);
           setPhotoZoom(null);

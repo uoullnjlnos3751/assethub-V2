@@ -1908,7 +1908,7 @@ export default function PMRunPage() {
       <Modal
         open={bulkPMModal.open}
         onClose={() => setBulkPMModal({ open: false, templateId: null })}
-        maxWidth={1040}
+        fullScreen
         title={`บันทึก PM แบบกลุ่ม (${selectedRunIds.length} รายการ)`}
       >
         {selectedRunIds.length > 0 && (() => {
@@ -1924,7 +1924,7 @@ export default function PMRunPage() {
           };
 
           return (
-            <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '80vh' }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
               <Alert severity="warning" sx={{ borderRadius: 0 }}>
                 ข้อความนี้จะถูกบันทึกไปยังรายการอุปกรณ์ที่เลือก {selectedRunIds.length} รายการ และสถานะจะเป็น 'เสร็จแล้ว (COMPLETED)' โดยอัตโนมัติ
               </Alert>
@@ -1935,9 +1935,71 @@ export default function PMRunPage() {
                 <Button size="small" variant="outlined" startIcon={<RestartAltIcon />} onClick={() => setAnswers({ staff_name: user?.displayName || user?.adUsername || '' })}>ล้างข้อมูล</Button>
               </Box>
 
-              {/* Checklist Scrollable Body */}
-              <Box sx={{ p: 3, overflowY: 'auto', flex: 1, bgcolor: 'action.hover' }}>
-                <ChecklistGroups items={items} answers={answers} setAnswers={setAnswers} readOnly={false} asset={firstRun.asset} />
+              {/* ── สองคอลัมน์ ────────────────────────────────────────────
+                  ซ้าย = เช็คลิสต์ชุดเดียวที่จะถูกเขียนลงทุกเครื่อง
+                  ขวา = รายชื่อเครื่องที่จะโดน ของเดิมบอกแค่จำนวน ("15 รายการ")
+                  ทั้งที่ปุ่มนี้เขียนสถานะ COMPLETED ทับทุกเครื่องรวดเดียว —
+                  เลือกพลาดมาหนึ่งเครื่องแล้วไม่มีทางเห็นก่อนกดบันทึก */}
+              <Box sx={{
+                flex: 1, minHeight: 0,
+                display: 'grid',
+                gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) 340px' },
+                overflowY: { xs: 'auto', lg: 'hidden' },
+              }}>
+                <Box sx={{
+                  gridColumn: { lg: 1 }, gridRow: { lg: 1 },
+                  p: 3, overflowY: { xs: 'visible', lg: 'auto' }, bgcolor: 'action.hover',
+                }}>
+                  <ChecklistGroups items={items} answers={answers} setAnswers={setAnswers} readOnly={false} asset={firstRun.asset} />
+                </Box>
+
+                <Box sx={{
+                  gridColumn: { lg: 2 }, gridRow: { lg: 1 },
+                  order: { xs: -1, lg: 0 },
+                  overflowY: { xs: 'visible', lg: 'auto' },
+                  borderLeft: { lg: '1px solid' }, borderColor: { lg: 'divider' },
+                }}>
+                  <Box sx={{ p: '12px 16px', borderBottom: '1px solid', borderColor: 'divider', position: 'sticky', top: 0, bgcolor: 'background.paper', zIndex: 1 }}>
+                    <Typography sx={{ fontSize: 12, fontWeight: 700 }}>
+                      อุปกรณ์ที่จะบันทึก ({selectedRunIds.length})
+                    </Typography>
+                    <Typography sx={{ fontSize: 10.5, color: 'text.secondary', mt: 0.25 }}>
+                      กดกากบาทเพื่อเอาออกจากชุดนี้
+                    </Typography>
+                  </Box>
+                  {selectedRunIds.map(id => {
+                    const r = runs.find(x => x.id === id);
+                    if (!r) return null;
+                    return (
+                      <Box key={id} sx={{
+                        display: 'flex', alignItems: 'flex-start', gap: 1,
+                        px: 2, py: 1, borderBottom: '1px solid', borderColor: 'divider',
+                      }}>
+                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                          <Typography sx={{ fontSize: 11.5, fontWeight: 600, color: 'primary.main' }}>
+                            {r.asset?.assetCode || 'ไม่มีรหัส'}
+                          </Typography>
+                          <Typography sx={{ fontSize: 10.5, color: 'text.secondary', lineHeight: 1.45 }}>
+                            {r.asset?.assetName || '—'}<br />
+                            {r.asset?.departmentId || '—'} · {r.asset?.ownerName || '—'}
+                          </Typography>
+                        </Box>
+                        {/* เหลือเครื่องเดียวแล้วเอาออกไม่ได้ บันทึกกลุ่มที่ว่างเปล่าไม่มีความหมาย */}
+                        <Tooltip title={selectedRunIds.length <= 1 ? 'ต้องเหลืออย่างน้อย 1 รายการ' : 'เอาออกจากชุดนี้'}>
+                          <span>
+                            <IconButton
+                              size="small"
+                              disabled={selectedRunIds.length <= 1}
+                              onClick={() => setSelectedRunIds(prev => prev.filter(x => x !== id))}
+                            >
+                              <CloseIcon sx={{ fontSize: 14 }} />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      </Box>
+                    );
+                  })}
+                </Box>
               </Box>
 
               {/* Footer Actions */}
