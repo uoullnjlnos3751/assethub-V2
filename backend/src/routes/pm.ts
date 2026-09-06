@@ -79,6 +79,30 @@ function buildPMAssetWhere(plan: { company?: string | null; site?: string | null
   };
 }
 
+/**
+ * ทรัพย์สินชิ้นนี้อยู่ในขอบเขตของแผนนี้ไหม — เวอร์ชันที่ตัดสินในหน่วยความจำ
+ *
+ * ต้องให้ผลตรงกับ buildPMAssetWhere ทุกเงื่อนไข ต่างกันแค่ตัวหนึ่งถามฐานข้อมูล
+ * อีกตัวถามอ็อบเจ็กต์ที่อ่านมาแล้ว (`contains` ของ Prisma ไม่ได้ตั้ง
+ * mode: 'insensitive' จึงเทียบตัวพิมพ์เล็กใหญ่เหมือน String.includes)
+ *
+ * มีไว้ให้หน้า "ขอบเขตที่ยังไม่มีแผน" ตัดสินด้วยเกณฑ์เดียวกับตอนสร้างงานจริง
+ * ของเดิมหน้านั้นเทียบด้วยกุญแจ `บริษัท|แผนก` เท่านั้น ซึ่งพลาดสองทาง:
+ * แผนกที่มีแผนโน้ตบุ๊กถูกนับว่าครอบคลุมจอกับเครื่องพิมพ์ไปด้วย (ซ่อนของที่
+ * ไม่มีแผนจริง 178 เครื่อง) ส่วนแผนที่เลือก "ทุกแผนก" เก็บแผนกเป็นค่าว่าง
+ * จึงไม่เคยจับคู่กับแผนกจริงของเครื่องไหนเลย
+ */
+function planCoversAsset(
+  plan: { company?: string | null; site?: string | null; deptTask?: string | null; deviceType?: string | null },
+  asset: { company?: string | null; location?: string | null; departmentId?: string | null; type?: string | null },
+): boolean {
+  if (plan.company && asset.company !== plan.company) return false;
+  if (plan.site && !(asset.location || '').includes(plan.site)) return false;
+  if (plan.deptTask && !(asset.departmentId || '').includes(plan.deptTask)) return false;
+  if (plan.deviceType && asset.type !== plan.deviceType) return false;
+  return true;
+}
+
 async function getPMEligibility(client: any, plan: { year: number; company?: string | null; site?: string | null; deptTask?: string | null; deviceType?: string | null; plannedDeviceCount?: number | string | null }) {
   const scopedAssets = await client.asset.findMany({
     where: buildPMAssetWhere(plan),
@@ -388,10 +412,13 @@ router.get('/plans/gaps', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), asy
     const year = parseInt(String(req.query.year || new Date().getFullYear()));
 
     const [plans, assets, runs] = await Promise.all([
-      prisma.pMPlan.findMany({ where: { year }, select: { company: true, deptTask: true, isAdhoc: true } }),
+      prisma.pMPlan.findMany({
+        where: { year },
+        select: { company: true, site: true, deptTask: true, deviceType: true, isAdhoc: true },
+      }),
       prisma.asset.findMany({
         where: { status: { notIn: PM_EXCLUDED_STATUSES } },
-        select: { id: true, company: true, departmentId: true, type: true },
+        select: { id: true, company: true, departmentId: true, type: true, location: true },
       }),
       prisma.pMRun.findMany({ where: { year }, distinct: ['assetId'], select: { assetId: true } }),
     ]);
@@ -399,14 +426,12 @@ router.get('/plans/gaps', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), asy
     // Ad-hoc plans carry no company/department, so they cover nothing in the
     // scoping sense even though their machines do have runs — which the
     // per-asset `inRun` check below still accounts for.
-    const covered = new Set(
-      plans.filter(pl => !pl.isAdhoc).map(pl => (pl.company || '') + '|' + (pl.deptTask || '')),
-    );
+    const scopedPlans = plans.filter(pl => !pl.isAdhoc);
     const inRun = new Set(runs.map(r => r.assetId));
 
     const map = new Map<string, { company: string; dept: string; type: string; total: number; free: number }>();
     for (const a of assets) {
-      if (covered.has((a.company || '') + '|' + (a.departmentId || ''))) continue;
+      if (scopedPlans.some(pl => planCoversAsset(pl, a))) continue;
       const company = a.company || UNSPECIFIED;
       const dept = a.departmentId || UNSPECIFIED;
       const type = a.type || UNSPECIFIED;
