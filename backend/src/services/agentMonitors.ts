@@ -22,6 +22,11 @@ export interface AgentMonitor {
   serial: string | null;
   port: string | null;
   year: number | null;
+  /** ความละเอียดเป็นพิกเซล — Agent ส่งมาตลอดแต่ไม่เคยถูกประกาศไว้ จึงไม่มีใคร
+   *  อ่านเลย ทั้งที่ทะเบียนมีจอบันทึกความละเอียดไว้แค่ 27 จาก 243 ตัว
+   *  (ไม่ใช่ขนาดกายภาพ — คำนวณเป็นนิ้วไม่ได้) */
+  width: number | null;
+  height: number | null;
 }
 
 export type MonitorBucket = 'FIX' | 'OK' | 'CREATE' | 'MANUAL';
@@ -153,6 +158,8 @@ export async function reconcileRecord(prisma: PrismaClient, record: any): Promis
       name: clean(raw.name), type: clean(raw.type), manufacturer: clean(raw.manufacturer),
       serial: clean(raw.serial), port: clean(raw.port),
       year: typeof raw.year === 'number' ? raw.year : null,
+      width: typeof raw.width === 'number' ? raw.width : null,
+      height: typeof raw.height === 'number' ? raw.height : null,
     };
     // Built-in laptop panels are part of the machine, never their own asset.
     if (mon.type !== 'External') continue;

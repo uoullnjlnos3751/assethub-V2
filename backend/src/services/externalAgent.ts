@@ -240,5 +240,64 @@ export async function fillBlanksFromAgent(
     details.push({ assetId: match.asset.id, assetCode: match.asset.assetCode, fields: blanks.map((b) => b.label) });
   }
 
+  const monitors = await fillMonitorBlanksFromAgent(prisma, records);
+  fieldsFilled += monitors.fieldsFilled;
+  details.push(...monitors.details);
+
   return { assetsUpdated: details.length, fieldsFilled, details };
+}
+
+/**
+ * เติมความละเอียดจอที่ยังว่าง จากสิ่งที่ Agent อ่านได้
+ *
+ * Agent ส่ง width/height ของจอมาด้วย (หน่วยเป็นพิกเซล) แต่โค้ดเดิมไม่เคยอ่าน —
+ * `AgentMonitor` ไม่ได้ประกาศสองช่องนี้ไว้เลย ทั้งที่ในทะเบียนมีจอเพียง 27 จาก
+ * 243 ตัวที่บันทึกความละเอียดไว้
+ *
+ * เติมเฉพาะช่องที่ว่าง ไม่แตะของเดิม ตามกฎเดียวกับการเติมสเปคเครื่อง — และ
+ * ไม่แตะ `ports` เพราะ port ของ Agent คือ "ช่องที่เสียบอยู่ตอนนี้" คนละความหมาย
+ * กับ `ports` ที่หมายถึงช่องที่ตัวจอมีทั้งหมด (ข้อมูลจาก GLPI)
+ */
+async function fillMonitorBlanksFromAgent(
+  prisma: PrismaClient,
+  records: { hostname: string }[],
+): Promise<{ fieldsFilled: number; details: { assetId: number; assetCode: string | null; fields: string[] }[] }> {
+  const bySerial = new Map<string, string>();
+  for (const summary of records) {
+    const record: any = await fetchAgentRecord(summary.hostname);
+    for (const m of (record?.monitors || [])) {
+      const serial = String(m?.serial ?? '').trim();
+      const w = Number(m?.width), h = Number(m?.height);
+      if (!serial || !(w > 0) || !(h > 0)) continue;
+      bySerial.set(serial, `${w}x${h}`);
+    }
+  }
+
+  const details: { assetId: number; assetCode: string | null; fields: string[] }[] = [];
+  let fieldsFilled = 0;
+  for (const [serial, resolution] of bySerial) {
+    const asset = await prisma.asset.findFirst({
+      where: { OR: [{ serialNo: serial }, { computerDetail: { snComputer: serial } }] },
+      select: { id: true, assetCode: true, monitorDetail: { select: { resolution: true } } },
+    });
+    // ว่างเท่านั้นถึงเติม ถ้ามีค่าอยู่แล้ว (แม้จะต่างกัน) ปล่อยให้คนตัดสิน
+    if (!asset || asset.monitorDetail?.resolution) continue;
+
+    await prisma.monitorDetail.upsert({
+      where: { assetId: asset.id },
+      create: { assetId: asset.id, resolution },
+      update: { resolution },
+    });
+    await prisma.assetHistory.create({
+      data: {
+        assetId: asset.id,
+        actionType: 'AGENT_SYNC',
+        actorUserId: null,
+        note: `เติมข้อมูลที่ว่างจากระบบ Agent: ความละเอียดจอ (${resolution})`,
+      },
+    });
+    fieldsFilled++;
+    details.push({ assetId: asset.id, assetCode: asset.assetCode, fields: ['ความละเอียดจอ'] });
+  }
+  return { fieldsFilled, details };
 }
