@@ -9,6 +9,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import { disposalAPI, assetAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { PageHeader } from '../../components/PageHeader';
 
 const METHODS = ['DONATE', 'SELL', 'DESTROY', 'RETURN', 'TRANSFER'];
 const METHOD_LABELS: Record<string, string> = {
@@ -91,12 +92,10 @@ export default function DisposalsPage() {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 2 }}>
-        <Box>
-          <Typography variant="h5" fontWeight={700}>จำหน่ายทรัพย์สินออก</Typography>
-          <Typography variant="body2" color="text.secondary">บันทึกการจำหน่ายทรัพย์สินออกจากระบบ (บริจาค / ขาย / ทำลาย / คืน Vendor / โอนย้าย)</Typography>
-        </Box>
-        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+      <PageHeader
+        title="จำหน่ายทรัพย์สินออก"
+        subtitle="บันทึกการจำหน่ายทรัพย์สินออกจากระบบ (บริจาค / ขาย / ทำลาย / คืน Vendor / โอนย้าย)"
+        actions={<>
           <TextField
             select size="small" label="ตัวกรองวิธีจำหน่าย" value={methodFilter}
             onChange={e => setMethodFilter(e.target.value)} sx={{ minWidth: 160 }}
@@ -105,8 +104,8 @@ export default function DisposalsPage() {
             {METHODS.map(m => <MenuItem key={m} value={m}>{METHOD_LABELS[m]}</MenuItem>)}
           </TextField>
           <Button variant="contained" startIcon={<AddIcon />} onClick={openNew}>บันทึกการจำหน่าย</Button>
-        </Box>
-      </Box>
+        </>}
+      />
 
       <Card sx={{ borderRadius: 2, overflow: 'hidden' }}>
         <Table size="small">

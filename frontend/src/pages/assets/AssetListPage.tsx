@@ -82,6 +82,7 @@ import {
   DENSITY_KEY,
 } from './assetListConfig';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { PageHeader } from '../../components/PageHeader';
 
 export default function AssetListPage() {
   const { user } = useAuth();
@@ -433,31 +434,11 @@ export default function AssetListPage() {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3, gap: 2, flexWrap: 'wrap' }}>
-        <Box>
-          <Typography variant="h4" fontWeight={800} sx={{ letterSpacing: '-0.02em', mb: 0.5 }}>
-            {isAvailableOnlyView ? 'รายการอุปกรณ์พร้อมยืม' : typeGroupLabels[typeGroup] || 'ทะเบียนทรัพย์สิน'}
-          </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="body2" color="text.secondary" fontWeight={500}>
-              {isAvailableOnlyView ? 'เลือกอุปกรณ์ที่ต้องการยืมเพื่อส่งคำขอ' : `จัดการและติดตามทรัพย์สินทั้งหมดในระบบ`}
-            </Typography>
-            {!isAvailableOnlyView && (
-              <Chip
-                label={`${total} รายการ`}
-                size="small"
-                sx={{
-                  height: 20,
-                  fontSize: '0.7rem',
-                  fontWeight: 700,
-                  bgcolor: alpha(theme.palette.primary.main, 0.1),
-                  color: theme.palette.primary.main
-                }}
-              />
-            )}
-          </Box>
-        </Box>
-        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: isMobile ? 1 : 0, width: isMobile ? '100%' : 'auto' }}>
+      <PageHeader
+        title={isAvailableOnlyView ? 'รายการอุปกรณ์พร้อมยืม' : typeGroupLabels[typeGroup] || 'ทะเบียนทรัพย์สิน'}
+        subtitle={isAvailableOnlyView ? 'เลือกอุปกรณ์ที่ต้องการยืมเพื่อส่งคำขอ' : 'จัดการและติดตามทรัพย์สินทั้งหมดในระบบ'}
+        count={isAvailableOnlyView ? undefined : total}
+        actions={<Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: isMobile ? 1 : 0, width: isMobile ? '100%' : 'auto' }}>
           {isAdmin && (
             <IconButton aria-label="ตั้งค่า"
               onClick={(e) => handleMenuOpen(e, { isHeaderMenu: true })}
@@ -502,8 +483,8 @@ export default function AssetListPage() {
               เพิ่มทรัพย์สินใหม่
             </Button>
           )}
-        </Box>
-      </Box>
+        </Box>}
+      />
 
       <AssetKpiStrip
         isAvailableOnlyView={isAvailableOnlyView}

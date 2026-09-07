@@ -11,6 +11,7 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { contractAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { PageHeader } from '../../components/PageHeader';
 
 const CONTRACT_TYPES = ['WARRANTY', 'MA', 'LEASE', 'INSURANCE', 'SUPPORT'];
 const TYPE_LABELS: Record<string, string> = {
@@ -87,12 +88,10 @@ export default function ContractsPage() {
   return (
     <Box>
       {/* Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 2 }}>
-        <Box>
-          <Typography variant="h5" fontWeight={700}>สัญญา & Warranty</Typography>
-          <Typography variant="body2" color="text.secondary">ติดตามสัญญา MA, ประกัน, เช่า และวันหมดอายุ</Typography>
-        </Box>
-        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+      <PageHeader
+        title="สัญญา & Warranty"
+        subtitle="ติดตามสัญญา MA, ประกัน, เช่า และวันหมดอายุ"
+        actions={<>
           <TextField
             select size="small" value={typeFilter} onChange={e => setTypeFilter(e.target.value)}
             label="ประเภท" sx={{ minWidth: 150 }}
@@ -109,8 +108,8 @@ export default function ContractsPage() {
             ใกล้หมดอายุ (90 วัน)
           </Button>
           <Button variant="contained" startIcon={<AddIcon />} onClick={openNew}>เพิ่มสัญญา</Button>
-        </Box>
-      </Box>
+        </>}
+      />
 
       {/* Summary cards */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
