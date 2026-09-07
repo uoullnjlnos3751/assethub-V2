@@ -103,6 +103,56 @@ function planCoversAsset(
   return true;
 }
 
+
+/**
+ * ประเภททรัพย์สินที่ถือว่าเป็นคอมพิวเตอร์ จึงมีสเปคให้ซิงก์
+ *
+ * ของเดิมเช็ค `type === 'Computer'` ตรง ๆ ซึ่งไม่มีทรัพย์สินสักชิ้นในระบบเป็น
+ * ค่านี้ (ของจริงคือ Notebook / PC Desktop / Macbook) บล็อกซิงก์สเปคจึงไม่เคย
+ * ทำงานเลยแม้แต่ครั้งเดียวนับตั้งแต่เขียนมา
+ */
+const COMPUTER_TYPES = ['notebook', 'pc desktop', 'desktop', 'macbook', 'computer', 'server', 'all in one'];
+const isComputerType = (type?: string | null) =>
+  !!type && COMPUTER_TYPES.includes(type.trim().toLowerCase());
+
+/**
+ * ช่องในเช็คลิสต์ -> ช่องใน ComputerDetail
+ *
+ * `fromNote` บอกว่าค่าที่ต้องการอยู่ครึ่งหลังของ "คำตอบ::หมายเหตุ" ไม่ใช่ครึ่งแรก
+ * — ข้อพวกนี้เป็นช่องติ๊กถูก/ผิด ส่วนสเปคจริงที่ดึงมาจาก GLPI/Agent ถูกเก็บไว้
+ * ในหมายเหตุ (ดู applyGLPISpecToAnswers ฝั่งหน้าเว็บ) ของเดิมหยิบครึ่งแรกเสมอ
+ * ซึ่งถ้าเงื่อนไขประเภทผ่าน จะได้คำว่า "yes" ไปเขียนทับเวอร์ชัน Windows
+ */
+const SPEC_FIELD_BY_KEY: Record<string, { field: string; fromNote?: boolean; licenseField?: string }> = {
+  cpu: { field: 'cpu' },
+  ram: { field: 'ram' },
+  storage: { field: 'storage1' },
+  computer_name: { field: 'domainName' },
+  os: { field: 'osVersion' },
+  // หมายเหตุของสองข้อนี้มีรูป "<ชื่อ/เวอร์ชัน> — <สถานะสิทธิ์>" (สร้างที่เดียวใน
+  // agentPmCheck.ts) แยกเก็บคนละช่องได้ ช่องเวอร์ชันจะได้ไม่ปนสถานะ activate
+  windows_version: { field: 'osVersion', fromNote: true, licenseField: 'windowsLicense' },
+  office_check: { field: 'officeLicense', fromNote: true },
+  antivirus: { field: 'antivirusStatus', fromNote: true },
+};
+
+const specValue = (raw: string, fromNote?: boolean) => {
+  const [answer, note] = raw.split('::');
+  return (fromNote ? note : answer)?.trim() || '';
+};
+
+/** แยก "เวอร์ชัน — สถานะสิทธิ์" ถ้าไม่มีตัวคั่นให้ถือว่าทั้งก้อนคือเวอร์ชัน */
+const splitLicense = (v: string): [string, string] => {
+  const i = v.indexOf(' — ');
+  return i < 0 ? [v, ''] : [v.slice(0, i).trim(), v.slice(i + 3).trim()];
+};
+
+/** เที่ยงคืนของวันนี้ตามเวลาไทย — วันนัดเก็บเป็นวัน ไม่ใช่เวลานาที */
+function bangkokMidnight(d: Date): Date {
+  const ymd = d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+  return new Date(`${ymd}T00:00:00+07:00`);
+}
+
 async function getPMEligibility(client: any, plan: { year: number; company?: string | null; site?: string | null; deptTask?: string | null; deviceType?: string | null; plannedDeviceCount?: number | string | null }) {
   const scopedAssets = await client.asset.findMany({
     where: buildPMAssetWhere(plan),
@@ -830,7 +880,7 @@ async function processDeviceAnswers(tx: any, run: any, answers: any[], oldAnswer
                           assetId: newAsset.id,
                           screenSize: dev.screenSize || null,
                           ports: dev.ports || null,
-                          hasSpeaker: !!dev.hasSpeaker,
+                          hasSpeaker: dev.hasSpeaker !== undefined ? !!dev.hasSpeaker : null,
                         }
                       });
                     }
@@ -873,19 +923,24 @@ async function processDeviceAnswers(tx: any, run: any, answers: any[], oldAnswer
 
                   // Upsert MonitorDetail if specs are present
                   if (!isPrinter && (dev.screenSize || dev.ports || dev.hasSpeaker !== undefined)) {
+                    /* เขียนเฉพาะช่องที่คราวนี้มีค่ามาจริง
+                       ของเดิมยัด `|| null` ทุกช่อง การบันทึก PM ที่ช่างกรอกแค่
+                       ขนาดจอจึงลบพอร์ตที่เคยบันทึกไว้ทิ้ง — เป็นเหตุผลที่จอ 194
+                       ตัวมีแถวรายละเอียด แต่เหลือสเปคจริงแค่ 52 ตัว */
+                    const monitorPatch: Record<string, string | boolean> = {};
+                    if (dev.screenSize) monitorPatch.screenSize = dev.screenSize;
+                    if (dev.ports) monitorPatch.ports = dev.ports;
+                    if (dev.hasSpeaker !== undefined) monitorPatch.hasSpeaker = !!dev.hasSpeaker;
+
                     await tx.monitorDetail.upsert({
                       where: { assetId: existingAsset.id },
                       create: {
                         assetId: existingAsset.id,
                         screenSize: dev.screenSize || null,
                         ports: dev.ports || null,
-                        hasSpeaker: !!dev.hasSpeaker,
+                        hasSpeaker: dev.hasSpeaker !== undefined ? !!dev.hasSpeaker : null,
                       },
-                      update: {
-                        screenSize: dev.screenSize || null,
-                        ports: dev.ports || null,
-                        hasSpeaker: !!dev.hasSpeaker,
-                      }
+                      update: monitorPatch
                     });
                   }
 
@@ -1016,18 +1071,24 @@ router.post('/runs/:id/perform', authenticate, authorize('IT_ADMIN', 'SUPERADMIN
         });
       }
 
-      // Auto-Sync PC Specs
-      if (run.assetId && run.asset?.type === 'Computer') {
-        const specUpdates: any = {};
+      // ── เขียนสเปคที่ตรวจได้กลับไปที่ทะเบียนทรัพย์สิน ──
+      if (run.assetId && isComputerType(run.asset?.type)) {
+        const specUpdates: Record<string, string> = {};
         for (const ans of cleanAnswers) {
           const itemDef = run.plan.template.templateItems.find((i) => i.id === Number(ans.itemId));
           if (!itemDef || !ans.value) continue;
-          const v = ans.value.split('::')[0];
-          if (itemDef.key === 'cpu') specUpdates.cpu = v;
-          else if (itemDef.key === 'ram') specUpdates.ram = v;
-          else if (itemDef.key === 'storage') specUpdates.storage1 = v;
-          else if (itemDef.key === 'windows_version' || itemDef.key === 'os') specUpdates.osVersion = v;
-          else if (itemDef.key === 'computer_name') specUpdates.domainName = v;
+          const target = SPEC_FIELD_BY_KEY[itemDef.key];
+          if (!target) continue;
+          const v = specValue(String(ans.value), target.fromNote);
+          // ไม่เขียนค่าว่างทับของเดิม — ช่างที่ข้ามข้อนั้นไม่ควรลบข้อมูลที่มีอยู่
+          if (!v) continue;
+          if (target.licenseField) {
+            const [ver, lic] = splitLicense(v);
+            if (ver) specUpdates[target.field] = ver;
+            if (lic) specUpdates[target.licenseField] = lic;
+          } else {
+            specUpdates[target.field] = v;
+          }
         }
 
         if (Object.keys(specUpdates).length > 0) {
@@ -1039,6 +1100,13 @@ router.post('/runs/:id/perform', authenticate, authorize('IT_ADMIN', 'SUPERADMIN
         }
       }
 
+      /* วันนัดของงานที่ทำเสร็จโดยไม่เคยถูกจอง — ลงวันที่ทำจริงให้
+         หน้ากำหนดการวาดแท่งได้ตรงกับสิ่งที่เกิดขึ้นจริง ไม่ใช่กางเต็มกรอบแผน
+         ถ้าเคยจองวันไว้แล้วไม่แตะ เพราะต้องเหลือไว้เทียบว่าทำตรงนัดหรือไม่ */
+      const scheduledPatch = (nextStatus === 'COMPLETED' && !run.scheduledDate)
+        ? { scheduledDate: bangkokMidnight(new Date()) }
+        : {};
+
       await tx.pMRun.update({
         where: { id: runId },
         data: {
@@ -1046,6 +1114,7 @@ router.post('/runs/:id/perform', authenticate, authorize('IT_ADMIN', 'SUPERADMIN
           performedBy: req.user!.userId,
           performedAt: run.performedAt || new Date(),
           completedAt: nextStatus === 'COMPLETED' ? (run.completedAt || new Date()) : null,
+          ...scheduledPatch,
         },
       });
     });
