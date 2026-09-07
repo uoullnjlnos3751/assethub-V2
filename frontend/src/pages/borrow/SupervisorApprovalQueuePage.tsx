@@ -9,6 +9,8 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import { borrowAPI } from '../../services/api';
 import { formatDate } from '../../utils/dateUtils';
+import SearchIcon from '@mui/icons-material/Search';
+import EmptyState from '../../components/EmptyState';
 
 interface Request {
   id: number;
@@ -37,6 +39,16 @@ export default function SupervisorApprovalQueuePage() {
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [search, setSearch] = useState('');
+
+  /* คิวนี้ยาวได้ไม่จำกัด (ดึงมา 200 รายการในครั้งเดียว) แต่เดิมไม่มีทางหา
+     คำขอใบใดใบหนึ่งนอกจากเลื่อนดู — กรองในหน้าเว็บได้เลยเพราะข้อมูลอยู่ครบแล้ว */
+  const filtered = requests.filter(r => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return [r.requestNo, r.requester?.displayName, r.requester?.adUsername, r.purpose]
+      .some(v => (v || '').toLowerCase().includes(q));
+  });
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -95,12 +107,27 @@ export default function SupervisorApprovalQueuePage() {
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
       {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
 
+      <TextField
+        size="small"
+        fullWidth
+        placeholder="ค้นหาเลขที่คำขอ ผู้ขอ หรือวัตถุประสงค์..."
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+        InputProps={{ startAdornment: <SearchIcon sx={{ fontSize: 18, mr: 1, opacity: 0.5 }} /> }}
+        sx={{ mb: 2, maxWidth: 420 }}
+      />
+
       {isMobile ? (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {requests.length === 0 ? (
-            <Typography color="text.secondary" align="center" sx={{ py: 4 }}>ไม่มีคำขอรอการอนุมัติ</Typography>
+          {filtered.length === 0 ? (
+            <EmptyState
+              filtered={!!search.trim()}
+              onClearFilter={() => setSearch('')}
+              title={search.trim() ? undefined : 'ไม่มีคำขอรอการอนุมัติ'}
+              description={search.trim() ? undefined : 'เมื่อลูกทีมส่งคำขอยืม รายการจะมาแสดงที่นี่'}
+            />
           ) : (
-            requests.map((request) => (
+            filtered.map((request) => (
               <Card key={request.id} sx={{ borderRadius: 3 }}>
                 <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
@@ -137,14 +164,19 @@ export default function SupervisorApprovalQueuePage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {requests.length === 0 ? (
+                {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                      <Typography color="text.secondary">ไม่มีคำขอรอการอนุมัติ</Typography>
+                    <TableCell colSpan={6} sx={{ border: 0 }}>
+                      <EmptyState
+                        filtered={!!search.trim()}
+                        onClearFilter={() => setSearch('')}
+                        title={search.trim() ? undefined : 'ไม่มีคำขอรอการอนุมัติ'}
+                        description={search.trim() ? undefined : 'เมื่อลูกทีมส่งคำขอยืม รายการจะมาแสดงที่นี่'}
+                      />
                     </TableCell>
                   </TableRow>
                 ) : (
-                  requests.map((request) => (
+                  filtered.map((request) => (
                     <TableRow key={request.id} hover>
                       <TableCell sx={{ fontWeight: 600 }}>{request.requestNo}</TableCell>
                       <TableCell>{request.requester?.displayName || request.requester?.adUsername}</TableCell>

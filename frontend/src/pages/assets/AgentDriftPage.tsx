@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import {
   Box, Card, Typography, Button, Chip, CircularProgress, Alert, Snackbar,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Accordion, AccordionSummary, AccordionDetails, alpha, useTheme,
+  Accordion, AccordionSummary, AccordionDetails, TextField, alpha, useTheme,
 } from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { RadioTower, Wand2, TriangleAlert, Monitor as MonitorIcon } from 'lucide-react';
@@ -12,6 +13,7 @@ import { assetAPI } from '../../services/api';
 import { SectionCard } from '../../components/SectionCard';
 import { MonitorCard, MonitorLinkList, MonitorRow, bucketColors } from './components/MonitorReconcile';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import EmptyState from '../../components/EmptyState';
 
 interface DriftField { field: string; label: string; value?: string; current?: string; incoming?: string }
 interface Machine {
@@ -41,6 +43,16 @@ export default function AgentDriftPage() {
   const [available, setAvailable] = useState(true);
   const [machines, setMachines] = useState<Machine[]>([]);
   const [unmatched, setUnmatched] = useState<Unmatched[]>([]);
+  const [unmatchedQuery, setUnmatchedQuery] = useState('');
+
+  /* รายการนี้ยาวตามจำนวนเครื่องที่ Agent เห็นแต่ยังไม่มีในทะเบียน หาเครื่อง
+     เดียวจากรายชื่อทั้ง fleet โดยไม่มีช่องค้นหาแทบเป็นไปไม่ได้ */
+  const unmatchedShown = unmatched.filter(u => {
+    const q = unmatchedQuery.trim().toLowerCase();
+    if (!q) return true;
+    return [u.hostname, u.brand, u.model, u.serialNo, u.loggedUser]
+      .some(v => (v || '').toLowerCase().includes(q));
+  });
   const [totals, setTotals] = useState<{ machines: number; blanks: number; conflicts: number } | null>(null);
   const [toast, setToast] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({ open: false, message: '', severity: 'success' });
 
@@ -308,6 +320,15 @@ export default function AgentDriftPage() {
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.25 }}>
                   จับคู่ไม่ได้ทั้งจากชื่อเครื่องและ Serial — อาจเป็นเครื่องใหม่ที่ยังไม่ได้ลงทะเบียน หรือเป็นเครื่องเสมือน
                 </Typography>
+                <TextField
+                  size="small"
+                  fullWidth
+                  placeholder="ค้นหาชื่อเครื่อง ยี่ห้อ Serial หรือผู้ใช้..."
+                  value={unmatchedQuery}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUnmatchedQuery(e.target.value)}
+                  InputProps={{ startAdornment: <SearchIcon sx={{ fontSize: 18, mr: 1, opacity: 0.5 }} /> }}
+                  sx={{ mb: 1.5, maxWidth: 420 }}
+                />
                 <TableContainer>
                   <Table size="small">
                     <TableHead><TableRow>
@@ -318,7 +339,14 @@ export default function AgentDriftPage() {
                       <TableCell />
                     </TableRow></TableHead>
                     <TableBody>
-                      {unmatched.map((u) => (
+                      {unmatchedShown.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={5} sx={{ border: 0 }}>
+                            <EmptyState filtered onClearFilter={() => setUnmatchedQuery('')} />
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {unmatchedShown.map((u) => (
                         <TableRow key={u.hostname} hover>
                           <TableCell sx={{ fontSize: '0.78rem', fontWeight: 600 }}>{u.hostname}</TableCell>
                           <TableCell sx={{ fontSize: '0.78rem' }}>{[u.brand, u.model].filter(Boolean).join(' ') || '—'}</TableCell>
