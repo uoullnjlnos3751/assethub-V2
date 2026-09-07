@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Typography, Chip, LinearProgress, alpha, useTheme, Theme } from '@mui/material';
-import { BatteryCharging, Radio } from 'lucide-react';
+import { BatteryCharging, Radio, ShieldCheck, ShieldAlert, TriangleAlert } from 'lucide-react';
 import { SectionCard } from '../../../components/SectionCard';
 
 interface ExternalAgentData {
@@ -70,6 +70,49 @@ const fmtLastSeen = (iso?: string) => {
   return `${d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })} ${d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.`;
 };
 
+type HealthLevel = 'ok' | 'warn' | 'critical';
+
+/** Rolls every signal the agent reports into one verdict — this is the thing
+ * a person scanning the sidebar should see before any individual meter,
+ * so it renders first, above the online/offline chip. */
+function assessHealth(agent: ExternalAgentData): { level: HealthLevel; reasons: string[] } {
+  const reasons: string[] = [];
+  let level: HealthLevel = 'ok';
+  const bump = (next: HealthLevel) => { if (next === 'critical' || level === 'ok') level = next; };
+
+  const isOnline = agent.online ?? agent.status === 'online';
+  if (!isOnline) { reasons.push('เครื่องออฟไลน์'); bump('warn'); }
+
+  if (agent.battery_charge_pct != null && agent.battery_charge_pct <= 15) {
+    reasons.push('แบตเตอรี่เหลือน้อย'); bump('critical');
+  } else if (agent.battery_health_pct != null && agent.battery_health_pct < 60) {
+    reasons.push('สุขภาพแบตเสื่อม'); bump('warn');
+  }
+
+  if (agent.tm_installed === 0) {
+    reasons.push('ไม่พบ Antivirus'); bump('critical');
+  } else if (agent.tm_realtime_scan && !/enable/i.test(agent.tm_realtime_scan)) {
+    reasons.push('Antivirus ปิดการสแกนเรียลไทม์'); bump('critical');
+  }
+
+  if (agent.cpu_load_pct != null && agent.cpu_load_pct >= 90) { reasons.push('CPU ทำงานหนัก'); bump('warn'); }
+  if (agent.ram_used_pct != null && agent.ram_used_pct >= 90) { reasons.push('RAM ใกล้เต็ม'); bump('warn'); }
+
+  return { level, reasons };
+}
+
+const HEALTH_META: Record<HealthLevel, { label: string; Icon: typeof ShieldCheck }> = {
+  ok: { label: 'ปกติ', Icon: ShieldCheck },
+  warn: { label: 'ควรตรวจสอบ', Icon: ShieldAlert },
+  critical: { label: 'ต้องดำเนินการ', Icon: TriangleAlert },
+};
+
+function healthColor(theme: Theme, level: HealthLevel) {
+  if (level === 'critical') return theme.palette.error.main;
+  if (level === 'warn') return theme.palette.warning.main;
+  return theme.palette.success.main;
+}
+
 /**
  * Live read from the separate external asset-monitoring agent (not this
  * system's own data) — battery, load, AV status. Renders nothing when the
@@ -88,6 +131,31 @@ export function AssetLiveStatusCard({ loading, agent }: { loading?: boolean; age
         <Typography sx={{ fontSize: '0.76rem', color: theme.palette.text.disabled, py: 1.5 }}>กำลังตรวจสอบสถานะ...</Typography>
       ) : agent ? (
         <Box>
+          {(() => {
+            const { level, reasons } = assessHealth(agent);
+            const meta = HEALTH_META[level];
+            const color = healthColor(theme, level);
+            return (
+              <Box sx={{
+                display: 'flex', alignItems: 'flex-start', gap: 1, mb: 1.5, p: 1.1,
+                borderRadius: '10px', bgcolor: alpha(color, theme.palette.mode === 'dark' ? 0.14 : 0.08),
+                border: `1px solid ${alpha(color, 0.3)}`,
+              }}>
+                <meta.Icon size={17} color={color} strokeWidth={2.2} style={{ flexShrink: 0, marginTop: 1 }} />
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography sx={{ fontSize: '0.82rem', fontWeight: 800, color }}>
+                    {meta.label}
+                  </Typography>
+                  {reasons.length > 0 && (
+                    <Typography sx={{ fontSize: '0.7rem', color: theme.palette.text.secondary, mt: '1px' }}>
+                      {reasons.join(' · ')}
+                    </Typography>
+                  )}
+                </Box>
+              </Box>
+            );
+          })()}
+
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
             <Chip
               size="small"

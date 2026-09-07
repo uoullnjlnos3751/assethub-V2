@@ -5,12 +5,16 @@ import { AppError } from '../middleware/errorHandler';
 import { searchADUsers, getAllADCompanies } from '../services/ldap';
 import { AuthService } from '../services/auth.service';
 import { invalidateSettingsCache } from '../services/notification';
+import { promoteOrphanedSupervisorRequests } from '../services/borrowSupervisor';
 import multer from 'multer';
 
 const router = Router();
 
 // Default templates content to restore when requested
 const DEFAULT_TEMPLATES: Record<string, { subjectTh: string, bodyTh: string }> = {
+  borrow_pending_supervisor: { subjectTh: 'มีคำขอยืมรอคุณอนุมัติ', bodyTh: '{{requester}} ส่งคำขอยืมเลขที่ {{requestNo}} รอการอนุมัติจากคุณในฐานะหัวหน้างาน' },
+  borrow_supervisor_approved: { subjectTh: 'คำขอยืมผ่านหัวหน้างานแล้ว รอ IT Admin', bodyTh: 'คำขอเลขที่ {{requestNo}} จาก {{requester}} ผ่านการอนุมัติจากหัวหน้างาน ({{supervisor}}) แล้ว รอ IT Admin ดำเนินการต่อ' },
+  borrow_rejected_by_supervisor: { subjectTh: 'คำขอยืมถูกหัวหน้างานปฏิเสธ', bodyTh: 'คำขอเลขที่ {{requestNo}} ถูกหัวหน้างาน ({{supervisor}}) ปฏิเสธเนื่องจาก {{note}}' },
   borrow_request_pending: { subjectTh: 'คำขอยืมทรัพย์สินใหม่', bodyTh: 'มีคำขอยืมใหม่จาก {{requester}}' },
   borrow_approved: { subjectTh: 'คำขอยืมได้รับการอนุมัติ', bodyTh: 'คำขอเลขที่ {{requestNo}} ได้รับการอนุมัติแล้ว' },
   borrow_rejected: { subjectTh: 'คำขอยืมถูกปฏิเสธ', bodyTh: 'คำขอเลขที่ {{requestNo}} ได้ถูกปฏิเสธเนื่องจาก {{note}}' },
@@ -87,7 +91,7 @@ router.get('/users', authenticate, authorize('SUPERADMIN'), async (req: Request,
         skip: (pageNum - 1) * limitNum,
         take: limitNum,
         orderBy: { createdAt: 'desc' },
-        select: { id: true, adUsername: true, displayName: true, email: true, department: true, company: true, companyThai: true, avatarUrl: true, role: true, isActive: true, authType: true, lastLoginAt: true, createdAt: true },
+        select: { id: true, adUsername: true, displayName: true, email: true, department: true, company: true, companyThai: true, avatarUrl: true, role: true, isActive: true, authType: true, lastLoginAt: true, createdAt: true, managerId: true, manager: { select: { id: true, displayName: true, adUsername: true } } },
       }),
       prisma.appUser.count({ where }),
     ]);
@@ -115,6 +119,55 @@ router.put('/users/:id/role', authenticate, authorize('SUPERADMIN'), async (req:
   } catch (err) { next(err); }
 });
 
+// หัวหน้างานโดยตรง — ใช้กำหนดว่าใครต้องอนุมัติคำขอยืมของผู้ใช้นี้ก่อนถึง IT Admin
+router.put('/users/:id/manager', authenticate, authorize('SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { managerId } = req.body;
+
+    const user = await prisma.appUser.findUnique({ where: { id } });
+    if (!user) throw new AppError('ไม่พบผู้ใช้', 404);
+
+    if (managerId === null || managerId === undefined || managerId === '') {
+      await prisma.appUser.update({ where: { id }, data: { managerId: null } });
+      // ไม่มีหัวหน้างานแล้ว -> คำขอที่ยังค้างรอหัวหน้างานเดิมอนุมัติ ไม่มีใครเห็นอีก
+      // ต่อไป (คิวหัวหน้างานกรองด้วย managerId ปัจจุบันเท่านั้น) ส่งต่อให้ IT Admin
+      // ตรงเลย เหมือนกับที่คำขอใหม่ทำเมื่อไม่มีหัวหน้างานผูกไว้ตั้งแต่แรก
+      await promoteOrphanedSupervisorRequests(prisma, [id], req.user!.userId, 'หัวหน้างานถูกยกเลิกการผูก');
+      return res.json({ message: 'ยกเลิกการผูกหัวหน้างานเรียบร้อย' });
+    }
+
+    const managerIdNum = parseInt(managerId, 10);
+    if (!Number.isInteger(managerIdNum)) throw new AppError('รหัสหัวหน้างานไม่ถูกต้อง', 400);
+    if (managerIdNum === id) throw new AppError('ไม่สามารถตั้งตัวเองเป็นหัวหน้างานของตัวเองได้');
+
+    const manager = await prisma.appUser.findUnique({ where: { id: managerIdNum } });
+    if (!manager) throw new AppError('ไม่พบผู้ใช้ที่ต้องการตั้งเป็นหัวหน้างาน', 404);
+    if (!manager.isActive) throw new AppError('ไม่สามารถตั้งผู้ใช้ที่ปิดใช้งานอยู่เป็นหัวหน้างานได้', 400);
+
+    // กันวนเป็นวง: ห้ามตั้งลูกทีมของ user นี้ (ไม่ว่าจะกี่ชั้น) มาเป็นหัวหน้างานของ
+    // user นี้ — เช็กและเขียนอยู่ใน transaction เดียวกันเพื่อปิดช่องที่คำขอสอง
+    // อันจะผ่านการเช็กพร้อมกันแล้วเขียนสวนทางกันจนเกิดวงจริงในฐานข้อมูล และเดิน
+    // สายบังคับบัญชาด้วย visited-set แทน "เดินจนกว่าจะเจอ null" เพราะถ้ามีวง
+    // ตกค้างอยู่ในข้อมูลอยู่ก่อนแล้ว (เช่นจาก race เดิมก่อนจะมี transaction นี้)
+    // การเดินแบบเดิมจะไม่จบเลย
+    await prisma.$transaction(async (tx) => {
+      const fresh = await tx.appUser.findUnique({ where: { id: managerIdNum }, select: { managerId: true } });
+      let cursor: number | null = fresh?.managerId ?? null;
+      const visited = new Set<number>([id]);
+      while (cursor !== null) {
+        if (cursor === id) throw new AppError('ไม่สามารถตั้งค่านี้ได้ เนื่องจากจะทำให้เกิดสายบังคับบัญชาแบบวนลูป');
+        if (visited.has(cursor)) break; // วงเดิมที่ไม่เกี่ยวกับ id นี้ — ไม่ใช่สิ่งที่ต้องบล็อก แค่หยุดเดิน
+        visited.add(cursor);
+        const next = await tx.appUser.findUnique({ where: { id: cursor }, select: { managerId: true } });
+        cursor = next?.managerId ?? null;
+      }
+      await tx.appUser.update({ where: { id }, data: { managerId: managerIdNum } });
+    });
+    res.json({ message: `ตั้งหัวหน้างานของ ${user.displayName || user.adUsername} เป็น ${manager.displayName || manager.adUsername} เรียบร้อย` });
+  } catch (err) { next(err); }
+});
+
 router.put('/users/:id/toggle-active', authenticate, authorize('SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
@@ -125,6 +178,17 @@ router.put('/users/:id/toggle-active', authenticate, authorize('SUPERADMIN'), as
       where: { id },
       data: { isActive: !user.isActive },
     });
+
+    // ปิดใช้งาน = ล็อกอินไม่ได้อีก (auth.service.ts บล็อก isActive:false) — ลูกทีม
+    // ที่มีคำขอยืมค้างรอคนนี้อนุมัติจะติดอยู่ที่คิวหัวหน้างานตลอดไปถ้าไม่ส่งต่อให้
+    // IT Admin ตรง เหมือนตอนยกเลิกการผูกหัวหน้างาน (ด้านบน)
+    if (!updated.isActive) {
+      const reports = await prisma.appUser.findMany({ where: { managerId: id }, select: { id: true } });
+      await promoteOrphanedSupervisorRequests(
+        prisma, reports.map((r) => r.id), req.user!.userId, 'หัวหน้างานถูกปิดใช้งาน',
+      );
+    }
+
     res.json({ message: `ผู้ใช้${updated.isActive ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}เรียบร้อย`, isActive: updated.isActive });
   } catch (err) { next(err); }
 });
@@ -138,6 +202,14 @@ router.delete('/users/:id', authenticate, authorize('SUPERADMIN'), async (req: R
     if (user.id === req.user!.userId) {
       throw new AppError('ไม่สามารถลบผู้ใช้งานที่กำลังล็อกอินอยู่ได้');
     }
+
+    // managerId เป็น ON DELETE SET NULL — ลบคนที่เป็นหัวหน้างานของใครอยู่ จะทำให้
+    // คำขอยืมที่ค้างรอคนนั้นอนุมัติหลุดจากทุกคิวเงียบๆ (คิวหัวหน้างานอ่าน managerId
+    // ปัจจุบัน, คิว IT Admin อ่านแค่ status:'Pending') ส่งต่อให้ IT Admin ก่อนลบจริง
+    const reports = await prisma.appUser.findMany({ where: { managerId: id }, select: { id: true } });
+    await promoteOrphanedSupervisorRequests(
+      prisma, reports.map((r) => r.id), req.user!.userId, 'หัวหน้างานถูกลบออกจากระบบ',
+    );
 
     await prisma.appUser.delete({ where: { id } });
     res.json({ message: 'ลบผู้ใช้งานเรียบร้อย' });
@@ -184,7 +256,7 @@ router.get('/users/:id', authenticate, authorize('SUPERADMIN'), async (req: Requ
     const id = parseInt(req.params.id);
     const user = await prisma.appUser.findUnique({
       where: { id },
-      select: { id: true, adUsername: true, displayName: true, email: true, department: true, role: true, isActive: true, authType: true, lastLoginAt: true, createdAt: true },
+      select: { id: true, adUsername: true, displayName: true, email: true, department: true, role: true, isActive: true, authType: true, lastLoginAt: true, createdAt: true, managerId: true, manager: { select: { id: true, displayName: true, adUsername: true } } },
     });
     if (!user) throw new AppError('ไม่พบผู้ใช้', 404);
     res.json(user);

@@ -10,6 +10,8 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { licenseAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
+import { PageHeader } from '../../components/PageHeader';
 
 const LICENSE_TYPES = ['PERPETUAL', 'SUBSCRIPTION', 'OEM', 'VOLUME'];
 const TYPE_LABELS: Record<string, string> = {
@@ -88,8 +90,9 @@ export default function LicensesPage() {
     load();
   };
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('ลบ License นี้?')) return;
+  const confirm = useConfirm();
+  const handleDelete = async (id: number, label?: string) => {
+    if (!await confirm({ title: 'ลบ License', target: label })) return;
     await licenseAPI.delete(id);
     load();
   };
@@ -101,12 +104,10 @@ export default function LicensesPage() {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 2 }}>
-        <Box>
-          <Typography variant="h5" fontWeight={700}>Software License</Typography>
-          <Typography variant="body2" color="text.secondary">จัดการสิทธิ์การใช้งานซอฟต์แวร์และจำนวน seat</Typography>
-        </Box>
-        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+      <PageHeader
+        title="Software License"
+        subtitle="จัดการสิทธิ์การใช้งานซอฟต์แวร์และจำนวน seat"
+        actions={<>
           <Button
             variant={expiringSoon ? 'contained' : 'outlined'}
             color="warning" size="small"
@@ -116,8 +117,8 @@ export default function LicensesPage() {
             ใกล้หมดอายุ
           </Button>
           <Button variant="contained" startIcon={<AddIcon />} onClick={openNew}>เพิ่ม License</Button>
-        </Box>
-      </Box>
+        </>}
+      />
 
       {/* Summary */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
@@ -170,9 +171,9 @@ export default function LicensesPage() {
                     }
                   </TableCell>
                   <TableCell>
-                    <Tooltip title="แก้ไข"><IconButton size="small" onClick={() => openEdit(l)}><EditIcon fontSize="small" /></IconButton></Tooltip>
+                    <Tooltip title="แก้ไข"><IconButton aria-label="แก้ไข" size="small" onClick={() => openEdit(l)}><EditIcon fontSize="small" /></IconButton></Tooltip>
                     {isSuperAdmin && (
-                      <Tooltip title="ลบ"><IconButton size="small" color="error" onClick={() => handleDelete(l.id)}><DeleteIcon fontSize="small" /></IconButton></Tooltip>
+                      <Tooltip title="ลบ"><IconButton aria-label="ลบ" size="small" color="error" onClick={() => handleDelete(l.id, l.name || l.licenseKey)}><DeleteIcon fontSize="small" /></IconButton></Tooltip>
                     )}
                   </TableCell>
                 </TableRow>

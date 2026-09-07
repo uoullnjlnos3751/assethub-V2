@@ -16,6 +16,7 @@ import { inventoryAPI } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 import LoadingSkeleton from '../../components/LoadingSkeleton';
 import EmptyState from '../../components/EmptyState';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 export default function InventoryPage() {
   const theme = useTheme();
@@ -85,8 +86,9 @@ export default function InventoryPage() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('ต้องการลบรายการนี้ใช่หรือไม่?')) return;
+  const confirm = useConfirm();
+  const handleDelete = async (id: number, label?: string) => {
+    if (!await confirm({ title: 'ลบรายการคลัง', target: label })) return;
     try {
       await inventoryAPI.delete(id);
       toast.success('ลบรายการเรียบร้อย');
@@ -204,22 +206,22 @@ export default function InventoryPage() {
                     <TableCell sx={{ textAlign: 'center' }}>
                       <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
                         <Tooltip title="เพิ่มสต็อก">
-                          <IconButton size="small" color="success" onClick={() => openCheckin(item)}>
+                          <IconButton aria-label="เพิ่มสต็อก" size="small" color="success" onClick={() => openCheckin(item)}>
                             <AddCircleIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="เบิกออก">
-                          <IconButton size="small" color="warning" onClick={() => openCheckout(item)}>
+                          <IconButton aria-label="เบิกออก" size="small" color="warning" onClick={() => openCheckout(item)}>
                             <RemoveCircleIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="แก้ไข">
-                          <IconButton size="small" onClick={() => openEdit(item)}>
+                          <IconButton aria-label="แก้ไข" size="small" onClick={() => openEdit(item)}>
                             <EditIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="ลบ">
-                          <IconButton size="small" color="error" onClick={() => handleDelete(item.id)}>
+                          <IconButton aria-label="ลบ" size="small" color="error" onClick={() => handleDelete(item.id, item.name || item.code)}>
                             <DeleteIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>

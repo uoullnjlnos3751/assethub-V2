@@ -5,6 +5,7 @@ import Layout from './layouts/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
 import LoginPage from './pages/LoginPage';
 import { Chatbot } from './components/Chatbot';
+import { ChatbotProvider } from './contexts/ChatbotContext';
 
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const AssetListPage = lazy(() => import('./pages/assets/AssetListPage'));
@@ -17,6 +18,7 @@ const MyHistoryPage = lazy(() => import('./pages/borrow/MyHistoryPage'));
 const MyExtensionsPage = lazy(() => import('./pages/borrow/MyExtensionsPage'));
 const AllRequestsPage = lazy(() => import('./pages/borrow/AllRequestsPage'));
 const ApprovalQueuePage = lazy(() => import('./pages/borrow/ApprovalQueuePage'));
+const SupervisorApprovalQueuePage = lazy(() => import('./pages/borrow/SupervisorApprovalQueuePage'));
 const CheckoutPage = lazy(() => import('./pages/borrow/CheckoutPage'));
 const ReturnPage = lazy(() => import('./pages/borrow/ReturnPage'));
 const BorrowHistoryPage = lazy(() => import('./pages/borrow/BorrowHistoryPage'));
@@ -57,6 +59,8 @@ const MasterDataManagementPage = lazy(() => import('./pages/admin/MasterDataMana
 const AssetHistoryPage = lazy(() => import('./pages/assets/AssetHistoryPage'));
 const ContractsPage = lazy(() => import('./pages/contracts/ContractsPage'));
 const LicensesPage = lazy(() => import('./pages/licenses/LicensesPage'));
+const CatalogListPage = lazy(() => import('./pages/catalog/CatalogListPage'));
+const CatalogDetailPage = lazy(() => import('./pages/catalog/CatalogDetailPage'));
 const DeliveryPage = lazy(() => import('./pages/delivery/DeliveryPage'));
 const DeliveryConfirmPage = lazy(() => import('./pages/delivery/DeliveryConfirmPage'));
 
@@ -84,6 +88,7 @@ export default function App() {
   if (loading) return null;
 
   return (
+    <ChatbotProvider>
     <Suspense fallback={null}>
       <Routes>
         <Route path="/login" element={user ? <Navigate to={homePathFor(user.role)} /> : <LoginPage />} />
@@ -112,6 +117,8 @@ export default function App() {
           <Route path="borrow/my-items" element={<MyItemsPage />} />
           <Route path="borrow/my-history" element={<MyHistoryPage />} />
           <Route path="borrow/my-extensions" element={<MyExtensionsPage />} />
+          {/* Borrow - Supervisor: no role restriction, any logged-in user can be someone's manager */}
+          <Route path="borrow/supervisor-queue" element={<SupervisorApprovalQueuePage />} />
           {/* Borrow - IT Admin */}
           <Route path="borrow/all-requests" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><AllRequestsPage /></ProtectedRoute>} />
           <Route path="borrow/approval-queue" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><ApprovalQueuePage /></ProtectedRoute>} />
@@ -157,6 +164,11 @@ export default function App() {
           {/* Contracts & Licenses (Phase 3) */}
           <Route path="contracts" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><ContractsPage /></ProtectedRoute>} />
           <Route path="licenses" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><LicensesPage /></ProtectedRoute>} />
+          {/* USER/VIEWER get view-only access (enforced by canEdit inside the pages
+              themselves + the backend's write-route role gates) — unlike licenses/
+              contracts above, this module is meant to reach every logged-in role. */}
+          <Route path="catalog" element={<ProtectedRoute roles={['SUPERADMIN', 'IT_ADMIN', 'USER', 'VIEWER']}><CatalogListPage /></ProtectedRoute>} />
+          <Route path="catalog/:id" element={<ProtectedRoute roles={['SUPERADMIN', 'IT_ADMIN', 'USER', 'VIEWER']}><CatalogDetailPage /></ProtectedRoute>} />
           <Route path="profile" element={<ProfilePage />} />
           {/* Donations */}
           <Route path="donations" element={<ProtectedRoute roles={['IT_ADMIN', 'SUPERADMIN']}><DonationListPage /></ProtectedRoute>} />
@@ -168,5 +180,6 @@ export default function App() {
       </Routes>
       {user && <Chatbot />}
     </Suspense>
+    </ChatbotProvider>
   );
 }

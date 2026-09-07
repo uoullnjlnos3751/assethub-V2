@@ -196,6 +196,12 @@ async function main() {
       { key: 'borrow_approved', channel: 'EMAIL' as const, subjectTh: 'คำขอยืมได้รับการอนุมัติ', bodyTh: 'คำขอเลขที่ {{requestNo}} ได้รับการอนุมัติแล้ว' },
       { key: 'checkout_completed', channel: 'EMAIL' as const, subjectTh: 'ส่งมอบทรัพย์สินเรียบร้อย', bodyTh: 'คำขอเลขที่ {{requestNo}} ได้ส่งมอบแล้ว' },
       { key: 'return_recorded', channel: 'EMAIL' as const, subjectTh: 'คืนทรัพย์สินเรียบร้อย', bodyTh: 'คำขอเลขที่ {{requestNo}} คืนเรียบร้อย' },
+      // Supervisor-approval stage — content matches DEFAULT_TEMPLATES in
+      // routes/admin.ts so a SUPERADMIN's "reset to default" restores the
+      // same text a fresh install seeds.
+      { key: 'borrow_pending_supervisor', channel: 'EMAIL' as const, subjectTh: 'มีคำขอยืมรอคุณอนุมัติ', bodyTh: '{{requester}} ส่งคำขอยืมเลขที่ {{requestNo}} รอการอนุมัติจากคุณในฐานะหัวหน้างาน' },
+      { key: 'borrow_supervisor_approved', channel: 'EMAIL' as const, subjectTh: 'คำขอยืมผ่านหัวหน้างานแล้ว รอ IT Admin', bodyTh: 'คำขอเลขที่ {{requestNo}} จาก {{requester}} ผ่านการอนุมัติจากหัวหน้างาน ({{supervisor}}) แล้ว รอ IT Admin ดำเนินการต่อ' },
+      { key: 'borrow_rejected_by_supervisor', channel: 'EMAIL' as const, subjectTh: 'คำขอยืมถูกหัวหน้างานปฏิเสธ', bodyTh: 'คำขอเลขที่ {{requestNo}} ถูกหัวหน้างาน ({{supervisor}}) ปฏิเสธเนื่องจาก {{note}}' },
     ];
 
     for (const t of templates) {

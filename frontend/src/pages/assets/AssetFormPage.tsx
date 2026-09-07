@@ -26,17 +26,21 @@ import {
   Autocomplete,
   Accordion,
   AccordionSummary,
-  AccordionDetails
+  AccordionDetails,
+  Tooltip
 } from '@mui/material';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
+import ZoomOutMapIcon from '@mui/icons-material/ZoomOutMap';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { assetAPI } from '../../services/api';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
 import LoadingSkeleton from '../../components/LoadingSkeleton';
 import { getTypeIcon, SectionCard, ToggleWrap, getBrandSuggestionsForType } from './components/AssetFormHelpers';
+import { ImageLightbox } from '../../components/ImageLightbox';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 /* ─── Types / Defaults ─────────────────────────────────────────── */
 const initialData = {
@@ -113,6 +117,9 @@ export default function AssetFormPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
   const [imageError, setImageError] = useState('');
+  /* ดูรูปเต็ม — รูปในกรอบย่อสูงราว 200px อ่านเลขทะเบียนบนป้ายไม่ออก ต้องกาง
+     เต็มจอถึงจะรู้ว่าถ่ายติดชัดหรือถ่ายผิดเครื่อง */
+  const [imageZoom, setImageZoom] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Change tracking (for unsaved banner / changelog)
@@ -570,6 +577,23 @@ export default function AssetFormPage() {
     } finally { setLoading(false); }
   };
 
+  /**
+   * ออกจากฟอร์ม ถามก่อนเฉพาะตอนมีของที่ยังไม่ได้บันทึก
+   *
+   * ปุ่มยกเลิกมีสองที่ (หัวและท้ายฟอร์ม) เคยเขียนเงื่อนไขซ้ำกันคนละชุด
+   * รวมมาไว้ที่เดียวจะได้ถามเหมือนกันเสมอ
+   */
+  const confirm = useConfirm();
+
+  const leaveForm = async () => {
+    if (hasChanges && !await confirm({
+      title: 'ออกจากหน้านี้โดยไม่บันทึก',
+      detail: `การแก้ไขที่ค้างอยู่ ${changeCount} รายการจะหายไป`,
+      confirmLabel: 'ออกโดยไม่บันทึก',
+    })) return;
+    navigate(-1);
+  };
+
   /* ─── Image handlers ─── */
   const handleImageUpload = async (file: File) => {
     if (!id) { setImageError('กรุณาบันทึกทรัพย์สินก่อนอัพโหลดรูปภาพ'); return; }
@@ -588,7 +612,13 @@ export default function AssetFormPage() {
 
   const handleImageDelete = async () => {
     if (!id) return;
-    try { await assetAPI.deleteImage(parseInt(id)); setImagePreview(null); if (fileInputRef.current) fileInputRef.current.value = ''; }
+    try {
+      await assetAPI.deleteImage(parseInt(id));
+      setImagePreview(null);
+      // ปิดหน้าดูรูปเต็มด้วย ไม่งั้นจะค้างอยู่กับรูปที่เพิ่งลบไป
+      setImageZoom(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
     catch (err: any) { setImageError(err.response?.data?.error || 'ไม่สามารถลบรูปภาพได้'); }
   };
 
@@ -678,10 +708,7 @@ export default function AssetFormPage() {
                 variant="outlined"
                 color="inherit"
                 size="small"
-                onClick={() => {
-                  if (hasChanges) { if (window.confirm('ยืนยันยกเลิกการแก้ไข? การเปลี่ยนแปลงทั้งหมดจะหายไป')) navigate(-1); }
-                  else navigate(-1);
-                }}
+                onClick={() => { void leaveForm(); }}
                 sx={{ borderRadius: '10px', color: 'text.secondary', borderColor: 'divider', fontWeight: 600 }}
               >
                 ย้อนกลับ
@@ -2355,6 +2382,18 @@ export default function AssetFormPage() {
             </Grid>
           </SectionCard>
 
+          {/* ดูรูปเต็มจอ พร้อมเปลี่ยน/ลบได้จากตรงนี้เลย — จุดประสงค์ของการกาง
+              รูปคือตรวจว่าถ่ายถูกและอ่านออกไหม ถ้าไม่ผ่านก็ต้องแก้ได้ทันที */}
+          <ImageLightbox
+            open={imageZoom}
+            onClose={() => setImageZoom(false)}
+            src={imagePreview}
+            title={`รูปทะเบียนทรัพย์สิน${form.assetCode ? ` · ${form.assetCode}` : ''}`}
+            onReplace={() => fileInputRef.current?.click()}
+            replacing={imageUploading}
+            onDelete={handleImageDelete}
+          />
+
           {/* ⑥ รูปภาพ */}
           <SectionCard title="รูปภาพทะเบียนทรัพย์สิน" barColor={`linear-gradient(180deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`}>
             {imageError && (
@@ -2365,7 +2404,11 @@ export default function AssetFormPage() {
             <Grid container spacing={3}>
               <Grid item xs={12} sm={6}>
                 <Box
-                  onClick={() => fileInputRef.current?.click()}
+                  /* มีรูปแล้ว = คลิกเพื่อดูใหญ่ ยังไม่มีรูป = คลิกเพื่อเลือกไฟล์
+                     ของเดิมคลิกที่รูปแล้วเด้งหน้าเลือกไฟล์ทันที ซึ่งสวนกับสิ่งที่
+                     คนคาดหวังเมื่อคลิกรูป และทำให้เผลอทับรูปเดิมได้ง่าย
+                     (ปุ่มกล้องมุมขวายังเปลี่ยนรูปได้เหมือนเดิม) */
+                  onClick={() => (imagePreview ? setImageZoom(true) : fileInputRef.current?.click())}
                   onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) handleImageUpload(f); }}
                   onDragOver={e => e.preventDefault()}
                   sx={{
@@ -2392,12 +2435,21 @@ export default function AssetFormPage() {
                     <>
                       <Box component="img" src={imagePreview} alt="Asset" sx={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                       <Box sx={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 0.5 }} onClick={e => e.stopPropagation()}>
-                        <IconButton size="small" onClick={() => fileInputRef.current?.click()} sx={{ bgcolor: alpha(theme.palette.background.paper, 0.9), '&:hover': { bgcolor: theme.palette.background.paper } }}>
-                          <PhotoCameraIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                        <IconButton size="small" onClick={handleImageDelete} sx={{ bgcolor: alpha(theme.palette.background.paper, 0.9), color: 'error.main', '&:hover': { bgcolor: theme.palette.background.paper } }}>
-                          <DeleteIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
+                        <Tooltip title="ดูรูปขนาดเต็ม">
+                          <IconButton aria-label="ดูรูปขนาดเต็ม" size="small" onClick={() => setImageZoom(true)} sx={{ bgcolor: alpha(theme.palette.background.paper, 0.9), '&:hover': { bgcolor: theme.palette.background.paper } }}>
+                            <ZoomOutMapIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="เปลี่ยนรูป">
+                          <IconButton aria-label="เปลี่ยนรูป" size="small" onClick={() => fileInputRef.current?.click()} sx={{ bgcolor: alpha(theme.palette.background.paper, 0.9), '&:hover': { bgcolor: theme.palette.background.paper } }}>
+                            <PhotoCameraIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="ลบรูป">
+                          <IconButton aria-label="ลบรูป" size="small" onClick={handleImageDelete} sx={{ bgcolor: alpha(theme.palette.background.paper, 0.9), color: 'error.main', '&:hover': { bgcolor: theme.palette.background.paper } }}>
+                            <DeleteIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </Tooltip>
                       </Box>
                     </>
                   ) : (
@@ -2468,10 +2520,7 @@ export default function AssetFormPage() {
         <Button
           variant="outlined"
           color="error"
-          onClick={() => {
-            if (hasChanges) { if (window.confirm('ยืนยันยกเลิกการแก้ไข? การเปลี่ยนแปลงทั้งหมดจะหายไป')) navigate(-1); }
-            else navigate(-1);
-          }}
+          onClick={() => { void leaveForm(); }}
           sx={{ borderRadius: '10px', fontWeight: 600 }}
         >
           ↩ ยกเลิก

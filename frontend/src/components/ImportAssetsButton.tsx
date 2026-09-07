@@ -1,9 +1,11 @@
 import React, { useRef, useState, useMemo } from 'react';
 import { Button, Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress, Alert, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, alpha } from '@mui/material';
 import { Upload } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
 import { assetAPI } from '../services/api';
+
+// xlsx ~419 KB โหลดตอนกดส่งออกจริงเท่านั้น ไม่ใช่ตอนเปิดหน้า
+const loadXlsx = () => import('xlsx');
 
 interface ImportedAsset {
   assetCode: string;
@@ -75,8 +77,9 @@ export default function ImportAssetsButton() {
       const reader = new FileReader();
       
       if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
           try {
+            const XLSX = await loadXlsx();
             const data = e.target?.result as ArrayBuffer;
             const workbook = XLSX.read(data, { type: 'array' });
             

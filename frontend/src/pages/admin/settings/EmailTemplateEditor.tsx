@@ -6,6 +6,7 @@ import { Save } from 'lucide-react';
 import { adminAPI } from '../../../services/api';
 import { useToast } from '../../../contexts/ToastContext';
 import { NotificationTemplate } from './types';
+import { useConfirm } from '../../../contexts/ConfirmContext';
 
 const EVENT_LABELS: Record<string, string> = {
   borrow_request_pending: 'มีคำขอยืมใหม่', borrow_approved: 'อนุมัติคำขอยืม', borrow_rejected: 'ปฏิเสธคำขอยืม',
@@ -81,8 +82,15 @@ export default function EmailTemplateEditor({ templates, setTemplates, onSaveTem
     if (editingTemplate) { onSaveTemplate(editingTemplate.id, { subjectTh: localSubject, bodyTh: localBody }); setEditingId(null); }
   };
 
+  const confirm = useConfirm();
   const handleReset = async () => {
-    if (!editingTemplate || !window.confirm('คุณต้องการรีเซ็ตเทมเพลตนี้กลับเป็นค่าเริ่มต้นใช่หรือไม่?')) return;
+    if (!editingTemplate) return;
+    if (!await confirm({
+      title: 'รีเซ็ตเทมเพลตกลับเป็นค่าเริ่มต้น',
+      target: editingTemplate.key,
+      detail: 'ข้อความที่แก้ไว้จะหายทั้งหมด',
+      confirmLabel: 'รีเซ็ต',
+    })) return;
     setResetting(true);
     try {
       const res = await adminAPI.resetNotificationTemplate(editingTemplate.id);

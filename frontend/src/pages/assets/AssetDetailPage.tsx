@@ -16,7 +16,13 @@ import {
 } from '@mui/material';
 import PrintIcon from '@mui/icons-material/Print';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import QRCode from 'react-qr-code';
+import {
+  LayoutDashboard, Cpu, AppWindow, FileText, Wallet, ClipboardList,
+  ShieldCheck, Wrench, Paperclip, History as HistoryIcon, Link2,
+} from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 import { assetAPI, maintenanceAPI } from '../../services/api';
 import MaintenanceTab from './MaintenanceTab';
 import LinkedAssetsTab from './tabs/LinkedAssetsTab';
@@ -24,25 +30,58 @@ import { SpecTab } from './tabs/SpecTab';
 import { HistoryTab } from './tabs/HistoryTab';
 import { PMTab } from './tabs/PMTab';
 import { DocumentsTab } from './tabs/DocumentsTab';
+import { HardwareTab } from './tabs/HardwareTab';
+import { ContractsTab } from './tabs/ContractsTab';
+import { FinancialsTab } from './tabs/FinancialsTab';
+import { RequestsTab } from './tabs/RequestsTab';
 import { AssetOverviewCard } from './components/AssetOverviewCard';
 import { AssetFinanceCard } from './components/AssetFinanceCard';
+import { AssetHealthStrip } from './components/AssetHealthStrip';
+import { AssetHeaderPills } from './components/AssetHeaderPills';
 import { AssetTimeline } from './components/AssetTimeline';
-import { AssetActionsPanel } from './components/AssetActionsPanel';
+import { AssetConnectionHistoryCard } from './components/AssetConnectionHistoryCard';
+import { AssetActionsMenu } from './components/AssetActionsMenu';
 import { AssetInsightTiles } from './components/AssetInsightTiles';
 import { AssetSpecMiniCard } from './components/AssetSpecMiniCard';
 import { AssetLiveStatusCard } from './components/AssetLiveStatusCard';
 import { AssetServiceHistoryCard } from './components/AssetServiceHistoryCard';
 import { AssetDocumentsRail } from './components/AssetDocumentsRail';
 import { PillTabBar } from '../../components/PillTabBar';
+import { useConfirm } from '../../contexts/ConfirmContext';
+
+// Fields the inline-edit chips are allowed to resend on a quick-update PUT —
+// the backend's PUT /assets/:id validates the "required" set (assetName/
+// type/brand/serialNo/departmentId) on every request, even ones only meant
+// to touch one field, so a quick-update payload has to carry the asset's
+// current value for everything else in this list too. Mirrors the backend's
+// own ALLOWED_ASSET_FIELDS (assets.ts) minus id/createdAt/updatedAt/age
+// (never resent) and the *RefId/assignedToUserId FK columns — those are
+// deliberately left out of the payload so the backend's own resolver reruns
+// off whichever free-text field changed; resending a stale FK would suppress
+// that resolution and leave it pointed at the previous owner/department/location.
+const ASSET_WRITABLE_FIELDS = [
+  'assetCode', 'assetName', 'serialNo', 'type', 'brand', 'model', 'cpu', 'ram',
+  'osVersion', 'windowsLicense', 'officeLicense', 'antivirusStatus', 'vendor',
+  'poNumber', 'prNumber', 'purchaseDate', 'purchasePrice', 'warrantyEndDate', 'ownerName', 'departmentId',
+  'location', 'status', 'remark', 'company', 'cpuGeneration', 'domainName',
+  'floor', 'poDate', 'ramDetail', 'gpu', 'osType', 'ramSlot1', 'ramSlot2',
+  'snComputer', 'storage1', 'storage2',
+  'oldAssetCode', 'accountingCode', 'budget', 'image', 'categoryId', 'catalogItemId',
+  'memoryType', 'ramOnboard', 'ramType', 'ramSpeed', 'ramMaxSupported', 'ramAvailableSlots', 'ramUpgradeable',
+] as const;
 
 const TABS = [
-  { value: 'overview', label: 'ภาพรวม' },
-  { value: 'spec', label: 'สเปก & ซอฟต์แวร์' },
-  { value: 'pm', label: 'PM' },
-  { value: 'repairs', label: 'ประวัติการซ่อม' },
-  { value: 'documents', label: 'ไฟล์แนบ' },
-  { value: 'history', label: 'บันทึกกิจกรรม' },
-  { value: 'linked', label: 'อุปกรณ์ที่เชื่อมโยง' },
+  { value: 'overview', label: 'หน้าแรก', icon: LayoutDashboard },
+  { value: 'hardware', label: 'ฮาร์ดแวร์', icon: Cpu },
+  { value: 'spec', label: 'ซอฟต์แวร์ & Windows', icon: AppWindow },
+  { value: 'contracts', label: 'สัญญา', icon: FileText },
+  { value: 'financials', label: 'การเงิน', icon: Wallet },
+  { value: 'requests', label: 'คำขอที่เกี่ยวข้อง', icon: ClipboardList },
+  { value: 'pm', label: 'PM', icon: ShieldCheck },
+  { value: 'repairs', label: 'ประวัติการซ่อม', icon: Wrench },
+  { value: 'documents', label: 'ไฟล์แนบ', icon: Paperclip },
+  { value: 'history', label: 'กิจกรรม', icon: HistoryIcon },
+  { value: 'linked', label: 'อุปกรณ์ที่เชื่อมโยง', icon: Link2 },
 ];
 
 /* ─── Main Page ───────────────────────────────────────────────── */
@@ -50,6 +89,8 @@ export default function AssetDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const theme = useTheme();
+  const { user } = useAuth();
+  const canEdit = user?.role === 'IT_ADMIN' || user?.role === 'SUPERADMIN';
   const [asset, setAsset] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
@@ -62,6 +103,9 @@ export default function AssetDetailPage() {
   const [externalAgent, setExternalAgent] = useState<any>(null);
   const [agentSpec, setAgentSpec] = useState<Record<string, string | null> | null>(null);
   const [loadingExternalAgent, setLoadingExternalAgent] = useState(false);
+  const [linkHistory, setLinkHistory] = useState<any[]>([]);
+  const [loadingLinkHistory, setLoadingLinkHistory] = useState(false);
+  const [showConnectionHistory, setShowConnectionHistory] = useState(false);
   const [syncingAgent, setSyncingAgent] = useState(false);
   const [toast, setToast] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'warning' | 'info' }>({
     open: false,
@@ -138,13 +182,39 @@ export default function AssetDetailPage() {
     }
   }, [asset?.id, id]);
 
+  // Notebook↔Monitor connection history — only computers and monitors ever
+  // appear on either side of an AssetLink, so gate the fetch to those (same
+  // "is this a computer" style check as GLPI/agent above, plus a monitor check
+  // since a monitor's own detail page also needs to see its notebook history).
+  useEffect(() => {
+    if (!asset || !id || asset.id !== parseInt(id)) return;
+    const t = (asset.type || '').toLowerCase();
+    const cat = (asset.category?.name || '').toLowerCase();
+    const isComputer = ['notebook', 'laptop', 'macbook', 'pc desktop', 'desktop', 'workstation', 'all-in-one', 'mini pc', 'thin client', 'computer'].some(k => t.includes(k)) || cat === 'คอมพิวเตอร์' || t === 'pc';
+    const isMonitor = t.includes('monitor');
+    setShowConnectionHistory(isComputer || isMonitor);
+
+    if (isComputer || isMonitor) {
+      setLoadingLinkHistory(true);
+      assetAPI.linkHistory(parseInt(id))
+        .then((res) => setLinkHistory(Array.isArray(res.data) ? res.data : []))
+        .catch(() => setLinkHistory([]))
+        .finally(() => setLoadingLinkHistory(false));
+    } else {
+      setLinkHistory([]);
+    }
+  }, [asset?.id, asset?.type, id]);
+
   // Apply the agent's reading to the asset — one field, or every differing one.
+  const confirm = useConfirm();
   const handleAgentSync = async (field?: string, label?: string) => {
     if (!id) return;
-    const confirmMsg = field
-      ? `อัปเดต "${label}" ของทรัพย์สินนี้ตามข้อมูลจากระบบ Agent หรือไม่?`
-      : 'อัปเดตทุกช่องที่ไม่ตรงกันตามข้อมูลจากระบบ Agent หรือไม่? (ค่าเดิมจะถูกเขียนทับ)';
-    if (!window.confirm(confirmMsg)) return;
+    if (!await confirm({
+      title: 'อัปเดตข้อมูลจากระบบ Agent',
+      target: field ? label : 'ทุกช่องที่ไม่ตรงกัน',
+      detail: field ? undefined : 'ค่าเดิมในช่องที่ไม่ตรงกันจะถูกเขียนทับ',
+      confirmLabel: 'อัปเดต', danger: !field,
+    })) return;
 
     setSyncingAgent(true);
     try {
@@ -166,11 +236,12 @@ export default function AssetDetailPage() {
   const handleGLPISync = async (field?: string, label?: string) => {
     if (!id || !asset) return;
 
-    const confirmMsg = field
-      ? `คุณต้องการอัปเดต "${label}" ของทรัพย์สินนี้ตามข้อมูลใน GLPI หรือไม่?`
-      : 'ปรับปรุงสเปคของเครื่องนี้ตาม GLPI?\n\nจะเติมเฉพาะช่องที่ว่าง และช่องที่ GLPI ให้ข้อมูลละเอียดกว่าเท่านั้น — ค่าที่ขัดกันจะไม่ถูกแตะ ต้องกดรับทีละช่องเอง';
-
-    if (!window.confirm(confirmMsg)) return;
+    if (!await confirm({
+      title: 'ปรับปรุงสเปคตามข้อมูลใน GLPI',
+      target: field ? label : 'ทุกช่องที่เติมได้',
+      detail: field ? undefined : 'เติมเฉพาะช่องที่ว่างและช่องที่ GLPI ให้ข้อมูลละเอียดกว่า — ค่าที่ขัดกันจะไม่ถูกแตะ ต้องกดรับทีละช่องเอง',
+      confirmLabel: 'ปรับปรุง', danger: false,
+    })) return;
 
     setSyncingGLPI(true);
     try {
@@ -218,6 +289,24 @@ export default function AssetDetailPage() {
 
   const reloadAsset = () => assetAPI.get(parseInt(id!)).then(res => setAsset(res.data));
 
+  // One field at a time from a header/Fact chip (see EditableAssetFields).
+  // Reloads via GET afterward rather than trusting the PUT response directly
+  // — the PUT handler returns the bare `prisma.asset.update()` row with none
+  // of the relations (category/assetHistory/pmRuns/documents) the GET
+  // include pulls in, and several cards on this page read those.
+  // ส่วนใหญ่เป็น text แต่ catalogItemId เป็น FK ตัวเลข/null ล้วน (ดู EditableCatalogChip) —
+  // เลยรับ any แทนที่จะบังคับ string เหมือน field อื่น
+  const handleQuickUpdate = async (field: string, value: any) => {
+    if (!id || !asset) return;
+    const payload: Record<string, any> = {};
+    for (const key of ASSET_WRITABLE_FIELDS) {
+      if (asset[key] !== undefined) payload[key] = asset[key];
+    }
+    payload[field] = value;
+    await assetAPI.update(parseInt(id), payload);
+    await reloadAsset();
+  };
+
   const goRepairs = () => {
     setActiveTab('repairs');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -234,7 +323,14 @@ export default function AssetDetailPage() {
           <Typography sx={{ fontSize: '1.4rem', fontWeight: 800, color: theme.palette.text.primary, lineHeight: 1.25 }}>
             {[asset.brand, asset.model].filter(Boolean).join(' ') || asset.assetName || asset.assetCode}
           </Typography>
+          {asset.updatedAt && (
+            <Typography sx={{ fontSize: '0.72rem', color: theme.palette.text.disabled, mt: '2px' }}>
+              อัปเดตล่าสุด {new Date(asset.updatedAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
+              {' '}{new Date(asset.updatedAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.
+            </Typography>
+          )}
         </Box>
+        <AssetHeaderPills asset={asset} canEdit={canEdit} onQuickUpdate={handleQuickUpdate} />
         <Button
           variant="outlined"
           color="inherit"
@@ -255,18 +351,22 @@ export default function AssetDetailPage() {
           พิมพ์สติ๊กเกอร์
         </Button>
         <Button
-          variant="contained"
+          variant="outlined"
+          startIcon={<EditRoundedIcon sx={{ fontSize: 16 }} />}
           onClick={() => navigate(`/assets/${id}/edit`)}
           size="small"
-          sx={{
-            borderRadius: '10px', textTransform: 'none', fontWeight: 700,
-            background: `linear-gradient(120deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-            boxShadow: 'none',
-            '&:hover': { boxShadow: 'none', filter: 'brightness(1.05)' },
-          }}
+          sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600 }}
         >
-          โอนย้าย / จ่ายใหม่
+          แก้ไข
         </Button>
+        <AssetActionsMenu
+          onTransfer={() => navigate(`/assets/${id}/edit`)}
+          onReportRepair={goRepairs}
+          onBorrow={() => navigate('/borrow/new')}
+          onShowQR={() => setShowQR(true)}
+          onReportDamage={() => navigate(`/assets/${id}/edit`)}
+          onProposeDisposal={() => navigate('/disposals')}
+        />
       </Box>
 
       <PillTabBar tabs={TABS} value={activeTab} onChange={setActiveTab} />
@@ -276,14 +376,18 @@ export default function AssetDetailPage() {
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', flexDirection: { xs: 'column', lg: 'row' } }}>
           {/* ── Main column ─────────────────────────────────── */}
           <Box sx={{ flex: 1, minWidth: 0, width: '100%', display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <AssetOverviewCard asset={asset} />
+            <AssetHealthStrip asset={asset} agent={externalAgent} loadingAgent={loadingExternalAgent} />
+            <AssetOverviewCard asset={asset} onQuickUpdate={handleQuickUpdate} />
 
             {/* Spec beside finance, as in the handoff. auto-fit keeps them side
                 by side when there's room and stacks them when there isn't —
-                including when AssetFinanceCard hides itself for want of data. */}
+                including when AssetFinanceCard hides itself for want of data.
+                Live agent health moved to the context rail (below) — it's a
+                "does this need attention" signal, not a spec, so it belongs
+                with the rest of the at-a-glance sidebar, not buried a scroll
+                down in the main column. */}
             <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 2, alignItems: 'stretch' }}>
               <AssetSpecMiniCard asset={asset} glpiSpec={glpiSpec} />
-              <AssetLiveStatusCard loading={loadingExternalAgent} agent={externalAgent} />
               <AssetFinanceCard asset={asset} />
             </Box>
 
@@ -294,10 +398,13 @@ export default function AssetDetailPage() {
           </Box>
 
           {/* ── Context rail ────────────────────────────────── */}
-          {/* Deliberately not sticky: with timeline + documents + actions
-              stacked, the rail is taller than the viewport, and a sticky block
+          {/* Deliberately not sticky: with timeline + documents stacked
+              below, it runs taller than the viewport, and a sticky block
               taller than its viewport pins its overflow off-screen where it
-              can't be scrolled to. */}
+              can't be scrolled to. The actions that used to anchor this rail
+              (transfer/repair/borrow/QR/damage/disposal) now live in the
+              header's gear-menu instead — reachable without scrolling at
+              all, which a sticky sidebar card could only approximate. */}
           <Box sx={{
             width: { xs: '100%', lg: 340 },
             flex: 'none',
@@ -305,21 +412,17 @@ export default function AssetDetailPage() {
             flexDirection: 'column',
             gap: 2,
           }}>
+            <AssetLiveStatusCard loading={loadingExternalAgent} agent={externalAgent} />
             <AssetTimeline asset={asset} maintenance={maintenance} />
+            {showConnectionHistory && (
+              <AssetConnectionHistoryCard loading={loadingLinkHistory} history={linkHistory} />
+            )}
             <AssetDocumentsRail asset={asset} onReload={reloadAsset} />
-            <AssetActionsPanel
-              onEdit={() => navigate(`/assets/${id}/edit`)}
-              onTransfer={() => navigate(`/assets/${id}/edit`)}
-              onReportRepair={goRepairs}
-              onBorrow={() => navigate('/borrow/new')}
-              onShowQR={() => setShowQR(true)}
-              onReportDamage={() => navigate(`/assets/${id}/edit`)}
-              onProposeDisposal={() => navigate('/disposals')}
-            />
           </Box>
         </Box>
       ) : (
         <Box>
+          {activeTab === 'hardware' && <HardwareTab asset={asset} agent={externalAgent} />}
           {activeTab === 'spec' && (
             <SpecTab
               asset={asset}
@@ -333,6 +436,9 @@ export default function AssetDetailPage() {
               onAgentSync={handleAgentSync}
             />
           )}
+          {activeTab === 'contracts' && <ContractsTab asset={asset} />}
+          {activeTab === 'financials' && <FinancialsTab asset={asset} />}
+          {activeTab === 'requests' && <RequestsTab asset={asset} />}
           {activeTab === 'pm' && <PMTab asset={asset} />}
           {activeTab === 'repairs' && (
             <MaintenanceTab

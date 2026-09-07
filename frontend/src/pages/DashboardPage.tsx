@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Typography, alpha, useTheme } from '@mui/material';
+import { Box, Typography, Select, MenuItem, alpha, useTheme } from '@mui/material';
 import {
   LayoutDashboard, Boxes, ShoppingCart, Wrench,
   CheckCircle2, Clock, Shield, ClipboardList,
@@ -23,7 +23,8 @@ import { CategoryUtilizationCard } from './dashboard/components/CategoryUtilizat
 import { AttentionQueue, AttentionItem } from './dashboard/components/AttentionQueue';
 import { LifecycleStrip, Stage } from './dashboard/components/LifecycleStrip';
 import { QuietStatusBar } from './dashboard/components/QuietStatusBar';
-import { OutcomeStrip } from './dashboard/components/OutcomeStrip';
+import { OutcomeStrip, hasOutcome } from './dashboard/components/OutcomeStrip';
+import { TrendStrip, MetricPoint } from './dashboard/components/TrendStrip';
 import { now, pct } from './dashboard/dashboardHelpers';
 
 // ── Main Dashboard ──────────────────────────────────────────────────────────
@@ -49,6 +50,9 @@ export default function DashboardPage() {
   const [stages, setStages] = useState<Stage[]>([]);
   const [outcome, setOutcome] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [companyOptions, setCompanyOptions] = useState<string[]>([]);
+  const [selectedCompany, setSelectedCompany] = useState<string>('');
+  const [metricHistory, setMetricHistory] = useState<MetricPoint[]>([]);
 
   useEffect(() => {
     if (user?.role === 'IT_ADMIN' || user?.role === 'SUPERADMIN' || user?.role === 'VIEWER') {
@@ -63,7 +67,7 @@ export default function DashboardPage() {
        * ก้อนที่ล้มจะมาเป็น null ไม่ลากทั้งหน้าลงไปด้วย — เดิมแต่ละก้อนมี
        * .catch() ของตัวเองอยู่แล้ว ที่นี่ย้ายไปทำฝั่ง server แทน
        */
-      dashboardAPI.overview(year, 60)
+      dashboardAPI.overview(year, 60, selectedCompany || undefined)
         .then(({ data: d }) => {
           setAssetSummary(d.assets);
           setBorrowSummary(d.borrow);
@@ -79,6 +83,11 @@ export default function DashboardPage() {
           setExternalAgentsSummary(d.agents?.available ? d.agents.data : null);
           setStages(d.stages || []);
           setOutcome(d.outcome);
+          // ตัวเลือกตัวกรองบริษัท เอาจากรอบ "ไม่กรอง" เท่านั้น ไม่งั้นเลือกไปแล้ว
+          // รายชื่อบริษัทอื่นจะหายไปจาก dropdown เพราะเห็นแค่บริษัทที่เลือกอยู่
+          if (!selectedCompany) {
+            setCompanyOptions((d.assets?.byCompany || []).map((c: any) => c.company).filter(Boolean).sort());
+          }
         })
         .catch(() => {})
         .finally(() => setLoading(false));
@@ -91,6 +100,14 @@ export default function DashboardPage() {
     } else {
       setLoading(false);
     }
+  }, [user, selectedCompany]);
+
+  // แนวโน้มย้อนหลัง — เป็นค่าระดับฟลีตทั้งหมด ไม่ผูกกับตัวกรองบริษัท (ตาราง
+  // สแนปช็อตรายวันเก็บแค่ค่ารวม ไม่ได้แยกราย บริษัท) จึงดึงครั้งเดียว ไม่ต้อง
+  // ดึงซ้ำตอนสลับตัวกรอง
+  useEffect(() => {
+    if (!(user?.role === 'IT_ADMIN' || user?.role === 'SUPERADMIN' || user?.role === 'VIEWER')) return;
+    dashboardAPI.history(60).then(r => setMetricHistory(r.data || [])).catch(() => {});
   }, [user]);
 
   // Team presence — refreshed on its own faster cadence than the rest of the
@@ -264,21 +281,43 @@ export default function DashboardPage() {
             ข้อมูล ณ {now()}
           </Typography>
         </Box>
-        <Box sx={{
-          display: 'flex', alignItems: 'center', gap: 0.75,
-          bgcolor: alpha(theme.palette.success.main, 0.10), color: theme.palette.success.main,
-          fontSize: '0.72rem', fontWeight: 600, px: 1.25, py: 0.5,
-          borderRadius: '999px', border: `1px solid ${alpha(theme.palette.success.main, 0.25)}`,
-        }}>
-          <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: theme.palette.success.main }} />
-          Live
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          {/* ตัวกรองบริษัท — กรองทุกการ์ดพร้อมกัน (ยกเว้นก้อนที่ไม่มีขอบเขตบริษัทของ
+              ตัวเอง เช่น สต๊อกวัสดุ/Agent ภายนอก ซึ่งคงค่าฟลีตทั้งหมดไว้เสมอ) */}
+          {companyOptions.length > 1 && (
+            <Select
+              size="small"
+              value={selectedCompany}
+              displayEmpty
+              onChange={(e) => setSelectedCompany(e.target.value)}
+              sx={{
+                fontSize: '0.75rem', height: 30, borderRadius: '999px',
+                bgcolor: theme.palette.background.paper,
+                '& .MuiSelect-select': { py: '4px', pl: '14px' },
+              }}
+            >
+              <MenuItem value="" sx={{ fontSize: '0.78rem' }}>ทุกบริษัท</MenuItem>
+              {companyOptions.map(c => (
+                <MenuItem key={c} value={c} sx={{ fontSize: '0.78rem' }}>{c}</MenuItem>
+              ))}
+            </Select>
+          )}
+          <Box sx={{
+            display: 'flex', alignItems: 'center', gap: 0.75,
+            bgcolor: alpha(theme.palette.success.main, 0.10), color: theme.palette.success.main,
+            fontSize: '0.72rem', fontWeight: 600, px: 1.25, py: 0.5,
+            borderRadius: '999px', border: `1px solid ${alpha(theme.palette.success.main, 0.25)}`,
+          }}>
+            <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: theme.palette.success.main }} />
+            Live
+          </Box>
         </Box>
       </Box>
 
       {/* ── Row 1: 4 KPI cards — เลือกเฉพาะตัวที่เปลี่ยนแปลงและมีความหมาย
               ตัวที่เคยเป็น "กำลังยืม" ถูกแทนด้วย OS ล้าสมัย เพราะโมดูลยืม-คืน
               เป็นศูนย์ทั้งปี ส่วน OS ล้าสมัยคือ 34% ของฟลีตที่ไม่เคยขึ้นหน้าแรก ── */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 1.5, mb: 2 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 1.25, mb: 1.5 }}>
         <KpiCard
           icon={Boxes} label="ทรัพย์สิน IT ทั้งหมด" value={total}
           sub={`ใช้งานอยู่ ${(byStatus.find(s => s.status === 'InUse')?._count || 0)} · พร้อมใช้ ${available}`}
@@ -305,19 +344,38 @@ export default function DashboardPage() {
         />
       </Box>
 
-      {/* ── วงจรชีวิต: ช่วงที่ยังไม่เริ่มบันทึกจะจางและเขียนบอกตรง ๆ ── */}
-      <LifecycleStrip stages={stages} navigate={navigate} />
+      {/* ── แนวโน้มย้อนหลัง: ตอบว่า "ดีขึ้นไหม" ซึ่งการ์ดด้านบนตอบไม่ได้ ──
+              ซ่อนตัวเองจนกว่าจะมีข้อมูลอย่างน้อย 3 วัน (ดูใน TrendStrip) */}
+      <TrendStrip history={metricHistory} />
 
-      {/* ── สิ่งที่ต้องลงมือ เรียงตามความเร่งด่วน ── */}
-      <Box sx={{ mb: 2 }}>
+      {/* ── สิ่งที่ต้องลงมือ เรียงตามความเร่งด่วน ──
+              อยู่ก่อนวงจรชีวิตเพราะเป็นงานที่ต้องทำ ไม่ใช่ภาพรวมไว้ดูเฉย ๆ
+              เดิมอยู่ใต้วงจรชีวิต ทำให้ของที่ต้องลงมือหล่นไปอยู่แถวสี่ของหน้า */}
+      <Box sx={{ mb: 1.5 }}>
         <AttentionQueue items={attention} navigate={navigate} />
       </Box>
 
-      {/* ── ผลลัพธ์จากการตรวจ PM ── */}
-      <OutcomeStrip outcome={outcome} year={new Date().getFullYear()} navigate={navigate} />
+      {/* ── วงจรชีวิต + ผลจากการตรวจ PM วางคู่กัน ──
+              เดิมเป็นสองแถบเต็มความกว้างซ้อนกัน กินรวม ~290px ทั้งที่ผลตรวจ PM มี
+              แค่สามตัวเลข พอจับคู่เหลือแถวเดียว ส่วนตอนที่ยังไม่มีผลตรวจ (การ์ด
+              ซ่อนตัวเอง) วงจรชีวิตกลับไปกินเต็มความกว้างเหมือนเดิม ไม่ทิ้งช่องว่าง */}
+      {/* minmax(0, …) ไม่ใช่ 1fr เปล่า ๆ — ค่า 1fr มีขั้นต่ำเป็น min-content ของ
+          สิ่งที่อยู่ข้างใน พอในการ์ดมีข้อความ noWrap ช่องจะกว้างตามข้อความนั้นและ
+          ดันล้นออกนอกกรอบที่จอมือถือ (วัดได้ล้น 14px ก่อนแก้) */}
+      <Box sx={{
+        display: 'grid',
+        gridTemplateColumns: {
+          xs: 'minmax(0, 1fr)',
+          lg: hasOutcome(outcome) ? 'minmax(0, 8fr) minmax(0, 4fr)' : 'minmax(0, 1fr)',
+        },
+        gap: 1.25, mb: 1.5, alignItems: 'stretch',
+      }}>
+        <LifecycleStrip stages={stages} navigate={navigate} />
+        <OutcomeStrip outcome={outcome} year={new Date().getFullYear()} navigate={navigate} />
+      </Box>
 
       {/* ── Row 2: IT Operations Room (live) + Donut ─────────────── */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '7fr 5fr' }, gap: 1.5, mb: 2 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '7fr 5fr' }, gap: 1.25, mb: 1.5 }}>
         <OpsRoomCard
           onlineNow={onlineNow}
           currentUserId={user?.id}
@@ -330,18 +388,17 @@ export default function DashboardPage() {
         <CategoryDonutCard byCategory={byCategory} total={total} onNavigate={() => navigate('/assets')} />
       </Box>
 
-      {/* ── Row 3: ทางลัด + สัดส่วนหมวด + Agent ─────────────────────
-              กราฟแนวโน้มยืม-คืนกับกิจกรรมล่าสุดถูกถอดออก ทั้งคู่เป็นศูนย์ตลอด 12
-              เดือนของปีนี้ กราฟที่ไม่มีเส้นกินพื้นที่เท่ากับกราฟที่มีข้อมูล
-              โมดูลยืม-คืนไปปรากฏในแถบวงจรชีวิตแทน ซึ่งบอกได้ว่า "ยังไม่เริ่มใช้" ── */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', lg: externalAgentsSummary ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)' }, gap: 1.5, mb: 2 }}>
+      {/* ── Row 3: การ์ดรายละเอียดทั้งหมดในกริดเดียว ─────────────────
+              เดิมแยกเป็นสองแถวตายตัว (ทางลัด+สัดส่วนหมวด+Agent แล้วค่อยรายละเอียด
+              สถานะ/สถานที่/ประกัน) ทำให้แถวแรกเหลือช่องว่างเวลาไม่มีข้อมูล Agent
+              และมีรอยต่อ mb ระหว่างสองแถวโดยไม่จำเป็น รวมเป็นกริด auto-fit เดียว
+              การ์ดจะเรียงเต็มความกว้างเสมอไม่ว่าจะมีกี่ใบ เหมือนกริดของการ์ดในภาพ
+              อ้างอิง — กราฟแนวโน้มยืม-คืนกับกิจกรรมล่าสุดยังไม่กลับมา ทั้งคู่เป็นศูนย์
+              ตลอด 12 เดือนของปีนี้ โมดูลยืม-คืนไปปรากฏในแถบวงจรชีวิตแทน ── */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 1.25, mb: 1.5 }}>
         <CategoryUtilizationCard categories={categoryUtilization} onNavigate={() => navigate('/assets')} />
         <ExternalAgentsSummaryCard summary={externalAgentsSummary} />
         <QuickActionsPanel onNavigate={navigate} />
-      </Box>
-
-      {/* ── Row 4: รายละเอียดที่ยังต้องดูเป็นตาราง ── */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 1.5, mb: 2 }}>
         <AssetStatusBreakdownCard byStatus={byStatus} total={total} onNavigate={() => navigate('/assets')} />
         <LocationBreakdownCard byLocation={byLocation} total={total} onNavigate={() => navigate('/assets')} />
         <WarrantyAlertsCard warrantyData={warrantyData} navigate={navigate} />

@@ -15,23 +15,24 @@
 import type { PrismaClient } from '@prisma/client';
 import { buildProcurementReport } from './pmProcurement';
 
-export async function assetSummary(prisma: PrismaClient) {
+export async function assetSummary(prisma: PrismaClient, company?: string) {
+  const where = company ? { company } : {};
   const [byStatus, byDepartment, byCompany, byType, byLocation, total, byCategory, costAgg] = await Promise.all([
-    prisma.asset.groupBy({ by: ['status'], _count: true }),
-    prisma.asset.groupBy({ by: ['departmentId'], _count: true }),
-    prisma.asset.groupBy({ by: ['company'], _count: true }),
-    prisma.asset.groupBy({ by: ['type'], _count: true }),
-    prisma.asset.groupBy({ by: ['location'], _count: true }),
-    prisma.asset.count(),
+    prisma.asset.groupBy({ where, by: ['status'], _count: true }),
+    prisma.asset.groupBy({ where, by: ['departmentId'], _count: true }),
+    prisma.asset.groupBy({ where, by: ['company'], _count: true }),
+    prisma.asset.groupBy({ where, by: ['type'], _count: true }),
+    prisma.asset.groupBy({ where, by: ['location'], _count: true }),
+    prisma.asset.count({ where }),
     prisma.category.findMany({
       where: { isActive: true },
-      select: { id: true, name: true, icon: true, _count: { select: { assets: true } } },
+      select: { id: true, name: true, icon: true, _count: { select: { assets: { where } } } },
       orderBy: { sortOrder: 'asc' },
     }),
     // Total acquisition cost — a real, simple sum. Not a depreciated "book
     // value" (that needs a depreciation policy — useful-life years per
     // category, salvage value — which nothing in this system defines yet).
-    prisma.asset.aggregate({ _sum: { purchasePrice: true } }),
+    prisma.asset.aggregate({ where, _sum: { purchasePrice: true } }),
   ]);
   return {
     total, byStatus, byDepartment, byCompany, byType, byLocation,
@@ -40,16 +41,26 @@ export async function assetSummary(prisma: PrismaClient) {
   };
 }
 
-export async function moduleStatus(prisma: PrismaClient) {
+/**
+ * `company` narrows everything genuinely asset-scoped (registry health, PM).
+ * Borrow overdue count and notification success rate stay unfiltered on
+ * purpose — a BorrowRequestItem has no company of its own (it links through
+ * an asset, and the notification outbox isn't asset-scoped at all), so
+ * "filtering" those would mean silently dropping rows rather than actually
+ * narrowing by company. Left as fleet-wide numbers instead of faking a scope
+ * they don't have.
+ */
+export async function moduleStatus(prisma: PrismaClient, company?: string) {
   const now = new Date();
+  const assetWhere = company ? { company } : {};
   const [totalAssets, missingSerial, missingLocation, overdueItems, pmTotal, pmDone, notifSent, notifTotal] =
     await Promise.all([
-      prisma.asset.count(),
-      prisma.asset.count({ where: { OR: [{ serialNo: '' }, { serialNo: '-' }] } }),
-      prisma.asset.count({ where: { OR: [{ location: null }, { location: '' }, { location: '-' }] } }),
+      prisma.asset.count({ where: assetWhere }),
+      prisma.asset.count({ where: { ...assetWhere, OR: [{ serialNo: '' }, { serialNo: '-' }] } }),
+      prisma.asset.count({ where: { ...assetWhere, OR: [{ location: null }, { location: '' }, { location: '-' }] } }),
       prisma.borrowRequestItem.count({ where: { itemStatus: 'CheckedOut', dueDate: { lt: now } } }),
-      prisma.pMRun.count({ where: { year: now.getFullYear() } }),
-      prisma.pMRun.count({ where: { year: now.getFullYear(), status: 'COMPLETED' } }),
+      prisma.pMRun.count({ where: { year: now.getFullYear(), ...(company ? { asset: { company } } : {}) } }),
+      prisma.pMRun.count({ where: { year: now.getFullYear(), status: 'COMPLETED', ...(company ? { asset: { company } } : {}) } }),
       prisma.notificationOutbox.count({ where: { status: 'SENT' } }),
       prisma.notificationOutbox.count(),
     ]);
@@ -68,10 +79,10 @@ export async function moduleStatus(prisma: PrismaClient) {
 }
 
 /** หมวดที่มีของมากที่สุด 5 อันดับ พร้อมสัดส่วนที่ถูกใช้งานอยู่ */
-export async function categoryUtilization(prisma: PrismaClient) {
+export async function categoryUtilization(prisma: PrismaClient, company?: string) {
   const categories = await prisma.category.findMany({
     where: { isActive: true },
-    select: { id: true, name: true, icon: true, assets: { select: { status: true } } },
+    select: { id: true, name: true, icon: true, assets: { where: company ? { company } : undefined, select: { status: true } } },
   });
   return categories
     .map(c => {
@@ -103,14 +114,16 @@ export async function inventoryLowStock(prisma: PrismaClient) {
   };
 }
 
-export async function dataHealth(prisma: PrismaClient) {
+export async function dataHealth(prisma: PrismaClient, company?: string) {
+  const base = company ? { company } : {};
   const [missingSerial, missingLocation, missingCompany, missingType, outdatedOSCount] = await Promise.all([
-    prisma.asset.count({ where: { OR: [{ serialNo: '' }, { serialNo: '-' }] } }),
-    prisma.asset.count({ where: { OR: [{ location: null }, { location: '' }, { location: '-' }] } }),
-    prisma.asset.count({ where: { OR: [{ company: null }, { company: '' }, { company: '-' }] } }),
-    prisma.asset.count({ where: { OR: [{ type: null }, { type: '' }] } }),
+    prisma.asset.count({ where: { ...base, OR: [{ serialNo: '' }, { serialNo: '-' }] } }),
+    prisma.asset.count({ where: { ...base, OR: [{ location: null }, { location: '' }, { location: '-' }] } }),
+    prisma.asset.count({ where: { ...base, OR: [{ company: null }, { company: '' }, { company: '-' }] } }),
+    prisma.asset.count({ where: { ...base, OR: [{ type: null }, { type: '' }] } }),
     prisma.asset.count({
       where: {
+        ...base,
         computerDetail: {
           OR: [
             { osVersion: { contains: 'Windows 7', mode: 'insensitive' } },
@@ -124,8 +137,8 @@ export async function dataHealth(prisma: PrismaClient) {
   /* วันหมดประกันที่ยังว่าง — ช่องนี้เป็นเหตุผลเดียวที่การ์ด "ใกล้หมดประกัน" ว่าง
      เปล่ามาตลอด ไม่ใช่เพราะฟีเจอร์พัง นับเฉพาะเครื่องที่ยังไม่ปลดระวาง */
   const [missingWarranty, activeTotal] = await Promise.all([
-    prisma.asset.count({ where: { warrantyEndDate: null, NOT: { status: 'Retired' } } }),
-    prisma.asset.count({ where: { NOT: { status: 'Retired' } } }),
+    prisma.asset.count({ where: { ...base, warrantyEndDate: null, NOT: { status: 'Retired' } } }),
+    prisma.asset.count({ where: { ...base, NOT: { status: 'Retired' } } }),
   ]);
   return {
     missingSerial, missingLocation, missingCompany, missingType, outdatedOSCount,
@@ -139,7 +152,10 @@ export async function borrowSummary(prisma: PrismaClient) {
     prisma.borrowRequest.count(),
     prisma.borrowRequestItem.count({ where: { itemStatus: 'CheckedOut', dueDate: { lt: new Date() } } }),
     prisma.borrowRequestItem.count({ where: { itemStatus: { in: ['CheckedOut', 'PartiallyReturned'] } } }),
-    prisma.borrowRequest.count({ where: { status: 'Pending' } }),
+    // ทั้ง Pending (รอ IT Admin) และ PendingSupervisor (รอหัวหน้างาน) คือคำขอที่
+    // "ยังรออนุมัติอยู่" — นับแค่ Pending ตัวเดียวทำให้คำขอที่ค้างอยู่ที่หัวหน้างาน
+    // หายไปจากตัวเลขนี้ทั้งที่ยังไม่จบขั้นตอน
+    prisma.borrowRequest.count({ where: { status: { in: ['Pending', 'PendingSupervisor'] } } }),
   ]);
   return { total, byStatus, overdue, activeItems, pendingApproval };
 }
@@ -167,15 +183,17 @@ export async function borrowTrend(prisma: PrismaClient, year: number) {
   return { year, months: Object.values(monthly) };
 }
 
-export async function pmSummary(prisma: PrismaClient, year: number) {
+export async function pmSummary(prisma: PrismaClient, year: number, company?: string) {
   const [runs, plans] = await Promise.all([
     prisma.pMRun.findMany({
-      where: { year },
+      where: { year, ...(company ? { asset: { company } } : {}) },
       include: {
         plan: true,
         asset: { select: { category: { select: { id: true, name: true, icon: true } }, departmentId: true } },
       },
     }),
+    // PMPlan มีแต่ site/deptTask/company ที่เป็น free text ไม่ผูกกับ Asset.company
+    // ตรง ๆ — ตัวรวม plannedTotal จึงยังเป็นทั้งปีเสมอ ไม่กรองตามบริษัทที่เลือก
     prisma.pMPlan.findMany({ where: { year } }),
   ]);
   const completed = runs.filter(r => r.status === 'COMPLETED').length;
@@ -244,7 +262,7 @@ export async function proactiveAlerts(prisma: PrismaClient) {
   nextWeek.setDate(now.getDate() + 7);
   const [overdueItems, pendingApprovals, upcomingPMs] = await Promise.all([
     prisma.borrowRequestItem.count({ where: { itemStatus: 'CheckedOut', dueDate: { lt: now } } }),
-    prisma.borrowRequest.count({ where: { status: 'Pending' } }),
+    prisma.borrowRequest.count({ where: { status: { in: ['Pending', 'PendingSupervisor'] } } }),
     prisma.pMRun.count({
       where: { status: { not: 'COMPLETED' }, plan: { endDate: { gte: now, lte: nextWeek } } },
     }),
@@ -252,13 +270,14 @@ export async function proactiveAlerts(prisma: PrismaClient) {
   return { overdueItems, pendingApprovals, upcomingPMs };
 }
 
-export async function warrantyExpiring(prisma: PrismaClient, days: number) {
+export async function warrantyExpiring(prisma: PrismaClient, days: number, company?: string) {
   const now = new Date();
   const future = new Date();
   future.setDate(now.getDate() + days);
+  const base = company ? { company } : {};
   const [expiring, expiredCount] = await Promise.all([
     prisma.asset.findMany({
-      where: { warrantyEndDate: { gte: now, lte: future }, status: { not: 'Retired' } },
+      where: { ...base, warrantyEndDate: { gte: now, lte: future }, status: { not: 'Retired' } },
       select: {
         id: true, assetCode: true, brand: true, model: true,
         warrantyEndDate: true, status: true,
@@ -267,7 +286,7 @@ export async function warrantyExpiring(prisma: PrismaClient, days: number) {
       orderBy: { warrantyEndDate: 'asc' },
       take: 20,
     }),
-    prisma.asset.count({ where: { warrantyEndDate: { lt: now }, status: { not: 'Retired' } } }),
+    prisma.asset.count({ where: { ...base, warrantyEndDate: { lt: now }, status: { not: 'Retired' } } }),
   ]);
   return {
     expiring: expiring.map(a => ({
@@ -286,9 +305,16 @@ export async function warrantyExpiring(prisma: PrismaClient, days: number) {
  * พอเรียงเป็นวงจรชีวิตแทน ช่วงที่ว่างจะกลายเป็นข้อเท็จจริงที่ใช้ตัดสินใจได้ —
  * "ยังไม่เริ่มบันทึกช่วงนี้" ต่างจาก "ช่วงนี้ไม่มีปัญหา" คนละเรื่องกัน
  */
-export async function lifecycle(prisma: PrismaClient) {
+/**
+ * DeliveryRequest has no company column of its own (it's a delivery/pickup
+ * event, not scoped to one), so that stage stays fleet-wide even when a
+ * company filter is active — same reasoning as the borrow/notification
+ * numbers in moduleStatus above.
+ */
+export async function lifecycle(prisma: PrismaClient, company?: string) {
   const now = new Date();
   const year = now.getFullYear();
+  const assetWhere = company ? { company } : {};
   const [
     deliveryTotal, deliveryOpen,
     inUse, available,
@@ -300,13 +326,13 @@ export async function lifecycle(prisma: PrismaClient) {
     prisma.deliveryRequest.count({
       where: { status: { notIn: ['CONFIRMED', 'RETURNED'] } },
     }),
-    prisma.asset.count({ where: { status: 'InUse' } }),
-    prisma.asset.count({ where: { status: 'Available' } }),
-    prisma.pMRun.count({ where: { year } }),
-    prisma.pMRun.count({ where: { year, status: 'COMPLETED' } }),
-    prisma.asset.count({ where: { status: 'Maintenance' } }),
-    prisma.asset.count({ where: { status: 'Retired' } }),
-    prisma.assetDisposal.count(),
+    prisma.asset.count({ where: { ...assetWhere, status: 'InUse' } }),
+    prisma.asset.count({ where: { ...assetWhere, status: 'Available' } }),
+    prisma.pMRun.count({ where: { year, ...(company ? { asset: { company } } : {}) } }),
+    prisma.pMRun.count({ where: { year, status: 'COMPLETED', ...(company ? { asset: { company } } : {}) } }),
+    prisma.asset.count({ where: { ...assetWhere, status: 'Maintenance' } }),
+    prisma.asset.count({ where: { ...assetWhere, status: 'Retired' } }),
+    prisma.assetDisposal.count({ where: company ? { asset: { company } } : {} }),
   ]);
 
   return [
@@ -346,11 +372,12 @@ export async function lifecycle(prisma: PrismaClient) {
 /**
  * ผลลัพธ์ที่เสนอไปแล้วปีนี้ — ตัวเลขที่ผู้บริหารสนใจ ไม่ใช่จำนวนทรัพย์สิน
  *
- * ใช้ตัวคำนวณเดียวกับเอกสารที่ยื่นหน่วยงาน (buildProcurementReport) แต่ไม่กรอง
- * บริษัท ตัวเลขบนแดชบอร์ดกับในเอกสารจึงเถียงกันเองไม่ได้
+ * ใช้ตัวคำนวณเดียวกับเอกสารที่ยื่นหน่วยงาน (buildProcurementReport) — ตัวเลขบน
+ * แดชบอร์ดกับในเอกสารจึงเถียงกันเองไม่ได้ ไม่ว่าจะกรองบริษัทหรือไม่ก็ตาม เพราะ
+ * ทั้งสองทางเรียกฟังก์ชันเดียวกันด้วยค่า company เดียวกัน
  */
-export async function procurementOutcome(prisma: PrismaClient, year: number) {
-  const r = await buildProcurementReport(prisma, null, year);
+export async function procurementOutcome(prisma: PrismaClient, year: number, company?: string) {
+  const r = await buildProcurementReport(prisma, company || null, year);
   return {
     addRam: r.addRam.length,
     replaceBattery: r.replaceBattery.length,
@@ -373,30 +400,68 @@ async function settle<T>(p: Promise<T>): Promise<T | null> {
   try { return await p; } catch { return null; }
 }
 
-export async function dashboardOverview(prisma: PrismaClient, opts: { year: number; warrantyDays: number }) {
+export async function dashboardOverview(prisma: PrismaClient, opts: { year: number; warrantyDays: number; company?: string }) {
+  const { company } = opts;
   const [
     assets, modules, categories, inventory, health, borrow, trend,
     pm, agents, activity, alerts, warranty, stages, outcome,
   ] = await Promise.all([
-    settle(assetSummary(prisma)),
-    settle(moduleStatus(prisma)),
-    settle(categoryUtilization(prisma)),
+    settle(assetSummary(prisma, company)),
+    settle(moduleStatus(prisma, company)),
+    settle(categoryUtilization(prisma, company)),
     settle(inventoryLowStock(prisma)),
-    settle(dataHealth(prisma)),
+    settle(dataHealth(prisma, company)),
     settle(borrowSummary(prisma)),
     settle(borrowTrend(prisma, opts.year)),
-    settle(pmSummary(prisma, opts.year)),
+    settle(pmSummary(prisma, opts.year, company)),
     settle(externalAgentsSummary()),
     settle(recentActivity(prisma)),
     settle(proactiveAlerts(prisma)),
-    settle(warrantyExpiring(prisma, opts.warrantyDays)),
-    settle(lifecycle(prisma)),
-    settle(procurementOutcome(prisma, opts.year)),
+    settle(warrantyExpiring(prisma, opts.warrantyDays, company)),
+    settle(lifecycle(prisma, company)),
+    settle(procurementOutcome(prisma, opts.year, company)),
   ]);
   return {
     generatedAt: new Date().toISOString(),
     year: opts.year,
+    company: company || null,
     assets, modules, categories, inventory, health, borrow, trend,
     pm, agents, activity, alerts, warranty, stages, outcome,
+  };
+}
+
+/**
+ * ไล่ลึกทีละชั้น: บริษัท → สถานที่ → ชั้น — ให้ค่า `company`/`location` มา
+ * เท่าไรก็ตอบชั้นถัดไปให้ ไม่ส่ง `company` มา = ตอบระดับบริษัท (บนสุด)
+ *
+ * ทำเป็น endpoint แยกจาก /overview เพราะ "ผู้ใช้กำลังไล่ดูอยู่ตรงไหน" เป็นสถานะ
+ * ชั่วคราวของการ์ดเดียว ไม่ใช่ข้อมูลที่ต้องมากับก้อนใหญ่ทุกครั้ง
+ */
+export async function locationBreakdown(prisma: PrismaClient, opts: { company?: string; location?: string }) {
+  const { company, location } = opts;
+  const where: Record<string, string> = {};
+  if (company) where.company = company;
+  if (location) where.location = location;
+
+  // ปกติไล่ company -> location -> floor ทีละชั้น แต่การ์ด "ตามสถานที่ตั้ง"
+  // เดิมเริ่มที่ชั้น location อยู่แล้ว (ข้าม company) แล้วอยากไล่ลงชั้น floor
+  // ต่อเลย — ให้ location อย่างเดียวก็กระโดดไป floor ได้ ไม่ต้องบังคับผ่าน company ก่อน
+  const level: 'company' | 'location' | 'floor' = location ? 'floor' : company ? 'location' : 'company';
+  const groupField = level === 'company' ? 'company' : level === 'location' ? 'location' : 'floor';
+
+  const rows = await prisma.asset.groupBy({
+    where,
+    by: [groupField as 'company' | 'location' | 'floor'],
+    _count: true,
+  });
+
+  return {
+    level,
+    company: company || null,
+    location: location || null,
+    rows: rows
+      .map(r => ({ value: (r as any)[groupField] as string | null, count: r._count }))
+      .filter(r => r.value)
+      .sort((a, b) => b.count - a.count),
   };
 }

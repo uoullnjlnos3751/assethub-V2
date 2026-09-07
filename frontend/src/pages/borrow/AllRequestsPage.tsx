@@ -163,6 +163,7 @@ export default function AllRequestsPage() {
         />
         {[
           { label: 'ทั้งหมด', value: null },
+          { label: 'รอหัวหน้างาน', value: 'PendingSupervisor' },
           { label: 'รออนุมัติ', value: 'Pending' },
           { label: 'จ่ายแล้ว', value: 'CheckedOut' },
           { label: 'คืนบางส่วน', value: 'PartiallyReturned' },

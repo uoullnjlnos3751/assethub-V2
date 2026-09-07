@@ -190,7 +190,7 @@ export default function PMSwHubTemplatePage() {
         <Box sx={{ p: '20px 24px', display: 'flex', flexDirection: 'column', gap: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
             <Typography sx={{ fontSize: 18, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <IconButton size="small" onClick={() => navigate('/pm/sw-hub/template')}><ArrowBackIcon fontSize="small" /></IconButton>
+              <IconButton aria-label="ย้อนกลับ" size="small" onClick={() => navigate('/pm/sw-hub/template')}><ArrowBackIcon fontSize="small" /></IconButton>
               {isEdit ? (id && id !== 'new' ? 'แก้ไข Template' : 'สร้าง Template ใหม่') : 'Preview Template'}
             </Typography>
             <Box>
@@ -245,9 +245,9 @@ export default function PMSwHubTemplatePage() {
                   >
                     {isEdit && (
                       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
-                        <IconButton size="small" sx={{ p: 0.25 }} onClick={() => moveItem(index, -1)}><ArrowUpwardIcon sx={{ fontSize: 12 }} /></IconButton>
+                        <IconButton aria-label="ย้ายขึ้น" size="small" sx={{ p: 0.25 }} onClick={() => moveItem(index, -1)}><ArrowUpwardIcon sx={{ fontSize: 12 }} /></IconButton>
                         <Typography sx={{ fontSize: 10, color: 'text.disabled' }}>{index + 1}</Typography>
-                        <IconButton size="small" sx={{ p: 0.25 }} onClick={() => moveItem(index, 1)}><ArrowDownwardIcon sx={{ fontSize: 12 }} /></IconButton>
+                        <IconButton aria-label="ย้ายลง" size="small" sx={{ p: 0.25 }} onClick={() => moveItem(index, 1)}><ArrowDownwardIcon sx={{ fontSize: 12 }} /></IconButton>
                       </Box>
                     )}
 
@@ -279,7 +279,7 @@ export default function PMSwHubTemplatePage() {
                           control={<Checkbox size="small" checked={item.required || false} onChange={e => handleChangeItem(index, 'required', e.target.checked)} />}
                           label={<Typography sx={{ fontSize: 11, color: 'text.secondary' }}>จำเป็น</Typography>}
                         />
-                        <IconButton size="small" color="error" onClick={() => handleRemoveItem(index)}><DeleteIcon fontSize="small" /></IconButton>
+                        <IconButton aria-label="ลบ" size="small" color="error" onClick={() => handleRemoveItem(index)}><DeleteIcon fontSize="small" /></IconButton>
                       </>
                     ) : (
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%', py: 0.5 }}>

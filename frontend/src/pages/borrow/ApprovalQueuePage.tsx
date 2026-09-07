@@ -19,12 +19,11 @@ interface QueueStats {
   avgApprovalHours: number | null;
 }
 
-// Real policy text from BUSINESS-RULES.md §2 — not decorative copy.
 const APPROVAL_RULES = [
-  'อนุมัติขั้นเดียวโดย IT Admin — ไม่มีขั้นตามมูลค่าและไม่มีสายบังคับบัญชา',
+  'คำขอที่ผู้ขอมีหัวหน้างานผูกไว้ ต้องผ่านการอนุมัติจากหัวหน้างานก่อน จึงจะเข้าคิวนี้',
+  'คำขอที่เห็นในคิวนี้คือคำขอที่ผ่านหัวหน้างานแล้ว (หรือผู้ขอไม่มีหัวหน้างานผูกไว้)',
   'ต้องอนุมัติภายใน 1 วันทำการ เกินแล้วระบบเตือน IT Admin ทุกเช้า 09:00',
   'ปฏิเสธคำขอต้องระบุเหตุผลเสมอ ระบบแจ้งผู้ขอทันที',
-  'หัวหน้าผู้ขอได้รับสำเนาอีเมลเพื่อรับทราบ ไม่ต้องกดอนุมัติ',
 ];
 
 interface Request {
@@ -54,16 +53,16 @@ interface RequesterHistory {
   currentlySuspended: boolean;
 }
 
-/** The 3 steps this app actually tracks per request (create → approve → done),
- *  matching BUSINESS-RULES.md's single-tier IT Admin approval — the mockup's
- *  5-step version includes a "แจ้งหัวหน้า" cc-email step and separate
- *  checkout/return steps that this same detail dialog already covers
- *  elsewhere, so folding them in here would just duplicate that UI. */
+/** Requests reaching this queue have already cleared the supervisor stage (or
+ *  had no manager to begin with), so that step is always shown as done here —
+ *  it's still worth surfacing who signed off, when there was one. */
 function ApprovalStepper({ request }: { request: Request }) {
   const theme = useTheme();
   const status = request.status || 'Pending';
+  const supervisorApproval = (request as any).approvals?.find((a: any) => a.stage === 'Supervisor' && a.action === 'Approved');
   const steps = [
     { label: 'ผู้ยื่นคำขอ', done: true, sub: `${formatDate(request.createdAt)} · ${request.requester?.displayName || request.requester?.adUsername}` },
+    { label: 'หัวหน้างานอนุมัติ', done: true, sub: supervisorApproval ? 'อนุมัติแล้ว' : 'ไม่มีหัวหน้างานผูกไว้ (ข้ามขั้นนี้)' },
     { label: 'IT Admin พิจารณา', done: status !== 'Pending', sub: status === 'Pending' ? 'รอดำเนินการ' : (status === 'Rejected' ? 'ปฏิเสธแล้ว' : 'อนุมัติแล้ว') },
     { label: 'จ่ายของ & รับคืน', done: ['Returned', 'PartiallyReturned'].includes(status), sub: status === 'CheckedOut' ? 'ส่งมอบแล้ว รอรับคืน' : (['Returned', 'PartiallyReturned'].includes(status) ? 'ดำเนินการแล้ว' : 'ยังไม่ถึงขั้นตอน') },
   ];

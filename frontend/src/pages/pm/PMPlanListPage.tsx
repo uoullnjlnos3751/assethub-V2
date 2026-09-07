@@ -56,6 +56,7 @@ import { PlanGapPanel, GapPrefill } from './components/PlanGapPanel';
 import { PlanGap } from './pmPlanGaps';
 import { formatDate } from '../../utils/dateUtils';
 import { Modal } from './components/Modal';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 /* ─────────────────────────────────────────────────────────────
    Types
@@ -299,6 +300,7 @@ function PlanFormFields({
    Main Page
 ───────────────────────────────────────────────────────────────── */
 export default function PMPlanListPage() {
+  const confirm = useConfirm();
   const navigate = useNavigate();
   const [plans, setPlans] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
@@ -632,7 +634,12 @@ export default function PMPlanListPage() {
   };
 
   const handleDelete = async (planId: number) => {
-    if (!window.confirm('⚠️ คุณแน่ใจหรือไม่ว่าต้องการลบแผน PM นี้?\nการลบจะลบข้อมูลงาน PM ทั้งหมด (รวมถึงงานที่เสร็จสิ้นแล้ว) ในแผนงานนี้ด้วย และไม่สามารถกู้คืนได้')) {
+    const p = plans.find(x => x.id === planId);
+    if (!await confirm({
+      title: 'ลบแผน PM',
+      target: p ? `${p.company || ''} ${p.deptTask || 'ทุกแผนก'} · ${p.deviceType || ''}`.trim() : `แผน #${planId}`,
+      detail: `งาน PM ทั้งหมดในแผนนี้${p?.totalCount ? ` (${p.totalCount} รายการ` + (p.completedCount ? `, ทำเสร็จแล้ว ${p.completedCount}` : '') + ')' : ''} จะถูกลบไปด้วย และกู้คืนไม่ได้`,
+    })) {
       return;
     }
 
@@ -779,7 +786,11 @@ export default function PMPlanListPage() {
               startIcon={<BoltIcon />}
               disabled={saving}
               onClick={async () => {
-                if (!window.confirm(`⚡ ยืนยัน Generate งาน PM ทั้ง ${plansNeedGenerate.length} แผนที่ยังไม่ได้สร้างงาน?`)) return;
+                if (!await confirm({
+                  title: 'สร้างงาน PM ให้แผนที่ยังไม่ได้เจน',
+                  target: `${plansNeedGenerate.length} แผน`,
+                  confirmLabel: 'สร้างงาน', danger: false,
+                })) return;
                 setSaving(true);
                 let ok = 0, fail = 0;
                 for (const plan of plansNeedGenerate) {
@@ -976,10 +987,10 @@ export default function PMPlanListPage() {
                           </Button>
                         )}
                         <Tooltip title="แก้ไข">
-                          <IconButton size="small" onClick={() => handleOpenEdit(plan)}><EditIcon fontSize="small" /></IconButton>
+                          <IconButton aria-label="แก้ไข" size="small" onClick={() => handleOpenEdit(plan)}><EditIcon fontSize="small" /></IconButton>
                         </Tooltip>
                         <Tooltip title="ลบ">
-                          <IconButton size="small" color="error" onClick={() => handleDelete(plan.id)}><DeleteIcon fontSize="small" /></IconButton>
+                          <IconButton aria-label="ลบ" size="small" color="error" onClick={() => handleDelete(plan.id)}><DeleteIcon fontSize="small" /></IconButton>
                         </Tooltip>
                       </Box>
                     </TableCell>
@@ -1061,13 +1072,13 @@ export default function PMPlanListPage() {
                       </Button>
                     )}
                     <Tooltip title="ดู Dashboard">
-                      <IconButton size="small" onClick={() => navigate('/pm')}><BarChartIcon fontSize="small" /></IconButton>
+                      <IconButton aria-label="ดู Dashboard" size="small" onClick={() => navigate('/pm')}><BarChartIcon fontSize="small" /></IconButton>
                     </Tooltip>
                     <Tooltip title="แก้ไขแผน PM">
-                      <IconButton size="small" onClick={() => handleOpenEdit(plan)}><EditIcon fontSize="small" /></IconButton>
+                      <IconButton aria-label="แก้ไขแผน PM" size="small" onClick={() => handleOpenEdit(plan)}><EditIcon fontSize="small" /></IconButton>
                     </Tooltip>
                     <Tooltip title="ลบแผน PM (ระวัง: ลบข้อมูลที่ตรวจแล้วด้วย)">
-                      <IconButton size="small" color="error" onClick={() => handleDelete(plan.id)}><DeleteIcon fontSize="small" /></IconButton>
+                      <IconButton aria-label="ลบแผน PM (ระวัง: ลบข้อมูลที่ตรวจแล้วด้วย)" size="small" color="error" onClick={() => handleDelete(plan.id)}><DeleteIcon fontSize="small" /></IconButton>
                     </Tooltip>
                   </Box>
                 </Box>
@@ -1175,9 +1186,21 @@ export default function PMPlanListPage() {
       {/* ── Generate Workload Modal ── */}
       <Modal open={generateModal.open} onClose={() => setGenerateModal({ open: false, plan: null })} title="Generate งาน PM">
         <Box sx={{ p: '18px 20px' }}>
+          {/* บอกขอบเขตของแผนให้ครบทุกเงื่อนไข ไม่ใช่หยิบมาโชว์ค่าเดียว
+              เดิมเขียน `deptTask || site` ซึ่งเวลาเลือก "ทุกแผนก" (deptTask ว่าง)
+              จะตกไปโชว์ชื่อสถานที่แทน กลายเป็นข้อความว่า "แผน: HQ" ทั้งที่แผนนั้น
+              ครอบคลุมทุกแผนกใน HQ อยู่แล้ว ทำให้เข้าใจผิดว่าระบบกรองเหลือแค่ HQ */}
           <Alert severity="info" icon={<EventIcon fontSize="inherit" />} sx={{ mb: 1.5 }}>
             <Typography sx={{ fontSize: 12.5, fontWeight: 700, mb: 0.5 }}>
-              แผน: {generateModal.plan?.deptTask || generateModal.plan?.site || 'ทั่วไป'}
+              ขอบเขตของแผนนี้
+            </Typography>
+            <Typography sx={{ fontSize: 11.5, mb: 0.5 }}>
+              {[
+                `บริษัท: ${generateModal.plan?.company || 'ทุกบริษัท'}`,
+                `สถานที่: ${generateModal.plan?.site || 'ทุกสถานที่'}`,
+                `แผนก: ${generateModal.plan?.deptTask || 'ทุกแผนก'}`,
+                `ประเภทอุปกรณ์: ${generateModal.plan?.deviceType || 'ทุกประเภท'}`,
+              ].join(' · ')}
             </Typography>
             <Typography sx={{ fontSize: 11 }}>
               {fmtDate(generateModal.plan?.startDate)} → {fmtDate(generateModal.plan?.endDate)} · เป้าหมาย {generateModal.plan?.plannedDeviceCount} เครื่อง
@@ -1186,7 +1209,7 @@ export default function PMPlanListPage() {
           {generateEligibility && <Box sx={{ mb: 1.5 }}><EligibilityStats data={generateEligibility} /></Box>}
           <Typography sx={{ fontSize: 12, color: 'text.secondary', lineHeight: 1.6 }}>
             ระบบจะสร้างรายการงาน PM สำหรับทรัพย์สินที่<strong>ยังไม่เคย PM</strong>ในปีนี้
-            โดยกรองตาม{generateModal.plan?.deptTask ? 'แผนก' : 'Location'}ที่กำหนดในแผน
+            และตรงกับขอบเขตข้างบนทุกข้อ — ช่องที่เป็น "ทุก…" คือไม่กรองด้วยเงื่อนไขนั้น
           </Typography>
           {genMsg && (
             <Alert severity={genMsg.includes('ผิดพลาด') ? 'error' : 'success'} sx={{ mt: 1.5 }}>{genMsg}</Alert>

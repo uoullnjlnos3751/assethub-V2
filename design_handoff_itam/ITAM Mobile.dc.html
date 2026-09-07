@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;padding:0;background:#eef3fa}
+*{box-sizing:border-box}
+a{color:#0891b2;text-decoration:none}
+a:hover{color:#0e7490}
+@keyframes mPulse{0%,100%{opacity:1}50%{opacity:.3}}
+</style>
+</helmet>
+
+<div style="width:1920px;min-height:1100px;padding:34px 40px 44px;font-family:'IBM Plex Sans Thai','IBM Plex Sans',system-ui,sans-serif;color:#15243c;background:radial-gradient(1200px 700px at 60% -10%,#e7eefb 0%,#eef3fa 60%)">
+
+  <div style="display:flex;align-items:flex-end;gap:18px;margin-bottom:26px">
+    <div style="flex:1">
+      <div style="font-size:12.5px;color:#68788e;letter-spacing:.06em">ITAM · MOBILE / FIELD WORK</div>
+      <div style="font-size:28px;font-weight:700;margin-top:4px">หน้าจอมือถือสำหรับงานหน้างาน</div>
+      <div style="font-size:13.5px;color:#68788e;margin-top:5px">ช่างและผู้ใช้ทั่วไปทำงานผ่านมือถือ — สแกน QR ครุภัณฑ์ ทำ Checklist PM แนบรูป และรับคืนอุปกรณ์</div>
+    </div>
+    <div style="display:flex;gap:9px">
+      <span style="padding:9px 15px;border-radius:11px;background:#ffffff;border:1px solid #dde5f0;font-size:12.5px;color:#54637a">Android · Material 3</span>
+      <span style="padding:9px 15px;border-radius:11px;background:#ffffff;border:1px solid #dde5f0;font-size:12.5px;color:#54637a">ใช้งานแบบ PWA · ออฟไลน์ได้</span>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:34px;align-items:flex-start">
+
+    <div style="width:420px;flex:none">
+      <div style="font-size:15px;font-weight:700;margin-bottom:3px">1 · แจ้งซ่อมจากหน้างาน</div>
+      <div style="font-size:12.5px;color:#68788e;margin-bottom:14px">สแกน QR ครุภัณฑ์ ระบบดึงข้อมูลเครื่องให้ทันที</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" title="แจ้งซ่อม" hint-size="420px,860px">
+        <div style="padding:14px 16px 22px;display:flex;flex-direction:column;gap:13px;font-family:'IBM Plex Sans Thai',sans-serif">
+          <div style="border-radius:16px;overflow:hidden;border:1px solid #dde5f0;background:#0b1524;height:168px;position:relative;display:flex;align-items:center;justify-content:center">
+            <div style="width:132px;height:132px;border:2px solid rgba(34,211,238,.85);border-radius:14px;position:relative">
+              <div style="position:absolute;left:6px;right:6px;top:50%;height:2px;background:rgba(34,211,238,.9);animation:mPulse 1.4s ease-in-out infinite"></div>
+            </div>
+            <span style="position:absolute;bottom:11px;font-size:11.5px;color:rgba(226,240,255,.8)">จ่อกล้องที่สติกเกอร์ QR ครุภัณฑ์</span>
+          </div>
+          <div style="border:1px solid #dde5f0;border-radius:16px;background:#f8fafc;padding:13px 15px">
+            <div style="font-size:11.5px;color:#68788e">พบทรัพย์สิน</div>
+            <div style="font-size:16px;font-weight:700;font-family:'IBM Plex Sans',sans-serif;color:#0e7490;margin-top:2px">AST-PR-0112</div>
+            <div style="font-size:13px;margin-top:3px">HP LaserJet Pro M404dn</div>
+            <div style="font-size:11.5px;color:#68788e;margin-top:2px">อาคาร A · ชั้น 2 · แผนกการเงิน · ในประกันถึง 12 ธ.ค. 69</div>
+          </div>
+          <div>
+            <div style="font-size:12.5px;color:#68788e;margin-bottom:8px">อาการที่พบ</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px">
+              <span style="padding:9px 14px;border-radius:999px;font-size:12.5px;background:rgba(8,145,178,.12);border:1px solid rgba(8,145,178,.45);color:#0e7490;font-weight:600">ดึงกระดาษไม่เข้า</span>
+              <span style="padding:9px 14px;border-radius:999px;font-size:12.5px;background:#ffffff;border:1px solid #dde5f0;color:#54637a">พิมพ์ไม่ออก</span>
+              <span style="padding:9px 14px;border-radius:999px;font-size:12.5px;background:#ffffff;border:1px solid #dde5f0;color:#54637a">หมึกหมด</span>
+              <span style="padding:9px 14px;border-radius:999px;font-size:12.5px;background:#ffffff;border:1px solid #dde5f0;color:#54637a">มีเสียงดัง</span>
+              <span style="padding:9px 14px;border-radius:999px;font-size:12.5px;background:#ffffff;border:1px solid #dde5f0;color:#54637a">อื่น ๆ</span>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:12.5px;color:#68788e;margin-bottom:8px">ความเร่งด่วน</div>
+            <div style="display:flex;gap:8px">
+              <span style="flex:1;text-align:center;padding:11px;border-radius:12px;font-size:13px;background:#ffffff;border:1px solid #dde5f0;color:#54637a">ต่ำ</span>
+              <span style="flex:1;text-align:center;padding:11px;border-radius:12px;font-size:13px;background:#ffffff;border:1px solid #dde5f0;color:#54637a">ปกติ</span>
+              <span style="flex:1;text-align:center;padding:11px;border-radius:12px;font-size:13px;font-weight:600;background:rgba(220,38,38,.1);border:1px solid rgba(220,38,38,.45);color:#b91c1c">ด่วน</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <div style="width:74px;height:74px;flex:none;border-radius:13px;border:1px dashed #cfd9e8;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-size:22px;color:#a3b0c2">📷</div>
+            <div style="width:74px;height:74px;flex:none;border-radius:13px;border:1px solid #dde5f0;background:#eef3fa;display:flex;align-items:center;justify-content:center;font-size:11.5px;color:#68788e;text-align:center">รูปที่ 1<br>ถ่ายแล้ว</div>
+            <div style="flex:1;font-size:11.5px;color:#68788e">แนบรูปช่วยให้ช่างเตรียมอะไหล่ได้ถูก (สูงสุด 3 รูป)</div>
+          </div>
+          <div style="border:1px solid #dde5f0;border-radius:14px;background:#f8fafc;padding:12px 14px;font-size:13px;color:#7a889c">รายละเอียดเพิ่มเติม (ไม่บังคับ)…</div>
+          <div style="text-align:center;padding:15px;border-radius:15px;background:linear-gradient(120deg,#0891b2,#2563eb);color:#ffffff;font-weight:700;font-size:15px;box-shadow:0 10px 22px rgba(8,145,178,.28)">ส่งใบแจ้งซ่อม</div>
+          <div style="text-align:center;font-size:11.5px;color:#68788e">ระบบจะจ่ายงานตามสัญญา MA และแจ้งเตือนช่างทันที</div>
+        </div>
+      </x-import>
+    </div>
+
+    <div style="width:420px;flex:none">
+      <div style="font-size:15px;font-weight:700;margin-bottom:3px">2 · ทำ PM หน้างาน</div>
+      <div style="font-size:12.5px;color:#68788e;margin-bottom:14px">Checklist 20 หัวข้อ กดตอบทีละข้อ บันทึกร่างได้แม้ไม่มีสัญญาณ</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" title="ทำ PM · AST-PC-0812" hint-size="420px,860px">
+        <div style="padding:14px 16px 22px;display:flex;flex-direction:column;gap:12px;font-family:'IBM Plex Sans Thai',sans-serif">
+          <div style="display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:14px;background:#f0fdf4;border:1px solid rgba(5,150,105,.35)">
+            <span style="width:8px;height:8px;border-radius:50%;background:#059669"></span>
+            <span style="flex:1;font-size:12px;color:#047857">บันทึกร่างอัตโนมัติ · ออฟไลน์อยู่ จะซิงก์เมื่อมีสัญญาณ</span>
+          </div>
+          <div style="border:1px solid #dde5f0;border-radius:16px;background:#f8fafc;padding:13px 15px">
+            <div style="display:flex;justify-content:space-between"><span style="font-size:11.5px;color:#68788e">COMPUTER NAME</span><span style="font-size:11.5px;color:#68788e">SERIAL</span></div>
+            <div style="display:flex;justify-content:space-between;margin-top:2px"><span style="font-size:15px;font-weight:700">FIN-PC-0812</span><span style="font-size:13px;font-family:'IBM Plex Sans',sans-serif">8CC0518T2</span></div>
+            <div style="font-size:12px;color:#68788e;margin-top:5px">สุนิสา ทองใบ · ฝ่ายการเงิน · อาคาร A ชั้น 2</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:11px">
+            <span style="font-size:12px;font-weight:600;color:#54637a">ความคืบหน้า</span>
+            <div style="flex:1;height:6px;border-radius:99px;background:#e6ebf3"><div style="width:60%;height:100%;border-radius:99px;background:#059669"></div></div>
+            <span style="font-size:12px;font-weight:700;color:#059669">12/20</span>
+          </div>
+          <div style="border:1px solid #dde5f0;border-radius:16px;overflow:hidden">
+            <div style="padding:9px 14px;background:#f4f7fb;font-size:11px;font-weight:600;color:#7a889c;letter-spacing:.06em">🪟 OS &amp; SOFTWARE</div>
+            <div style="padding:12px 14px;border-bottom:1px solid #f2f5f9">
+              <div style="font-size:13px;margin-bottom:9px">5 · ตรวจสอบ Windows Update (winver)</div>
+              <div style="display:flex;gap:7px"><span style="flex:1;text-align:center;padding:9px;border-radius:999px;font-size:12.5px;background:#eaf6ed;border:1px solid #34c759;color:#1c873b;font-weight:600">✓ ใช่</span><span style="flex:1;text-align:center;padding:9px;border-radius:999px;font-size:12.5px;background:#ffffff;border:1px solid #dde5f0;color:#68788e">✗ ไม่</span><span style="flex:1;text-align:center;padding:9px;border-radius:999px;font-size:12.5px;background:#ffffff;border:1px solid #dde5f0;color:#68788e">— N/A</span></div>
+            </div>
+            <div style="padding:12px 14px;border-bottom:1px solid #f2f5f9">
+              <div style="font-size:13px;margin-bottom:9px">7 · อัปเดต Antivirus (Virus Definition)</div>
+              <div style="display:flex;gap:7px"><span style="flex:1;text-align:center;padding:9px;border-radius:999px;font-size:12.5px;background:#ffffff;border:1px solid #dde5f0;color:#68788e">✓ ใช่</span><span style="flex:1;text-align:center;padding:9px;border-radius:999px;font-size:12.5px;background:#fdf2f2;border:1px solid #ff3b30;color:#c91e14;font-weight:600">✗ ไม่</span><span style="flex:1;text-align:center;padding:9px;border-radius:999px;font-size:12.5px;background:#ffffff;border:1px solid #dde5f0;color:#68788e">— N/A</span></div>
+              <div style="margin-top:9px;border:1px solid #f59e0b;border-radius:10px;background:#fffbeb;padding:9px 12px;font-size:12px;color:#92400e">Signature ค้าง 21 วัน · สั่งอัปเดตแล้ว</div>
+            </div>
+            <div style="padding:12px 14px">
+              <div style="font-size:13px;margin-bottom:9px">14 · ทำความสะอาดอุปกรณ์</div>
+              <div style="display:flex;gap:7px"><span style="flex:1;text-align:center;padding:9px;border-radius:999px;font-size:12.5px;background:#eaf6ed;border:1px solid #34c759;color:#1c873b;font-weight:600">✓ ใช่</span><span style="flex:1;text-align:center;padding:9px;border-radius:999px;font-size:12.5px;background:#ffffff;border:1px solid #dde5f0;color:#68788e">✗ ไม่</span><span style="flex:1;text-align:center;padding:9px;border-radius:999px;font-size:12.5px;background:#ffffff;border:1px solid #dde5f0;color:#68788e">— N/A</span></div>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px">
+            <div style="flex:1;text-align:center;padding:13px;border-radius:14px;background:#ffffff;border:1px solid #dde5f0;font-size:13.5px;color:#31435c">📸 แนบรูป</div>
+            <div style="flex:1;text-align:center;padding:13px;border-radius:14px;background:#ffffff;border:1px solid #dde5f0;font-size:13.5px;color:#31435c">💾 บันทึกร่าง</div>
+          </div>
+          <div style="text-align:center;padding:15px;border-radius:15px;background:#059669;color:#ffffff;font-weight:700;font-size:15px;box-shadow:0 10px 22px rgba(5,150,105,.26)">✅ บันทึกผล PM</div>
+        </div>
+      </x-import>
+    </div>
+
+    <div style="width:420px;flex:none">
+      <div style="font-size:15px;font-weight:700;margin-bottom:3px">3 · จ่ายของ / รับคืน</div>
+      <div style="font-size:12.5px;color:#68788e;margin-bottom:14px">สแกนทีละชิ้นแล้วให้ผู้ใช้เซ็นรับบนหน้าจอ</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" title="รับคืน · BRW-2569-0205" hint-size="420px,860px">
+        <div style="padding:14px 16px 22px;display:flex;flex-direction:column;gap:12px;font-family:'IBM Plex Sans Thai',sans-serif">
+          <div style="display:flex;gap:8px">
+            <span style="flex:1;text-align:center;padding:10px;border-radius:12px;font-size:13px;font-weight:600;background:rgba(8,145,178,.12);border:1px solid rgba(8,145,178,.45);color:#0e7490">รับคืน</span>
+            <span style="flex:1;text-align:center;padding:10px;border-radius:12px;font-size:13px;background:#ffffff;border:1px solid #dde5f0;color:#54637a">จ่ายของ</span>
+          </div>
+          <div style="border:1px solid #dde5f0;border-radius:16px;background:#f8fafc;padding:13px 15px">
+            <div style="font-size:11.5px;color:#68788e">ผู้ยืม</div>
+            <div style="font-size:15px;font-weight:700;margin-top:2px">ปิยะวัฒน์ กล้าหาญ</div>
+            <div style="font-size:12px;color:#68788e;margin-top:2px">แผนกการตลาด · กำหนดคืนวันนี้ (05 ส.ค. 69)</div>
+          </div>
+          <div style="font-size:12.5px;color:#68788e">รายการที่ต้องคืน · สแกนแล้ว 2/3</div>
+          <div style="display:flex;flex-direction:column;gap:9px">
+            <div style="display:flex;align-items:center;gap:11px;padding:12px 14px;border-radius:14px;border:1px solid rgba(5,150,105,.35);background:#f0fdf4">
+              <span style="width:26px;height:26px;flex:none;border-radius:50%;background:#059669;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px">✓</span>
+              <div style="flex:1"><div style="font-size:13.5px">iPad Pro 11"</div><div style="font-size:11.5px;color:#68788e">AST-TB-0044 · สภาพปกติ</div></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:11px;padding:12px 14px;border-radius:14px;border:1px solid rgba(5,150,105,.35);background:#f0fdf4">
+              <span style="width:26px;height:26px;flex:none;border-radius:50%;background:#059669;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px">✓</span>
+              <div style="flex:1"><div style="font-size:13.5px">Apple Pencil</div><div style="font-size:11.5px;color:#68788e">AST-AC-0231 · สภาพปกติ</div></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:11px;padding:12px 14px;border-radius:14px;border:1px solid #dde5f0;background:#ffffff">
+              <span style="width:26px;height:26px;flex:none;border-radius:50%;background:#f4f7fb;border:1px solid #dde5f0;color:#a3b0c2;display:flex;align-items:center;justify-content:center;font-size:12px">3</span>
+              <div style="flex:1"><div style="font-size:13.5px">เคสหนัง iPad</div><div style="font-size:11.5px;color:#b45309">รอสแกน</div></div>
+              <span style="padding:7px 12px;border-radius:10px;background:rgba(8,145,178,.1);border:1px solid rgba(8,145,178,.4);font-size:12px;color:#0e7490">สแกน</span>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:12.5px;color:#68788e;margin-bottom:8px">สภาพที่ตรวจพบ</div>
+            <div style="display:flex;gap:8px">
+              <span style="flex:1;text-align:center;padding:11px;border-radius:12px;font-size:13px;font-weight:600;background:#eaf6ed;border:1px solid #34c759;color:#1c873b">ปกติ</span>
+              <span style="flex:1;text-align:center;padding:11px;border-radius:12px;font-size:13px;background:#ffffff;border:1px solid #dde5f0;color:#54637a">มีรอย</span>
+              <span style="flex:1;text-align:center;padding:11px;border-radius:12px;font-size:13px;background:#ffffff;border:1px solid #dde5f0;color:#54637a">ชำรุด</span>
+            </div>
+          </div>
+          <div style="border:1px dashed #cfd9e8;border-radius:14px;background:#f8fafc;height:104px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px">
+            <span style="font-size:13px;color:#7a889c">ให้ผู้ยืมเซ็นรับที่นี่</span>
+            <span style="font-size:11.5px;color:#a3b0c2">ลากนิ้วเพื่อเซ็น</span>
+          </div>
+          <div style="text-align:center;padding:15px;border-radius:15px;background:linear-gradient(120deg,#0891b2,#2563eb);color:#ffffff;font-weight:700;font-size:15px;box-shadow:0 10px 22px rgba(8,145,178,.28)">ยืนยันรับคืน</div>
+        </div>
+      </x-import>
+    </div>
+
+    <div style="width:420px;flex:none">
+      <div style="font-size:15px;font-weight:700;margin-bottom:3px">4 · ทรัพย์สินของฉัน</div>
+      <div style="font-size:12.5px;color:#68788e;margin-bottom:14px">มุมมองพนักงานทั่วไป — ของในความดูแลและสิ่งที่ต้องทำ</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" title="ของฉัน" hint-size="420px,860px">
+        <div style="padding:14px 16px 22px;display:flex;flex-direction:column;gap:12px;font-family:'IBM Plex Sans Thai',sans-serif">
+          <div style="display:flex;align-items:center;gap:12px;padding:13px 15px;border-radius:16px;background:linear-gradient(120deg,#0891b2,#2563eb);color:#ffffff">
+            <div style="width:42px;height:42px;flex:none;border-radius:13px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:18px">👤</div>
+            <div style="flex:1"><div style="font-size:15px;font-weight:700">ณิชา พงษ์ศรี</div><div style="font-size:12px;color:rgba(255,255,255,.82)">ฝ่ายไอที · 6 รายการในความดูแล</div></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:9px">
+            <div style="display:flex;align-items:center;gap:11px;padding:12px 14px;border-radius:14px;border:1px solid rgba(194,130,10,.35);background:#fffaf5">
+              <span style="width:8px;height:8px;flex:none;border-radius:50%;background:#c2820a"></span>
+              <div style="flex:1"><div style="font-size:13px;color:#92400e">ครบกำหนดคืนใน 5 วัน</div><div style="font-size:11.5px;color:#b45309">ชุดประชุมทางไกล · 10 ส.ค. 69</div></div>
+              <span style="padding:7px 12px;border-radius:10px;background:rgba(194,130,10,.14);border:1px solid rgba(194,130,10,.4);font-size:12px;color:#92400e">ขอต่ออายุ</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:11px;padding:12px 14px;border-radius:14px;border:1px solid rgba(8,145,178,.3);background:#f0fbfe">
+              <span style="width:8px;height:8px;flex:none;border-radius:50%;background:#0891b2"></span>
+              <div style="flex:1"><div style="font-size:13px;color:#0e7490">ยืนยันการตรวจนับประจำปี</div><div style="font-size:11.5px;color:#0e7490">3 รายการ · ภายใน 31 ส.ค. 69</div></div>
+              <span style="padding:7px 12px;border-radius:10px;background:rgba(8,145,178,.12);border:1px solid rgba(8,145,178,.4);font-size:12px;color:#0e7490">ยืนยัน</span>
+            </div>
+          </div>
+          <div style="font-size:12.5px;color:#68788e">ทรัพย์สินในความดูแล</div>
+          <div style="display:flex;flex-direction:column;gap:9px">
+            <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;border:1px solid #dde5f0;background:#f8fafc">
+              <div style="width:40px;height:40px;flex:none;border-radius:11px;background:rgba(8,145,178,.1);display:flex;align-items:center;justify-content:center;font-size:17px">💻</div>
+              <div style="flex:1"><div style="font-size:13.5px;font-weight:600">ThinkPad T14 Gen3</div><div style="font-size:11.5px;color:#68788e">AST-NB-0298 · ประจำตัว</div></div>
+              <span style="padding:4px 10px;border-radius:999px;font-size:11px;background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.35);color:#047857">ใช้งาน</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;border:1px solid #dde5f0;background:#f8fafc">
+              <div style="width:40px;height:40px;flex:none;border-radius:11px;background:rgba(37,99,235,.1);display:flex;align-items:center;justify-content:center;font-size:17px">🖥</div>
+              <div style="flex:1"><div style="font-size:13.5px;font-weight:600">Dell P2723DE 27"</div><div style="font-size:11.5px;color:#68788e">AST-MN-2244 · ประจำตัว</div></div>
+              <span style="padding:4px 10px;border-radius:999px;font-size:11px;background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.35);color:#047857">ใช้งาน</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;border:1px solid #dde5f0;background:#f8fafc">
+              <div style="width:40px;height:40px;flex:none;border-radius:11px;background:rgba(124,58,237,.1);display:flex;align-items:center;justify-content:center;font-size:17px">📶</div>
+              <div style="flex:1"><div style="font-size:13.5px;font-weight:600">Mobile Wi-Fi + SIM</div><div style="font-size:11.5px;color:#68788e">AST-NW-0117 · คืน 15 ก.ย. 69</div></div>
+              <span style="padding:4px 10px;border-radius:999px;font-size:11px;background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.35);color:#6d28d9">ยืม</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:2px">
+            <div style="flex:1;text-align:center;padding:14px;border-radius:14px;background:#ffffff;border:1px solid #dde5f0;font-size:13.5px;color:#31435c">🛠 แจ้งซ่อม</div>
+            <div style="flex:1;text-align:center;padding:14px;border-radius:14px;background:linear-gradient(120deg,#0891b2,#2563eb);color:#ffffff;font-weight:600;font-size:13.5px">＋ ขอยืมของ</div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+  </div>
+
+  <div style="margin-top:30px;font-size:12px;color:#7a889c">© 2569 · ระบบบริหารทรัพย์สินไอที — หน้าจอมือถือ (Mockup)</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1920,&quot;height&quot;:1160}}"></script>
+</body>
+</html>

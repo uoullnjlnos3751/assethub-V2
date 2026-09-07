@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Typography, Button, useTheme, alpha } from '@mui/material';
-import { Inbox, Plus, RefreshCw } from 'lucide-react';
+import { Inbox, Plus, RefreshCw, SearchX } from 'lucide-react';
 
 interface EmptyStateProps {
   title?: string;
@@ -10,18 +10,28 @@ interface EmptyStateProps {
   onAction?: () => void;
   secondaryActionLabel?: string;
   onSecondaryAction?: () => void;
+  /** ว่างเพราะตัวกรอง/คำค้น ไม่ใช่เพราะไม่มีข้อมูลจริง — สองอย่างนี้ต้องการ
+   *  การกระทำคนละแบบ ผู้ใช้จึงต้องแยกออกจากกันได้ทันที */
+  filtered?: boolean;
+  onClearFilter?: () => void;
 }
 
 export default function EmptyState({
-  title = 'ไม่มีข้อมูล',
-  description = 'ยังไม่มีรายการในระบบ',
+  title,
+  description,
   icon,
   actionLabel,
   onAction,
   secondaryActionLabel,
   onSecondaryAction,
+  filtered = false,
+  onClearFilter,
 }: EmptyStateProps) {
   const theme = useTheme();
+  const heading = title ?? (filtered ? 'ไม่พบรายการที่ตรงกับที่ค้นหา' : 'ไม่มีข้อมูล');
+  const body = description ?? (filtered
+    ? 'ลองแก้คำค้นหรือล้างตัวกรองเพื่อดูรายการทั้งหมด'
+    : 'ยังไม่มีรายการในระบบ');
 
   return (
     <Box
@@ -47,15 +57,22 @@ export default function EmptyState({
           mb: 3,
         }}
       >
-        {icon || <Inbox size={36} color={theme.palette.primary.main} />}
+        {icon || (filtered
+          ? <SearchX size={36} color={theme.palette.primary.main} />
+          : <Inbox size={36} color={theme.palette.primary.main} />)}
       </Box>
       <Typography variant="h6" fontWeight={700} sx={{ mb: 1, color: theme.palette.text.primary }}>
-        {title}
+        {heading}
       </Typography>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 3, maxWidth: 400 }}>
-        {description}
+        {body}
       </Typography>
       <Box sx={{ display: 'flex', gap: 2 }}>
+        {filtered && onClearFilter && (
+          <Button variant="outlined" startIcon={<RefreshCw size={18} />} onClick={onClearFilter}>
+            ล้างตัวกรอง
+          </Button>
+        )}
         {onAction && actionLabel && (
           <Button
             variant="contained"

@@ -10,8 +10,7 @@
  */
 import { prisma } from '../lib/prisma';
 import { fillBlanksFromAgent } from '../services/externalAgent';
-
-const DAY_MS = 24 * 60 * 60 * 1000;
+import { scheduleDaily } from './dailySchedule';
 
 export async function runAgentSpecAutofill(): Promise<void> {
   if (process.env.AGENT_AUTOFILL_ENABLED === 'false') return;
@@ -40,10 +39,10 @@ export function startAgentSpecSync(): void {
     return;
   }
 
-  // Delayed first run so a restart does not fire an outbound sweep before the
-  // server has finished coming up.
-  setTimeout(() => { void runAgentSpecAutofill(); }, 60_000);
-  setInterval(() => { void runAgentSpecAutofill(); }, DAY_MS);
-
-  console.log('[AgentAutofill] Scheduled daily blank-fill from the monitoring agent (interval: 24h)');
+  // 01:30 — ก่อน ComponentChange (02:00) ที่ต้องใช้สเปคล่าสุดในการเทียบ
+  scheduleDaily({
+    name: 'AgentAutofill',
+    hour: 1, minute: 30,
+    run: runAgentSpecAutofill,
+  });
 }

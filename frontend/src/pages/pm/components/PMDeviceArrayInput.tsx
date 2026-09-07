@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box, Button, TextField, Select, MenuItem, InputLabel, FormControl,
-  Typography, Avatar, Chip, alpha, useTheme,
+  Typography, Avatar, Chip, IconButton, Tooltip, alpha, useTheme,
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import SyncIcon from '@mui/icons-material/Sync';
 import SearchIcon from '@mui/icons-material/Search';
@@ -13,6 +15,7 @@ import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import { pmAPI, assetAPI } from '../../../services/api';
 import { resolveMediaUrl } from '../../../utils/mediaUrl';
 import imageCompression from 'browser-image-compression';
+import { ImageLightbox } from '../../../components/ImageLightbox';
 
 interface PMDeviceData {
   _assetId?: number;
@@ -26,10 +29,15 @@ interface PMDeviceData {
   serialNo: string;
   printerType?: string;
   photoFilename?: string;
-  source?: 'glpi' | 'itam' | 'history';
+  source?: 'glpi' | 'itam' | 'history' | 'agent';
   screenSize?: string | null;
   ports?: string | null;
   hasSpeaker?: boolean;
+  /** จาก Agent เท่านั้น: พอร์ตที่เสียบอยู่จริงตอนนี้ คนละความหมายกับ `ports`
+   *  ที่เป็นรายการพอร์ตทั้งหมดที่จอตัวนั้นมี (GLPI) */
+  connectedPort?: string | null;
+  /** ปีที่ผลิตจาก EDID — GLPI ไม่มีข้อมูลนี้ */
+  year?: number | null;
 }
 
 interface PMDeviceArrayInputProps {
@@ -45,10 +53,11 @@ const PRINTER_BRANDS = ['HP', 'Epson', 'Canon', 'Brother', 'FujiXerox', 'Ricoh',
 const PRINTER_TYPES = ['Laser', 'Inkjet', 'Dot Matrix', 'Thermal', 'Label', 'Other'];
 const DEFAULT_COMPANIES = ['TRRHQ', 'TRR', 'TRRCORP', 'TRRT', 'PS', 'SSEC', 'TMI', 'TRM', 'TRRL', 'TRRP', 'TRW', 'TEG', 'TRRSK'];
 
-const SOURCE_META: Record<string, { label: string; colorKey: 'success' | 'info' | 'warning' }> = {
+const SOURCE_META: Record<string, { label: string; colorKey: 'success' | 'info' | 'warning' | 'secondary' }> = {
   glpi: { label: '🟢 จาก GLPI API', colorKey: 'success' },
   itam: { label: '🔵 จาก ITAM DB (คลัง)', colorKey: 'info' },
   history: { label: '🟡 จากประวัติ PM', colorKey: 'warning' },
+  agent: { label: '🤖 จาก Agent', colorKey: 'secondary' },
 };
 
 export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, value, onChange, parentAsset, readOnly = false }) => {
@@ -56,6 +65,11 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
   const [devices, setDevices] = useState<PMDeviceData[]>([]);
   const [hasAny, setHasAny] = useState<'yes' | 'no' | null>(null);
   const [previewCodes, setPreviewCodes] = useState<string[]>([]);
+  /** ลำดับของเครื่องที่กำลังเปิดดูรูปเต็มอยู่ — null คือไม่ได้เปิด */
+  const [photoZoom, setPhotoZoom] = useState<number | null>(null);
+  /** input เลือกไฟล์ของแต่ละแถว เก็บไว้ให้ปุ่ม "เปลี่ยนรูป" ในหน้าดูรูปเต็ม
+   *  เรียกใช้ตัวเดียวกับปุ่มในแถวได้ ไม่ต้องมีตัวจัดการอัปโหลดสองชุด */
+  const photoInputs = React.useRef<Record<number, HTMLInputElement | null>>({});
   const [companies, setCompanies] = useState<string[]>(DEFAULT_COMPANIES);
   const [displayFormat, setDisplayFormat] = useState<string>('{AssetName} / {AssetCode}');
 
@@ -257,14 +271,39 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
     } as any]);
   };
 
+  /**
+   * ลบเครื่องออกหนึ่งตัว ตัวที่อยู่ถัดไปเลื่อนขึ้นมาแทนทั้งชุด
+   *
+   * Agent มักรายงานจอมาเกินกว่าที่ตั้งอยู่หน้างานจริง (จอที่เคยเสียบไว้ยังค้าง
+   * อยู่ใน EDID) ช่างจึงต้องลบตัวที่ไม่มีอยู่จริงออกได้ทุกตำแหน่ง รวมทั้งตัวแรก
+   * — ของเดิมซ่อนปุ่มลบของจอที่ 1 ไว้ ทำให้ต้องไปแก้ข้อมูลทับเอาเองทีละช่อง
+   *
+   * previewCodes ต้องตัดตามด้วย มันอ้างด้วยลำดับล้วน ๆ ถ้าไม่ตัด รหัสทรัพย์สิน
+   * ที่จองไว้ให้ตัวที่ถูกลบจะตกไปติดกับตัวที่เลื่อนขึ้นมาแทน
+   */
   const removeDevice = (index: number) => {
     const newD = [...devices];
     newD.splice(index, 1);
+    setPreviewCodes(prev => { const c = [...prev]; c.splice(index, 1); return c; });
     updateParent(newD);
     if (newD.length === 0) {
       setHasAny(null);
       onChange('');
     }
+  };
+
+  /** สลับลำดับกับตัวข้างบน/ข้างล่าง พาข้อมูลไปทั้งชุด รวมรหัสที่จองไว้ */
+  const moveDevice = (index: number, dir: -1 | 1) => {
+    const to = index + dir;
+    if (to < 0 || to >= devices.length) return;
+    const newD = [...devices];
+    [newD[index], newD[to]] = [newD[to], newD[index]];
+    setPreviewCodes(prev => {
+      const c = [...prev];
+      [c[index], c[to]] = [c[to], c[index]];
+      return c;
+    });
+    updateParent(newD);
   };
 
   const updateField = (index: number, field: keyof PMDeviceData, val: any) => {
@@ -311,22 +350,24 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
 
   return (
     <Box sx={{ mt: 1 }}>
-      <Box sx={{ display: 'flex', gap: 0.75, mb: 1.5 }}>
+      {/* ปุ่มแรกที่ต้องกดของทุกข้อชนิด device_array — ขยายจาก size="small" ให้กด
+          ง่ายขึ้นตามที่แจ้งมา หน้าจอนี้ใช้บนคอมพิวเตอร์ระหว่างทำ PM เท่านั้น */}
+      <Box sx={{ display: 'flex', gap: 1, mb: 1.5 }}>
         <Button
           variant={hasAny === 'yes' ? 'contained' : 'outlined'}
           color={hasAny === 'yes' ? 'success' : 'inherit'}
-          size="small"
-          startIcon={<CheckCircleIcon sx={{ fontSize: 16 }} />}
+          startIcon={<CheckCircleIcon sx={{ fontSize: 18 }} />}
           onClick={() => !readOnly && handleToggleYesNo('yes')}
           disabled={readOnly}
+          sx={{ fontSize: 13.5, px: 2.25, py: 0.8 }}
         >{buttonYes}</Button>
         <Button
           variant={hasAny === 'no' ? 'contained' : 'outlined'}
           color={hasAny === 'no' ? 'error' : 'inherit'}
-          size="small"
-          startIcon={<CancelIcon sx={{ fontSize: 16 }} />}
+          startIcon={<CancelIcon sx={{ fontSize: 18 }} />}
           onClick={() => !readOnly && handleToggleYesNo('no')}
           disabled={readOnly}
+          sx={{ fontSize: 13.5, px: 2.25, py: 0.8 }}
         >{buttonNo}</Button>
       </Box>
 
@@ -351,28 +392,55 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
                       />
                     )}
                   </Box>
-                  {!readOnly && idx > 0 && (
-                    <Button
-                      size="small"
-                      color="error"
-                      startIcon={<DeleteOutlineIcon sx={{ fontSize: 16 }} />}
-                      onClick={() => removeDevice(idx)}
-                      sx={{ minHeight: 'auto', py: 0.25 }}
-                    >ลบเครื่องนี้</Button>
+                  {!readOnly && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+                      <Tooltip title={idx === 0 ? '' : `ย้ายขึ้นเป็นลำดับที่ ${idx}`}>
+                        <span>
+                          <IconButton aria-label="ย้ายขึ้น" size="small" disabled={idx === 0} onClick={() => moveDevice(idx, -1)}>
+                            <ArrowUpwardIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                      <Tooltip title={idx === devices.length - 1 ? '' : `ย้ายลงเป็นลำดับที่ ${idx + 2}`}>
+                        <span>
+                          <IconButton aria-label="ย้ายลง" size="small" disabled={idx === devices.length - 1} onClick={() => moveDevice(idx, 1)}>
+                            <ArrowDownwardIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                      <Button
+                        size="small"
+                        color="error"
+                        startIcon={<DeleteOutlineIcon sx={{ fontSize: 16 }} />}
+                        onClick={() => removeDevice(idx)}
+                        sx={{ minHeight: 'auto', py: 0.25, ml: 0.5 }}
+                      >ลบเครื่องนี้</Button>
+                    </Box>
                   )}
                 </Box>
 
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                {/* กว้างพอสำหรับ 2 คอลัมน์บน desktop แล้ว (dialog ขยายเป็น 1040px) —
+                    ช่องที่มีข้อความอธิบาย/คำเตือนต่อท้าย (assetCode, บริษัท, S/N,
+                    ข้อมูลผู้ถือครอง, สเปคจอ) ยังคงเต็มแถวเพื่อไม่ให้ข้อความล้น
+                    ส่วนช่องสั้น ๆ (เลขครุภัณฑ์, ยี่ห้อ, ประเภท, รุ่น) จับคู่กัน 2 ต่อแถว */}
+                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 1.5, alignItems: 'start' }}>
 
                   {/* Photo Upload */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, gridColumn: '1 / -1' }}>
                     {d.photoFilename ? (
-                      <Avatar
-                        variant="rounded"
-                        src={resolveMediaUrl(`/uploads/pm/${d.photoFilename}`)}
-                        alt={labelSingular}
-                        sx={{ width: 60, height: 60, borderRadius: '8px', border: `1px solid ${theme.palette.divider}` }}
-                      />
+                      <Tooltip title="คลิกเพื่อดูรูปขนาดเต็ม">
+                        <Avatar
+                          variant="rounded"
+                          src={resolveMediaUrl(`/uploads/pm/${d.photoFilename}`)}
+                          alt={labelSingular}
+                          onClick={() => setPhotoZoom(idx)}
+                          sx={{
+                            width: 60, height: 60, borderRadius: '8px',
+                            border: `1px solid ${theme.palette.divider}`, cursor: 'zoom-in',
+                            '&:hover': { borderColor: theme.palette.primary.main },
+                          }}
+                        />
+                      </Tooltip>
                     ) : (
                       <Box sx={{
                         width: 60, height: 60, bgcolor: theme.palette.action.hover, borderRadius: '8px',
@@ -384,17 +452,28 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
                     {!readOnly && (
                       <Button component="label" size="small" variant="outlined" sx={{ fontSize: '0.75rem' }}>
                         ถ่ายภาพหรืออัปโหลด
-                        <input type="file" accept="image/*" hidden onChange={(e) => {
-                          if (e.target.files && e.target.files[0]) {
-                            handlePhotoUpload(idx, e.target.files[0]);
-                          }
-                        }} />
+                        <input
+                          ref={el => { photoInputs.current[idx] = el; }}
+                          type="file" accept="image/*" hidden
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              handlePhotoUpload(idx, e.target.files[0]);
+                            }
+                          }}
+                        />
                       </Button>
+                    )}
+                    {d.photoFilename && !readOnly && (
+                      <Button
+                        size="small" color="error" startIcon={<DeleteOutlineIcon sx={{ fontSize: 16 }} />}
+                        onClick={() => updateField(idx, 'photoFilename', undefined)}
+                        sx={{ fontSize: '0.75rem' }}
+                      >ลบรูป</Button>
                     )}
                   </Box>
 
                   {/* Fields */}
-                  <Box>
+                  <Box sx={{ gridColumn: '1 / -1' }}>
                     <Typography variant="caption" sx={{ display: 'block', color: theme.palette.text.secondary, mb: 0.5 }}>ชื่อทรัพย์สิน / รหัสทรัพย์สิน</Typography>
                     <Box sx={{ display: 'flex', gap: 0.75 }}>
                       <Box sx={{ flex: 1 }}>
@@ -446,7 +525,7 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
                     />
                   </Box>
 
-                  <Box>
+                  <Box sx={{ gridColumn: '1 / -1' }}>
                     <FormControl size="small" fullWidth disabled={readOnly}>
                       <InputLabel>บริษัท (Company)</InputLabel>
                       <Select label="บริษัท (Company)" value={d.company} onChange={e => updateField(idx, 'company', e.target.value)}>
@@ -467,7 +546,7 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
                     )}
                   </Box>
 
-                  <Box>
+                  <Box sx={{ gridColumn: '1 / -1' }}>
                     <Typography variant="caption" sx={{ display: 'block', color: theme.palette.text.secondary, mb: 0.5 }}>
                       Serial No. <Box component="span" sx={{ color: theme.palette.error.main }}>*</Box>
                     </Typography>
@@ -523,14 +602,15 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
                   />
 
                   {/* Readonly Info */}
-                  <Box sx={{ bgcolor: theme.palette.action.hover, p: 1.25, borderRadius: '8px', fontSize: '0.7rem', color: theme.palette.text.secondary }}>
+                  <Box sx={{ gridColumn: '1 / -1', bgcolor: theme.palette.action.hover, p: 1.25, borderRadius: '8px', fontSize: '0.7rem', color: theme.palette.text.secondary }}>
                     <Box component="strong" sx={{ color: theme.palette.text.primary }}>ผู้ถือครอง:</Box> {parentAsset?.ownerName || '-'}{' '}
                     <Box component="strong" sx={{ color: theme.palette.text.primary }}>แผนก:</Box> {parentAsset?.departmentId || '-'}
                   </Box>
 
-                  {/* Monitor Specs from GLPI / DB if present */}
-                  {!isPrinter && (d.screenSize || d.ports || d.hasSpeaker) && (
+                  {/* Monitor Specs from GLPI / DB / Agent if present */}
+                  {!isPrinter && (d.screenSize || d.ports || d.hasSpeaker || d.connectedPort || d.year) && (
                     <Box sx={{
+                      gridColumn: '1 / -1',
                       bgcolor: alpha(theme.palette.info.main, 0.08),
                       border: `1px solid ${alpha(theme.palette.info.main, 0.25)}`,
                       p: 1.25, borderRadius: '8px', fontSize: '0.7rem', color: theme.palette.info.main,
@@ -538,6 +618,10 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
                       <Box component="strong">🖥️ สเปคจอ:</Box>{' '}
                       {d.screenSize && <Box component="span" sx={{ mr: 1 }}>📐 ขนาด {d.screenSize}</Box>}
                       {d.ports && <Box component="span" sx={{ mr: 1 }}>🔌 พอร์ต: {d.ports}</Box>}
+                      {/* Agent บอกได้แค่พอร์ตที่เสียบอยู่ ไม่ใช่พอร์ตที่จอมีทั้งหมด
+                          จึงเขียนแยกให้ชัด ไม่ปนกับ 'พอร์ต' ด้านบน */}
+                      {d.connectedPort && <Box component="span" sx={{ mr: 1 }}>🔌 เสียบผ่าน {d.connectedPort}</Box>}
+                      {d.year && <Box component="span" sx={{ mr: 1 }}>📅 ผลิตปี {d.year}</Box>}
                       {d.hasSpeaker && <Box component="span">🔊 มีลำโพงในตัว</Box>}
                     </Box>
                   )}
@@ -563,6 +647,21 @@ export const PMDeviceArrayInput: React.FC<PMDeviceArrayInputProps> = ({ type, va
           )}
         </Box>
       )}
+
+      {/* หน้าดูรูปเต็มตัวเดียวใช้ร่วมกันทุกเครื่อง อ่านรูปจากลำดับที่กำลังเปิดอยู่ */}
+      <ImageLightbox
+        open={photoZoom !== null}
+        onClose={() => setPhotoZoom(null)}
+        src={photoZoom !== null && devices[photoZoom]?.photoFilename
+          ? resolveMediaUrl(`/uploads/pm/${devices[photoZoom]!.photoFilename}`)
+          : null}
+        title={photoZoom !== null ? `${labelHeader} ${photoZoom + 1}` : ''}
+        onReplace={readOnly || photoZoom === null ? undefined : () => photoInputs.current[photoZoom]?.click()}
+        onDelete={readOnly || photoZoom === null ? undefined : () => {
+          updateField(photoZoom, 'photoFilename', undefined);
+          setPhotoZoom(null);
+        }}
+      />
     </Box>
   );
 };

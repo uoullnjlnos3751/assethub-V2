@@ -1,5 +1,6 @@
 import {
-  PLAN_STATE_LABEL, SchedPlan, SchedSelection, groupState, pct, rollup, schedScopeBits,
+  PLAN_STATE_LABEL, SchedPlan, SchedSelection, barRange, groupState, pct, rollup,
+  rollupDepartments, schedScopeBits,
 } from './pmSchedule';
 import { Rows, stamp, writeCsv, writeWorkbook } from '../../utils/spreadsheet';
 
@@ -40,10 +41,11 @@ export function buildScheduleReports(
   const companyRows: Rows = [
     ...head('สรุปรายบริษัท'),
     ['บริษัท', 'จำนวนแผน', 'เป้าหมาย (เครื่อง)', 'สร้างงานแล้ว', 'ทำเสร็จ', 'คงเหลือ', '% คืบหน้า',
-      'เริ่ม', 'สิ้นสุด', 'สถานะรวม', 'แผนที่เกินกำหนด'],
+      'นัดแล้ว', 'เริ่ม', 'สิ้นสุด', 'ที่มาของช่วงเวลา', 'สถานะรวม', 'แผนที่เกินกำหนด'],
     ...companies.map(g => [
       g.name, g.plans.length, g.target, g.total, g.done, g.total - g.done, `${pct(g.done, g.total)}%`,
-      g.start, g.end, PLAN_STATE_LABEL[groupState(g)],
+      g.scheduled, g.start, g.end, g.booked ? 'วันนัดจริง' : 'กรอบของแผน',
+      PLAN_STATE_LABEL[groupState(g)],
       g.plans.filter(p => p.state === 'OVERDUE').length,
     ]),
   ];
@@ -52,13 +54,17 @@ export function buildScheduleReports(
   const deptRows: Rows = [
     ...head('สรุปรายแผนก'),
     ['บริษัท', 'แผนก', 'จำนวนแผน', 'เป้าหมาย (เครื่อง)', 'สร้างงานแล้ว', 'ทำเสร็จ', 'คงเหลือ',
-      '% คืบหน้า', 'เริ่ม', 'สิ้นสุด', 'สถานะ'],
+      '% คืบหน้า', 'นัดแล้ว', 'เริ่ม', 'สิ้นสุด', 'ที่มาของช่วงเวลา', 'สถานะ'],
   ];
+  // rollupDepartments (ไม่ใช่ rollup ธรรมดา) เพื่อให้ชีตนี้ตรงกับกราฟ — แผน
+  // "ทุกแผนก" ถูกกางเป็นรายแผนกจริงเหมือนกัน ส่วนชีตรายบริษัทกับรายแผนยังใช้
+  // ตัวแผนเต็มใบ เป้าหมายระดับแผนจึงไม่เพี้ยน
   for (const co of companies) {
-    for (const dp of rollup(co.plans, 'dept')) {
+    for (const dp of rollupDepartments(co.plans)) {
       deptRows.push([
         co.name, dp.name, dp.plans.length, dp.target, dp.total, dp.done, dp.total - dp.done,
-        `${pct(dp.done, dp.total)}%`, dp.start, dp.end, PLAN_STATE_LABEL[groupState(dp)],
+        `${pct(dp.done, dp.total)}%`, dp.scheduled, dp.start, dp.end,
+        dp.booked ? 'วันนัดจริง' : 'กรอบของแผน', PLAN_STATE_LABEL[groupState(dp)],
       ]);
     }
   }
@@ -67,9 +73,14 @@ export function buildScheduleReports(
     ...head('รายแผน'),
     ['รหัสแผน', 'บริษัท', 'แผนก', 'สถานที่', 'ประเภทอุปกรณ์', 'ผู้รับผิดชอบ',
       'เป้าหมาย (เครื่อง)', 'สร้างงานแล้ว', 'ทำเสร็จ', 'คงเหลือ', '% คืบหน้า',
-      'เริ่ม', 'สิ้นสุด', 'จำนวนวัน', 'สถานะ'],
+      'เริ่ม (แผน)', 'สิ้นสุด (แผน)', 'จำนวนวัน',
+      'นัดแล้ว', 'วันนัดแรก', 'วันนัดสุดท้าย', 'สถานะ'],
     ...[...plans]
-      .sort((a, b) => (a.start! < b.start! ? -1 : a.start! > b.start! ? 1 : a.id - b.id))
+      // เรียงตามช่วงที่กราฟใช้จริง ชีตนี้จะได้ไล่ลงมาตามลำดับเดียวกับที่เห็นบนจอ
+      .sort((a, b) => {
+        const x = barRange(a).start || '', y = barRange(b).start || '';
+        return x < y ? -1 : x > y ? 1 : a.id - b.id;
+      })
       .map(p => {
         const days = p.start && p.end
           ? Math.round((new Date(`${p.end}T00:00:00`).getTime() - new Date(`${p.start}T00:00:00`).getTime()) / 86_400_000) + 1
@@ -77,7 +88,9 @@ export function buildScheduleReports(
         return [
           p.id, p.company, p.dept, p.site || '', p.deviceType || '', p.lead || '',
           p.target, p.total, p.done, p.total - p.done, `${pct(p.done, p.total)}%`,
-          p.start || '', p.end || '', days, PLAN_STATE_LABEL[p.state],
+          p.start || '', p.end || '', days,
+          p.scheduled, p.schedStart || '', p.schedEnd || '',
+          PLAN_STATE_LABEL[p.state],
         ];
       }),
   ];
@@ -92,7 +105,7 @@ export function buildScheduleReports(
 export function exportScheduleWorkbook(
   year: number, plans: SchedPlan[], sel: SchedSelection, today: Date,
 ) {
-  writeWorkbook(
+  void writeWorkbook(
     buildScheduleReports(year, plans, sel, today).map(r => ({ name: r.label, rows: r.rows })),
     `PM-schedule-${year + 543}-${stamp()}.xlsx`,
   );

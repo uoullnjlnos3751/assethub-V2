@@ -18,6 +18,7 @@ import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import DownloadIcon from '@mui/icons-material/Download';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { assetAPI } from '../../../services/api';
+import { useConfirm } from '../../../contexts/ConfirmContext';
 
 /* ─── Documents tab ───────────────────────────────────────────── */
 export function DocumentsTab({ asset, onReload }: { asset: any; onReload: () => void }) {
@@ -51,8 +52,9 @@ export function DocumentsTab({ asset, onReload }: { asset: any; onReload: () => 
     }
   };
 
+  const confirm = useConfirm();
   const handleDelete = async (docId: number) => {
-    if (!window.confirm('ยืนยันการลบเอกสารนี้?')) return;
+    if (!await confirm({ title: 'ลบเอกสารแนบ', target: docs.find((d: any) => d.id === docId)?.fileName })) return;
     try {
       await assetAPI.deleteDocument(asset.id, docId);
       onReload();
@@ -109,12 +111,12 @@ export function DocumentsTab({ asset, onReload }: { asset: any; onReload: () => 
                   </Box>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                     <Tooltip title="ดาวน์โหลด">
-                      <IconButton size="small" onClick={() => assetAPI.downloadDocument(asset.id, doc.id)}>
+                      <IconButton aria-label="ดาวน์โหลด" size="small" onClick={() => assetAPI.downloadDocument(asset.id, doc.id)}>
                         <DownloadIcon fontSize="small" color="primary" />
                       </IconButton>
                     </Tooltip>
                     <Tooltip title="ลบ">
-                      <IconButton size="small" onClick={() => handleDelete(doc.id)}>
+                      <IconButton aria-label="ลบ" size="small" onClick={() => handleDelete(doc.id)}>
                         <DeleteOutlineIcon fontSize="small" color="error" />
                       </IconButton>
                     </Tooltip>

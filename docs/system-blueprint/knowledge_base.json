@@ -1,0 +1,136 @@
+{
+  "$schema_note": "AI-ready knowledge base for AssetHub (ITAM) — see INDEX.md for the human-readable table of contents this JSON mirrors. confidence: 'verified' means read directly from source code with a file:line citation available in the corresponding .md file; 'observed' means inferred from consistent behavior across multiple verified facts; never 'guessed'.",
+  "system": {
+    "name": "AssetHub (ITAM / IT Asset Management)",
+    "type": "web_application_client_server_spa_rest_api",
+    "organization": "TRR Group",
+    "purpose": "IT asset lifecycle management: registry, borrow/return, preventive maintenance, disposal/donation, licenses/contracts, reporting",
+    "tech_stack": {
+      "frontend": { "framework": "React 18", "language": "TypeScript", "build": "Vite", "ui_library": "MUI v6", "routing": "react-router-dom v6", "http_client": "axios" },
+      "backend": { "framework": "Express.js", "language": "TypeScript", "orm": "Prisma v5.22", "auth": "JWT via httpOnly cookie (assethub_session) + Bearer fallback" },
+      "database": "PostgreSQL 16",
+      "process_manager_production": "PM2 (NOT Docker, despite docker-compose*.yml files existing in repo — verified live during this session)"
+    },
+    "confidence": "verified",
+    "source": "00_SYSTEM_OVERVIEW.md"
+  },
+  "roles": [
+    { "code": "SUPERADMIN", "label_th": "ผู้ดูแลระบบสูงสุด", "in_prisma_enum": true, "notes": "full access; only role that can delete assets, delete users, manage backup/restore" },
+    { "code": "IT_ADMIN", "label_th": "เจ้าหน้าที่ IT", "in_prisma_enum": true, "notes": "operational admin; cannot delete most entities, cannot manage other users' accounts" },
+    { "code": "USER", "label_th": "พนักงานทั่วไป", "in_prisma_enum": true, "notes": "self-service only: borrow requests, own history, profile" },
+    { "code": "VIEWER", "label_th": "ผู้ดูรายงาน", "in_prisma_enum": true, "notes": "read-only access to reports, licenses, contracts, dashboard, PM coverage" },
+    { "code": "HR_CUSTODY", "label_th": "(legacy, unused)", "in_prisma_enum": true, "notes": "orphaned enum value left after the 'custody' feature was dropped (commit e169e45); no user holds this role" },
+    { "code": "APPROVER", "label_th": "ผู้อนุมัติ", "in_prisma_enum": false, "notes": "planned/UI-only role, not in Prisma enum, cannot actually be assigned" },
+    { "code": "VENDOR", "label_th": "ผู้ขาย/ผู้รับเหมา", "in_prisma_enum": false, "notes": "planned/UI-only role, not in Prisma enum" }
+  ],
+  "special_authorization_model": {
+    "name": "manager_based_supervisor_approval",
+    "description": "Borrow-request first-stage approval is granted by AppUser.managerId (self-relation), not by a role. Anyone can be another employee's manager.",
+    "affected_feature": "borrow supervisor-approval queue (/borrow/supervisor-queue)",
+    "confidence": "verified",
+    "source": "11_module_borrow.md, 02_ROLES_PERMISSIONS.md"
+  },
+  "navigation": {
+    "user_nav_items_count": 6,
+    "admin_nav_sections": ["ภาพรวมระบบ", "จัดการทรัพย์สิน", "Service Desk", "งานซ่อมบำรุง", "จำหน่ายทรัพย์สินออก", "License & สัญญา", "สรุปและรายงาน", "ผู้ดูแลระบบ"],
+    "total_routes": 62,
+    "public_no_auth_routes": ["/login", "/delivery-confirm/:token"],
+    "confidence": "verified",
+    "source": "01_SITEMAP.md"
+  },
+  "modules": [
+    { "id": "MOD-BORROW", "name": "Borrow / Return (ยืม-คืน)", "pages": 13, "backend_route_file": "borrow.ts", "api_endpoint_count": 24, "key_workflow": "2-stage approval (supervisor via managerId, then IT Admin) -> checkout -> return; extension sub-workflow", "confidence": "verified", "source": "11_module_borrow.md" },
+    { "id": "MOD-PM-CORE", "name": "PM ทรัพย์สิน IT (Preventive Maintenance)", "pages": 7, "backend_route_file": "pm.ts", "api_endpoint_count": 28, "key_workflow": "Template -> Plan -> generate Runs -> perform with GLPI/Agent-assisted data entry -> auto-create monitor/printer assets + CMDB link", "confidence": "verified", "source": "12_module_pm_core.md" },
+    { "id": "MOD-DONATION-DISPOSAL", "name": "Donation & Disposal (จำหน่าย/บริจาค)", "backend_route_files": ["donation.ts", "disposals.ts"], "confidence": "verified", "source": "04_module_donation_disposal.md" },
+    { "id": "MOD-DELIVERY-LICENSE-CONTRACT", "name": "Delivery, Licenses, Contracts", "backend_route_files": ["delivery.ts", "licenses.ts", "contracts.ts"], "notable": "delivery.ts exposes a public token-based confirmation endpoint with no authentication", "confidence": "verified", "source": "05_module_delivery_license_contract.md" },
+    { "id": "MOD-INVENTORY-CATEGORY-MAINTENANCE", "name": "Inventory, Categories, Maintenance, Asset Links", "backend_route_files": ["inventory.ts", "categories.ts", "maintenance.ts", "assetLinks.ts"], "confidence": "verified", "source": "06_module_inventory_category_maintenance.md" },
+    { "id": "MOD-PMSWHUB-FLOORPLAN", "name": "PM SW/Hub Room & Floor Plan", "backend_route_files": ["pmSwHub.ts", "pmSwHubPlan.ts", "pmSwHubTemplate.ts", "floorplan.ts"], "notable": "parallel PM system for network cabinets, independent of the main Asset-based PM system; FloorPlan pins are people/seats, devices follow via ownerName matching; floorplan.ts is the one route file using router.use(authenticate) file-wide instead of per-route, leaving 6 read endpoints role-open (masked in practice by frontend route guard)", "confidence": "verified", "source": "07_module_pmswhub_floorplan.md" },
+    { "id": "MOD-DASHBOARD-REPORTS", "name": "Dashboard & Reports", "backend_route_files": ["dashboard.ts"], "notable": "7 dashboard widget components exist but are never imported anywhere (dead code); ReportBorrowPage.tsx has a real bug reading a field the backend never sends", "confidence": "verified", "source": "08_module_dashboard_reports.md" },
+    { "id": "MOD-ADMIN-SETTINGS", "name": "Admin & Settings", "backend_route_files": ["admin.ts", "assetMasterData.ts", "departments.ts", "backup.ts", "settings.ts", "notifications.ts", "ai.ts", "presence.ts"], "notable": "SettingsPage.tsx has 14 non-sequential tabs; two parallel/unrelated backup systems coexist (full pg_dump vs JSON asset export); several backend endpoints have no calling UI at all", "confidence": "verified", "source": "09_module_admin_settings.md" },
+    { "id": "MOD-ASSETS-CORE", "name": "Asset Registry Core", "backend_route_file": "assets.ts", "notable": "dual-write pattern: legacy free-text columns (ownerName, departmentId, vendor, location, company) alongside newer FK relations (assignedToUserId, departmentRefId, vendorRefId, locationRefId), reconciled by resolver functions on every write; which *Detail table an asset uses is decided by free-text type-keyword matching, decoupled from categoryId; several AssetFormPage.tsx fields have no matching DB column and are silently dropped on save", "confidence": "verified", "source": "13_module_assets_core.md" }
+  ],
+  "database": {
+    "total_models": 73,
+    "total_enums": 15,
+    "provider": "postgresql",
+    "orm": "Prisma 5.22",
+    "notable_patterns": [
+      "Category-driven polymorphic detail tables: one Asset row + one of 9 possible *Detail 1:1 tables depending on type (ComputerDetail, PhoneDetail, MonitorDetail, DeviceDetail, NetworkDeviceDetail, RackDetail, PrinterDetail, CableDetail, ConsumableDetail)",
+      "Dual-write migration in progress: legacy string columns co-exist with newer FK relations on Asset (ownerName/assignedToUserId, departmentId/departmentRefId, vendor/vendorRefId, location/locationRefId)",
+      "Supervisor-approval borrow workflow added via AppUser.managerId self-relation + BorrowRequestStatus.PendingSupervisor + ApprovalStage enum (migrations 20260826150000 / 20260826150500)",
+      "SystemSetting is the only model with no @@map (uses PascalCase table name literally)"
+    ],
+    "confidence": "verified",
+    "source": "03_database_schema.md"
+  },
+  "security": {
+    "auth_precedence": "AD/LDAP first, local bcrypt fallback",
+    "session_mechanism": "JWT in httpOnly cookie 'assethub_session' (not localStorage) + Bearer header fallback for non-browser clients",
+    "rate_limiting": { "login": "configurable via LOGIN_RATE_LIMIT_MAX, deliberately under AD lockout threshold", "auth_general": "authLimiter ~100/15min", "api_general": "apiLimiter ~5000/15min", "disabled_in": "NODE_ENV=development" },
+    "csrf_protection": "none dedicated — relies on SameSite=Lax cookie + strict CORS origin allow-list (flagged as unverified-adequacy gap)",
+    "notable_findings": [
+      "startDailySummaryJob() in jobs/proactiveSummary.ts appears to be dead code — defined but never called",
+      "ALLOW_DEV_AUTH_BYPASS dev-only auth bypass exists, gated behind non-production env check",
+      "app.ts writes security headers by hand instead of using helmet; no CSP header set"
+    ],
+    "confidence": "verified",
+    "source": "10_auth_security.md"
+  },
+  "known_issues_found_during_documentation": [
+    {
+      "id": "ISSUE-001",
+      "title": "MonitorDetail upsert can null out screenSize/ports/hasSpeaker",
+      "description": "In pm.ts processDeviceAnswers(), if a device object carries any one of screenSize/ports/hasSpeaker, all three get upserted together — the two not supplied get written as null, overwriting previously-recorded values. Affects both the GLPI sync path and (avoided-but-not-fixed) the newly added Agent monitor path.",
+      "status": "known, not fixed — flagged as a spawn_task chip for the user",
+      "source": "12_module_pm_core.md"
+    },
+    {
+      "id": "ISSUE-002",
+      "title": "assets.ts previously required ownerName on every update",
+      "description": "validateAssetData() unconditionally required a non-empty ownerName even for assets that legitimately have no current holder (e.g. sitting in IT storage). Fixed during this session by removing the requirement; confirmed still in place by the Assets Core research pass.",
+      "status": "fixed",
+      "source": "13_module_assets_core.md"
+    },
+    {
+      "id": "ISSUE-003",
+      "title": "ReportBorrowPage.tsx reads a field the backend never sends",
+      "description": "Line 232 reads summary.activeCheckedOut; the backend only ever returns activeItems. The 'กำลังยืม' (currently borrowed) stat card on the borrow report always shows 0.",
+      "status": "known, not fixed — flagged as a spawn_task chip for the user",
+      "source": "08_module_dashboard_reports.md"
+    },
+    {
+      "id": "ISSUE-004",
+      "title": "AssetFormPage.tsx collects several fields with no matching DB column",
+      "description": "Phone color, network portSpeed/isManaged, printer paperSizes/cartridgeModel, AV device lumens/lampHours/fps, rack vaCapacity/wattCapacity are all captured in the form UI but silently dropped on save since no Prisma column exists for them. Conversely several real columns (mdmEnrolled, networkType, locationRack, poeSupport, isColor, networkReady, duplexSupport, deviceType, powerSource, rgbSupport) have no form input at all.",
+      "status": "known, not fixed, not yet flagged as a task",
+      "source": "13_module_assets_core.md"
+    },
+    {
+      "id": "ISSUE-005",
+      "title": "VIEWER role can open report pages the backend blocks",
+      "description": "VIEWER passes the React Router role guard for /reports/borrow, /reports/pm, /reports/maintenance, but the backend endpoints those pages actually call (/borrow/history, parts of /pm/runs, /pm/procurement-report, /maintenance/report/all) are IT_ADMIN/SUPERADMIN-only — VIEWER opens the page and then hits 403s loading data.",
+      "status": "known, not fixed, not yet flagged as a task",
+      "source": "08_module_dashboard_reports.md"
+    },
+    {
+      "id": "ISSUE-006",
+      "title": "Several backend endpoints have no calling frontend UI (dead code)",
+      "description": "GET /admin/login-logs, POST /admin/test-email, POST /admin/notification-templates/:id/test, POST /admin/clear-all-assets, POST /admin/advanced-clear-data, POST /categories/:id/types/reorder, plus 7 unused dashboard widget components.",
+      "status": "informational, no action needed unless cleanup is desired",
+      "source": "09_module_admin_settings.md, 06_module_inventory_category_maintenance.md, 08_module_dashboard_reports.md"
+    }
+  ],
+  "external_integrations": [
+    { "system": "Active Directory / TRR Intranet API", "direction": "outbound", "purpose": "login authentication, employee profile autofill" },
+    { "system": "GLPI", "direction": "outbound", "purpose": "hardware spec sync (CPU/RAM/OS/Office/Antivirus/connected monitors) by serial number" },
+    { "system": "External Asset-Monitoring Agent", "direction": "outbound", "purpose": "live device telemetry: battery health, disk space, antivirus status, Windows Update status, connected monitors/printers" },
+    { "system": "Google Gemini", "direction": "outbound", "purpose": "in-app chatbot" },
+    { "system": "LINE Messaging API / Microsoft Teams / SMTP", "direction": "outbound", "purpose": "multi-channel notifications" }
+  ],
+  "completeness_status": {
+    "note": "All 13 modules plus Overview, Sitemap, Roles, and Database Schema are complete. See INDEX.md's Completeness Audit section for the full 23-point checklist (20 fully met, 3 met at a meaningful-but-not-literal-100% depth, 1 not attempted: systematic responsive/breakpoint inventory).",
+    "fully_verified": ["system", "roles", "navigation", "database", "security", "MOD-BORROW", "MOD-PM-CORE", "MOD-DONATION-DISPOSAL", "MOD-DELIVERY-LICENSE-CONTRACT", "MOD-INVENTORY-CATEGORY-MAINTENANCE", "MOD-PMSWHUB-FLOORPLAN", "MOD-DASHBOARD-REPORTS", "MOD-ADMIN-SETTINGS", "MOD-ASSETS-CORE"],
+    "not_attempted": ["systematic responsive/mobile breakpoint inventory across every page"],
+    "total_documentation_size": "~640KB / ~5,500+ lines of markdown across 15 files (13 module docs + overview + sitemap + roles + database schema + this JSON), plus 2 raw grep evidence files"
+  }
+}

@@ -18,9 +18,9 @@ import {
   GanttAxis, GanttBar, GanttLegend, GanttRow, GanttTrack, StatePill,
 } from './components/GanttChart';
 import {
-  PLAN_STATES, RawPlan, SchedGroup, SchedSelection, buildTimeline,
+  PLAN_STATES, RawPlan, SchedGroup, SchedSelection, barRange, buildTimeline,
   emptySchedSelection, groupState, matchesPlan, normalise, pct, planStateColors,
-  rollup, schedScopeSummary, schedSelectionActive, thDate,
+  rollup, rollupDepartments, schedScopeSummary, schedSelectionActive, thDate,
 } from './pmSchedule';
 import { buildScheduleReports, exportScheduleCsv, exportScheduleWorkbook } from './pmScheduleExport';
 
@@ -98,8 +98,19 @@ export default function PMSchedulePage() {
   useEffect(() => { setSel(emptySchedSelection()); setCollapsed({}); }, [year]);
 
   const plans = useMemo(() => normalise(raw, today), [raw, today]);
-  const dated = useMemo(() => plans.filter(p => p.start && p.end), [plans]);
-  const undated = useMemo(() => plans.filter(p => !p.start || !p.end), [plans]);
+  // "วาดได้" = มีช่วงเวลาที่ใช้ได้ ไม่ว่าจะมาจากวันนัดหรือกรอบของแผน ต้องนิยาม
+  // ให้ตรงกับ undated ข้างล่าง ไม่งั้นแผนที่มีแต่วันนัดจะหายไปจากกราฟทั้งที่ไม่ได้
+  // ถูกนับว่าอยู่นอกกำหนดการ
+  const dated = useMemo(
+    () => plans.filter(p => { const r = barRange(p); return r.start && r.end; }),
+    [plans],
+  );
+  // แผนที่วาดไม่ได้เลย — ไม่มีทั้งกรอบของแผนและวันนัด แผนที่ไม่ได้ตั้งกรอบไว้แต่มี
+  // วันนัดแล้วถือว่าอยู่ในกำหนดการ เพราะรู้แล้วว่าจะไปทำวันไหน
+  const undated = useMemo(
+    () => plans.filter(p => { const r = barRange(p); return !r.start || !r.end; }),
+    [plans],
+  );
 
   const visible = useMemo(() => dated.filter(p => matchesPlan(p, sel, null)), [dated, sel]);
   const timeline = useMemo(() => buildTimeline(dated), [dated]);
@@ -344,7 +355,7 @@ export default function PMSchedulePage() {
       <Box sx={{ mb: 1.5 }} className="pms-gantt-company">
         <SectionCard title="ภาพรวมรายบริษัท" icon={Building2}>
           <Typography sx={{ fontSize: 10.5, color: 'text.disabled', mb: 1 }}>
-            แต่ละแท่งคือช่วงเวลารวมของทุกแผนในบริษัทนั้น
+            แต่ละแท่งคือช่วงวันนัดจริงของทุกแผนในบริษัทนั้น · เส้นประ = ยังไม่ได้ตั้งวันนัด จึงกางเต็มกรอบของแผน
           </Typography>
           {!timeline || !byCompany.length ? noTimeline : (
             <Box sx={{ overflowX: 'auto' }}>
@@ -363,6 +374,7 @@ export default function PMSchedulePage() {
                         <GanttBar
                           tl={timeline} start={g.start} end={g.end} state={st}
                           done={g.done} total={g.total} target={g.target} height={24}
+                          booked={g.booked} scheduled={g.scheduled}
                           title={g.name}
                           subtitle={`${g.plans.length} แผน${late ? ` · เกินกำหนด ${late} แผน` : ''}`}
                         />
@@ -389,7 +401,7 @@ export default function PMSchedulePage() {
       <Box className="pms-gantt-dept">
         <SectionCard title="รายละเอียดรายแผนก" icon={LayoutList}>
           <Typography sx={{ fontSize: 10.5, color: 'text.disabled', mb: 1 }}>
-            คลิกชื่อบริษัทเพื่อย่อ/ขยาย
+            คลิกชื่อบริษัทเพื่อย่อ/ขยาย · แต่ละแถวกางตามวันนัดของแผนกนั้นเอง ตั้งวันนัดได้ที่หน้างาน PM
           </Typography>
           {!timeline || !byCompany.length ? noTimeline : (
             <Box sx={{ overflowX: 'auto' }}>
@@ -397,7 +409,10 @@ export default function PMSchedulePage() {
                 <GanttAxis tl={timeline} today={today} />
                 {byCompany.map(co => {
                   const open = !collapsed[co.name];
-                  const depts: SchedGroup[] = rollup(co.plans, 'dept');
+                  const depts: SchedGroup[] = rollupDepartments(co.plans);
+                  // นับแผนแบบไม่ซ้ำ — แผน "ทุกแผนก" หนึ่งใบถูกกางเป็นหลายแถว
+                  // การนับตรง ๆ จะได้จำนวนแผนเกินจริงหลายเท่า
+                  const planCount = new Set(co.plans.map(p => p.id)).size;
                   return (
                     <React.Fragment key={co.name}>
                       <GanttRow sx={{
@@ -415,7 +430,7 @@ export default function PMSchedulePage() {
                             transform: open ? 'none' : 'rotate(-90deg)', transition: 'transform .18s',
                           }} />
                           <Typography sx={{ ...nameSx, fontWeight: 700, fontSize: 11 }}>{co.name}</Typography>
-                          <Typography sx={subSx}>{depts.length} แผนก · {co.plans.length} แผน</Typography>
+                          <Typography sx={subSx}>{depts.length} แผนก · {planCount} แผน</Typography>
                         </Box>
                         <GanttTrack tl={timeline} today={today} height={ROW_H.group} />
                         <Box sx={metaSx}><MetaCount done={co.done} total={co.total} /></Box>
@@ -431,14 +446,18 @@ export default function PMSchedulePage() {
                             {/* one bar per plan, so a department running two
                                 separate windows shows two bars rather than one
                                 span that covers the gap between them */}
-                            {dp.plans.map(p => (
-                              <GanttBar
-                                key={p.id} tl={timeline} start={p.start!} end={p.end!} state={p.state}
-                                done={p.done} total={p.total} target={p.target} height={15}
-                                title={`${dp.name} · ${p.company}`}
-                                subtitle={`แผน #${p.id}${p.deviceType ? ` · ${p.deviceType}` : ''}`}
-                              />
-                            ))}
+                            {dp.plans.map(p => {
+                              const r = barRange(p);
+                              return (
+                                <GanttBar
+                                  key={p.id} tl={timeline} start={r.start!} end={r.end!} state={p.state}
+                                  done={p.done} total={p.total} target={p.target} height={15}
+                                  booked={r.booked} scheduled={p.scheduled}
+                                  title={`${dp.name} · ${p.company}`}
+                                  subtitle={`แผน #${p.id}${p.deviceType ? ` · ${p.deviceType}` : ''}`}
+                                />
+                              );
+                            })}
                           </GanttTrack>
                           <Box sx={metaSx}><MetaCount done={dp.done} total={dp.total} /></Box>
                         </GanttRow>

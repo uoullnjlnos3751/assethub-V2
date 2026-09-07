@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { baseURL } from '../services/api';
+import { useChatbotContext } from '../contexts/ChatbotContext';
 
 interface Message {
   role: 'user' | 'ai';
@@ -7,7 +8,7 @@ interface Message {
 }
 
 export const Chatbot: React.FC = () => {
-  const [isOpen, setIsOpen] = useState(false);
+  const { isOpen, setOpen, queuedQuery, clearQueuedQuery } = useChatbotContext();
   const [messages, setMessages] = useState<Message[]>([
     { role: 'ai', text: 'สวัสดีครับ ผมคือ AssetHub Assistant 🤖\nคุณสามารถถามข้อมูลเกี่ยวกับทรัพย์สินได้เลยครับ เช่น "มีโน้ตบุ๊กกี่เครื่อง", "ใครถือครอง M001"' }
   ]);
@@ -25,13 +26,26 @@ export const Chatbot: React.FC = () => {
     scrollToBottom();
   }, [messages, isOpen, toolStatus]);
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
+  // A question handed in from outside (e.g. the AppBar search box's "ถาม AI"
+  // row) — send it as if the visitor had typed it themselves. Waits for any
+  // answer already streaming to finish first: sendText() appends its chunks
+  // by rewriting `messages[messages.length - 1]`, so two streams running at
+  // once would interleave their text into whichever bubble is currently
+  // last. Not clearing queuedQuery until it's actually sent means this
+  // re-fires and catches it once isLoading drops back to false.
+  useEffect(() => {
+    if (!queuedQuery || isLoading) return;
+    clearQueuedQuery();
+    sendText(queuedQuery.text);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queuedQuery, isLoading]);
 
-    const userMessage: Message = { role: 'user', text: input.trim() };
+  const sendText = async (text: string) => {
+    if (!text.trim()) return;
+
+    const userMessage: Message = { role: 'user', text: text.trim() };
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
-    setInput('');
     setIsLoading(true);
     setAwaitingResponse(true);
     setToolStatus(null);
@@ -101,15 +115,26 @@ export const Chatbot: React.FC = () => {
     }
   };
 
+  const handleSend = () => {
+    const text = input;
+    setInput('');
+    sendText(text);
+  };
+
+  // ปุ่มลอยถูกถอดออกแล้ว ทางเข้าเดียวคือ "ถาม AI" ในช่องค้นหาบนแถบด้านบน
+  // (askAI() ใน ChatbotContext เป็นตัวสั่งเปิด) ปิดอยู่ก็ไม่ต้องเรนเดอร์อะไร
+  // ทิ้งไว้ให้ทับหน้าจอ
+  if (!isOpen) return null;
+
   return (
-    // `app-noprint` lets a page's print stylesheet drop the floating bubble;
-    // it is chrome, never part of a printed report.
+    // `app-noprint` lets a page's print stylesheet drop the panel; it is
+    // chrome, never part of a printed report.
     <div className="app-noprint" style={{ position: 'fixed', bottom: 30, right: 30, zIndex: 9999 }}>
       {/* Chat Window */}
       {isOpen && (
         <div style={{
           position: 'absolute',
-          bottom: 70,
+          bottom: 0,
           right: 0,
           width: 360,
           height: 500,
@@ -135,7 +160,7 @@ export const Chatbot: React.FC = () => {
               <span style={{ fontWeight: 600, fontSize: 15 }}>AssetHub Assistant</span>
             </div>
             <button 
-              onClick={() => setIsOpen(false)}
+              onClick={() => setOpen(false)}
               style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 18 }}
             >
               ✕
@@ -237,28 +262,6 @@ export const Chatbot: React.FC = () => {
         </div>
       )}
 
-      {/* Floating Button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        style={{
-          width: 60,
-          height: 60,
-          borderRadius: '50%',
-          backgroundColor: '#2563eb',
-          color: '#fff',
-          border: 'none',
-          boxShadow: '0 4px 14px rgba(37,99,235,0.4)',
-          cursor: 'pointer',
-          fontSize: 28,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          transition: 'transform 0.2s',
-          transform: isOpen ? 'scale(0.9)' : 'scale(1)',
-        }}
-      >
-        {isOpen ? '✕' : '💬'}
-      </button>
     </div>
   );
 };

@@ -255,16 +255,16 @@ export default function FlowchartsPage() {
           </Box>
           {/* Toolbar */}
           <Box display="flex" alignItems="center" gap={0.5}>
-            <Tooltip title="ย่อภาพ"><span><IconButton size="small" onClick={() => setZoom(z => Math.max(0.5, z - 0.15))} disabled={zoom <= 0.5}><ZoomOutIcon fontSize="small" /></IconButton></span></Tooltip>
+            <Tooltip title="ย่อภาพ"><span><IconButton aria-label="ย่อภาพ" size="small" onClick={() => setZoom(z => Math.max(0.5, z - 0.15))} disabled={zoom <= 0.5}><ZoomOutIcon fontSize="small" /></IconButton></span></Tooltip>
             <Chip label={`${Math.round(zoom * 100)}%`} size="small" sx={{ fontSize: '0.7rem', height: 24, minWidth: 48, bgcolor: alpha(active.color, 0.1), color: active.color, fontWeight: 700 }} />
-            <Tooltip title="ขยายภาพ"><span><IconButton size="small" onClick={() => setZoom(z => Math.min(3, z + 0.15))} disabled={zoom >= 3}><ZoomInIcon fontSize="small" /></IconButton></span></Tooltip>
+            <Tooltip title="ขยายภาพ"><span><IconButton aria-label="ขยายภาพ" size="small" onClick={() => setZoom(z => Math.min(3, z + 0.15))} disabled={zoom >= 3}><ZoomInIcon fontSize="small" /></IconButton></span></Tooltip>
             <Tooltip title="เต็มจอ">
-              <IconButton size="small" onClick={() => setFullscreen(f => !f)} sx={{ color: fullscreen ? active.color : 'inherit' }}>
+              <IconButton aria-label="เต็มจอ" size="small" onClick={() => setFullscreen(f => !f)} sx={{ color: fullscreen ? active.color : 'inherit' }}>
                 <FullscreenIcon fontSize="small" />
               </IconButton>
             </Tooltip>
             <Tooltip title="ดาวน์โหลดรูป">
-              <IconButton size="small" onClick={handleDownload}><DownloadIcon fontSize="small" /></IconButton>
+              <IconButton aria-label="ดาวน์โหลดรูป" size="small" onClick={handleDownload}><DownloadIcon fontSize="small" /></IconButton>
             </Tooltip>
           </Box>
         </Box>

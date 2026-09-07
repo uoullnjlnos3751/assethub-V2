@@ -129,7 +129,9 @@ export function GanttTrack({ tl, today, height, children }: {
  * to carry white text, and outside in the status colour otherwise — a bar that
  * is 13% done has no fill under the middle, and the label vanished there.
  */
-export function GanttBar({ tl, start, end, state, done, total, target, height, title, subtitle }: {
+export function GanttBar({
+  tl, start, end, state, done, total, target, height, title, subtitle, booked, scheduled,
+}: {
   tl: Timeline;
   start: string;
   end: string;
@@ -141,6 +143,10 @@ export function GanttBar({ tl, start, end, state, done, total, target, height, t
   height: number;
   title: string;
   subtitle?: string;
+  /** แท่งนี้วาดจากวันนัดจริงหรือจากกรอบของแผนที่ยังไม่ได้นัด */
+  booked?: boolean;
+  /** จำนวนเครื่องที่ตั้งวันนัดแล้ว ใช้เตือนเมื่อยังนัดไม่ครบทั้งกลุ่ม */
+  scheduled?: number;
 }) {
   const theme = useTheme();
   const color = planStateColors(theme)[state];
@@ -174,9 +180,13 @@ export function GanttBar({ tl, start, end, state, done, total, target, height, t
           <b>{title}</b>
           {subtitle && <><br /><Box component="span" sx={{ opacity: 0.75 }}>{subtitle}</Box></>}
           <Box sx={{ height: '1px', bgcolor: 'currentColor', opacity: 0.2, my: 0.6 }} />
-          {thDate(day(start))} – {thDate(day(end))}<br />
+          {booked ? 'วันนัด' : 'กรอบของแผน'} {thDate(day(start))} – {thDate(day(end))}<br />
           ทำเสร็จ <b>{fmt(done)}</b> จาก <b>{fmt(total)}</b> เครื่อง ({p}%)<br />
           สถานะ: {PLAN_STATE_LABEL[state]}
+          {booked && scheduled !== undefined && scheduled < total && (
+            <><br />นัดแล้ว <b>{fmt(scheduled)}</b> จาก <b>{fmt(total)}</b> เครื่อง — อีก <b>{fmt(total - scheduled)}</b> ยังไม่ได้ลงวัน</>
+          )}
+          {!booked && <><br /><Box component="span" sx={{ opacity: 0.75 }}>ยังไม่ได้ตั้งวันนัด แท่งนี้จึงกางเต็มกรอบของแผน</Box></>}
           {target !== undefined && target > total && (
             <><br />เป้าหมายตั้งไว้ <b>{fmt(target)}</b> เครื่อง — ยังสร้างงานไม่ครบอีก <b>{fmt(target - total)}</b></>
           )}
@@ -186,8 +196,12 @@ export function GanttBar({ tl, start, end, state, done, total, target, height, t
       <Box sx={{
         position: 'absolute', top: '50%', transform: 'translateY(-50%)',
         left: `${a * 100}%`, width: `${w * 100}%`, height,
-        borderRadius: '6px', border: `1px solid ${color}`,
-        bgcolor: theme.palette.mode === 'dark' ? `${color}29` : `${color}1f`,
+        borderRadius: '6px',
+        // เส้นประ = ยังไม่ได้ตั้งวันนัด แท่งนี้เป็นกรอบของแผน ไม่ใช่วันที่จะไปจริง
+        border: `1px ${booked === false ? 'dashed' : 'solid'} ${color}`,
+        bgcolor: booked === false
+          ? 'transparent'
+          : theme.palette.mode === 'dark' ? `${color}29` : `${color}1f`,
       }}>
         <Box sx={{
           position: 'absolute', left: 0, top: 0, bottom: 0, width: `${p}%`,

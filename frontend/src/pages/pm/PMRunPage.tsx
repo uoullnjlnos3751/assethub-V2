@@ -44,6 +44,7 @@ import MonitorIcon from '@mui/icons-material/Monitor';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import PersonIcon from '@mui/icons-material/Person';
 import EventIcon from '@mui/icons-material/Event';
+import ZoomOutMapIcon from '@mui/icons-material/ZoomOutMap';
 import SyncAltIcon from '@mui/icons-material/SyncAlt';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
@@ -59,14 +60,20 @@ import ExtensionIcon from '@mui/icons-material/Extension';
 import ComputerIcon from '@mui/icons-material/Computer';
 import SensorsIcon from '@mui/icons-material/Sensors';
 import PushPinIcon from '@mui/icons-material/PushPin';
-import * as XLSX from 'xlsx';
-import { Html5Qrcode } from 'html5-qrcode';
 import { pmAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { PMDeviceArrayInput } from './components/PMDeviceArrayInput';
+import { ImageLightbox } from '../../components/ImageLightbox';
 import { Modal } from './components/Modal';
 import { StarRating } from './components/StarRating';
 import { getRatingCategory, RATING_RUBRIC, suggestRating } from './components/pmRatingRubric';
+import { useConfirm } from '../../contexts/ConfirmContext';
+
+// html5-qrcode ~382 KB โหลดตอนเปิดกล้องสแกนจริงเท่านั้น
+const loadQr = async () => (await import('html5-qrcode')).Html5Qrcode;
+
+// xlsx ~419 KB โหลดตอนกดส่งออกจริงเท่านั้น ไม่ใช่ตอนเปิดหน้า
+const loadXlsx = () => import('xlsx');
 
 /* ─────────────────────────────────────────────────────────────
    Types & Constants
@@ -112,6 +119,51 @@ const STATUS_CHIP: Record<string, { color: 'success' | 'info' | 'warning' | 'def
   DRAFT: { color: 'warning', label: 'รอดำเนินการ' },
 };
 
+/**
+ * งานที่เลยวันนัดมาแล้วแต่ยังไม่ได้ทำ
+ *
+ * แยกจาก "เกินกำหนด" ของแผน ซึ่งดูวันสิ้นสุดของทั้งแผน — ตัวนี้เตือนได้ตั้งแต่
+ * วันรุ่งขึ้นหลังวันนัด แทนที่จะต้องรอจนสิ้นแผนถึงจะรู้ว่าตกหล่น
+ */
+const schedLate = (run: any) => {
+  if (!run?.scheduledDate || run.status === 'COMPLETED') return false;
+  return new Date(run.scheduledDate).getTime() < new Date().setHours(0, 0, 0, 0);
+};
+
+/**
+ * แปลงวันนัดเป็นค่าของ <input type="date"> (YYYY-MM-DD) ตามเวลาเครื่องผู้ใช้
+ *
+ * ตัดสตริง ISO ตรง ๆ ไม่ได้ เพราะฝั่งเซิร์ฟเวอร์เก็บเป็นเที่ยงคืนเวลาไทย ซึ่ง
+ * ใน UTC คือห้าโมงเย็นของ "วันก่อนหน้า" — การ slice(0, 10) จึงได้วันที่ย้อนไป
+ * หนึ่งวันทุกครั้ง
+ */
+const toDateInput = (value: any): string => {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+/** ตัวกรองวันนัด — ตอบสี่คำถามที่ช่างถามจริงตอนเริ่มวัน */
+const SCHED_FILTERS = [
+  { key: 'TODAY', label: 'นัดวันนี้' },
+  { key: 'WEEK', label: '7 วันข้างหน้า' },
+  { key: 'LATE', label: 'เลยวันนัด' },
+  { key: 'NONE', label: 'ยังไม่นัด' },
+];
+
+function matchesSchedFilter(run: any, key: string) {
+  const today = new Date().setHours(0, 0, 0, 0);
+  if (key === 'NONE') return !run.scheduledDate && run.status !== 'COMPLETED';
+  if (key === 'LATE') return schedLate(run);
+  if (!run.scheduledDate) return false;
+  const d = new Date(run.scheduledDate).setHours(0, 0, 0, 0);
+  if (key === 'TODAY') return d === today;
+  if (key === 'WEEK') return d >= today && d <= today + 6 * 86_400_000;
+  return true;
+}
+
 /* ─────────────────────────────────────────────────────────────
    Shared bits used by both the single-run and bulk checklist modals
 ───────────────────────────────────────────────────────────────── */
@@ -124,19 +176,22 @@ function BoolAnswerButtons({
   disabled?: boolean;
   onSelect: (v: string) => void;
 }) {
+  // ปุ่มที่ผู้ใช้กดซ้ำ ๆ มากที่สุดตลอดการตรวจ PM ครั้งหนึ่ง (ทุกข้อในเช็คลิสต์) —
+  // จึงขยายขนาดให้ใหญ่กว่าปุ่มอื่นในหน้าจอ (ไม่ใช่ size="small") ตามที่ผู้ใช้แจ้งว่า
+  // ปุ่มเดิมอึดอัดและกดยาก หน้าจอนี้ใช้บนคอมพิวเตอร์เท่านั้นจึงไม่ต้องหด/ไม่ต้อง
+  // รองรับมือถือ
   const options: { val: string; label: string; icon: React.ReactNode; color: 'success' | 'error' | 'inherit' }[] = [
-    { val: 'yes', label: 'ใช่', icon: <CheckIcon sx={{ fontSize: 14 }} />, color: 'success' },
-    { val: 'no', label: 'ไม่', icon: <CloseIcon sx={{ fontSize: 14 }} />, color: 'error' },
-    { val: 'na', label: 'N/A', icon: <RemoveIcon sx={{ fontSize: 14 }} />, color: 'inherit' },
+    { val: 'yes', label: 'ใช่', icon: <CheckIcon sx={{ fontSize: 17 }} />, color: 'success' },
+    { val: 'no', label: 'ไม่', icon: <CloseIcon sx={{ fontSize: 17 }} />, color: 'error' },
+    { val: 'na', label: 'N/A', icon: <RemoveIcon sx={{ fontSize: 17 }} />, color: 'inherit' },
   ];
   return (
-    <Box sx={{ display: 'flex', gap: 0.75, flexShrink: 0 }}>
+    <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
       {options.map((opt) => {
         const selected = value === opt.val;
         return (
           <Button
             key={opt.val}
-            size="small"
             disabled={disabled}
             onClick={() => onSelect(opt.val)}
             startIcon={opt.icon}
@@ -144,8 +199,10 @@ function BoolAnswerButtons({
             color={selected ? opt.color : 'inherit'}
             sx={{
               borderRadius: 5,
-              px: 1.5,
-              fontSize: 12,
+              px: 2.5,
+              py: 0.9,
+              fontSize: 14,
+              fontWeight: 600,
               opacity: disabled && !selected ? 0.5 : 1,
             }}
           >
@@ -195,10 +252,10 @@ function ChecklistItemRow({
       sx={{
         display: 'flex',
         alignItems: 'flex-start',
-        gap: 1.75,
+        gap: 2,
         flexWrap: 'wrap',
-        px: 2.5,
-        py: 1.5,
+        px: 3,
+        py: 2,
         borderBottom: '1px solid',
         borderColor: 'divider',
         '&:last-of-type': { borderBottom: 'none' },
@@ -206,8 +263,8 @@ function ChecklistItemRow({
     >
       <Box
         sx={{
-          width: 24,
-          height: 24,
+          width: 28,
+          height: 28,
           borderRadius: '50%',
           bgcolor: 'action.hover',
           border: '1px solid',
@@ -215,7 +272,7 @@ function ChecklistItemRow({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: 10,
+          fontSize: 11.5,
           fontWeight: 600,
           color: 'text.secondary',
           flexShrink: 0,
@@ -225,7 +282,7 @@ function ChecklistItemRow({
       </Box>
 
       <Box sx={{ flex: 1, minWidth: 220 }}>
-        <Typography sx={{ fontSize: 13, color: 'text.primary', fontWeight: 500 }}>{item.label}</Typography>
+        <Typography sx={{ fontSize: 14.5, color: 'text.primary', fontWeight: 500 }}>{item.label}</Typography>
 
         {type === 'text' && (
           <TextField
@@ -483,6 +540,7 @@ export default function PMRunPage() {
   const [filterType, setFilterType] = useState('');
   const [filterStaff, setFilterStaff] = useState('');
   const [filterCompany, setFilterCompany] = useState('');
+  const [filterSched, setFilterSched] = useState('');
   const [plans, setPlans] = useState<any[]>([]);
 
   const [pmModal, setPMModal] = useState<{ open: boolean; run: any; readOnly?: boolean }>({ open: false, run: null, readOnly: false });
@@ -511,6 +569,10 @@ export default function PMRunPage() {
   const [agentApplied, setAgentApplied] = useState(false);
   const [noteModal, setNoteModal] = useState<{ open: boolean; run: any; value: string }>({ open: false, run: null, value: '' });
   const [savingNote, setSavingNote] = useState(false);
+  const [schedModal, setSchedModal] = useState<{ open: boolean; value: string }>({ open: false, value: '' });
+  const [savingSched, setSavingSched] = useState(false);
+  const [pmPhotoZoom, setPmPhotoZoom] = useState(false);
+  const pmPhotoInputRef = React.useRef<HTMLInputElement>(null);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2800); };
 
@@ -546,12 +608,13 @@ export default function PMRunPage() {
   useEffect(() => {
     if (!qrModalOpen) return;
 
-    let html5QrCode: Html5Qrcode | null = null;
+    let html5QrCode: InstanceType<Awaited<ReturnType<typeof loadQr>>> | null = null;
 
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       const element = document.getElementById('qr-reader');
       if (!element) return;
 
+      const Html5Qrcode = await loadQr();
       html5QrCode = new Html5Qrcode('qr-reader');
       html5QrCode.start(
         { facingMode: 'environment' },
@@ -595,7 +658,8 @@ export default function PMRunPage() {
     const matchType = !filterType || r.asset?.type === filterType;
     const matchStaff = !filterStaff || (r.performer?.displayName || r.staffName) === filterStaff;
     const matchCompany = !filterCompany || r.asset?.company === filterCompany;
-    return matchQ && matchStatus && matchPlan && matchType && matchStaff && matchCompany;
+    const matchSched = !filterSched || matchesSchedFilter(r, filterSched);
+    return matchQ && matchStatus && matchPlan && matchType && matchStaff && matchCompany && matchSched;
   });
 
   const sortedRuns = [...filtered].sort((a, b) => {
@@ -669,18 +733,108 @@ export default function PMRunPage() {
     }
   };
 
+  /** Does the run's own template even have a place to put detected monitors?
+   * The merge/apply buttons need this to know whether "nothing added" means
+   * "already up to date" or "this template has nowhere to write it" —
+   * those used to be indistinguishable and the button/toast claimed success
+   * either way. */
+  const hasMonitorArrayItem = (run: any): boolean =>
+    !!run && getChecklistItems(run).some((item: any) => (item.type || '').toLowerCase() === 'monitor_array');
+
+  // Merge detected monitors into the "ตรวจสอบจอ Monitor" device list.
+  //
+  // Shared by the GLPI and Agent paths: both end up filling the same checklist
+  // item, and the merge has to behave identically either way. Pressing a
+  // button twice — or pressing it after the technician already typed a
+  // monitor in by hand — never duplicates or wipes their work: dedup keys on
+  // serialNo when there is one, falls back to the matched registry _assetId,
+  // and as a last resort (a panel with neither — real, not rare; see
+  // agentMonitors.ts) a connectedPort+brand+model signature, since serial-less
+  // devices used to sail through the old serial-only check on every press.
+  const mergeMonitorsIntoAnswers = (target: Record<string, any>, devices: any[]): { added: number; hasField: boolean } => {
+    if (!pmModal.run) return { added: 0, hasField: false };
+    const monitorItem = getChecklistItems(pmModal.run).find(
+      (item: any) => (item.type || '').toLowerCase() === 'monitor_array'
+    );
+    if (!monitorItem) return { added: 0, hasField: false };
+    if (!devices.length) return { added: 0, hasField: true };
+
+    let existingDevices: any[] = [];
+    const rawExisting = target[monitorItem.key];
+    if (rawExisting && rawExisting !== 'no') {
+      try {
+        const parsed = JSON.parse(rawExisting);
+        if (Array.isArray(parsed)) existingDevices = parsed;
+      } catch { /* start fresh if it wasn't valid device JSON */ }
+    }
+
+    const noIdSignature = (d: any) => `${d.connectedPort || ''}|${d.brand || ''}|${d.model || ''}`;
+    const existingSerials = new Set(
+      existingDevices.map((d) => (d.serialNo || '').trim().toLowerCase()).filter(Boolean)
+    );
+    const existingAssetIds = new Set(existingDevices.map((d) => d._assetId).filter(Boolean));
+    const existingNoIdSignatures = new Set(
+      existingDevices.filter((d) => !d.serialNo && !d._assetId).map(noIdSignature)
+    );
+
+    const fresh = devices.filter((d) => {
+      if (d.serialNo) return !existingSerials.has(String(d.serialNo).trim().toLowerCase());
+      if (d._assetId) return !existingAssetIds.has(d._assetId);
+      return !existingNoIdSignatures.has(noIdSignature(d));
+    });
+    if (!fresh.length) return { added: 0, hasField: true };
+
+    target[monitorItem.key] = JSON.stringify([...existingDevices, ...fresh]);
+    return { added: fresh.length, hasField: true };
+  };
+
   // เติมเฉพาะข้อที่ Agent ตอบได้ พร้อมหมายเหตุที่บอกว่าตอบจากอะไร ช่างแก้ทับได้
   // เสมอ — ข้อที่ต้องเดินไปดู (ทำความสะอาด UPS สภาพเครื่อง) ไม่ถูกแตะ
   const applyAgentAnswers = () => {
-    if (!agentCheck?.answers?.length) return;
+    const answerCount = agentCheck?.answers?.length || 0;
+    const monitors = agentCheck?.monitors || [];
+    if (!answerCount && !monitors.length) return;
+
     const next = { ...answers };
-    for (const a of agentCheck.answers) {
+    for (const a of (agentCheck.answers || [])) {
       next[a.key] = a.value;
       if (a.note) next[`${a.key}_note`] = a.note;
     }
+
+    // Agent มองไม่เห็นขนาดจอ (นิ้ว) และลำโพงในตัว จึงไม่ส่ง screenSize/ports/
+    // hasSpeaker มาเลย — ถ้าส่งมาแม้แต่ตัวเดียว ฝั่งบันทึกจะ upsert MonitorDetail
+    // แล้วเขียนอีกสองช่องที่เหลือเป็น null ทับของเดิมที่เคยกรอกไว้
+    const { added, hasField: hasMonitorField } = mergeMonitorsIntoAnswers(next, monitors.map((m: any) => ({
+      _assetId: m._assetId || undefined,
+      assetCode: m._assetId ? (m.assetCode || '') : undefined,
+      hasMonitor: true,
+      company: m.company || pmModal.run?.asset?.company || '',
+      brand: m.brand || '',
+      model: m.model || '',
+      serialNo: m.serial || '',
+      source: 'agent',
+      connectedPort: m.connectedPort || null,
+      year: m.year || null,
+    })));
+
     setAnswers(next);
     setAgentApplied(true);
-    showToast(`✅ เติมคำตอบจาก Agent ${agentCheck.answers.length} ข้อแล้ว — ตรวจทานได้ก่อนบันทึก`);
+    const parts = [
+      answerCount ? `คำตอบ ${answerCount} ข้อ` : '',
+      added ? `จอ ${added} ตัว` : '',
+    ].filter(Boolean);
+    // เทมเพลตนี้ไม่มีช่องจอเลย — ไม่ใช่ว่า "ครบแล้ว" ต้องบอกตรงๆ ว่าจอที่ Agent
+    // เห็นไม่มีที่ให้เติม ไม่งั้นข้อความจะขัดกับความจริง (จอหายไปเงียบๆ)
+    if (monitors.length > 0 && !hasMonitorField) {
+      showToast(parts.filter(p => !p.includes('จอ')).length
+        ? `⚠️ เติม${parts.filter(p => !p.includes('จอ')).join('')}จาก Agent แล้ว — แต่เทมเพลตนี้ไม่มีช่องบันทึกจอภาพ จอที่ตรวจพบ ${monitors.length} ตัวจึงไม่ถูกเติม`
+        : `⚠️ เทมเพลตนี้ไม่มีช่องบันทึกจอภาพ — จอที่ Agent ตรวจพบ ${monitors.length} ตัวจึงไม่ถูกเติม`);
+      return;
+    }
+    // กดซ้ำแล้วจอที่ Agent เห็นอยู่ในฟอร์มครบแล้ว — บอกตามจริงดีกว่าขึ้นว่าเติมสำเร็จ
+    showToast(parts.length
+      ? `✅ เติม${parts.join(' และ ')}จาก Agent แล้ว — ตรวจทานได้ก่อนบันทึก`
+      : 'ℹ️ ข้อมูลจาก Agent อยู่ในแบบฟอร์มครบแล้ว ไม่มีอะไรต้องเติมเพิ่ม');
   };
 
   // Applies the previously-fetched GLPI spec into the checklist answers.
@@ -705,54 +859,26 @@ export default function PMRunPage() {
 
     // Pre-fill the "ตรวจสอบจอ Monitor" device list from what GLPI saw
     // connected, so the technician only has to verify/correct it instead of
-    // typing brand/model/S/N by hand. Existing entries are kept — GLPI
-    // monitors are merged in by serial number so re-applying (or applying
-    // after the technician already typed something) never wipes their work.
-    if (glpiSpec.monitors && glpiSpec.monitors.length > 0 && pmModal.run) {
-      const monitorItem = getChecklistItems(pmModal.run).find(
-        (item: any) => (item.type || '').toLowerCase() === 'monitor_array'
-      );
-      if (monitorItem) {
-        let existingDevices: any[] = [];
-        const rawExisting = newAnswers[monitorItem.key];
-        if (rawExisting && rawExisting !== 'no') {
-          try {
-            const parsed = JSON.parse(rawExisting);
-            if (Array.isArray(parsed)) existingDevices = parsed;
-          } catch { /* start fresh if it wasn't valid device JSON */ }
-        }
-
-        const existingSerials = new Set(
-          existingDevices.map((d) => (d.serialNo || '').trim().toLowerCase()).filter(Boolean)
-        );
-
-        const glpiDevices = glpiSpec.monitors
-          .filter((m: any) => !m.serial || !existingSerials.has(String(m.serial).trim().toLowerCase()))
-          .map((m: any) => ({
-            _assetId: m._assetId || undefined,
-            // assetCode มาเป็นรหัสจริงของระเบียนแล้ว (หรือ null ถ้ายังไม่มี)
-            // ไม่ใช่สตริง `ชื่อ / รหัส` ที่เคยพ่วงคำว่า null ติดมาอีกต่อไป
-            // จอที่ยังไม่อยู่ในทะเบียนต้องเป็น undefined เพื่อให้ช่องโชว์รหัส
-            // ที่ระบบเจนให้แทน
-            assetCode: m._assetId ? (m.assetCode || '') : undefined,
-            hasMonitor: true,
-            // บริษัทของเครื่องที่กำลังทำ PM คือคำตอบที่ถูกเสมอสำหรับจอที่ยังไม่มี
-            // ในทะเบียน — GLPI บอกบริษัทไม่ได้ ส่วนจอที่มีแล้วจะติดบริษัทของตัวเองมา
-            company: m.company || pmModal.run.asset?.company || '',
-            brand: m.brand || '',
-            model: m.model || '',
-            serialNo: m.serial || '',
-            source: 'glpi',
-            screenSize: m.screenSize || null,
-            ports: m.ports || null,
-            hasSpeaker: !!m.hasSpeaker,
-          }));
-
-        if (glpiDevices.length > 0) {
-          newAnswers[monitorItem.key] = JSON.stringify([...existingDevices, ...glpiDevices]);
-        }
-      }
-    }
+    // typing brand/model/S/N by hand.
+    mergeMonitorsIntoAnswers(newAnswers, (glpiSpec.monitors || []).map((m: any) => ({
+      _assetId: m._assetId || undefined,
+      // assetCode มาเป็นรหัสจริงของระเบียนแล้ว (หรือ null ถ้ายังไม่มี)
+      // ไม่ใช่สตริง `ชื่อ / รหัส` ที่เคยพ่วงคำว่า null ติดมาอีกต่อไป
+      // จอที่ยังไม่อยู่ในทะเบียนต้องเป็น undefined เพื่อให้ช่องโชว์รหัส
+      // ที่ระบบเจนให้แทน
+      assetCode: m._assetId ? (m.assetCode || '') : undefined,
+      hasMonitor: true,
+      // บริษัทของเครื่องที่กำลังทำ PM คือคำตอบที่ถูกเสมอสำหรับจอที่ยังไม่มี
+      // ในทะเบียน — GLPI บอกบริษัทไม่ได้ ส่วนจอที่มีแล้วจะติดบริษัทของตัวเองมา
+      company: m.company || pmModal.run?.asset?.company || '',
+      brand: m.brand || '',
+      model: m.model || '',
+      serialNo: m.serial || '',
+      source: 'glpi',
+      screenSize: m.screenSize || null,
+      ports: m.ports || null,
+      hasSpeaker: !!m.hasSpeaker,
+    })));
 
     setAnswers(newAnswers);
     setGlpiSpecApplied(true);
@@ -925,8 +1051,13 @@ export default function PMRunPage() {
   };
 
   /* ── Delete Run ── */
+  const confirm = useConfirm();
   const handleDeleteRun = async (id: number) => {
-    if (!window.confirm('คุณแน่ใจหรือไม่ว่าต้องการลบงาน PM นี้?')) return;
+    if (!await confirm({
+      title: 'ลบงาน PM',
+      target: runs.find(r => r.id === id)?.asset?.assetCode,
+      detail: 'ผลตรวจและรูปถ่ายที่บันทึกไว้ในงานนี้จะถูกลบไปด้วย',
+    })) return;
     try {
       await pmAPI.deleteRun(id);
       setRuns(prev => prev.filter(r => r.id !== id));
@@ -952,8 +1083,33 @@ export default function PMRunPage() {
     }
   };
 
+  /* ── วันนัดลงหน้างาน ──
+     ตั้งทีเดียวทั้งชุดเสมอ เพราะงานจริงคือ "แผนก SAL ทั้งแผนก ลงวันจันทร์"
+     ไม่ใช่การไล่ตั้งทีละเครื่อง 56 ครั้ง */
+  const handleSaveSchedule = async (clear = false) => {
+    if (selectedRunIds.length === 0) return;
+    const value = clear ? null : schedModal.value;
+    if (!clear && !value) return;
+    setSavingSched(true);
+    try {
+      const res = await pmAPI.bulkSetRunSchedule(selectedRunIds, value);
+      const ids = new Set(selectedRunIds);
+      setRuns(prev => prev.map(r => (
+        ids.has(r.id) && r.status !== 'COMPLETED' ? { ...r, scheduledDate: value } : r
+      )));
+      setSchedModal({ open: false, value: '' });
+      setSelectedRunIds([]);
+      showToast(`✅ ${res.data.message}`);
+    } catch (err: any) {
+      alert(err.response?.data?.message || err.message || 'เกิดข้อผิดพลาดในการตั้งวันนัด');
+    } finally {
+      setSavingSched(false);
+    }
+  };
+
   /* ── Export Excel ── */
   const handleExport = async () => {
+    const XLSX = await loadXlsx();
     setExporting(true);
     try {
       const exportRows = filtered.map((r, idx) => {
@@ -969,6 +1125,7 @@ export default function PMRunPage() {
           'Location': r.asset?.location || r.plan?.site || '',
           'แผน PM': r.plan?.deptTask || r.plan?.site || '',
           'สถานะ': r.status === 'COMPLETED' ? 'เสร็จแล้ว' : r.status === 'IN_PROGRESS' ? 'กำลังทำ' : 'รอดำเนินการ',
+          'วันนัด': r.scheduledDate ? new Date(r.scheduledDate).toLocaleDateString('th-TH') : '',
           'ผู้ทำ PM': r.performer?.displayName || '',
           'วันที่ PM': r.performedAt ? new Date(r.performedAt).toLocaleDateString('th-TH') : '',
         };
@@ -1020,9 +1177,9 @@ export default function PMRunPage() {
 
   const clearFilters = () => {
     setSearch(''); setFilterStatus(''); setFilterPlan(''); setFilterType('');
-    setFilterStaff(''); setFilterCompany(''); setCurrentPage(1);
+    setFilterStaff(''); setFilterCompany(''); setFilterSched(''); setCurrentPage(1);
   };
-  const anyFilter = !!(search || filterStatus || filterPlan || filterType || filterStaff || filterCompany);
+  const anyFilter = !!(search || filterStatus || filterPlan || filterType || filterStaff || filterCompany || filterSched);
 
   /** Counts ignore the filter they belong to, so a chip never zeroes itself out. */
   const countBy = (fn: (r: any) => boolean) => runs.filter(fn).length;
@@ -1137,7 +1294,7 @@ export default function PMRunPage() {
             onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
           />
           <Tooltip title="สแกน QR Code">
-            <IconButton size="small" onClick={() => setQrModalOpen(true)}><QrCodeScannerIcon fontSize="small" /></IconButton>
+            <IconButton aria-label="สแกน QR Code" size="small" onClick={() => setQrModalOpen(true)}><QrCodeScannerIcon fontSize="small" /></IconButton>
           </Tooltip>
           <Select size="small" sx={{ minWidth: 150 }} displayEmpty value={filterPlan}
             onChange={e => { setFilterPlan(e.target.value); setCurrentPage(1); }}>
@@ -1165,6 +1322,13 @@ export default function PMRunPage() {
             onClick={() => { setFilterStatus(filterStatus === s.key ? '' : s.key); setCurrentPage(1); }}
             sx={chipSx(filterStatus === s.key, s.color)}
             label={<>{s.label} <Box component="span" sx={{ fontSize: 9.5, opacity: 0.7 }}>{s.n}</Box></>} />
+        )))}
+
+        {chipRow('วันนัด', SCHED_FILTERS.map(f => (
+          <Chip key={f.key} variant="outlined" size="small"
+            onClick={() => { setFilterSched(filterSched === f.key ? '' : f.key); setCurrentPage(1); }}
+            sx={chipSx(filterSched === f.key, f.key === 'LATE' ? theme.palette.warning.main : undefined)}
+            label={<>{f.label} <Box component="span" sx={{ fontSize: 9.5, opacity: 0.7 }}>{countBy(r => matchesSchedFilter(r, f.key))}</Box></>} />
         )))}
 
         {uniqueCompanies.length > 1 && chipRow('บริษัท', uniqueCompanies.map(c => (
@@ -1211,6 +1375,7 @@ export default function PMRunPage() {
                   <TableCell sx={{ fontSize: 11, fontWeight: 700, color: 'text.secondary' }}>สถานะ</TableCell>
                   <TableCell sx={{ fontSize: 11, fontWeight: 700, color: 'text.secondary' }}>รหัสทรัพย์สิน / ชื่ออุปกรณ์</TableCell>
                   <TableCell sx={{ fontSize: 11, fontWeight: 700, color: 'text.secondary' }}>แผนก / ผู้ถือครอง</TableCell>
+                  <TableCell sx={{ fontSize: 11, fontWeight: 700, color: 'text.secondary' }}>วันนัด</TableCell>
                   <TableCell sx={{ fontSize: 11, fontWeight: 700, color: 'text.secondary' }}>แผน PM (กำหนดเสร็จ)</TableCell>
                   <TableCell sx={{ fontSize: 11, fontWeight: 700, color: 'text.secondary' }}>ประเภท</TableCell>
                   <TableCell sx={{ fontSize: 11, fontWeight: 700, color: 'text.secondary', textAlign: 'right' }}>จัดการ</TableCell>
@@ -1264,7 +1429,20 @@ export default function PMRunPage() {
                         </Box>
                       </TableCell>
                       <TableCell sx={{ fontSize: 11 }}>
-                        <Typography sx={{ fontWeight: 500, fontSize: 11 }}>{r.plan?.deptTask || r.plan?.site || `Plan #${r.plan?.id}`}</Typography>
+                        {r.scheduledDate ? (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontWeight: 600, color: schedLate(r) ? 'warning.main' : 'text.primary' }}>
+                            <EventIcon sx={{ fontSize: 13 }} />
+                            {new Date(r.scheduledDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })}
+                          </Box>
+                        ) : (
+                          <Box sx={{ color: 'text.disabled' }}>ยังไม่นัด</Box>
+                        )}
+                        {schedLate(r) && (
+                          <Box sx={{ fontSize: 10, color: 'warning.main', mt: 0.25 }}>เลยวันนัดแล้ว</Box>
+                        )}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: 11 }}>
+                        <Typography sx={{ fontWeight: 500, fontSize: 11 }}>{r.plan?.deptTask || (r.plan?.isAdhoc ? 'Ad-hoc' : 'ทุกแผนก')}</Typography>
                         <Box sx={{ color: isOverdue ? 'error.main' : 'text.secondary', mt: 0.25, display: 'flex', alignItems: 'center', gap: 0.5 }}>
                           <EventIcon sx={{ fontSize: 12 }} />
                           สิ้นสุด {r.plan?.endDate ? new Date(r.plan.endDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' }) : '—'}
@@ -1285,25 +1463,25 @@ export default function PMRunPage() {
                         <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
                           <Tooltip title="ดูรายละเอียด PM">
                             <span>
-                              <IconButton size="small" color="primary" onClick={() => openPM(r, true)} disabled={!r.plan?.template?.templateItems?.length}>
+                              <IconButton aria-label="ดูรายละเอียด PM" size="small" color="primary" onClick={() => openPM(r, true)} disabled={!r.plan?.template?.templateItems?.length}>
                                 <VisibilityIcon fontSize="small" />
                               </IconButton>
                             </span>
                           </Tooltip>
                           <Tooltip title="แก้ไข / บันทึกผล PM">
                             <span>
-                              <IconButton size="small" color="success" onClick={() => openPM(r, false)} disabled={!r.plan?.template?.templateItems?.length}>
+                              <IconButton aria-label="แก้ไข / บันทึกผล PM" size="small" color="success" onClick={() => openPM(r, false)} disabled={!r.plan?.template?.templateItems?.length}>
                                 <EditIcon fontSize="small" />
                               </IconButton>
                             </span>
                           </Tooltip>
                           <Tooltip title={r.notes ? 'แก้ไขโน้ต' : 'เพิ่มโน้ต (เช่น เจ้าของเครื่องไม่ว่าง จะนัดทำ PM วันไหน)'}>
-                            <IconButton size="small" color={r.notes ? 'primary' : 'default'} onClick={() => openNoteModal(r)}>
+                            <IconButton aria-label="แก้ไขโน้ต" size="small" color={r.notes ? 'primary' : 'default'} onClick={() => openNoteModal(r)}>
                               <EditNoteIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
                           <Tooltip title="ลบข้อมูล">
-                            <IconButton size="small" color="error" onClick={() => handleDeleteRun(r.id)}>
+                            <IconButton aria-label="ลบข้อมูล" size="small" color="error" onClick={() => handleDeleteRun(r.id)}>
                               <DeleteIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
@@ -1379,6 +1557,18 @@ export default function PMRunPage() {
           >
             ทำ PM พร้อมกัน
           </Button>
+          <Button
+            variant="outlined"
+            startIcon={<EventIcon />}
+            onClick={() => {
+              // ตั้งค่าเริ่มต้นเป็นวันนัดเดิมของรายการแรกที่เลือก ถ้ามี — การแก้วันนัด
+              // ทั้งแผนกที่จองไว้แล้วเป็นเรื่องปกติพอ ๆ กับการตั้งครั้งแรก
+              const first = runs.find(r => r.id === selectedRunIds[0]);
+              setSchedModal({ open: true, value: toDateInput(first?.scheduledDate) });
+            }}
+          >
+            ตั้งวันนัด
+          </Button>
           <Button variant="outlined" onClick={() => setSelectedRunIds([])}>
             ยกเลิก
           </Button>
@@ -1389,7 +1579,7 @@ export default function PMRunPage() {
       <Modal
         open={pmModal.open}
         onClose={() => setPMModal({ open: false, run: null, readOnly: false })}
-        maxWidth={760}
+        fullScreen
         title={`${pmModal.readOnly || pmModal.run?.status === 'COMPLETED' ? 'รายละเอียดข้อมูล' : 'บันทึกข้อมูล'} PM: ${pmModal.run?.asset?.assetName || pmModal.run?.asset?.assetCode || ''} — ${pmModal.run?.asset?.brand || ''} ${pmModal.run?.asset?.model || ''}`}
       >
         {pmModal.run && (() => {
@@ -1403,10 +1593,59 @@ export default function PMRunPage() {
           };
 
           return (
-            <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '80vh' }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+              {/* Progress & Actions — เต็มความกว้าง ค้างอยู่บนสุดเสมอ เพราะเป็น
+                  ตัวเลขที่ต้องเห็นตลอดว่าเหลืออีกกี่ข้อ */}
+              <Box sx={{ p: '10px 24px', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, flexWrap: 'wrap', gap: 1.5, bgcolor: 'action.hover' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1, minWidth: 220 }}>
+                  <Typography sx={{ fontSize: 12, fontWeight: 600 }}>ความคืบหน้า</Typography>
+                  <LinearProgress variant="determinate" value={checkPct} color="success" sx={{ flex: 1, height: 6, borderRadius: 99 }} />
+                  <Typography sx={{ fontSize: 12, fontWeight: 700, color: 'success.main', minWidth: 40 }}>{checkPct}%</Typography>
+                </Box>
+                {!isReadOnly && (
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button size="small" variant="outlined" startIcon={<CheckIcon />} onClick={() => setAll('yes')}>ทำทั้งหมด (Yes)</Button>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<RestartAltIcon />}
+                      onClick={() => {
+                        setAnswers({ staff_name: user?.displayName || user?.adUsername || '' });
+                        localStorage.removeItem(`pm_draft_${pmModal.run.id}`);
+                      }}
+                    >
+                      ล้างข้อมูล
+                    </Button>
+                  </Box>
+                )}
+              </Box>
+
+              {/* ── สองคอลัมน์ ────────────────────────────────────────────
+                  ซ้าย = เช็คลิสต์ที่ต้องกรอก เลื่อนของตัวเอง
+                  ขวา = ข้อมูลเครื่องกับผลตรวจ Agent ที่ต้องเห็นระหว่างกรอก
+                  ของเดิมวางเรียงลงมาชั้นเดียว ผลตรวจ Agent จึงเลื่อนหายไปพอดี
+                  ตอนที่ช่างเริ่มกรอกเช็คลิสต์ ทั้งที่เป็นข้อมูลที่ต้องใช้อ้างอิง
+
+                  แถบเลื่อนแยกคอลัมน์เฉพาะจอกว้าง จอแคบปล่อยให้เลื่อนทั้งหน้า
+                  เป็นแถบเดียว ไม่งั้นจะได้กล่องเลื่อนสองกล่องซ้อนกันบนมือถือ */}
+              <Box sx={{
+                flex: 1, minHeight: 0,
+                display: 'grid',
+                gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) 400px' },
+                overflowY: { xs: 'auto', lg: 'hidden' },
+              }}>
+
+              {/* ── คอลัมน์ขวา: ข้อมูลเครื่อง + ผลตรวจ ── */}
+              <Box sx={{
+                gridColumn: { lg: 2 }, gridRow: { lg: 1 },
+                order: { xs: -1, lg: 0 },
+                overflowY: { xs: 'visible', lg: 'auto' },
+                borderLeft: { lg: '1px solid' }, borderColor: { lg: 'divider' },
+                display: 'flex', flexDirection: 'column',
+              }}>
               {/* Header Info */}
-              <Box sx={{ borderBottom: '1px solid', borderColor: 'divider', p: '12px 24px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '12px 24px', flexShrink: 0 }}>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '12px 24px' }}>
+              <Box sx={{ borderBottom: '1px solid', borderColor: 'divider', p: '12px 20px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '12px 20px', flexShrink: 0 }}>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '12px 20px' }}>
                   {[
                     { lbl: 'ผู้ถือครอง', val: pmModal.run.asset?.ownerName || '—' },
                     { lbl: 'แผนก', val: pmModal.run.asset?.departmentId || pmModal.run.plan?.deptTask || '—' },
@@ -1434,41 +1673,33 @@ export default function PMRunPage() {
                 )}
               </Box>
 
-              {/* Progress & Actions */}
-              <Box sx={{ p: '10px 24px', borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, flexWrap: 'wrap', gap: 1.5, bgcolor: 'action.hover' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1, minWidth: 220 }}>
-                  <Typography sx={{ fontSize: 12, fontWeight: 600 }}>ความคืบหน้า</Typography>
-                  <LinearProgress variant="determinate" value={checkPct} color="success" sx={{ flex: 1, height: 6, borderRadius: 99 }} />
-                  <Typography sx={{ fontSize: 12, fontWeight: 700, color: 'success.main', minWidth: 40 }}>{checkPct}%</Typography>
-                </Box>
-                {!isReadOnly && (
-                  <Box sx={{ display: 'flex', gap: 1 }}>
-                    <Button size="small" variant="outlined" startIcon={<CheckIcon />} onClick={() => setAll('yes')}>ทำทั้งหมด (Yes)</Button>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={<RestartAltIcon />}
-                      onClick={() => {
-                        setAnswers({ staff_name: user?.displayName || user?.adUsername || '' });
-                        localStorage.removeItem(`pm_draft_${pmModal.run.id}`);
-                      }}
-                    >
-                      ล้างข้อมูล
-                    </Button>
-                  </Box>
-                )}
-              </Box>
-
               {/* Photo Upload Section */}
-              <Box sx={{ p: '10px 24px', borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
+              <Box sx={{ p: '10px 20px', borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
                 <Box sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary', mb: 1, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   <PhotoCameraIcon sx={{ fontSize: 14 }} /> รูปถ่ายขณะทำ PM (Photo attachment)
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                   {pmModal.run.photoUrl ? (
-                    <Box sx={{ width: 64, height: 64, borderRadius: 1, border: '1px solid', borderColor: 'divider', overflow: 'hidden', bgcolor: 'action.hover' }}>
-                      <img src={`/uploads/pm/${pmModal.run.photoUrl}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="PM Attachment" />
-                    </Box>
+                    /* รูปย่อ 64px ถูกครอบ (objectFit: cover) จึงบอกไม่ได้เลยว่าถ่าย
+                       ติดครบหรือชัดไหม — คลิกเพื่อกางเต็มจอ */
+                    <Tooltip title="คลิกเพื่อดูรูปขนาดเต็ม">
+                      <Box
+                        onClick={() => setPmPhotoZoom(true)}
+                        sx={{
+                          width: 64, height: 64, borderRadius: 1, border: '1px solid', borderColor: 'divider',
+                          overflow: 'hidden', bgcolor: 'action.hover', cursor: 'zoom-in', position: 'relative',
+                          '&:hover .zoom-hint': { opacity: 1 },
+                        }}
+                      >
+                        <img src={`/uploads/pm/${pmModal.run.photoUrl}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="PM Attachment" />
+                        <Box className="zoom-hint" sx={{
+                          position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          bgcolor: 'rgba(0,0,0,0.45)', color: '#fff', opacity: 0, transition: 'opacity .15s',
+                        }}>
+                          <ZoomOutMapIcon sx={{ fontSize: 20 }} />
+                        </Box>
+                      </Box>
+                    </Tooltip>
                   ) : (
                     <Box sx={{ width: 64, height: 64, borderRadius: 1, border: '1px dashed', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'text.disabled', bgcolor: 'action.hover' }}>
                       {isReadOnly ? <Typography sx={{ fontSize: 11 }}>ไม่มีรูปถ่าย</Typography> : <PhotoCameraIcon />}
@@ -1476,10 +1707,13 @@ export default function PMRunPage() {
                   )}
                   {!isReadOnly && (
                     <Box>
-                      <Button component="label" variant="outlined" size="small" startIcon={<PhotoCameraIcon />} disabled={uploadingPhoto}>
+                      <Button variant="outlined" size="small" startIcon={<PhotoCameraIcon />} disabled={uploadingPhoto}
+                        onClick={() => pmPhotoInputRef.current?.click()}>
                         {uploadingPhoto ? 'กำลังอัปโหลด...' : 'เลือกรูปภาพ'}
-                        <input type="file" accept="image/*" hidden onChange={handlePhotoUpload} disabled={uploadingPhoto} />
                       </Button>
+                      {/* input แยกออกมาถือ ref ไว้ ปุ่ม "เปลี่ยนรูป" ในหน้าดูรูปเต็ม
+                          จะได้เรียกใช้ตัวเดียวกันนี้ได้ */}
+                      <input ref={pmPhotoInputRef} type="file" accept="image/*" hidden onChange={handlePhotoUpload} disabled={uploadingPhoto} />
                       <Typography sx={{ fontSize: 10, color: 'text.secondary', mt: 0.75 }}>
                         รองรับไฟล์ JPG, PNG, GIF, WEBP ขนาดไม่เกิน 10MB
                       </Typography>
@@ -1492,7 +1726,7 @@ export default function PMRunPage() {
                   วางไว้เหนือ checklist เพราะเป็นเรื่องที่ต้องรู้ก่อนเริ่มตรวจ
                   และหลายข้อ (แบตเสื่อม ดิสก์เต็ม) มองด้วยตาไม่เห็น */}
               {agentCheck && (
-                <Box sx={{ px: 3, pt: 2 }}>
+                <Box sx={{ px: 2.5, py: 2 }}>
                   <Box sx={{
                     borderRadius: '12px', overflow: 'hidden',
                     border: '1px solid', borderColor: 'divider',
@@ -1509,13 +1743,25 @@ export default function PMRunPage() {
                         </Typography>
                       )}
                       <Box sx={{ flex: 1 }} />
-                      {agentCheck.available && agentCheck.answers?.length > 0 && !isReadOnly && (
-                        <Button size="small" variant={agentApplied ? 'outlined' : 'contained'} color="secondary"
-                          onClick={applyAgentAnswers}
-                          sx={{ fontSize: 10.5, py: 0.25, textTransform: 'none' }}>
-                          {agentApplied ? `เติมแล้ว (กดซ้ำได้)` : `เติมคำตอบ ${agentCheck.answers.length} ข้อ`}
-                        </Button>
-                      )}
+                      {(() => {
+                        // Only promise "จอ N ตัว" when the template actually has
+                        // somewhere to put them — otherwise the button claims a
+                        // count it can never write, then reports false success.
+                        const canFileMonitors = hasMonitorArrayItem(pmModal.run);
+                        const monitorCount = canFileMonitors ? (agentCheck.monitors?.length || 0) : 0;
+                        const answerCount = agentCheck.answers?.length || 0;
+                        if (!agentCheck.available || isReadOnly || (!answerCount && !monitorCount)) return null;
+                        return (
+                          <Button size="small" variant={agentApplied ? 'outlined' : 'contained'} color="secondary"
+                            onClick={applyAgentAnswers}
+                            sx={{ fontSize: 10.5, py: 0.25, textTransform: 'none' }}>
+                            {agentApplied ? `เติมแล้ว (กดซ้ำได้)` : `เติม${[
+                              answerCount ? `คำตอบ ${answerCount} ข้อ` : '',
+                              monitorCount ? `จอ ${monitorCount} ตัว` : '',
+                            ].filter(Boolean).join(' + ')}`}
+                          </Button>
+                        );
+                      })()}
                     </Box>
 
                     <Box sx={{ p: '10px 14px' }}>
@@ -1546,6 +1792,34 @@ export default function PMRunPage() {
                             );
                           })}
 
+                          {/* จอที่ต่ออยู่: เติมลงฟอร์มได้ ต่างจากเครื่องพิมพ์ เพราะจอ
+                              ผูกกับเครื่องตัวเดียวและมี Serial ของตัวเองให้จับคู่ทะเบียน */}
+                          {agentCheck.monitors?.length > 0 && (
+                            <Box sx={{ mt: 0.75, pt: 0.75, borderTop: '1px dashed', borderColor: 'divider' }}>
+                              {/* จำนวนจอ ณ ขณะตรวจ คือตัวเลขแรกที่ผู้ใช้ต้องอ่าน — เลยทำให้
+                                  เด่นกว่ารายละเอียดแต่ละจอด้านล่าง ไม่ใช่แค่ label เล็ก ๆ เท่ากัน */}
+                              <Typography sx={{ fontSize: 13, fontWeight: 700, color: 'text.primary', mb: 0.5 }}>
+                                🖥️ จอที่ต่ออยู่ขณะนี้ {agentCheck.monitors.length} ตัว
+                              </Typography>
+                              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                                {agentCheck.monitors.map((m: any, idx: number) => (
+                                  <Chip
+                                    key={idx}
+                                    size="small"
+                                    icon={<MonitorIcon />}
+                                    variant={m._assetId ? 'filled' : 'outlined'}
+                                    color={m._assetId ? 'default' : 'warning'}
+                                    label={`${[m.brand, m.model].filter(Boolean).join(' ') || 'ไม่ทราบรุ่น'}${
+                                      m.serial ? ` (S/N: ${m.serial})` : ' (ไม่มี S/N)'
+                                    }${m.connectedPort ? ` · พอร์ต ${m.connectedPort}` : ''}${
+                                      m._assetId ? ` · ${m.assetCode || 'อยู่ในทะเบียน'}` : ' · ยังไม่มีในทะเบียน'}`}
+                                    sx={{ fontSize: 10 }}
+                                  />
+                                ))}
+                              </Box>
+                            </Box>
+                          )}
+
                           {/* เครื่องพิมพ์: โชว์เฉย ๆ ไม่เติมลงฟอร์ม เพราะตัวที่ใช้ร่วมกัน
                               ทั้งออฟฟิศจะกลายเป็นทรัพย์สินซ้ำบนทุกเครื่องที่ map ไว้ */}
                           {agentCheck.printers?.length > 0 && (
@@ -1559,8 +1833,15 @@ export default function PMRunPage() {
                   </Box>
                 </Box>
               )}
-              {/* Checklist Scrollable Body */}
-              <Box sx={{ p: '16px 24px', overflowY: 'auto', flex: 1, bgcolor: 'action.hover' }}>
+              </Box>{/* ── จบคอลัมน์ขวา ── */}
+
+              {/* ── คอลัมน์ซ้าย: เช็คลิสต์ ── */}
+              <Box sx={{
+                gridColumn: { lg: 1 }, gridRow: { lg: 1 },
+                p: '16px 24px',
+                overflowY: { xs: 'visible', lg: 'auto' },
+                bgcolor: 'action.hover',
+              }}>
                 {glpiSpec && (
                   <Alert severity="success" icon={<SensorsIcon fontSize="inherit" />} sx={{ mb: 2 }}>
                     <Typography sx={{ fontWeight: 600, fontSize: 12, mb: 0.75 }}>ข้อมูลฮาร์ดแวร์สแกนอัตโนมัติจาก GLPI:</Typography>
@@ -1602,10 +1883,22 @@ export default function PMRunPage() {
                 )}
 
                 <ChecklistGroups items={items} answers={answers} setAnswers={setAnswers} readOnly={isReadOnly} asset={pmModal.run.asset} />
-              </Box>
+              </Box>{/* ── จบคอลัมน์ซ้าย ── */}
+
+              </Box>{/* ── จบสองคอลัมน์ ── */}
+
+              {/* ไม่มีปุ่มลบ เพราะยังไม่มี API ลบรูป PM — ทับด้วยรูปใหม่ได้อย่างเดียว */}
+              <ImageLightbox
+                open={pmPhotoZoom}
+                onClose={() => setPmPhotoZoom(false)}
+                src={pmModal.run.photoUrl ? `/uploads/pm/${pmModal.run.photoUrl}` : null}
+                title={`รูปถ่ายขณะทำ PM · ${pmModal.run.asset?.assetCode || pmModal.run.asset?.assetName || ''}`}
+                onReplace={isReadOnly ? undefined : () => pmPhotoInputRef.current?.click()}
+                replacing={uploadingPhoto}
+              />
 
               {/* Footer Actions */}
-              <Box sx={{ p: '16px 24px', borderTop: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'flex-end', gap: 1.25, flexShrink: 0 }}>
+              <Box sx={{ p: '12px 24px', borderTop: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'flex-end', gap: 1.25, flexShrink: 0, bgcolor: 'background.paper' }}>
                 <Button variant="outlined" onClick={() => setPMModal({ open: false, run: null, readOnly: false })}>ปิด</Button>
                 {!isReadOnly && (
                   <>
@@ -1627,7 +1920,7 @@ export default function PMRunPage() {
       <Modal
         open={bulkPMModal.open}
         onClose={() => setBulkPMModal({ open: false, templateId: null })}
-        maxWidth={760}
+        fullScreen
         title={`บันทึก PM แบบกลุ่ม (${selectedRunIds.length} รายการ)`}
       >
         {selectedRunIds.length > 0 && (() => {
@@ -1643,7 +1936,7 @@ export default function PMRunPage() {
           };
 
           return (
-            <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '80vh' }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
               <Alert severity="warning" sx={{ borderRadius: 0 }}>
                 ข้อความนี้จะถูกบันทึกไปยังรายการอุปกรณ์ที่เลือก {selectedRunIds.length} รายการ และสถานะจะเป็น 'เสร็จแล้ว (COMPLETED)' โดยอัตโนมัติ
               </Alert>
@@ -1654,9 +1947,71 @@ export default function PMRunPage() {
                 <Button size="small" variant="outlined" startIcon={<RestartAltIcon />} onClick={() => setAnswers({ staff_name: user?.displayName || user?.adUsername || '' })}>ล้างข้อมูล</Button>
               </Box>
 
-              {/* Checklist Scrollable Body */}
-              <Box sx={{ p: 3, overflowY: 'auto', flex: 1, bgcolor: 'action.hover' }}>
-                <ChecklistGroups items={items} answers={answers} setAnswers={setAnswers} readOnly={false} asset={firstRun.asset} />
+              {/* ── สองคอลัมน์ ────────────────────────────────────────────
+                  ซ้าย = เช็คลิสต์ชุดเดียวที่จะถูกเขียนลงทุกเครื่อง
+                  ขวา = รายชื่อเครื่องที่จะโดน ของเดิมบอกแค่จำนวน ("15 รายการ")
+                  ทั้งที่ปุ่มนี้เขียนสถานะ COMPLETED ทับทุกเครื่องรวดเดียว —
+                  เลือกพลาดมาหนึ่งเครื่องแล้วไม่มีทางเห็นก่อนกดบันทึก */}
+              <Box sx={{
+                flex: 1, minHeight: 0,
+                display: 'grid',
+                gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) 340px' },
+                overflowY: { xs: 'auto', lg: 'hidden' },
+              }}>
+                <Box sx={{
+                  gridColumn: { lg: 1 }, gridRow: { lg: 1 },
+                  p: 3, overflowY: { xs: 'visible', lg: 'auto' }, bgcolor: 'action.hover',
+                }}>
+                  <ChecklistGroups items={items} answers={answers} setAnswers={setAnswers} readOnly={false} asset={firstRun.asset} />
+                </Box>
+
+                <Box sx={{
+                  gridColumn: { lg: 2 }, gridRow: { lg: 1 },
+                  order: { xs: -1, lg: 0 },
+                  overflowY: { xs: 'visible', lg: 'auto' },
+                  borderLeft: { lg: '1px solid' }, borderColor: { lg: 'divider' },
+                }}>
+                  <Box sx={{ p: '12px 16px', borderBottom: '1px solid', borderColor: 'divider', position: 'sticky', top: 0, bgcolor: 'background.paper', zIndex: 1 }}>
+                    <Typography sx={{ fontSize: 12, fontWeight: 700 }}>
+                      อุปกรณ์ที่จะบันทึก ({selectedRunIds.length})
+                    </Typography>
+                    <Typography sx={{ fontSize: 10.5, color: 'text.secondary', mt: 0.25 }}>
+                      กดกากบาทเพื่อเอาออกจากชุดนี้
+                    </Typography>
+                  </Box>
+                  {selectedRunIds.map(id => {
+                    const r = runs.find(x => x.id === id);
+                    if (!r) return null;
+                    return (
+                      <Box key={id} sx={{
+                        display: 'flex', alignItems: 'flex-start', gap: 1,
+                        px: 2, py: 1, borderBottom: '1px solid', borderColor: 'divider',
+                      }}>
+                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                          <Typography sx={{ fontSize: 11.5, fontWeight: 600, color: 'primary.main' }}>
+                            {r.asset?.assetCode || 'ไม่มีรหัส'}
+                          </Typography>
+                          <Typography sx={{ fontSize: 10.5, color: 'text.secondary', lineHeight: 1.45 }}>
+                            {r.asset?.assetName || '—'}<br />
+                            {r.asset?.departmentId || '—'} · {r.asset?.ownerName || '—'}
+                          </Typography>
+                        </Box>
+                        {/* เหลือเครื่องเดียวแล้วเอาออกไม่ได้ บันทึกกลุ่มที่ว่างเปล่าไม่มีความหมาย */}
+                        <Tooltip title={selectedRunIds.length <= 1 ? 'ต้องเหลืออย่างน้อย 1 รายการ' : 'เอาออกจากชุดนี้'}>
+                          <span>
+                            <IconButton aria-label="ปิด"
+                              size="small"
+                              disabled={selectedRunIds.length <= 1}
+                              onClick={() => setSelectedRunIds(prev => prev.filter(x => x !== id))}
+                            >
+                              <CloseIcon sx={{ fontSize: 14 }} />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      </Box>
+                    );
+                  })}
+                </Box>
               </Box>
 
               {/* Footer Actions */}
@@ -1705,6 +2060,40 @@ export default function PMRunPage() {
           <Button variant="contained" startIcon={<SaveIcon />} onClick={handleSaveNote} disabled={savingNote}>
             {savingNote ? 'กำลังบันทึก...' : 'บันทึกโน้ต'}
           </Button>
+        </Box>
+      </Modal>
+
+      <Modal open={schedModal.open} onClose={() => setSchedModal({ open: false, value: '' })} title="ตั้งวันนัดลงหน้างาน" maxWidth={440}>
+        <Box sx={{ p: 3 }}>
+          <Typography sx={{ fontSize: 13, fontWeight: 600, mb: 0.5 }}>
+            {selectedRunIds.length} รายการที่เลือก
+          </Typography>
+          <Typography sx={{ fontSize: 11, color: 'text.secondary', mb: 2 }}>
+            วันที่ทีมจะเข้าไปตรวจเครื่องกลุ่มนี้ ต่างจาก "สิ้นสุด" ของแผน ซึ่งเป็นกำหนดของทั้งแผนรวมกัน
+          </Typography>
+          <TextField
+            autoFocus
+            fullWidth
+            type="date"
+            label="วันนัด"
+            InputLabelProps={{ shrink: true }}
+            value={schedModal.value}
+            onChange={e => setSchedModal(p => ({ ...p, value: e.target.value }))}
+          />
+          <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 1.5 }}>
+            งานที่ทำเสร็จแล้วจะถูกข้ามโดยอัตโนมัติ
+          </Typography>
+        </Box>
+        <Box sx={{ p: '16px 24px', borderTop: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', gap: 1.25 }}>
+          <Button color="inherit" onClick={() => handleSaveSchedule(true)} disabled={savingSched}>
+            ล้างวันนัด
+          </Button>
+          <Box sx={{ display: 'flex', gap: 1.25 }}>
+            <Button variant="outlined" onClick={() => setSchedModal({ open: false, value: '' })}>ยกเลิก</Button>
+            <Button variant="contained" startIcon={<SaveIcon />} onClick={() => handleSaveSchedule()} disabled={savingSched || !schedModal.value}>
+              {savingSched ? 'กำลังบันทึก...' : 'บันทึกวันนัด'}
+            </Button>
+          </Box>
         </Box>
       </Modal>
 

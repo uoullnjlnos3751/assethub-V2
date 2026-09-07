@@ -25,13 +25,13 @@ import MoveToInboxIcon from '@mui/icons-material/MoveToInbox';
 import CancelIcon from '@mui/icons-material/Cancel';
 import { formatDate } from '../../utils/dateUtils';
 
-const TABS = [
-  { label: 'รออนุมัติ', filter: 'Pending' },
-  { label: 'อนุมัติแล้ว', filter: 'Approved' },
-  { label: 'ส่งมอบแล้ว', filter: 'CheckedOut' },
-  { label: 'คืนแล้ว', filter: 'Returned' },
-  { label: 'ไม่อนุมัติ', filter: 'Rejected' },
-  { label: 'ยกเลิก', filter: 'Cancelled' },
+const TABS: { label: string; filter: string[] }[] = [
+  { label: 'รออนุมัติ', filter: ['PendingSupervisor', 'Pending'] },
+  { label: 'อนุมัติแล้ว', filter: ['Approved'] },
+  { label: 'ส่งมอบแล้ว', filter: ['CheckedOut'] },
+  { label: 'คืนแล้ว', filter: ['Returned'] },
+  { label: 'ไม่อนุมัติ', filter: ['Rejected'] },
+  { label: 'ยกเลิก', filter: ['Cancelled'] },
 ];
 
 export default function MyRequestsPage() {
@@ -73,9 +73,9 @@ export default function MyRequestsPage() {
     } finally { setSubmitting(false); }
   };
 
-  const countBy = (s: string) => requests.filter(r => r.status === s).length;
+  const countBy = (statuses: string[]) => requests.filter(r => statuses.includes(r.status)).length;
   const filtered = requests
-    .filter(r => r.status === TABS[activeTab].filter)
+    .filter(r => TABS[activeTab].filter.includes(r.status))
     .filter(r => {
       if (!searchTerm) return true;
       const s = searchTerm.toLowerCase();
@@ -112,11 +112,11 @@ export default function MyRequestsPage() {
       {/* Stat Cards */}
       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 1.5, mb: 3 }}>
         {[
-          { label: 'รออนุมัติ',   count: countBy('Pending'),    color: theme.palette.warning.main, Icon: HourglassEmptyIcon },
-          { label: 'อนุมัติแล้ว', count: countBy('Approved'),   color: theme.palette.info.main,    Icon: CheckCircleIcon },
-          { label: 'ส่งมอบแล้ว',  count: countBy('CheckedOut'), color: theme.palette.success.main, Icon: Inventory2OutlinedIcon },
-          { label: 'คืนแล้ว',     count: countBy('Returned'),   color: theme.palette.text.secondary, Icon: MoveToInboxIcon },
-          { label: 'ไม่อนุมัติ',  count: countBy('Rejected'),   color: theme.palette.error.main,   Icon: CancelIcon },
+          { label: 'รออนุมัติ',   count: countBy(['PendingSupervisor', 'Pending']), color: theme.palette.warning.main, Icon: HourglassEmptyIcon },
+          { label: 'อนุมัติแล้ว', count: countBy(['Approved']),   color: theme.palette.info.main,    Icon: CheckCircleIcon },
+          { label: 'ส่งมอบแล้ว',  count: countBy(['CheckedOut']), color: theme.palette.success.main, Icon: Inventory2OutlinedIcon },
+          { label: 'คืนแล้ว',     count: countBy(['Returned']),   color: theme.palette.text.secondary, Icon: MoveToInboxIcon },
+          { label: 'ไม่อนุมัติ',  count: countBy(['Rejected']),   color: theme.palette.error.main,   Icon: CancelIcon },
         ].map(s => (
           <Card key={s.label} sx={{ p: '14px 16px', bgcolor: alpha(s.color, 0.06), border: `1px solid ${alpha(s.color, 0.2)}` }}>
             <s.Icon sx={{ fontSize: 20, color: s.color, mb: 0.5 }} />
@@ -137,7 +137,7 @@ export default function MyRequestsPage() {
           startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 18, color: 'text.disabled' }} /></InputAdornment>,
           endAdornment: searchTerm && (
             <InputAdornment position="end">
-              <IconButton size="small" onClick={() => setSearchTerm('')}><CloseIcon sx={{ fontSize: 16 }} /></IconButton>
+              <IconButton aria-label="ปิด" size="small" onClick={() => setSearchTerm('')}><CloseIcon sx={{ fontSize: 16 }} /></IconButton>
             </InputAdornment>
           ),
         }}
@@ -203,7 +203,7 @@ export default function MyRequestsPage() {
                     <Button fullWidth size="small" variant="outlined" color="inherit" startIcon={<VisibilityIcon sx={{ fontSize: 16 }} />} onClick={() => setDetailReq(r)}>
                       ดูรายละเอียด
                     </Button>
-                    {r.status === 'Pending' && (
+                    {['PendingSupervisor', 'Pending'].includes(r.status) && (
                       <Button size="small" variant="outlined" color="error" startIcon={<CloseIcon sx={{ fontSize: 16 }} />} onClick={() => setCancelDialog({ open: true, id: r.id })}>
                         ยกเลิก
                       </Button>
@@ -235,7 +235,7 @@ export default function MyRequestsPage() {
                       <TableCell align="right">
                         <Box sx={{ display: 'flex', gap: 0.75, justifyContent: 'flex-end' }}>
                           <Button size="small" variant="outlined" color="inherit" onClick={() => setDetailReq(r)}>ดู</Button>
-                          {r.status === 'Pending' && (
+                          {['PendingSupervisor', 'Pending'].includes(r.status) && (
                             <Button size="small" variant="outlined" color="error" onClick={() => setCancelDialog({ open: true, id: r.id })}>ยกเลิก</Button>
                           )}
                         </Box>
@@ -260,7 +260,7 @@ export default function MyRequestsPage() {
               </Box>
               <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                 <StatusChip status={detailReq.status} />
-                <IconButton size="small" onClick={() => setDetailReq(null)}><CloseIcon sx={{ fontSize: 18 }} /></IconButton>
+                <IconButton aria-label="ปิด" size="small" onClick={() => setDetailReq(null)}><CloseIcon sx={{ fontSize: 18 }} /></IconButton>
               </Box>
             </DialogTitle>
 
@@ -312,15 +312,31 @@ export default function MyRequestsPage() {
               <Box sx={{ mb: 2.5, p: '16px 20px', borderRadius: '12px', border: `1px solid ${theme.palette.divider}` }}>
                 <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, mb: 2 }}>สถานะคำขอ</Typography>
                 <Stepper activeStep={
-                  detailReq.status === 'Pending' ? 1 :
-                  detailReq.status === 'Approved' ? 2 :
-                  detailReq.status === 'CheckedOut' ? 3 :
-                  detailReq.status === 'Returned' ? 4 : 1
+                  detailReq.status === 'PendingSupervisor' ? 1 :
+                  detailReq.status === 'Pending' ? 2 :
+                  detailReq.status === 'Approved' ? 3 :
+                  detailReq.status === 'CheckedOut' ? 4 :
+                  detailReq.status === 'Returned' ? 5 :
+                  // Rejected: land on whichever step actually rejected it, so the
+                  // active step lines up with the red `error` marker below instead
+                  // of sitting one step behind it (the fallback here used to be a
+                  // flat `1`, left over from before the supervisor step existed —
+                  // now it means "หัวหน้างานอนุมัติ", not "รอ IT Admin อนุมัติ").
+                  // Same rejected/no-approvals condition as each StepLabel's own
+                  // `error` check just below, so the two never disagree.
+                  detailReq.status === 'Rejected'
+                    ? (detailReq.approvals?.some((a: any) => a.stage === 'Supervisor' && a.action === 'Rejected') ? 1 : 2)
+                    : 0
                 } alternativeLabel>
                   <Step><StepLabel>สร้างคำขอ</StepLabel></Step>
                   <Step>
-                    <StepLabel error={detailReq.status === 'Rejected'}>
-                      {detailReq.status === 'Rejected' ? 'ไม่อนุมัติ' : 'รอ IT อนุมัติ'}
+                    <StepLabel error={detailReq.status === 'Rejected' && detailReq.approvals?.some((a: any) => a.stage === 'Supervisor' && a.action === 'Rejected')}>
+                      หัวหน้างานอนุมัติ
+                    </StepLabel>
+                  </Step>
+                  <Step>
+                    <StepLabel error={detailReq.status === 'Rejected' && (!detailReq.approvals?.length || detailReq.approvals.some((a: any) => a.stage === 'ITAdmin' && a.action === 'Rejected'))}>
+                      รอ IT Admin อนุมัติ
                     </StepLabel>
                   </Step>
                   <Step><StepLabel>เตรียมอุปกรณ์</StepLabel></Step>
@@ -362,7 +378,7 @@ export default function MyRequestsPage() {
             </DialogContent>
 
             <DialogActions sx={{ p: 2.5, gap: 1 }}>
-              {detailReq.status === 'Pending' && (
+              {['PendingSupervisor', 'Pending'].includes(detailReq.status) && (
                 <Button fullWidth variant="outlined" color="error" startIcon={<CloseIcon sx={{ fontSize: 16 }} />}
                   onClick={() => { setDetailReq(null); setCancelDialog({ open: true, id: detailReq.id }); }}>
                   ยกเลิกคำขอ

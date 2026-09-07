@@ -148,6 +148,28 @@ export interface LiveSpot {
   pmDate: string | null;
 }
 
+export interface LiveFrameAsset {
+  assetId: number;
+  assetName: string | null;
+  assetCode: string | null;
+  type: string | null;
+  kind: DeviceKind;
+  pmStatus: PMStatus;
+  pmDate: string | null;
+}
+
+/** กรอบอุปกรณ์วาดเอง — อิสระจากตารางที่นั่ง/โซน ผูกอุปกรณ์ได้หลายชิ้นต่อกรอบ */
+export interface LiveFrame {
+  id: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  label: string | null;
+  color: string | null;
+  assets: LiveFrameAsset[];
+}
+
 export interface LiveFloorPlan {
   plan: {
     id: number; name: string; floor: string; building: string | null;
@@ -161,6 +183,7 @@ export interface LiveFloorPlan {
   zones: LiveZone[];
   seats: LiveSeat[];
   spots: LiveSpot[];
+  frames: LiveFrame[];
   summary: {
     seats: number;
     seatsDone: number;
@@ -269,6 +292,16 @@ export async function buildLiveFloorPlan(
           asset: { select: { id: true, assetName: true, assetCode: true, type: true, ownerName: true, departmentId: true } },
         },
       },
+      frames: {
+        orderBy: { id: 'asc' },
+        include: {
+          assets: {
+            include: {
+              asset: { select: { id: true, assetName: true, assetCode: true, type: true } },
+            },
+          },
+        },
+      },
     },
   });
   if (!plan) return null;
@@ -316,6 +349,7 @@ export async function buildLiveFloorPlan(
     ...ownedAssets.map(a => a.id),
     ...links.map(l => l.child?.id).filter((v): v is number => typeof v === 'number'),
     ...plan.pins.map(p => p.assetId),
+    ...plan.frames.flatMap(f => f.assets.map(fa => fa.assetId)),
   ]);
   const pm = await pmStatusByAsset(prisma, [...allIds], year);
   const statusOf = (id: number) => pm.get(id)?.status ?? 'NO_PM';
@@ -410,6 +444,19 @@ export async function buildLiveFloorPlan(
   const deskTotal = zones.reduce((n, z) => n + z.desks.length, 0);
   const deskFree = zones.reduce((n, z) => n + z.desks.filter(d => d.seatId === null).length, 0);
 
+  const frames: LiveFrame[] = plan.frames.map(f => ({
+    id: f.id, x: f.x, y: f.y, w: f.w, h: f.h, label: f.label, color: f.color,
+    assets: f.assets.map(fa => ({
+      assetId: fa.assetId,
+      assetName: fa.asset?.assetName ?? null,
+      assetCode: fa.asset?.assetCode ?? null,
+      type: fa.asset?.type ?? null,
+      kind: deviceKind(fa.asset?.type),
+      pmStatus: statusOf(fa.assetId),
+      pmDate: dateOf(fa.assetId),
+    })),
+  }));
+
   const byKind: Record<string, number> = {};
   for (const d of [...seats.flatMap(s => s.devices), ...spots]) {
     byKind[d.kind] = (byKind[d.kind] || 0) + 1;
@@ -428,6 +475,7 @@ export async function buildLiveFloorPlan(
     zones,
     seats,
     spots,
+    frames,
     summary: {
       seats: seats.length,
       seatsDone: seats.filter(s => s.status === 'COMPLETED').length,

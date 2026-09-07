@@ -25,7 +25,6 @@ import {
 import { alpha } from '@mui/material/styles';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
-import * as XLSX from 'xlsx';
 import HubIcon from '@mui/icons-material/Hub';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import PrintIcon from '@mui/icons-material/Print';
@@ -49,6 +48,10 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import { pmSwHubPlanService, PMSwHubPlan, pmSwHubTemplateService } from '../../services/pmSwHub';
 import { formatDate } from '../../utils/dateUtils';
 import { Modal } from './components/Modal';
+import { useConfirm } from '../../contexts/ConfirmContext';
+
+// xlsx ~419 KB โหลดตอนกดส่งออกจริงเท่านั้น ไม่ใช่ตอนเปิดหน้า
+const loadXlsx = () => import('xlsx');
 
 function fmtDate(d: string | Date | null) {
   if (!d) return '—';
@@ -216,8 +219,13 @@ export default function PMSwHubPlanListPage() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('ยืนยันการลบแผน PM SW/Hub Room นี้?')) return;
+  const confirm = useConfirm();
+  const handleDelete = async (id: number, label?: string) => {
+    if (!await confirm({
+      title: 'ลบแผน PM SW/Hub Room',
+      target: label,
+      detail: 'งานตรวจทั้งหมดในแผนนี้จะถูกลบไปด้วย',
+    })) return;
     setSaving(true);
     try {
       await pmSwHubPlanService.delete(id);
@@ -321,6 +329,7 @@ export default function PMSwHubPlanListPage() {
 
   // Excel Export Handler
   const handleExportExcel = async () => {
+    const XLSX = await loadXlsx();
     try {
       setExporting(true);
 
@@ -472,7 +481,7 @@ export default function PMSwHubPlanListPage() {
             </ToggleButtonGroup>
 
             <Box sx={{ display: 'flex', gap: 0.5 }}>
-              <IconButton
+              <IconButton aria-label="ก่อนหน้า"
                 size="small"
                 onClick={() => {
                   if (viewMode === 'monthly') setFilterYear(prev => prev - 1);
@@ -481,7 +490,7 @@ export default function PMSwHubPlanListPage() {
               >
                 <ChevronLeftIcon fontSize="small" />
               </IconButton>
-              <IconButton
+              <IconButton aria-label="รีเซ็ต"
                 size="small"
                 onClick={() => {
                   setTimeOffset(0);
@@ -490,7 +499,7 @@ export default function PMSwHubPlanListPage() {
               >
                 <RestartAltIcon fontSize="small" />
               </IconButton>
-              <IconButton
+              <IconButton aria-label="ถัดไป"
                 size="small"
                 onClick={() => {
                   if (viewMode === 'monthly') setFilterYear(prev => prev + 1);
@@ -672,8 +681,8 @@ export default function PMSwHubPlanListPage() {
                       </Button>
                     )}
 
-                    <IconButton size="small" onClick={() => handleEditPlan(plan)} title="แก้ไขข้อมูลแผน"><EditIcon fontSize="small" /></IconButton>
-                    <IconButton size="small" color="error" onClick={() => handleDelete(plan.id)} disabled={saving} title="ลบแผน"><DeleteIcon fontSize="small" /></IconButton>
+                    <IconButton aria-label="แก้ไข" size="small" onClick={() => handleEditPlan(plan)} title="แก้ไขข้อมูลแผน"><EditIcon fontSize="small" /></IconButton>
+                    <IconButton aria-label="ลบ" size="small" color="error" onClick={() => handleDelete(plan.id, `ชั้น ${plan.floor} · ${plan.period}`)} disabled={saving} title="ลบแผน"><DeleteIcon fontSize="small" /></IconButton>
                   </Box>
                 </Box>
               </Card>

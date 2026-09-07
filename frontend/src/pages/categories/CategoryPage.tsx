@@ -13,6 +13,7 @@ import CategoryIcon from '@mui/icons-material/Category';
 import { categoryAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 interface CategoryType {
   id: number;
@@ -126,8 +127,13 @@ export default function CategoryPage() {
     }
   };
 
+  const confirm = useConfirm();
   const handleDeleteCategory = async (id: number, name: string) => {
-    if (!window.confirm(`ต้องการลบหมวดหมู่ "${name}" และประเภทย่อยทั้งหมดใช่หรือไม่?`)) return;
+    if (!await confirm({
+      title: 'ลบหมวดหมู่',
+      target: name,
+      detail: 'ประเภทย่อยทั้งหมดในหมวดนี้จะถูกลบไปด้วย',
+    })) return;
     try {
       await categoryAPI.delete(id);
       toast.success('ลบหมวดหมู่เรียบร้อย');
@@ -138,7 +144,7 @@ export default function CategoryPage() {
   };
 
   const handleDeleteType = async (typeId: number, name: string) => {
-    if (!window.confirm(`ต้องการลบประเภท "${name}" ใช่หรือไม่?`)) return;
+    if (!await confirm({ title: 'ลบประเภทอุปกรณ์', target: name })) return;
     try {
       await categoryAPI.deleteType(typeId);
       toast.success('ลบประเภทเรียบร้อย');
@@ -208,11 +214,11 @@ export default function CategoryPage() {
                       >
                         เพิ่มประเภท
                       </Button>
-                      <IconButton size="small" onClick={() => { setCatForm({ name: cat.name, icon: cat.icon, description: cat.description || '' }); setCatDialog({ open: true, category: cat }); }}>
+                      <IconButton aria-label="แก้ไข" size="small" onClick={() => { setCatForm({ name: cat.name, icon: cat.icon, description: cat.description || '' }); setCatDialog({ open: true, category: cat }); }}>
                         <EditIcon fontSize="small" />
                       </IconButton>
                       {user?.role === 'SUPERADMIN' && (
-                        <IconButton size="small" color="error" onClick={() => handleDeleteCategory(cat.id, cat.name)}>
+                        <IconButton aria-label="ลบ" size="small" color="error" onClick={() => handleDeleteCategory(cat.id, cat.name)}>
                           <DeleteIcon fontSize="small" />
                         </IconButton>
                       )}
@@ -261,11 +267,11 @@ export default function CategoryPage() {
                             </TableCell>
                             {isAdmin && (
                               <TableCell align="right">
-                                <IconButton size="small" onClick={() => { setTypeForm({ name: type.name, description: type.description || '', detailTable: type.detailTable || '', isBorrowable: type.isBorrowable, isAssignable: type.isAssignable }); setTypeDialog({ open: true, categoryId: cat.id, type }); }}>
+                                <IconButton aria-label="แก้ไข" size="small" onClick={() => { setTypeForm({ name: type.name, description: type.description || '', detailTable: type.detailTable || '', isBorrowable: type.isBorrowable, isAssignable: type.isAssignable }); setTypeDialog({ open: true, categoryId: cat.id, type }); }}>
                                   <EditIcon fontSize="small" />
                                 </IconButton>
                                 {user?.role === 'SUPERADMIN' && (
-                                  <IconButton size="small" color="error" onClick={() => handleDeleteType(type.id, type.name)}>
+                                  <IconButton aria-label="ลบ" size="small" color="error" onClick={() => handleDeleteType(type.id, type.name)}>
                                     <DeleteIcon fontSize="small" />
                                   </IconButton>
                                 )}

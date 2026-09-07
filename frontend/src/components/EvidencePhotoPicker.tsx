@@ -49,7 +49,7 @@ export function EvidencePhotoPicker({ photos, onChange, label = 'แนบภา
         {photos.map((p, i) => (
           <Box key={p.previewUrl} sx={{ position: 'relative', width: 72, height: 72, borderRadius: 1.5, overflow: 'hidden', border: `1px solid ${theme.palette.divider}` }}>
             <Box component="img" src={p.previewUrl} alt="" sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            <IconButton
+            <IconButton aria-label="ปิด"
               size="small"
               onClick={() => remove(i)}
               sx={{

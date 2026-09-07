@@ -363,6 +363,8 @@ async function sendLine(eventType: string, payload: Record<string, any>) {
       message = `📦 มีการส่งมอบทรัพย์สิน\nใบเบิก: ${payload.requestNo}\nผู้ขอ: ${payload.requester}\nจำนวน: ${payload.itemsCount} รายการ`;
     } else if (eventType === 'return_recorded') {
       message = `🔄 มีการคืนทรัพย์สิน\nใบเบิก: ${payload.requestNo}\nผู้คืน: ${payload.requester}\nรหัสทรัพย์สิน: ${payload.assetCode}\nสภาพ: ${payload.condition}`;
+    } else if (eventType === 'borrow_supervisor_approved') {
+      message = `✅ คำขอยืมผ่านหัวหน้างานแล้ว รอ IT Admin\nใบเบิก: ${payload.requestNo}\nผู้ขอ: ${payload.requester}\nหัวหน้างาน: ${payload.supervisor}`;
     } else if (eventType === 'overdue_borrow') {
       const itemsList = Array.isArray(payload.items) 
         ? payload.items.slice(0, 5).map((item: any) => `• ${item.assetCode} (${item.brand} ${item.model}) - ${item.status}`).join('\n')

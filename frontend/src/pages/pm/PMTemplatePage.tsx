@@ -337,9 +337,9 @@ export default function PMTemplatePage() {
                 >
                   {/* Order controls */}
                   <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
-                    <IconButton size="small" sx={{ p: 0.25 }} onClick={() => moveItem(idx, -1)}><ArrowUpwardIcon sx={{ fontSize: 12 }} /></IconButton>
+                    <IconButton aria-label="ย้ายขึ้น" size="small" sx={{ p: 0.25 }} onClick={() => moveItem(idx, -1)}><ArrowUpwardIcon sx={{ fontSize: 12 }} /></IconButton>
                     <Typography sx={{ fontSize: 10, color: 'text.disabled', width: 20, textAlign: 'center' }}>{idx + 1}</Typography>
-                    <IconButton size="small" sx={{ p: 0.25 }} onClick={() => moveItem(idx, 1)}><ArrowDownwardIcon sx={{ fontSize: 12 }} /></IconButton>
+                    <IconButton aria-label="ย้ายลง" size="small" sx={{ p: 0.25 }} onClick={() => moveItem(idx, 1)}><ArrowDownwardIcon sx={{ fontSize: 12 }} /></IconButton>
                   </Box>
 
                   {/* Label */}
@@ -379,7 +379,7 @@ export default function PMTemplatePage() {
                   />
 
                   {/* Delete */}
-                  <IconButton size="small" color="error" onClick={() => removeItem(idx)}><DeleteIcon fontSize="small" /></IconButton>
+                  <IconButton aria-label="ลบ" size="small" color="error" onClick={() => removeItem(idx)}><DeleteIcon fontSize="small" /></IconButton>
                 </Box>
               ))
             )}

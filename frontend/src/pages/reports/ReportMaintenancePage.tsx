@@ -5,14 +5,17 @@ import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
 import { maintenanceAPI } from '../../services/api';
 import ReportHeaderTabs from './ReportHeaderTabs';
 import { Wrench, CheckCircle2, Clock, AlertTriangle, Eye, DollarSign, FileText } from 'lucide-react';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 import { useNavigate } from 'react-router-dom';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
 
 import 'dayjs/locale/th';
+
+// jspdf ~382 KB โหลดตอนกดออก PDF จริงเท่านั้น
+const loadJsPdf = async () => (await import('jspdf')).default;
+// html2canvas ~198 KB ใช้คู่กับ jspdf ตอนออก PDF เท่านั้น
+const loadHtml2Canvas = async () => (await import('html2canvas')).default;
 
 dayjs.locale('th');
 
@@ -37,6 +40,7 @@ export default function ReportMaintenancePage() {
       setExportingPDF(true);
       const element = document.getElementById('report-content');
       if (!element) return;
+      const html2canvas = await loadHtml2Canvas();
       const canvas = await html2canvas(element, { 
         scale: 3, 
         useCORS: true, 
@@ -44,6 +48,7 @@ export default function ReportMaintenancePage() {
         logging: false
       });
       const imgData = canvas.toDataURL('image/png');
+      const jsPDF = await loadJsPdf();
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
@@ -346,7 +351,7 @@ export default function ReportMaintenancePage() {
                   Ticket No: {selectedRecord.ticketNo}
                 </Typography>
               </Box>
-              <IconButton onClick={handleCloseDialog} sx={{ color: 'text.secondary' }}>
+              <IconButton aria-label="ปิด" onClick={handleCloseDialog} sx={{ color: 'text.secondary' }}>
                 <CloseIcon />
               </IconButton>
             </DialogTitle>

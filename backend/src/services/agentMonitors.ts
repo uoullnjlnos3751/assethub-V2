@@ -22,6 +22,11 @@ export interface AgentMonitor {
   serial: string | null;
   port: string | null;
   year: number | null;
+  /** ความละเอียดเป็นพิกเซล — Agent ส่งมาตลอดแต่ไม่เคยถูกประกาศไว้ จึงไม่มีใคร
+   *  อ่านเลย ทั้งที่ทะเบียนมีจอบันทึกความละเอียดไว้แค่ 27 จาก 243 ตัว
+   *  (ไม่ใช่ขนาดกายภาพ — คำนวณเป็นนิ้วไม่ได้) */
+  width: number | null;
+  height: number | null;
 }
 
 export type MonitorBucket = 'FIX' | 'OK' | 'CREATE' | 'MANUAL';
@@ -153,6 +158,8 @@ export async function reconcileRecord(prisma: PrismaClient, record: any): Promis
       name: clean(raw.name), type: clean(raw.type), manufacturer: clean(raw.manufacturer),
       serial: clean(raw.serial), port: clean(raw.port),
       year: typeof raw.year === 'number' ? raw.year : null,
+      width: typeof raw.width === 'number' ? raw.width : null,
+      height: typeof raw.height === 'number' ? raw.height : null,
     };
     // Built-in laptop panels are part of the machine, never their own asset.
     if (mon.type !== 'External') continue;
@@ -192,6 +199,83 @@ export async function reconcileRecord(prisma: PrismaClient, record: any): Promis
     });
   }
   return rows;
+}
+
+/**
+ * The same monitors, shaped for the device list on the PM checklist.
+ *
+ * The form already takes this shape from GLPI (see fetchGLPISpecBySerial), so
+ * the agent becomes a second source for machines GLPI has no record of. What
+ * each side knows is not the same, though:
+ *
+ *   screen size, built-in speaker   GLPI only — the agent reads EDID, which
+ *                                   carries neither
+ *   manufacture year                agent only — GLPI has no field for it
+ *   port                            both, but meaning different things: GLPI
+ *                                   lists the sockets the panel has, the agent
+ *                                   names the one it is plugged into today
+ *
+ * That last difference is why the port lands in `connectedPort` and not in
+ * `ports`. processDeviceAnswers() upserts MonitorDetail as soon as any one of
+ * screenSize/ports/hasSpeaker is present on a device, writing the other two as
+ * null — so putting the agent's port in `ports` would silently blank a screen
+ * size someone had already recorded. Keeping all three untouched leaves the
+ * stored monitor detail alone, which is the only correct thing for a source
+ * that cannot see those properties.
+ */
+export interface AgentPmMonitor {
+  /** Registry row matched by serial, when there is one. */
+  _assetId: number | null;
+  assetName: string | null;
+  assetCode: string | null;
+  brand: string;
+  model: string;
+  serial: string;
+  company: string | null;
+  /** The port it is plugged into right now — not the set the panel has. */
+  connectedPort: string | null;
+  year: number | null;
+  source: 'agent';
+}
+
+export async function buildAgentPmMonitors(
+  prisma: PrismaClient,
+  record: any,
+  hostCompany?: string | null,
+): Promise<AgentPmMonitor[]> {
+  const out: AgentPmMonitor[] = [];
+  for (const raw of (record?.monitors ?? [])) {
+    // Built-in laptop panels are part of the machine, never their own asset —
+    // half of what the agent reports fleet-wide is one of these.
+    if (clean(raw?.type) !== 'External') continue;
+
+    const serial = clean(raw?.serial) ?? '';
+    // Roughly one external panel in fifteen reports no serial. It still gets a
+    // row, pre-filled with what is known, for the technician to complete —
+    // saving without one is refused further down in processDeviceAnswers().
+    const reg = serial
+      ? await prisma.asset.findFirst({
+          where: { OR: [{ serialNo: serial }, { snComputer: serial }] },
+          select: REG_SELECT,
+        })
+      : null;
+
+    out.push({
+      _assetId: reg?.id ?? null,
+      assetName: reg?.assetName ?? null,
+      assetCode: reg?.assetCode ?? null,
+      brand: brandFromPnp(raw?.manufacturer) || reg?.brand || '',
+      model: clean(raw?.name) || reg?.model || '',
+      serial,
+      // A panel already in the registry keeps its own company; a new one falls
+      // to the company of the machine it is plugged into, same as the GLPI path.
+      company: reg?.company ?? hostCompany ?? null,
+      connectedPort: clean(raw?.port),
+      year: typeof raw?.year === 'number' ? raw.year : null,
+      source: 'agent',
+    });
+  }
+  return out;
 }
 
 /** Every machine the agent covers. The fleet view is where the work happens —

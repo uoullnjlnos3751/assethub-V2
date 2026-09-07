@@ -1,12 +1,19 @@
-import * as XLSX from 'xlsx';
-
 /**
  * Shared spreadsheet/download plumbing for report exports.
  *
  * Split out of pages/pm/pmExport.ts once the PM schedule page needed the same
  * BOM handling and column sizing — the encoding rules below are the kind of
  * thing that is silently wrong in one copy and right in the other.
+ *
+ * xlsx โหลดแบบ dynamic ตอนจะเขียนไฟล์จริงเท่านั้น ก้อนนี้ใหญ่ ~419 KB และคน
+ * ส่วนใหญ่เปิดหน้ารายงานโดยไม่เคยกดส่งออกเลย การ import ที่หัวไฟล์จึงลากมันเข้า
+ * ไปในทุกหน้าที่แตะโมดูลนี้ตั้งแต่เปิด
  */
+
+type XlsxModule = typeof import('xlsx');
+let xlsxPromise: Promise<XlsxModule> | null = null;
+/** โหลดครั้งเดียวแล้วใช้ซ้ำ กดส่งออกรัว ๆ ก็ไม่ดึงซ้ำ */
+const loadXlsx = () => (xlsxPromise ??= import('xlsx'));
 
 export type Cell = string | number;
 export type Rows = Cell[][];
@@ -42,16 +49,17 @@ export function autoWidth(rows: Rows) {
 export const sheetName = (label: string) =>
   label.replace(/[[\]:*?/\\]/g, ' ').slice(0, 31) || 'Sheet1';
 
-export function sheetFor(rows: Rows) {
+function sheetForWith(XLSX: XlsxModule, rows: Rows) {
   const ws = XLSX.utils.aoa_to_sheet(rows);
   ws['!cols'] = autoWidth(rows);
   return ws;
 }
 
 /** One sheet per entry, in order. */
-export function writeWorkbook(sheets: { name: string; rows: Rows }[], filename: string) {
+export async function writeWorkbook(sheets: { name: string; rows: Rows }[], filename: string) {
+  const XLSX = await loadXlsx();
   const wb = XLSX.utils.book_new();
-  for (const s of sheets) XLSX.utils.book_append_sheet(wb, sheetFor(s.rows), sheetName(s.name));
+  for (const s of sheets) XLSX.utils.book_append_sheet(wb, sheetForWith(XLSX, s.rows), sheetName(s.name));
   const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
   triggerDownload(new Blob([out], { type: XLSX_MIME }), filename);
 }

@@ -26,6 +26,7 @@ import BackupTab from './settings/BackupTab';
 import AuditLogTab from './settings/AuditLogTab';
 import { SectionCard } from '../../components/SectionCard';
 import type { SystemSettings, NotificationTemplate, HealthCheckResult, NotificationLog } from './settings/types';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 // Mirrors SECRET_MASK in backend/src/routes/admin.ts — the API sends this in
 // place of a stored credential, and treats it coming back as "unchanged".
@@ -42,46 +43,60 @@ const TAB_GROUPS = [
   {
     label: 'ทั่วไป', icon: <Globe size={15} />,
     items: [
-      { index: 0, label: 'ข้อมูลระบบ', icon: <Globe size={16} />, roles: ['SUPERADMIN'] },
-      { index: 1, label: 'กฎการยืม', icon: <Clock size={16} />, roles: ['SUPERADMIN'] },
-      { index: 7, label: 'การสร้างรหัสทรัพย์สิน', icon: <Building2 size={16} /> },
+      { index: 0, label: 'ข้อมูลระบบ', desc: 'ชื่อระบบ โลโก้ เขตเวลา', icon: <Globe size={16} />, roles: ['SUPERADMIN'] },
+      { index: 1, label: 'กฎการยืม', desc: 'จำนวนวัน การต่ออายุ การเตือน', icon: <Clock size={16} />, roles: ['SUPERADMIN'] },
+      { index: 7, label: 'การสร้างรหัสทรัพย์สิน', desc: 'รูปแบบรหัสและเลขรันนิ่ง', icon: <Building2 size={16} /> },
     ]
   },
   {
     label: 'ผู้ใช้ & สิทธิ์', icon: <Users size={15} />,
     items: [
-      { index: 8, label: 'ผู้ใช้งาน', icon: <Users size={16} />, roles: ['SUPERADMIN'] },
-      { index: 10, label: 'ตารางสิทธิ์รายเมนู', icon: <Shield size={16} /> },
-      { index: 9, label: 'บริษัท & หน่วยงาน', icon: <Building2 size={16} /> },
+      { index: 8, label: 'ผู้ใช้งาน', desc: 'บัญชีผู้ใช้และบทบาท', icon: <Users size={16} />, roles: ['SUPERADMIN'] },
+      { index: 10, label: 'ตารางสิทธิ์รายเมนู', desc: 'ใครเข้าเมนูไหนได้บ้าง', icon: <Shield size={16} /> },
+      { index: 9, label: 'บริษัท & หน่วยงาน', desc: 'โครงสร้างบริษัทและแผนก', icon: <Building2 size={16} /> },
     ]
   },
   {
     label: 'การแจ้งเตือน', icon: <Bell size={15} />,
     items: [
-      { index: 2, label: 'LINE แจ้งเตือน', icon: <Smartphone size={16} />, roles: ['SUPERADMIN'] },
-      { index: 3, label: 'Templates อีเมล', icon: <Mail size={16} />, roles: ['SUPERADMIN'] },
+      { index: 2, label: 'LINE แจ้งเตือน', desc: 'เชื่อม LINE และดูประวัติส่ง', icon: <Smartphone size={16} />, roles: ['SUPERADMIN'] },
+      { index: 3, label: 'Templates อีเมล', desc: 'ข้อความอีเมลแต่ละเหตุการณ์', icon: <Mail size={16} />, roles: ['SUPERADMIN'] },
     ]
   },
   {
     label: 'ความปลอดภัย & ระบบ', icon: <Shield size={15} />,
     items: [
-      { index: 4, label: 'ความปลอดภัย', icon: <Shield size={16} />, roles: ['SUPERADMIN'] },
-      { index: 5, label: 'ระบบ / Health', icon: <Server size={16} />, roles: ['SUPERADMIN'] },
-      { index: 6, label: 'จัดการข้อมูล', icon: <Database size={16} />, roles: ['SUPERADMIN'] },
-      { index: 12, label: 'Backup', icon: <Download size={16} /> },
-      { index: 13, label: 'Audit Log', icon: <History size={16} /> },
-      { index: 11, label: 'เชื่อมต่อระบบภายนอก', icon: <Server size={16} /> },
+      { index: 4, label: 'ความปลอดภัย', desc: 'เซสชัน รหัสผ่าน การบังคับออก', icon: <Shield size={16} />, roles: ['SUPERADMIN'] },
+      { index: 5, label: 'ระบบ / Health', desc: 'สถานะเซิร์ฟเวอร์และฐานข้อมูล', icon: <Server size={16} />, roles: ['SUPERADMIN'] },
+      { index: 6, label: 'จัดการข้อมูล', desc: 'ค้นหาและลบทรัพย์สินเป็นชุด', icon: <Database size={16} />, roles: ['SUPERADMIN'] },
+      { index: 12, label: 'Backup', desc: 'สำรองและกู้คืนฐานข้อมูล', icon: <Download size={16} /> },
+      { index: 13, label: 'Audit Log', desc: 'ประวัติการเปลี่ยนแปลงในระบบ', icon: <History size={16} /> },
+      { index: 11, label: 'เชื่อมต่อระบบภายนอก', desc: 'GLPI, Agent และ API อื่น', icon: <Server size={16} /> },
     ]
   },
 ];
 
+/** ทุกเมนูแบนเป็นชุดเดียว ใช้ตอนค้นหาและตอนหาหัวข้อของหน้าที่เปิดอยู่ */
+const ALL_TABS = TAB_GROUPS.flatMap(g => g.items.map(i => ({ ...i, group: g.label })));
+
 export default function SettingsPage() {
   const toast = useToast();
+  const confirm = useConfirm();
   const { user, refreshSettings } = useAuth();
   const theme = useTheme();
   const [searchParams] = useSearchParams();
   const [tab, setTab] = useState(0);
   const visible = (entry: { roles?: string[] }) => !entry.roles || entry.roles.includes(user?.role || '');
+  const [navQuery, setNavQuery] = useState('');
+  /** หัวข้อที่เปิดอยู่ ใช้เขียนบรรทัดรองใต้ชื่อหน้า */
+  const current = ALL_TABS.find(t => t.index === tab && visible(t));
+  /** ผลค้นหา — ดูทั้งชื่อ คำอธิบาย และชื่อกลุ่ม คนจำได้อย่างใดอย่างหนึ่งก็พอ */
+  const matches = (() => {
+    const q = navQuery.trim().toLowerCase();
+    if (!q) return [];
+    return ALL_TABS.filter(visible).filter(t =>
+      t.label.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q) || t.group.toLowerCase().includes(q));
+  })();
   const [settings, setSettings] = useState<SystemSettings | null>(null);
   const [orig, setOrig] = useState<SystemSettings | null>(null);
   const [templates, setTemplates] = useState<NotificationTemplate[]>([]);
@@ -208,15 +223,75 @@ export default function SettingsPage() {
     } catch { toast.error('เกิดข้อผิดพลาด'); }
   };
 
+  /**
+   * หนึ่งรายการในเมนูซ้าย
+   *
+   * แถบสีด้านซ้ายของรายการที่เลือกอยู่ ทำให้รู้ตำแหน่งได้จากการกวาดตาแนวตั้ง
+   * ครั้งเดียว ต่างจากของเดิมที่ใช้แค่พื้นหลังจาง ๆ ซึ่งกลืนไปกับ hover
+   * ตอนค้นหาจะโชว์ชื่อกลุ่มกำกับด้วย เพราะผลลัพธ์ถูกดึงออกจากกลุ่มมาแล้ว
+   */
+  const navItem = (item: typeof ALL_TABS[number], showGroup: boolean) => {
+    const active = tab === item.index;
+    return (
+      <Box
+        key={item.index}
+        role="button"
+        tabIndex={0}
+        onClick={() => setTab(item.index)}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setTab(item.index); } }}
+        sx={{
+          position: 'relative',
+          display: 'flex', alignItems: 'flex-start', gap: 1.1,
+          pl: 1.6, pr: 1.25, py: 0.9, mb: 0.25, borderRadius: '9px', cursor: 'pointer',
+          bgcolor: active ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
+          color: active ? theme.palette.primary.main : theme.palette.text.secondary,
+          transition: 'background-color .15s, color .15s',
+          '&:hover': { bgcolor: active ? alpha(theme.palette.primary.main, 0.14) : theme.palette.action.hover },
+          '&:focus-visible': { outline: `2px solid ${theme.palette.primary.main}`, outlineOffset: 1 },
+          '&::before': active ? {
+            content: '""', position: 'absolute', left: 0, top: 7, bottom: 7,
+            width: 3, borderRadius: 3, bgcolor: theme.palette.primary.main,
+          } : {},
+        }}
+      >
+        <Box sx={{ display: 'flex', flexShrink: 0, mt: '1px' }}>{item.icon}</Box>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography sx={{ fontSize: '0.8rem', fontWeight: active ? 700 : 500, color: 'inherit', lineHeight: 1.4 }}>
+            {item.label}
+          </Typography>
+          <Typography sx={{
+            fontSize: '0.68rem', lineHeight: 1.4,
+            color: active ? alpha(theme.palette.primary.main, 0.75) : theme.palette.text.disabled,
+          }}>
+            {showGroup ? `${item.group} · ${item.desc}` : item.desc}
+          </Typography>
+        </Box>
+      </Box>
+    );
+  };
+
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}><CircularProgress /></Box>;
 
   return (
     <Box>
-      <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
-        <Settings size={28} />
-        <Box>
-          <Typography variant="h5" fontWeight={800} sx={{ letterSpacing: '-0.02em', mb: 0.5 }}>ตั้งค่าระบบ (System Settings)</Typography>
-          <Typography variant="body2" color="text.secondary">จัดการการตั้งค่าทั้งหมดของระบบ ITAM</Typography>
+      {/* ── Page header ──
+          เดิมเป็นหัวข้อลอย ๆ ไม่บอกว่ากำลังอยู่หน้าไหนใน 14 หน้า พอเลื่อนลง
+          ไปกลางฟอร์มก็จำไม่ได้แล้ว ตอนนี้บอกทั้งกลุ่มและหัวข้อย่อยที่เปิดอยู่ */}
+      <Box sx={{ mb: 2.5, display: 'flex', alignItems: 'center', gap: 1.75 }}>
+        <Box sx={{
+          width: 42, height: 42, borderRadius: '12px', flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          bgcolor: alpha(theme.palette.primary.main, 0.1), color: theme.palette.primary.main,
+        }}>
+          <Settings size={22} />
+        </Box>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="h5" fontWeight={800} sx={{ letterSpacing: '-0.02em', lineHeight: 1.25 }}>
+            ตั้งค่าระบบ
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem' }}>
+            {current ? `${current.group} · ${current.desc}` : 'จัดการการตั้งค่าทั้งหมดของระบบ ITAM'}
+          </Typography>
         </Box>
       </Box>
 
@@ -226,55 +301,66 @@ export default function SettingsPage() {
         <Paper
           elevation={0}
           sx={{
-            width: { xs: '100%', md: 244 },
+            width: { xs: '100%', md: 268 },
             flexShrink: 0,
             borderRadius: 2.5,
             border: `0.5px solid ${theme.palette.divider}`,
-            p: 1,
+            overflow: 'hidden',
             position: { md: 'sticky' },
             top: { md: 16 },
           }}
         >
-          {TAB_GROUPS.filter(group => group.items.some(visible)).map((group, gi) => (
-            <Box key={group.label} sx={{ mt: gi === 0 ? 0 : 1.25 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 1.25, py: 0.75 }}>
-                <Box sx={{ display: 'flex', color: theme.palette.text.disabled }}>{group.icon}</Box>
-                <Typography sx={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '.05em', color: theme.palette.text.disabled }}>
-                  {group.label}
+          {/* ค้นหา — 14 หน้าย่อยมากพอที่จะจำไม่ได้ว่าอะไรอยู่กลุ่มไหน
+              พิมพ์แล้วยุบกลุ่มทิ้ง เหลือเฉพาะที่ตรง */}
+          <Box sx={{ p: 1.25, borderBottom: `0.5px solid ${theme.palette.divider}` }}>
+            <TextField
+              size="small"
+              fullWidth
+              placeholder="ค้นหาการตั้งค่า..."
+              value={navQuery}
+              onChange={e => setNavQuery(e.target.value)}
+              InputProps={{
+                startAdornment: <Search size={15} style={{ marginRight: 8, opacity: 0.5, flexShrink: 0 }} />,
+                sx: { fontSize: '0.8rem', borderRadius: '9px' },
+              }}
+            />
+          </Box>
+
+          <Box sx={{ p: 1, maxHeight: { md: 'calc(100vh - 190px)' }, overflowY: 'auto' }}>
+            {navQuery.trim() ? (
+              matches.length === 0 ? (
+                <Typography sx={{ fontSize: '0.75rem', color: 'text.disabled', px: 1.25, py: 2, textAlign: 'center' }}>
+                  ไม่พบการตั้งค่าที่ตรงกับ "{navQuery}"
                 </Typography>
-              </Box>
-              {group.items.filter(visible).map(item => {
-                const active = tab === item.index;
-                return (
-                  <Box
-                    key={item.index}
-                    onClick={() => setTab(item.index)}
-                    sx={{
-                      display: 'flex', alignItems: 'center', gap: 1,
-                      px: 1.25, py: 0.85, borderRadius: '8px', cursor: 'pointer',
-                      bgcolor: active ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
-                      color: active ? theme.palette.primary.main : theme.palette.text.secondary,
-                      transition: 'background-color .15s, color .15s',
-                      '&:hover': {
-                        bgcolor: active ? alpha(theme.palette.primary.main, 0.14) : theme.palette.action.hover,
-                      },
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', flexShrink: 0 }}>{item.icon}</Box>
-                    <Typography sx={{ fontSize: '0.8rem', fontWeight: active ? 700 : 500, color: 'inherit' }}>
-                      {item.label}
+              ) : (
+                matches.map(item => navItem(item, true))
+              )
+            ) : (
+              TAB_GROUPS.filter(group => group.items.some(visible)).map((group, gi) => (
+                <Box key={group.label} sx={{ mt: gi === 0 ? 0 : 1.5 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 1.25, pt: 0.75, pb: 0.5 }}>
+                    <Box sx={{ display: 'flex', color: theme.palette.text.secondary }}>{group.icon}</Box>
+                    <Typography sx={{
+                      fontSize: '0.7rem', fontWeight: 800, letterSpacing: '.06em',
+                      color: theme.palette.text.secondary, textTransform: 'uppercase',
+                    }}>
+                      {group.label}
                     </Typography>
                   </Box>
-                );
-              })}
-            </Box>
-          ))}
+                  {group.items.filter(visible).map(item => navItem({ ...item, group: group.label }, false))}
+                </Box>
+              ))
+            )}
+          </Box>
         </Paper>
 
         {/* ── Tab Content ── */}
         <Box sx={{ flex: 1, minWidth: 0, width: '100%' }}>
       {tab === 0 && (
-        <Box sx={{ maxWidth: 720, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        /* เดิมบีบไว้ที่ 720px ทำให้จอ 1500px เหลือที่ว่างทางขวาเกือบครึ่ง
+           ปล่อยให้กว้างขึ้นแล้วให้การ์ดข้างในจัดคอลัมน์เอง แต่ยังคุมไม่ให้
+           บรรทัดยาวจนอ่านยาก */
+        <Box sx={{ maxWidth: 1080, display: 'flex', flexDirection: 'column', gap: 2 }}>
           <SectionCard title="ข้อมูลระบบ" icon={Building2}>
             <Grid container spacing={2.5}>
               <Grid item xs={12} sm={6}>
@@ -515,10 +601,10 @@ export default function SettingsPage() {
             </TableContainer>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1, px: 2, py: 1 }}>
               <Typography variant="caption" color="text.secondary">หน้า {logPage} / {logTotalPages}</Typography>
-              <IconButton size="small" disabled={logLoading || logPage <= 1} onClick={() => fetchLogs(logPage - 1)}>
+              <IconButton aria-label="ก่อนหน้า" size="small" disabled={logLoading || logPage <= 1} onClick={() => fetchLogs(logPage - 1)}>
                 <ChevronLeft size={16} />
               </IconButton>
-              <IconButton size="small" disabled={logLoading || logPage >= logTotalPages} onClick={() => fetchLogs(logPage + 1)}>
+              <IconButton aria-label="ถัดไป" size="small" disabled={logLoading || logPage >= logTotalPages} onClick={() => fetchLogs(logPage + 1)}>
                 <ChevronRight size={16} />
               </IconButton>
             </Box>
@@ -544,7 +630,7 @@ export default function SettingsPage() {
               <Divider sx={{ mb: 2 }} />
               <Typography variant="subtitle2" fontWeight={700} color="error" sx={{ mb: 1 }}>ยกเลิกเซสชันทั้งหมด</Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>ทุกคนในระบบจะต้องล็อกอินใหม่ทันที</Typography>
-              <Button variant="contained" color="error" size="small" onClick={async () => { if (window.confirm('ยืนยัน? ทุกคนจะต้องล็อกอินใหม่')) { try { await adminAPI.forceLogoutAll(); toast.success('ยกเลิกเซสชันทั้งหมดแล้ว'); } catch { toast.error('เกิดข้อผิดพลาด'); } } }}>
+              <Button variant="contained" color="error" size="small" onClick={async () => { if (await confirm({ title: 'ยกเลิกเซสชันทั้งหมด', detail: 'ผู้ใช้ทุกคนที่กำลังใช้งานอยู่จะถูกบังคับออกจากระบบ และต้องล็อกอินใหม่', confirmLabel: 'บังคับออกจากระบบ' })) { try { await adminAPI.forceLogoutAll(); toast.success('ยกเลิกเซสชันทั้งหมดแล้ว'); } catch { toast.error('เกิดข้อผิดพลาด'); } } }}>
                 บังคับยกเลิกเซสชัน
               </Button>
             </SectionCard>

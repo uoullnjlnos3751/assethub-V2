@@ -1,11 +1,15 @@
 import React from 'react';
 import { Box, alpha, useTheme } from '@mui/material';
+import type { LucideIcon } from 'lucide-react';
 
 export interface PillTab {
   value: string;
   label: string;
   /** Small red dot — used for "this tab has a validation error" style signals. */
   alert?: boolean;
+  /** Optional leading icon — every tab in the reference ITAM this bar is
+   *  modeled on carries one; omit to keep a plain text pill. */
+  icon?: LucideIcon;
 }
 
 /**
@@ -28,6 +32,7 @@ export function PillTabBar({ tabs, value, onChange }: {
     }}>
       {tabs.map(t => {
         const active = value === t.value;
+        const Icon = t.icon;
         return (
           <Box
             key={t.value}
@@ -38,6 +43,7 @@ export function PillTabBar({ tabs, value, onChange }: {
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onChange(t.value); } }}
             sx={{
               position: 'relative',
+              display: 'inline-flex', alignItems: 'center', gap: '6px',
               px: 2, py: 1.05, borderRadius: '10px', cursor: 'pointer',
               fontSize: '0.83rem', fontWeight: active ? 700 : 500,
               color: active ? theme.palette.primary.main : theme.palette.text.secondary,
@@ -51,6 +57,7 @@ export function PillTabBar({ tabs, value, onChange }: {
               '&:focus-visible': { outline: `2px solid ${theme.palette.primary.main}`, outlineOffset: 2 },
             }}
           >
+            {Icon && <Icon size={15} strokeWidth={2.3} />}
             {t.label}
             {t.alert && (
               <Box sx={{

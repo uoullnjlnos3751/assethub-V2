@@ -14,9 +14,12 @@ export async function sendDailySummary() {
       retryWithBackoff(() => prisma.borrowRequestItem.count({
         where: { itemStatus: { in: ['CheckedOut', 'PartiallyReturned'] }, dueDate: { lt: now } }
       }), 'countOverdue'),
-      // Pending borrow requests
+      // Pending borrow requests — both stages count as "still waiting":
+      // PendingSupervisor requests were invisible to this summary entirely
+      // before, so a request stuck waiting on a supervisor never showed up
+      // in the daily 09:00 LINE broadcast.
       retryWithBackoff(() => prisma.borrowRequest.count({
-        where: { status: 'Pending' }
+        where: { status: { in: ['Pending', 'PendingSupervisor'] } }
       }), 'countPending'),
       // PM remaining for current year
       retryWithBackoff(() => prisma.pMRun.count({

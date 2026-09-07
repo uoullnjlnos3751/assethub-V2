@@ -72,6 +72,15 @@ interface LiveSpot {
   kind: DeviceKind; ownerName: string | null; departmentId: string | null;
   pmStatus: PMStatus; pmDate: string | null;
 }
+interface LiveFrameAsset {
+  assetId: number; assetName: string | null; assetCode: string | null;
+  type: string | null; kind: DeviceKind; pmStatus: PMStatus; pmDate: string | null;
+}
+/** กรอบอุปกรณ์วาดเอง — อิสระจากตารางที่นั่ง/โซน เช่น ตู้ Rack มุมเซิร์ฟเวอร์ */
+interface LiveFrame {
+  id: number; x: number; y: number; w: number; h: number;
+  label: string | null; color: string | null; assets: LiveFrameAsset[];
+}
 interface LivePlan {
   plan: {
     id: number; name: string; floor: string; building: string | null;
@@ -81,6 +90,7 @@ interface LivePlan {
   zones: LiveZone[];
   seats: LiveSeat[];
   spots: LiveSpot[];
+  frames: LiveFrame[];
   summary: {
     seats: number; seatsDone: number; seatsUnplaced: number;
     devices: number; devicesDone: number; spots: number; byKind: Record<string, number>;
@@ -100,15 +110,6 @@ interface Candidate {
   pmPlanned: boolean; placed: boolean; looksLikeStorage: boolean;
 }
 
-/** ชื่อยาว ๆ บนแผนผังทับกันจนอ่านไม่ออก ตัดเหลือชื่อต้นกับอักษรแรกของนามสกุล */
-function shortName(full: string | null | undefined): string {
-  const s = String(full ?? '').trim();
-  if (!s) return '—';
-  const parts = s.split(/\s+/);
-  if (parts.length === 1) return parts[0].slice(0, 14);
-  return `${parts[0]} ${parts[1][0]}.`.slice(0, 16);
-}
-
 const thYear = (ad: number) => ad + 543;
 
 /** สีให้โซนที่วาดใหม่ ไล่วนไปเรื่อย ๆ เพื่อให้โซนติดกันไม่ได้สีเดียวกัน */
@@ -117,6 +118,9 @@ const ZONE_COLORS = ['#2563eb', '#dc2626', '#15803d', '#a16207', '#db2777',
 
 /** ห้องกับจุดสังเกตไม่ควรแย่งสายตาไปจากโซนแผนก สีกลาง ๆ จึงเหมาะกว่าสีในชุดข้างบน */
 const ROOM_COLOR = '#64748b';
+
+/** สีเริ่มต้นของกรอบอุปกรณ์วาดเอง — แยกจากชุดสีโซนแผนกให้ดูออกว่าคนละชนิดกัน */
+const FRAME_COLOR = '#0f766e';
 
 export default function PMFloorPlanPage() {
   const navigate = useNavigate();
@@ -132,7 +136,7 @@ export default function PMFloorPlanPage() {
 
   // โหมดแก้ไข: ที่นั่งกับอุปกรณ์ส่วนกลางแก้คนละชุด แต่บันทึกพร้อมกัน
   const [isEditMode, setIsEditMode] = useState(false);
-  const [editTab, setEditTab] = useState<'seat' | 'spot' | 'zone'>('seat');
+  const [editTab, setEditTab] = useState<'seat' | 'spot' | 'zone' | 'frame'>('seat');
   const [draftSeats, setDraftSeats] = useState<LiveSeat[]>([]);
   const [draftSpots, setDraftSpots] = useState<LiveSpot[]>([]);
   const [saving, setSaving] = useState(false);
@@ -147,7 +151,15 @@ export default function PMFloorPlanPage() {
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [applyingTemplate, setApplyingTemplate] = useState(false);
 
+  // กรอบอุปกรณ์วาดเอง — ใช้กลไกลากวาดเดียวกับโซน (drawing/pctAt) แต่แยก state
+  // การย้าย/ปรับขนาดออกจากโซน เพราะแก้ได้ทีละชนิดตามแท็บที่เลือกอยู่แล้ว
+  const [draftFrames, setDraftFrames] = useState<LiveFrame[]>([]);
+  const [frameDrag, setFrameDrag] = useState<{ id: number; mode: 'move' | 'resize'; ox: number; oy: number } | null>(null);
+  // กรอบที่กำลังเปิดแผงผูกอุปกรณ์อยู่ในแถบเครื่องมือ — เปิดได้ทีละกรอบ
+  const [assignOpenId, setAssignOpenId] = useState<number | null>(null);
+
   const [showZones, setShowZones] = useState(true);
+  const [showFrames, setShowFrames] = useState(true);
   const [showFreeDesks, setShowFreeDesks] = useState(true);
   const [dimPlan, setDimPlan] = useState(true);
 
@@ -197,6 +209,7 @@ export default function PMFloorPlanPage() {
       setDraftZones(res.data.zones || []);
       setDraftSeats(res.data.seats || []);
       setDraftSpots(res.data.spots || []);
+      setDraftFrames(res.data.frames || []);
     } catch (err) {
       console.error(err);
       setLive(null);
@@ -382,10 +395,13 @@ export default function PMFloorPlanPage() {
   /* ── แก้ผัง ─────────────────────────────────────────────────────────── */
 
   const zoneEditing = isEditMode && editTab === 'zone';
+  // กรอบอุปกรณ์ใช้กลไกลากวาดเดียวกับโซน (pctAt + drawing) แค่แยกแท็บ — วาดได้
+  // ทีละอย่างอยู่แล้วเพราะเลือกได้ทีละแท็บ จึงใช้ drawing ร่วมกันได้โดยไม่ชนกัน
+  const frameEditing = isEditMode && editTab === 'frame';
 
-  /** ลากกรอบบนผืนวาดเพื่อสร้างโซนใหม่ */
+  /** ลากกรอบบนผืนวาดเพื่อสร้างโซน/กรอบอุปกรณ์ใหม่ ตามแท็บที่เปิดอยู่ */
   const startDraw = (e: React.MouseEvent) => {
-    if (!zoneEditing || zoneDrag) return;
+    if (!(zoneEditing || frameEditing) || zoneDrag || frameDrag) return;
     const p = pctAt(e);
     if (!p) return;
     setDrawing({ x0: p.x, y0: p.y, x1: p.x, y1: p.y });
@@ -395,27 +411,51 @@ export default function PMFloorPlanPage() {
     const p = pctAt(e);
     if (!p) return;
     if (drawing) { setDrawing(d => d && { ...d, x1: p.x, y1: p.y }); return; }
-    if (!zoneDrag) return;
-    setDraftZones(prev => prev.map(z => {
-      if (z.id !== zoneDrag.id) return z;
-      if (zoneDrag.mode === 'move') {
-        // หนีบไว้ในผืน ไม่งั้นลากโซนออกนอกจอแล้วหาไม่เจอ
-        return { ...z,
-          x: Math.max(0, Math.min(100 - z.w, p.x - zoneDrag.ox)),
-          y: Math.max(0, Math.min(100 - z.h, p.y - zoneDrag.oy)) };
-      }
-      return { ...z, w: Math.max(2, Math.min(100 - z.x, p.x - z.x)), h: Math.max(2, Math.min(100 - z.y, p.y - z.y)) };
-    }));
+    if (zoneDrag) {
+      setDraftZones(prev => prev.map(z => {
+        if (z.id !== zoneDrag.id) return z;
+        if (zoneDrag.mode === 'move') {
+          // หนีบไว้ในผืน ไม่งั้นลากโซนออกนอกจอแล้วหาไม่เจอ
+          return { ...z,
+            x: Math.max(0, Math.min(100 - z.w, p.x - zoneDrag.ox)),
+            y: Math.max(0, Math.min(100 - z.h, p.y - zoneDrag.oy)) };
+        }
+        return { ...z, w: Math.max(2, Math.min(100 - z.x, p.x - z.x)), h: Math.max(2, Math.min(100 - z.y, p.y - z.y)) };
+      }));
+      return;
+    }
+    if (frameDrag) {
+      setDraftFrames(prev => prev.map(f => {
+        if (f.id !== frameDrag.id) return f;
+        if (frameDrag.mode === 'move') {
+          return { ...f,
+            x: Math.max(0, Math.min(100 - f.w, p.x - frameDrag.ox)),
+            y: Math.max(0, Math.min(100 - f.h, p.y - frameDrag.oy)) };
+        }
+        return { ...f, w: Math.max(1, Math.min(100 - f.x, p.x - f.x)), h: Math.max(1, Math.min(100 - f.y, p.y - f.y)) };
+      }));
+    }
   };
 
   const endDraw = () => {
     setZoneDrag(null);
+    setFrameDrag(null);
     if (!drawing) return;
     const x = Math.min(drawing.x0, drawing.x1), y = Math.min(drawing.y0, drawing.y1);
     const w = Math.abs(drawing.x1 - drawing.x0), h = Math.abs(drawing.y1 - drawing.y0);
+    const wasFrame = frameEditing;
     setDrawing(null);
-    // ลากสั้น ๆ มักเป็นการคลิกพลาด ไม่ใช่ตั้งใจสร้างโซน
+    // ลากสั้น ๆ มักเป็นการคลิกพลาด ไม่ใช่ตั้งใจสร้างโซน/กรอบ
     if (w < 2 || h < 2) return;
+    if (wasFrame) {
+      const n = draftFrames.length;
+      setDraftFrames(prev => [...prev, {
+        // id ติดลบคือกรอบใหม่ที่ยังไม่มีในฐานข้อมูล ใช้แยกจากของที่บันทึกแล้ว
+        id: -(Date.now() % 1e9) - n,
+        x, y, w, h, label: null, color: FRAME_COLOR, assets: [],
+      }]);
+      return;
+    }
     const n = draftZones.length;
     setDraftZones(prev => [...prev, {
       // id ติดลบคือโซนใหม่ที่ยังไม่มีในฐานข้อมูล ใช้แยกจากของที่บันทึกแล้ว
@@ -446,6 +486,33 @@ export default function PMFloorPlanPage() {
     setDraftZones(prev => prev.filter(x => x.id !== id));
     setDraftSeats(prev => prev.map(s =>
       s.zoneId === id ? { ...s, zoneId: null, deskIndex: null, deskCode: null } : s));
+  };
+
+  const patchFrame = (id: number, patch: Partial<LiveFrame>) =>
+    setDraftFrames(prev => prev.map(f => (f.id === id ? { ...f, ...patch } : f)));
+
+  const removeFrame = (id: number) => {
+    setDraftFrames(prev => prev.filter(x => x.id !== id));
+    if (assignOpenId === id) setAssignOpenId(null);
+  };
+
+  /** ผูกอุปกรณ์เข้ากรอบ — kind ตั้งเป็น 'other' ไปก่อน (เหมือน addSpot) เพราะยัง
+   *  ไม่รู้ชนิดจริงจนกว่าจะบันทึกแล้วดึง live ใหม่จาก server */
+  const addDeviceToFrame = (frameId: number, a: any) => {
+    setDraftFrames(prev => prev.map(f => {
+      if (f.id !== frameId) return f;
+      if (f.assets.some(x => x.assetId === a.id)) return f;
+      return { ...f, assets: [...f.assets, {
+        assetId: a.id, assetName: a.assetName, assetCode: a.assetCode, type: a.type,
+        kind: 'other' as DeviceKind, pmStatus: 'NO_PM' as PMStatus, pmDate: null,
+      }] };
+    }));
+    setSearch(''); setAssets([]);
+  };
+
+  const removeDeviceFromFrame = (frameId: number, assetId: number) => {
+    setDraftFrames(prev => prev.map(f =>
+      f.id === frameId ? { ...f, assets: f.assets.filter(a => a.assetId !== assetId) } : f));
   };
 
   const addSpot = (a: any) => {
@@ -488,6 +555,12 @@ export default function PMFloorPlanPage() {
       await floorPlanAPI.updatePins(live.plan.id, draftSpots.map(s => ({
         assetId: s.assetId, x: s.x, y: s.y, label: s.label,
       })));
+      await floorPlanAPI.updateFrames(live.plan.id, draftFrames.map(f => ({
+        // กรอบใหม่ยังไม่มี id จริง ส่ง null ให้ server สร้างให้ เหมือนโซน
+        id: f.id > 0 ? f.id : null,
+        x: f.x, y: f.y, w: f.w, h: f.h, label: f.label, color: f.color,
+        assetIds: f.assets.map(a => a.assetId),
+      })), year);
       setIsEditMode(false);
       await fetchLive(live.plan.id, year);
     } catch (err: any) {
@@ -605,6 +678,7 @@ export default function PMFloorPlanPage() {
 
   const seatsShown = isEditMode ? draftSeats : (live?.seats || []);
   const spotsShown = isEditMode ? draftSpots : (live?.spots || []);
+  const framesShown = isEditMode ? draftFrames : (live?.frames || []);
   const s = live?.summary;
 
   /**
@@ -726,8 +800,8 @@ export default function PMFloorPlanPage() {
               <>
                 <Button variant="outlined" onClick={() => {
                   setIsEditMode(false); setSelected(null); setArmed(null); setSearch('');
-                  setDrawing(null); setZoneDrag(null);
-                  setDraftZones(live.zones); setDraftSeats(live.seats); setDraftSpots(live.spots);
+                  setDrawing(null); setZoneDrag(null); setFrameDrag(null); setAssignOpenId(null);
+                  setDraftZones(live.zones); setDraftSeats(live.seats); setDraftSpots(live.spots); setDraftFrames(live.frames);
                 }}>ยกเลิก</Button>
                 <Button variant="contained" onClick={handleSave} disabled={saving}>
                   {saving ? 'กำลังบันทึก...' : 'บันทึกตำแหน่ง'}
@@ -791,6 +865,7 @@ export default function PMFloorPlanPage() {
           <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center' }}>
             {([
               ['โซน', showZones, setShowZones],
+              ['กรอบอุปกรณ์', showFrames, setShowFrames],
               ['โต๊ะว่าง', showFreeDesks, setShowFreeDesks],
               ['หรี่แบบ', dimPlan, setDimPlan],
             ] as const).map(([label, on, set]) => (
@@ -844,11 +919,11 @@ export default function PMFloorPlanPage() {
         {isEditMode && (
           <Paper variant="outlined" sx={{ width: 310, p: 2, flexShrink: 0 }}>
             <Box sx={{ display: 'flex', gap: 0.75, mb: 2 }}>
-              {([['seat', 'ที่นั่ง'], ['spot', 'ส่วนกลาง'], ['zone', 'ผังโซน']] as const).map(([k, label]) => (
+              {([['seat', 'ที่นั่ง'], ['spot', 'ส่วนกลาง'], ['zone', 'ผังโซน'], ['frame', 'กรอบ']] as const).map(([k, label]) => (
                 <Button key={k} size="small" fullWidth
                   variant={editTab === k ? 'contained' : 'outlined'}
-                  onClick={() => { setEditTab(k); setSearch(''); setOwners([]); setAssets([]); }}
-                  sx={{ fontSize: 12 }}>
+                  onClick={() => { setEditTab(k); setSearch(''); setOwners([]); setAssets([]); setAssignOpenId(null); }}
+                  sx={{ fontSize: 11, px: 0.5, minWidth: 0 }}>
                   {label}
                 </Button>
               ))}
@@ -891,7 +966,7 @@ export default function PMFloorPlanPage() {
                         <TextField size="small" value={z.name ?? ''} label="ชื่อ" fullWidth
                           onChange={e => patchZone(z.id, { name: e.target.value })}
                           sx={{ '& input': { fontSize: 12, py: 0.6 } }} />
-                        <IconButton size="small" color="error" onClick={() => removeZone(z.id)}>
+                        <IconButton aria-label="ปิด" size="small" color="error" onClick={() => removeZone(z.id)}>
                           <CloseIcon sx={{ fontSize: 16 }} />
                         </IconButton>
                       </Box>
@@ -1050,14 +1125,14 @@ export default function PMFloorPlanPage() {
                           {seat.departmentId || '—'} · {seat.devices.length ? `${seat.devices.length} ชิ้น` : 'ยังไม่พบอุปกรณ์'}
                         </Box>
                       </Box>
-                      <IconButton size="small" color="error" onClick={() => setDraftSeats(p => p.filter((_, j) => j !== i))}>
+                      <IconButton aria-label="ปิด" size="small" color="error" onClick={() => setDraftSeats(p => p.filter((_, j) => j !== i))}>
                         <CloseIcon sx={{ fontSize: 16 }} />
                       </IconButton>
                     </Box>
                   ))}
                 </Box>
               </>
-            ) : (
+            ) : editTab === 'spot' ? (
               <>
                 <TextField fullWidth size="small" placeholder="ค้นเครื่องพิมพ์ / อุปกรณ์ส่วนกลาง..."
                   value={search} onChange={e => setSearch(e.target.value)}
@@ -1093,11 +1168,100 @@ export default function PMFloorPlanPage() {
                           <Box sx={{ color: 'text.secondary', fontSize: 10 }}>{sp.type}</Box>
                         </Box>
                       </Box>
-                      <IconButton size="small" color="error" onClick={() => setDraftSpots(p => p.filter((_, j) => j !== i))}>
+                      <IconButton aria-label="ปิด" size="small" color="error" onClick={() => setDraftSpots(p => p.filter((_, j) => j !== i))}>
                         <CloseIcon sx={{ fontSize: 16 }} />
                       </IconButton>
                     </Box>
                   ))}
+                </Box>
+              </>
+            ) : (
+              <>
+                <Typography sx={{ fontSize: 10.5, color: 'text.secondary', lineHeight: 1.7, mb: 1.5 }}>
+                  ลากกรอบบนแปลนเพื่อสร้างกรอบอุปกรณ์ใหม่ (เช่น ตู้ Rack มุมเซิร์ฟเวอร์) · ลากตัวกรอบเพื่อย้าย ·
+                  ลากจุดมุมล่างขวาเพื่อปรับขนาด แล้วผูกอุปกรณ์เข้ากรอบด้านล่าง
+                </Typography>
+
+                <Box sx={{ maxHeight: 460, overflowY: 'auto' }}>
+                  {draftFrames.length === 0 && (
+                    <Typography sx={{ p: 2, fontSize: 11, color: 'text.secondary', textAlign: 'center' }}>
+                      ยังไม่มีกรอบอุปกรณ์ — ลากกรอบบนแปลนเพื่อเริ่ม
+                    </Typography>
+                  )}
+                  {draftFrames.map(f => {
+                    const open = assignOpenId === f.id;
+                    return (
+                      <Box key={f.id} sx={{
+                        p: 1, mb: 1, borderRadius: 1.5, border: '1px solid',
+                        borderColor: alpha(f.color || FRAME_COLOR, 0.5),
+                        bgcolor: alpha(f.color || FRAME_COLOR, 0.05),
+                      }}>
+                        <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center', mb: 0.75 }}>
+                          <TextField size="small" value={f.label ?? ''} label="ชื่อกรอบ" fullWidth
+                            placeholder="เช่น Rack ชั้น 3"
+                            onChange={e => patchFrame(f.id, { label: e.target.value })}
+                            sx={{ '& input': { fontSize: 12, py: 0.6 } }} />
+                          <IconButton aria-label="ปิด" size="small" color="error" onClick={() => removeFrame(f.id)}>
+                            <CloseIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </Box>
+
+                        <Box sx={{ display: 'flex', gap: 0.4, alignItems: 'center', mb: 0.75, flexWrap: 'wrap' }}>
+                          {[FRAME_COLOR, ...ZONE_COLORS].map(c => (
+                            <Box key={c} onClick={() => patchFrame(f.id, { color: c })}
+                              sx={{
+                                width: 15, height: 15, borderRadius: '50%', bgcolor: c, cursor: 'pointer',
+                                border: f.color === c ? '2px solid' : '1px solid',
+                                borderColor: f.color === c ? 'text.primary' : alpha('#000', 0.15),
+                                transition: 'transform .12s',
+                                '&:hover': { transform: 'scale(1.2)' },
+                              }} />
+                          ))}
+                        </Box>
+
+                        <Button size="small" fullWidth variant="outlined"
+                          onClick={() => { setAssignOpenId(open ? null : f.id); setSearch(''); setAssets([]); }}
+                          sx={{ fontSize: 11 }}>
+                          {open ? 'ปิด' : `ผูกอุปกรณ์ (${f.assets.length})`}
+                        </Button>
+
+                        {open && (
+                          <Box sx={{ mt: 1 }}>
+                            <TextField fullWidth size="small" placeholder="ค้นอุปกรณ์ที่จะผูกเข้ากรอบนี้..."
+                              value={search} onChange={e => setSearch(e.target.value)}
+                              InputProps={{ endAdornment: searching ? <CircularProgress size={14} /> : undefined }} />
+                            {assets.length > 0 && (
+                              <Box sx={{ mt: 0.75, maxHeight: 160, overflowY: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 1.5 }}>
+                                {assets.map(a => (
+                                  <Box key={a.id} onClick={() => addDeviceToFrame(f.id, a)}
+                                    sx={{ p: '6px 10px', borderBottom: '1px solid', borderColor: 'divider', cursor: 'pointer', fontSize: 11.5, '&:hover': { bgcolor: 'action.hover' }, '&:last-of-type': { borderBottom: 'none' } }}>
+                                    <Box sx={{ fontWeight: 600 }}>{a.assetName || a.assetCode || `#${a.id}`}</Box>
+                                    <Box sx={{ color: 'text.secondary', fontSize: 10 }}>{a.type} · {a.departmentId || '—'}</Box>
+                                  </Box>
+                                ))}
+                              </Box>
+                            )}
+                            <Box sx={{ mt: 0.75 }}>
+                              {f.assets.length === 0 ? (
+                                <Typography sx={{ fontSize: 10.5, color: 'text.secondary', textAlign: 'center', py: 1 }}>
+                                  ยังไม่มีอุปกรณ์ในกรอบนี้
+                                </Typography>
+                              ) : f.assets.map(a => (
+                                <Box key={a.assetId} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: '5px 8px', bgcolor: 'action.hover', borderRadius: 1, mb: 0.5, fontSize: 11.5 }}>
+                                  <Box sx={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {a.assetName || a.assetCode}
+                                  </Box>
+                                  <IconButton aria-label="ปิด" size="small" color="error" onClick={() => removeDeviceFromFrame(f.id, a.assetId)}>
+                                    <CloseIcon sx={{ fontSize: 14 }} />
+                                  </IconButton>
+                                </Box>
+                              ))}
+                            </Box>
+                          </Box>
+                        )}
+                      </Box>
+                    );
+                  })}
                 </Box>
               </>
             )}
@@ -1253,6 +1417,62 @@ export default function PMFloorPlanPage() {
                   );
                 })}
 
+                {/* กรอบอุปกรณ์วาดเอง — เส้นประแยกจากกรอบทึบของโซน ให้ดูออกว่าคนละชนิด */}
+                {showFrames && framesShown.map(f => {
+                  const col = f.color || FRAME_COLOR;
+                  return (
+                    <Tooltip key={`frame-${f.id}`} arrow title={
+                      <Box sx={{ py: 0.25 }}>
+                        <Typography sx={{ fontSize: 12, fontWeight: 700 }}>{f.label || 'กรอบอุปกรณ์'}</Typography>
+                        {f.assets.length === 0 ? (
+                          <Typography sx={{ fontSize: 10.5, opacity: 0.7 }}>ยังไม่มีอุปกรณ์ในกรอบนี้</Typography>
+                        ) : f.assets.map(a => (
+                          <Typography key={a.assetId} sx={{ fontSize: 10.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <Box component="span" sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: STATUS[a.pmStatus].color, flexShrink: 0 }} />
+                            {a.assetName || a.assetCode || a.type || 'อุปกรณ์'}
+                          </Typography>
+                        ))}
+                      </Box>
+                    }>
+                      <Box
+                        onMouseDown={e => {
+                          if (!frameEditing) return;
+                          e.stopPropagation();
+                          const p = pctAt(e);
+                          if (p) setFrameDrag({ id: f.id, mode: 'move', ox: p.x - f.x, oy: p.y - f.y });
+                        }}
+                        sx={{
+                          position: 'absolute', left: `${f.x}%`, top: `${f.y}%`,
+                          width: `${f.w}%`, height: `${f.h}%`,
+                          border: `1.5px dashed ${alpha(col, 0.85)}`,
+                          bgcolor: alpha(col, 0.08), borderRadius: '5px',
+                          pointerEvents: frameEditing ? 'auto' : 'none',
+                          cursor: frameEditing ? 'move' : undefined,
+                          zIndex: 1,
+                        }}>
+                        <Box sx={{
+                          position: 'absolute', left: 0, top: 0, transform: 'translate(3px, 3px)',
+                          bgcolor: col, color: '#fff', px: 0.6, py: '1px',
+                          borderRadius: '4px', fontSize: 9.5, fontWeight: 800,
+                          lineHeight: 1.5, pointerEvents: 'none', zIndex: 2, whiteSpace: 'nowrap',
+                        }}>
+                          {f.label || 'กรอบ'}{f.assets.length > 0 ? ` · ${f.assets.length}` : ''}
+                        </Box>
+                        {frameEditing && (
+                          <Box
+                            onMouseDown={e => { e.stopPropagation(); setFrameDrag({ id: f.id, mode: 'resize', ox: 0, oy: 0 }); }}
+                            sx={{
+                              position: 'absolute', right: 0, bottom: 0, transform: 'translate(50%,50%)',
+                              width: 12, height: 12,
+                              bgcolor: '#fff', border: `2px solid ${col}`, borderRadius: '3px',
+                              cursor: 'nwse-resize', zIndex: 6,
+                            }} />
+                        )}
+                      </Box>
+                    </Tooltip>
+                  );
+                })}
+
                 {drawing && (
                   <Box sx={{
                     position: 'absolute',
@@ -1260,58 +1480,75 @@ export default function PMFloorPlanPage() {
                     top: `${Math.min(drawing.y0, drawing.y1)}%`,
                     width: `${Math.abs(drawing.x1 - drawing.x0)}%`,
                     height: `${Math.abs(drawing.y1 - drawing.y0)}%`,
-                    border: `2px dashed ${theme.palette.primary.main}`,
-                    bgcolor: alpha(theme.palette.primary.main, 0.12),
+                    border: `2px dashed ${frameEditing ? FRAME_COLOR : theme.palette.primary.main}`,
+                    bgcolor: alpha(frameEditing ? FRAME_COLOR : theme.palette.primary.main, 0.12),
                     borderRadius: '5px', pointerEvents: 'none', zIndex: 7,
                   }} />
                 )}
 
-                {/* ที่นั่ง */}
+                {/* ที่นั่ง — แนวทางที่ 1: ไอคอนเล็กพอดีช่องโต๊ะ (เดิมเป็นป้ายชื่อ+ไอคอน
+                    ที่ยาวกว่าช่องโต๊ะ ~22px เสมอ ล้นทับที่นั่งข้างเคียง) รายละเอียด
+                    ชื่อ/แผนก/อุปกรณ์ย้ายไปอยู่ใน Tooltip ตอนชี้เมาส์แทน ส่วนคลิกยังเปิด
+                    แผงรายละเอียดเต็มด้านล่างเหมือนเดิม (ไม่ได้แตะส่วนนั้น) */}
                 {seatsShown.map((seat, i) => {
                   const cfg = STATUS[seat.status];
                   const isSel = selected?.kind === 'seat' && selected.id === seat.id;
+                  const primaryDevice = seat.devices[0];
                   return (
-                    <Box key={`seat-${seat.id || i}-${seat.ownerName}`}
-                      draggable={isEditMode}
-                      onDragStart={e => onDragStart(e, 'seat', i)}
-                      onClick={e => { e.stopPropagation(); setSelected(isSel ? null : { kind: 'seat', id: seat.id }); }}
-                      sx={{
-                        position: 'absolute', left: `${seat.x}%`, top: `${seat.y}%`,
-                        transform: 'translate(-50%, -50%)',
-                        cursor: isEditMode ? 'grab' : 'pointer',
-                        zIndex: isSel ? 30 : 10,
-                        '&:hover': { zIndex: 25 },
-                        '&:active': isEditMode ? { cursor: 'grabbing' } : undefined,
-                      }}>
-                      <Box sx={{
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25,
-                        bgcolor: 'background.paper',
-                        border: `2px solid ${cfg.color}`,
-                        borderRadius: '9px', px: 0.75, py: 0.4,
-                        boxShadow: isSel ? `0 0 0 3px ${alpha(cfg.color, 0.35)}, 0 4px 10px rgba(0,0,0,.28)` : '0 2px 6px rgba(0,0,0,.24)',
-                        transition: 'box-shadow .15s, transform .15s',
-                        '&:hover': { transform: 'scale(1.06)' },
-                      }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4 }}>
-                          <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: cfg.color, flexShrink: 0 }} />
-                          <Typography sx={{ fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap', lineHeight: 1.3 }}>
-                            {shortName(seat.ownerName)}
+                    <Tooltip
+                      key={`seat-${seat.id || i}-${seat.ownerName}`}
+                      arrow
+                      title={
+                        <Box sx={{ py: 0.25 }}>
+                          <Typography sx={{ fontSize: 12, fontWeight: 700 }}>{seat.ownerName || '—'}</Typography>
+                          <Typography sx={{ fontSize: 10.5, opacity: 0.85, mb: seat.devices.length ? 0.5 : 0 }}>
+                            {[seat.departmentId, seat.deskCode ? `โต๊ะ ${seat.deskCode}` : null].filter(Boolean).join(' · ') || '—'}
                           </Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', gap: 0.4, alignItems: 'center', color: 'text.secondary' }}>
                           {seat.devices.length === 0 ? (
-                            <SeatIcon size={12} />
-                          ) : seat.devices.slice(0, 4).map(d => (
-                            <Box key={d.assetId} sx={{ color: STATUS[d.pmStatus].color, display: 'flex' }}>
-                              <DeviceIcon kind={d.kind} size={12} />
-                            </Box>
+                            <Typography sx={{ fontSize: 10.5, opacity: 0.7 }}>ยังไม่มีอุปกรณ์บนที่นั่งนี้</Typography>
+                          ) : seat.devices.map(d => (
+                            <Typography key={d.assetId} sx={{ fontSize: 10.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <Box component="span" sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: STATUS[d.pmStatus].color, flexShrink: 0 }} />
+                              {d.assetName || d.assetCode || d.type || 'อุปกรณ์'}
+                            </Typography>
                           ))}
-                          {seat.devices.length > 4 && (
-                            <Typography sx={{ fontSize: 8.5, fontWeight: 700 }}>+{seat.devices.length - 4}</Typography>
-                          )}
                         </Box>
+                      }
+                    >
+                      <Box
+                        draggable={isEditMode}
+                        onDragStart={e => onDragStart(e, 'seat', i)}
+                        onClick={e => { e.stopPropagation(); setSelected(isSel ? null : { kind: 'seat', id: seat.id }); }}
+                        sx={{
+                          position: 'absolute', left: `${seat.x}%`, top: `${seat.y}%`,
+                          transform: 'translate(-50%, -50%)',
+                          cursor: isEditMode ? 'grab' : 'pointer',
+                          zIndex: isSel ? 30 : 10,
+                          '&:hover': { zIndex: 25 },
+                          '&:active': isEditMode ? { cursor: 'grabbing' } : undefined,
+                        }}>
+                        <Box sx={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          width: 20, height: 20, borderRadius: '50%',
+                          bgcolor: 'background.paper', color: cfg.color,
+                          border: `2px solid ${cfg.color}`,
+                          boxShadow: isSel ? `0 0 0 3px ${alpha(cfg.color, 0.35)}, 0 3px 8px rgba(0,0,0,.28)` : '0 1px 4px rgba(0,0,0,.24)',
+                          transition: 'transform .15s',
+                          '&:hover': { transform: 'scale(1.15)' },
+                        }}>
+                          {primaryDevice ? <DeviceIcon kind={primaryDevice.kind} size={11} /> : <SeatIcon size={11} />}
+                        </Box>
+                        {seat.devices.length > 1 && (
+                          <Box sx={{
+                            position: 'absolute', right: -3, bottom: -3,
+                            minWidth: 11, height: 11, px: '2px', borderRadius: '999px',
+                            bgcolor: cfg.color, color: '#fff', fontSize: 7.5, fontWeight: 800,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            border: '1px solid', borderColor: 'background.paper',
+                          }}>{seat.devices.length}</Box>
+                        )}
                       </Box>
-                    </Box>
+                    </Tooltip>
                   );
                 })}
 
@@ -1372,7 +1609,7 @@ export default function PMFloorPlanPage() {
                     : `${selectedSpot!.type} · อุปกรณ์ส่วนกลาง`}
                 </Typography>
               </Box>
-              <IconButton size="small" onClick={() => setSelected(null)}><CloseIcon sx={{ fontSize: 17 }} /></IconButton>
+              <IconButton aria-label="ปิด" size="small" onClick={() => setSelected(null)}><CloseIcon sx={{ fontSize: 17 }} /></IconButton>
             </Box>
 
             {selectedSeat?.looksLikeStorage && (
@@ -1456,7 +1693,7 @@ export default function PMFloorPlanPage() {
                 onClick={() => handleApplyTemplate(t)} sx={{ fontSize: 11.5 }}>
                 ใช้ผังนี้
               </Button>
-              <IconButton size="small" color="error" onClick={() => handleDeleteTemplate(t)}>
+              <IconButton aria-label="ปิด" size="small" color="error" onClick={() => handleDeleteTemplate(t)}>
                 <CloseIcon sx={{ fontSize: 17 }} />
               </IconButton>
             </Box>

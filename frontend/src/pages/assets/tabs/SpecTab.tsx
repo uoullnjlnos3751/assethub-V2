@@ -18,6 +18,9 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SyncIcon from '@mui/icons-material/Sync';
 import { getStatusLabel } from '../../../config/statusConfig';
 import { AgentSpecCard } from './AgentSpecCard';
+import { WindowsCard } from '../components/WindowsCard';
+import { OfficeCard } from '../components/OfficeCard';
+import { InstalledSoftwareCard } from '../components/InstalledSoftwareCard';
 
 /* ─── Spec item ───────────────────────────────────────────────── */
 function SpecItem({ label, value, mono, colorClass }: {
@@ -129,7 +132,7 @@ export function SpecTab({ asset, glpiSpec, loadingGLPI, syncingGLPI, onSync, age
             )}
           </Box>
           {f.state !== 'same' && onSync && (
-            <IconButton size="small" onClick={() => onSync(f.key, f.label)} disabled={syncingGLPI}
+            <IconButton aria-label="ซิงก์ข้อมูล" size="small" onClick={() => onSync(f.key, f.label)} disabled={syncingGLPI}
               sx={{ color: 'primary.main', flex: 'none' }} title={`ปรับปรุงเฉพาะ ${f.label}`}>
               <SyncIcon sx={{ fontSize: 16 }} />
             </IconButton>
@@ -152,6 +155,19 @@ export function SpecTab({ asset, glpiSpec, loadingGLPI, syncingGLPI, onSync, age
           onSync={onAgentSync}
         />
       )}
+
+      {/* Windows / Office license & update status, and the installed-software
+          list — all read live from the agent, none of it stored in the
+          registry itself. Each card hides on its own when the agent has
+          nothing to say (no record at all, or an older agent build that
+          doesn't report the Office/Windows fields). */}
+      {agent && (
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 1.5, alignItems: 'start' }}>
+          <WindowsCard agent={agent} />
+          <OfficeCard agent={agent} />
+        </Box>
+      )}
+      {agent && <InstalledSoftwareCard agent={agent} />}
 
       {isComputer && (glpiSpec || loadingGLPI) && (
         <Card sx={{ overflow: 'hidden' }}>
@@ -214,26 +230,11 @@ export function SpecTab({ asset, glpiSpec, loadingGLPI, syncingGLPI, onSync, age
           </AccordionDetails>
         </Accordion>
 
-        {/* Computer Hardware */}
+        {/* Computer OS/license — CPU/RAM/GPU/Storage moved to their own
+            "ฮาร์ดแวร์" tab (per-component cards) so this accordion doesn't
+            repeat the exact same fields in a second shape. */}
         {isComputer && !isMonitor && (
           <>
-            <Accordion defaultExpanded disableGutters elevation={0} sx={{ bgcolor: 'transparent', '&:before': { display: 'none' }, mb: 1 }}>
-              <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ fontSize: 18 }} />} sx={{ minHeight: 0, py: 0.5, px: 0, '& .MuiAccordionSummary-content': { m: 0 } }}>
-                <SectionHeader title="Hardware" />
-              </AccordionSummary>
-              <AccordionDetails sx={{ pt: 1.5, pb: 0.5, px: 0 }}>
-                <Grid container spacing={1}>
-                  <SpecItem label="CPU" value={asset.cpu} />
-                  <SpecItem label="Generation" value={asset.cpuGeneration} />
-                  <SpecItem label="RAM" value={asset.ram} />
-                  <SpecItem label="RAM Slot 1" value={asset.ramSlot1} />
-                  <SpecItem label="RAM Slot 2" value={asset.ramSlot2} />
-                  <SpecItem label="Storage 1" value={asset.storage1} />
-                  <SpecItem label="Storage 2" value={asset.storage2} />
-                  <SpecItem label="GPU" value={asset.gpu} />
-                </Grid>
-              </AccordionDetails>
-            </Accordion>
             <Accordion defaultExpanded disableGutters elevation={0} sx={{ bgcolor: 'transparent', '&:before': { display: 'none' }, mb: 1 }}>
               <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ fontSize: 18 }} />} sx={{ minHeight: 0, py: 0.5, px: 0, '& .MuiAccordionSummary-content': { m: 0 } }}>
                 <SectionHeader title="ระบบปฏิบัติการ" />

@@ -4,10 +4,15 @@ import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { borrowAPI, dashboardAPI } from '../../services/api';
 import { ShoppingCart, AlertTriangle, CheckCircle2, History, Search, TrendingUp, User, Download, FileText } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 import ReportHeaderTabs from './ReportHeaderTabs';
-import * as XLSX from 'xlsx';
+
+// jspdf ~382 KB โหลดตอนกดออก PDF จริงเท่านั้น
+const loadJsPdf = async () => (await import('jspdf')).default;
+// html2canvas ~198 KB ใช้คู่กับ jspdf ตอนออก PDF เท่านั้น
+const loadHtml2Canvas = async () => (await import('html2canvas')).default;
+
+// xlsx ~419 KB โหลดตอนกดส่งออกจริงเท่านั้น ไม่ใช่ตอนเปิดหน้า
+const loadXlsx = () => import('xlsx');
 
 const statusLabels: Record<string, string> = { Pending: 'รออนุมัติ', Approved: 'อนุมัติแล้ว', Rejected: 'ปฏิเสธ', CheckedOut: 'ส่งมอบแล้ว', PartiallyReturned: 'คืนบางส่วน', Returned: 'คืนแล้ว' };
 const statusColors: Record<string, string> = { Pending: 'warning', Approved: 'info', Rejected: 'error', CheckedOut: 'primary', PartiallyReturned: 'secondary', Returned: 'success' };
@@ -29,6 +34,7 @@ export default function ReportBorrowPage() {
       setExportingPDF(true);
       const element = document.getElementById('report-content');
       if (!element) return;
+      const html2canvas = await loadHtml2Canvas();
       const canvas = await html2canvas(element, { 
         scale: 3, 
         useCORS: true, 
@@ -36,6 +42,7 @@ export default function ReportBorrowPage() {
         logging: false
       });
       const imgData = canvas.toDataURL('image/png');
+      const jsPDF = await loadJsPdf();
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
@@ -101,7 +108,8 @@ export default function ReportBorrowPage() {
   const trendMax = Math.max(...trend.map((m: any) => m.requests), 1);
 
   // Client-side Excel Export
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
+    const XLSX = await loadXlsx();
     const exportData = filtered.map(row => ({
       'เลขที่คำขอ': row.requestNo || '-',
       'ผู้ขอยืม': row.requester?.displayName || row.requester?.adUsername || '-',

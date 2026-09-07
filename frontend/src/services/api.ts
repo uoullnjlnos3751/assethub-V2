@@ -81,6 +81,10 @@ export const authAPI = {
 // Assets
 export const assetAPI = {
   list: (params?: any) => api.get('/assets', { params }),
+  /** Count / total purchase value / breakdown-by-dimension for whatever
+   * filters are applied — same params as `list`, plus optional `dimension`
+   * (location | departmentId | status | type | company, default location). */
+  summary: (params?: any) => api.get('/assets/summary', { params }),
   get: (id: number) => api.get(`/assets/${id}`),
   create: (data: any) => api.post('/assets', data),
   upsert: (data: any) => api.post('/assets/upsert', data),
@@ -136,6 +140,8 @@ export const assetAPI = {
   assetAgentMonitors: (id: number) => api.get(`/assets/${id}/agent-monitors`),
   monitorSync: (id: number, fields: Record<string, string>) => api.post(`/assets/${id}/monitor-sync`, { fields }),
   monitorLink: (pairs: { parentId: number; childId: number }[]) => api.post('/assets/agent/monitor-link', { pairs }),
+  /** ประวัติการเชื่อมต่อ Notebook↔Monitor ของทรัพย์สินนี้ (ทั้งฝั่งเป็น parent และ child) */
+  linkHistory: (id: number) => api.get(`/assets/${id}/link-history`),
   agentFillBlanks: (assetIds?: number[]) => api.post('/assets/agent/fill-blanks', { assetIds }),
   getAssetHistory: (id: number, params?: any) => api.get(`/assets/${id}/history`, { params }),
   getGlobalHistory: (params?: any) => api.get('/assets/global-history', { params }),
@@ -213,6 +219,8 @@ export const borrowAPI = {
   requesterHistory: (userId: number) => api.get(`/borrow/requester-history/${userId}`),
   overdue: () => api.get('/borrow/overdue'),
   approve: (id: number, data: any) => api.post(`/borrow/requests/${id}/approve`, data),
+  supervisorQueue: (params?: any) => api.get('/borrow/requests/supervisor-queue', { params }),
+  supervisorApprove: (id: number, data: any) => api.post(`/borrow/requests/${id}/supervisor-approve`, data),
   checkout: (id: number, data: any) => api.post(`/borrow/requests/${id}/checkout`, data),
   returnItem: (itemId: number, data: any) => api.post(`/borrow/items/${itemId}/return`, data),
   uploadCheckoutImage: (checkoutId: number, file: File, description?: string) => {
@@ -255,6 +263,12 @@ export const pmAPI = {
   performRun: (runId: number, data: any) => api.post(`/pm/runs/${runId}/perform`, data),
   deleteRun: (id: number) => api.delete(`/pm/runs/${id}`),
   updateRunNotes: (id: number, notes: string) => api.patch(`/pm/runs/${id}/notes`, { notes }),
+  /** วันนัดลงหน้างานของงาน PM — ส่ง null เพื่อล้างนัด วันที่เป็น 'YYYY-MM-DD' */
+  setRunSchedule: (id: number, scheduledDate: string | null) =>
+    api.patch(`/pm/runs/${id}/schedule`, { scheduledDate }),
+  /** ตั้งวันนัดทีเดียวทั้งชุด — วิธีที่ใช้จริงคือเลือกทั้งแผนกแล้วจองเป็นของวันหนึ่ง */
+  bulkSetRunSchedule: (runIds: number[], scheduledDate: string | null) =>
+    api.post('/pm/runs/bulk-schedule', { runIds, scheduledDate }),
   dashboard: (params?: any) => api.get('/pm/dashboard', { params }),
   // Per-asset PM coverage for the dashboard — see backend/src/routes/pm.ts.
   coverage: (params?: { year?: number }) => api.get('/pm/coverage', { params }),
@@ -322,6 +336,9 @@ export const floorPlanAPI = {
   /** โซนแผนกและตารางโต๊ะ — บันทึกทั้งชุดในครั้งเดียว */
   updateZones: (id: number, zones: any[], year: number) =>
     api.put(`/floorplans/${id}/zones`, { zones }, { params: { year } }),
+  /** กรอบอุปกรณ์วาดเอง (Rack/ตู้เครือข่าย ฯลฯ) — บันทึกทั้งชุดในครั้งเดียว เหมือนโซน/ที่นั่ง */
+  updateFrames: (id: number, frames: any[], year: number) =>
+    api.put(`/floorplans/${id}/frames`, { frames }, { params: { year } }),
   /** ผังที่เก็บไว้ใช้ซ้ำกับชั้นอื่น */
   templates: () => api.get('/floorplans/templates/list'),
   saveTemplate: (id: number, data: { name: string; description?: string }) =>
@@ -340,6 +357,7 @@ export const adminAPI = {
   createLocalUser: (data: { username: string; password: string; displayName: string; role?: string }) => api.post('/admin/users/local', data),
   setLocalPassword: (id: number, password: string) => api.put(`/admin/users/${id}/local-password`, { password }),
   updateRole: (id: number, role: string) => api.put(`/admin/users/${id}/role`, { role }),
+  updateManager: (id: number, managerId: number | null) => api.put(`/admin/users/${id}/manager`, { managerId }),
   toggleActive: (id: number) => api.put(`/admin/users/${id}/toggle-active`),
   deleteUser: (id: number) => api.delete(`/admin/users/${id}`),
 
@@ -399,8 +417,13 @@ export const departmentAPI = {
 // Dashboard
 export const dashboardAPI = {
   /** ทุกก้อนของแดชบอร์ดในคำขอเดียว — endpoint รายก้อนยังอยู่ให้หน้าอื่นเรียก */
-  overview: (year: number, warrantyDays = 60) =>
-    api.get('/dashboard/overview', { params: { year, warrantyDays } }),
+  overview: (year: number, warrantyDays = 60, company?: string) =>
+    api.get('/dashboard/overview', { params: { year, warrantyDays, company } }),
+  /** ค่า KPI รายวันย้อนหลัง สำหรับกราฟแนวโน้ม */
+  history: (days = 90) => api.get('/dashboard/history', { params: { days } }),
+  /** ไล่ชั้น บริษัท → สถานที่ → ชั้น ทีละคลิก */
+  locationBreakdown: (company?: string, location?: string) =>
+    api.get('/dashboard/location-breakdown', { params: { company, location } }),
   assetSummary: () => api.get('/dashboard/asset-summary'),
   dataHealth: () => api.get('/dashboard/data-health'),
   borrowSummary: () => api.get('/dashboard/borrow-summary'),
@@ -508,6 +531,27 @@ export const licenseAPI = {
   delete: (id: number) => api.delete(`/licenses/${id}`),
   assign: (id: number, data: { assetId?: number; userId?: number; note?: string }) => api.post(`/licenses/${id}/assign`, data),
   unassign: (assignmentId: number) => api.delete(`/licenses/assignments/${assignmentId}`),
+};
+
+// Standard IT Equipment Catalog — reference specs per job role. USER/VIEWER
+// read-only, IT_ADMIN/SUPERADMIN full CRUD (enforced server-side).
+export const catalogAPI = {
+  list: (params?: { jobRole?: string; q?: string; activeOnly?: boolean }) => api.get('/catalog', { params }),
+  jobRoles: () => api.get('/catalog/job-roles'),
+  get: (id: number) => api.get(`/catalog/${id}`),
+  assets: (id: number) => api.get(`/catalog/${id}/assets`),
+  create: (data: any) => api.post('/catalog', data),
+  update: (id: number, data: any) => api.put(`/catalog/${id}`, data),
+  delete: (id: number) => api.delete(`/catalog/${id}`),
+  uploadImage: (id: number, formData: FormData) =>
+    api.post(`/catalog/${id}/image`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  deleteImage: (id: number) => api.delete(`/catalog/${id}/image`),
+  uploadDocument: (id: number, formData: FormData) =>
+    api.post(`/catalog/${id}/documents`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  downloadDocument: (id: number, docId: number) => {
+    window.open(`/api/catalog/${id}/documents/${docId}/download`, '_blank');
+  },
+  deleteDocument: (id: number, docId: number) => api.delete(`/catalog/${id}/documents/${docId}`),
 };
 
 // Asset Disposals (Phase 2)

@@ -277,12 +277,12 @@ export default function DonationListPage() {
                         </TableCell>
                         <TableCell align="center" onClick={e => e.stopPropagation()}>
                           <Tooltip title="ดูรายละเอียด">
-                            <IconButton size="small" onClick={() => navigate(`/donations/${d.id}`)}>
+                            <IconButton aria-label="ดูรายละเอียด" size="small" onClick={() => navigate(`/donations/${d.id}`)}>
                               <VisibilityIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
                           <Tooltip title="ลบ">
-                            <IconButton size="small" color="error" onClick={() => setDeleteId(d.id)}>
+                            <IconButton aria-label="ลบ" size="small" color="error" onClick={() => setDeleteId(d.id)}>
                               <DeleteIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>

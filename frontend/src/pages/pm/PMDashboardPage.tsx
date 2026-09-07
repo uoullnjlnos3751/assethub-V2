@@ -528,9 +528,16 @@ export default function PMDashboardPage() {
                   return (
                     <TableRow key={p.id} hover sx={{ cursor: 'pointer' }}
                       onClick={() => navigate(p.generated > 0 ? `/pm/runs?planId=${p.id}` : '/pm/plans')}>
+                      {/* แผนที่ไม่ระบุแผนก = ครอบคลุมทุกแผนก ไม่ใช่ "ไม่มีชื่อ" ที่ต้อง
+                          หยิบชื่อสถานที่มาแทน — การตกไปโชว์ site ทำให้อ่านเป็นว่าแผน
+                          จำกัดอยู่แค่สถานที่นั้นแผนกเดียว สถานที่ย้ายไปเป็นบรรทัดรอง
+                          เพื่อให้ยังแยกแผนคนละสถานที่ออกจากกันได้ */}
                       <TableCell sx={{ fontSize: 12.5, fontWeight: 700 }}>
-                        {p.dept || p.site || `แผน #${p.id}`}
+                        {p.dept || 'ทุกแผนก'}
                         {p.isAdhoc && <Box component="span" sx={{ fontWeight: 400, color: 'text.disabled', ml: 0.5 }}>(นอกแผน)</Box>}
+                        {p.site && (
+                          <Box sx={{ fontWeight: 400, fontSize: 10.5, color: 'text.disabled' }}>{p.site}</Box>
+                        )}
                       </TableCell>
                       <TableCell sx={mutedSx}>{p.company || '—'}</TableCell>
                       <TableCell sx={mutedSx}>{p.deviceType || '—'}</TableCell>

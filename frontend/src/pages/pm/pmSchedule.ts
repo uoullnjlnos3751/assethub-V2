@@ -24,6 +24,18 @@ export interface RawPlan {
   isAdhoc: boolean;
   totalCount: number;
   completedCount: number;
+  /** งานที่ตั้งวันนัดไว้แล้ว และช่วงวันนัดจริง (YYYY-MM-DD) — ว่างเมื่อยังไม่มี
+   *  การนัดสักเครื่อง */
+  scheduledCount?: number;
+  schedStart?: string | null;
+  schedEnd?: string | null;
+  /** แผนกจริงของงานที่สร้างไว้แล้วในแผนนี้ พร้อมจำนวนของแต่ละแผนก มาจาก
+   *  /pm/plans — จำเป็นสำหรับแผนที่เลือก "ทุกแผนก" ไว้ เพราะตัวแผนเองไม่ได้เก็บ
+   *  ว่ากินแผนกไหนบ้าง รู้ได้จากงานที่สร้างจริงเท่านั้น */
+  deptBreakdown?: {
+    dept: string; total: number; done: number;
+    scheduled?: number; schedStart?: string | null; schedEnd?: string | null;
+  }[];
 }
 
 export type PlanState = 'DONE' | 'OVERDUE' | 'RUNNING' | 'IDLE';
@@ -76,13 +88,38 @@ export interface SchedPlan {
    *  rather than folded away. */
   target: number;
   done: number;
+  /** กรอบของแผน — วันที่ตั้งไว้ตอนสร้างแผน */
   start: string | null;
   end: string | null;
+  /** ช่วงวันนัดจริงของงานในกลุ่มนี้ และจำนวนที่นัดแล้ว */
+  schedStart: string | null;
+  schedEnd: string | null;
+  scheduled: number;
   isAdhoc: boolean;
   state: PlanState;
+  deptBreakdown?: {
+    dept: string; total: number; done: number;
+    scheduled?: number; schedStart?: string | null; schedEnd?: string | null;
+  }[];
+}
+
+/**
+ * ช่วงเวลาที่แท่งกราฟควรวาด
+ *
+ * ใช้วันนัดจริงเมื่อมีการนัดแล้ว เพราะนั่นคือสิ่งที่ทีมจะไปทำจริง ๆ ส่วนกรอบของ
+ * แผนเป็นเพียงขอบเขตกว้าง ๆ ที่ตั้งไว้ตอนสร้าง — แผนเดียวกินทั้งเดือนแต่แผนก SAL
+ * ลงจริงแค่ 7–11 ก.ย. ถ้าวาดตามกรอบแผนทุกแถวจะยาวเท่ากันหมดจนอ่านไม่ได้ว่า
+ * ใครทำเมื่อไหร่
+ *
+ * `booked` แยกไว้ให้ผู้เรียกรู้ว่าแท่งนี้เป็นวันนัดจริงหรือกรอบแผนที่ยังไม่ได้นัด
+ */
+export function barRange(p: { start: string | null; end: string | null; schedStart: string | null; schedEnd: string | null }) {
+  if (p.schedStart && p.schedEnd) return { start: p.schedStart, end: p.schedEnd, booked: true };
+  return { start: p.start, end: p.end, booked: false };
 }
 
 const UNSET_COMPANY = '(ไม่ระบุบริษัท)';
+const ALL_DEPTS = 'ทุกแผนก';
 
 export function normalise(raw: RawPlan[], today: Date): SchedPlan[] {
   return raw.map(p => {
@@ -96,8 +133,13 @@ export function normalise(raw: RawPlan[], today: Date): SchedPlan[] {
     return {
       id: p.id,
       company: p.company || UNSET_COMPANY,
-      dept: p.deptTask || p.site || `แผน #${p.id}`,
+      /* แผนที่ไม่ระบุแผนกคือแผนที่ครอบคลุมทุกแผนก ไม่ใช่แผน "ไม่มีชื่อ" ที่ต้องไป
+         หยิบชื่อสถานที่มาใช้แทน — ของเดิมตกไปใช้ site ทำให้แผนของบริษัท TRR ที่
+         เลือกทุกแผนกไว้ ขึ้นเป็นแถวชื่อ "HQ" แถวเดียว อ่านได้เป็นว่ามีแค่แผนก HQ
+         ทั้งที่ไม่มีแผนกชื่อนี้อยู่จริง (HQ เป็นสถานที่) */
+      dept: p.deptTask || (p.isAdhoc ? `แผน #${p.id}` : ALL_DEPTS),
       site: p.site,
+      deptBreakdown: p.deptBreakdown,
       deviceType: p.deviceType,
       lead: p.lead,
       total,
@@ -105,7 +147,13 @@ export function normalise(raw: RawPlan[], today: Date): SchedPlan[] {
       done: p.completedCount,
       start,
       end,
+      schedStart: p.schedStart ?? null,
+      schedEnd: p.schedEnd ?? null,
+      scheduled: p.scheduledCount ?? 0,
       isAdhoc: p.isAdhoc,
+      // สถานะยังตัดสินจากกรอบของแผน ไม่ใช่วันนัด — "เกินกำหนด" หมายถึงเลย
+      // กำหนดส่งของแผน ซึ่งเป็นข้อผูกพันจริง ส่วนวันนัดเลื่อนได้ตลอดโดยไม่ได้
+      // แปลว่าแผนพลาด (งานที่เลยวันนัดรายเครื่องเตือนอยู่แล้วในหน้า PM Runs)
       state: stateOf(p.completedCount, p.totalCount, start, end, today),
     };
   });
@@ -161,25 +209,70 @@ export interface SchedGroup {
   done: number;
   total: number;
   target: number;
+  /** ช่วงที่แท่งของกลุ่มนี้กิน — วันนัดจริงถ้ามี ไม่งั้นคือกรอบของแผน */
   start: string;
   end: string;
+  /** จำนวนที่ตั้งวันนัดแล้ว และกลุ่มนี้วาดจากวันนัดจริงหรือยัง */
+  scheduled: number;
+  booked: boolean;
 }
 
 export function rollup(plans: SchedPlan[], key: 'company' | 'dept'): SchedGroup[] {
   const map = new Map<string, SchedGroup>();
   for (const p of plans) {
-    if (!p.start || !p.end) continue;
+    const r = barRange(p);
+    if (!r.start || !r.end) continue;
     const name = p[key];
     let g = map.get(name);
-    if (!g) { g = { name, plans: [], done: 0, total: 0, target: 0, start: p.start, end: p.end }; map.set(name, g); }
+    if (!g) {
+      g = { name, plans: [], done: 0, total: 0, target: 0, start: r.start, end: r.end, scheduled: 0, booked: false };
+      map.set(name, g);
+    }
     g.plans.push(p);
     g.done += p.done;
     g.total += p.total;
     g.target += p.target;
-    if (p.start < g.start) g.start = p.start;
-    if (p.end > g.end) g.end = p.end;
+    g.scheduled += p.scheduled;
+    // กลุ่มนับว่า "ตามวันนัดจริง" เมื่อมีแผนใดในกลุ่มนัดแล้ว ช่วงของกลุ่มจึงเป็น
+    // ช่วงที่ครอบทั้งวันนัดจริงและกรอบของแผนที่ยังไม่ได้นัด
+    if (r.booked) g.booked = true;
+    if (r.start < g.start) g.start = r.start;
+    if (r.end > g.end) g.end = r.end;
   }
   return [...map.values()].sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
+}
+
+/**
+ * เหมือน rollup(plans, 'dept') แต่กางแผนที่เลือก "ทุกแผนก" ออกเป็นรายแผนกจริง
+ *
+ * แผนหนึ่งใบที่ครอบคลุมทุกแผนกเคยได้แถวเดียวในตารางรายแผนก ทั้งที่ข้างในมีงาน
+ * กระจายอยู่ 27 แผนก ซึ่งเป็นข้อมูลที่หน้านี้มีไว้เพื่อแสดงโดยเฉพาะ ที่นี่จึงตัดแผน
+ * แบบนั้นเป็นชิ้นละแผนกตามงานที่สร้างจริง แต่ละชิ้นถือจำนวนของแผนกตัวเอง แถบ
+ * ในกราฟจึงยาวตามความคืบหน้าของแผนกนั้นจริง ๆ ไม่ใช่ของทั้งแผน
+ *
+ * เป้าหมาย (target) ของชิ้นย่อยตั้งเท่ากับจำนวนงานที่สร้างแล้วของแผนกนั้น เพราะ
+ * เป้าหมายเป็นตัวเลขระดับแผน ไม่มีการตั้งแยกรายแผนก การเฉลี่ยลงไปจะเป็นการแต่ง
+ * ตัวเลขที่ไม่มีอยู่จริง — ส่วนเป้าหมายจริงของแผนยังอ่านได้จากตารางรายบริษัทและ
+ * ชีต "รายแผน" ซึ่งยังใช้ตัวแผนเต็มใบเหมือนเดิม
+ */
+export function rollupDepartments(plans: SchedPlan[]): SchedGroup[] {
+  const expanded: SchedPlan[] = [];
+  for (const p of plans) {
+    // กางเฉพาะแผนที่เป็น "ทุกแผนก" จริง ๆ และมีงานสร้างไว้แล้ว — แผนที่ยังไม่ได้
+    // generate ไม่มีงานให้ดูว่าตกแผนกไหน จึงคงเป็นแถวเดียวชื่อ "ทุกแผนก" ตามเดิม
+    if (p.dept !== ALL_DEPTS || !p.deptBreakdown?.length) { expanded.push(p); continue; }
+    for (const d of p.deptBreakdown) {
+      // แต่ละแผนกถือวันนัดของตัวเอง ไม่ใช่ของทั้งแผน — นี่คือจุดที่กราฟเริ่ม
+      // บอกได้ว่า SAL ลง 7–11 ก.ย. ส่วน ACC ลง 14 ก.ย.
+      expanded.push({
+        ...p, dept: d.dept, done: d.done, total: d.total, target: d.total,
+        schedStart: d.schedStart ?? null,
+        schedEnd: d.schedEnd ?? null,
+        scheduled: d.scheduled ?? 0,
+      });
+    }
+  }
+  return rollup(expanded, 'dept');
 }
 
 /**
@@ -216,13 +309,19 @@ export interface Timeline {
   months: { label: string; weeks: number }[];
 }
 
-/** Whole Mon-start weeks covering every dated plan. */
+/**
+ * Whole Mon-start weeks covering every dated plan.
+ *
+ * วัดจากช่วงที่แท่งกินจริง (barRange) ไม่ใช่กรอบของแผน — ถ้าวันนัดถูกเลื่อนออก
+ * ไปพ้นกำหนดของแผน แกนเวลาต้องยืดตาม ไม่งั้นแท่งจะถูกหนีบติดขอบขวาโดยไม่มีอะไร
+ * บอกว่ามันเลยกรอบไปแล้ว
+ */
 export function buildTimeline(plans: SchedPlan[]): Timeline | null {
-  const dated = plans.filter(p => p.start && p.end);
+  const dated = plans.map(barRange).filter(r => r.start && r.end);
   if (!dated.length) return null;
 
-  const t0 = monday(new Date(Math.min(...dated.map(p => day(p.start!).getTime()))));
-  const last = monday(new Date(Math.max(...dated.map(p => day(p.end!).getTime()))));
+  const t0 = monday(new Date(Math.min(...dated.map(r => day(r.start!).getTime()))));
+  const last = monday(new Date(Math.max(...dated.map(r => day(r.end!).getTime()))));
   const tEnd = new Date(last); tEnd.setDate(tEnd.getDate() + 7);   // exclusive
   const weeks = Math.round((tEnd.getTime() - t0.getTime()) / (7 * DAY_MS));
   const span = tEnd.getTime() - t0.getTime();

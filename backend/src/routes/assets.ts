@@ -120,7 +120,7 @@ const ALLOWED_ASSET_FIELDS = new Set([
   'location', 'status', 'remark', 'company', 'cpuGeneration', 'domainName',
   'floor', 'poDate', 'ramDetail', 'gpu', 'osType', 'ramSlot1', 'ramSlot2',
   'snComputer', 'storage1', 'storage2', 'createdAt', 'updatedAt',
-  'oldAssetCode', 'accountingCode', 'budget', 'image', 'categoryId',
+  'oldAssetCode', 'accountingCode', 'budget', 'image', 'categoryId', 'catalogItemId',
   'memoryType', 'ramOnboard', 'ramType', 'ramSpeed', 'ramMaxSupported', 'ramAvailableSlots', 'ramUpgradeable',
   'assignedToUserId', 'departmentRefId', 'vendorRefId', 'locationRefId',
 ]);
@@ -291,10 +291,13 @@ const validateAssetData = (data: any, isCreate = true) => {
     errors.push('แผนก ต้องไม่ว่างเปล่า');
   }
 
-  const ownerName = data.ownerName ? String(data.ownerName).trim() : '';
-  if (!ownerName) {
-    errors.push('ผู้ถือครอง ต้องไม่ว่างเปล่า');
-  }
+  // ผู้ถือครอง (ownerName) is genuinely optional — a machine sitting in IT
+  // storage or handed to HR pending assignment has no current holder, and the
+  // dashboard already tracks "ไม่มีผู้ครอบครอง" as a normal count, not an error
+  // state. The frontend form itself labels this field "(ถ้ามี)" and never
+  // required it client-side. Requiring it here blocked every update to an
+  // asset that already has no owner on file — including edits that don't
+  // touch ownerName at all, since the whole payload gets rejected together.
 
   // Warranty Date validation
   if (data.purchaseDate && data.warrantyEndDate) {
@@ -601,13 +604,12 @@ const ASSET_TYPE_GROUPS: Record<string, string[]> = {
   rack: ['Server Rack', 'Server', 'PDU', 'UPS', 'Enclosure'],
 };
 
-router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { search, status, department, location, type, typeGroup, categoryId, cpu, ram, warrantyStatus, warrantyExpiringInDays, ownerName, exactOwnerName, screenSize, resolution, panelType, printerType, isColor, ipAddress, storage, osType, company, serialNo, purchaseDateFrom, purchaseDateTo, page = '1', limit = '50' } = req.query;
-    const pageNum = parseInt(page as string);
-    const parsedLimit = parseInt(limit as string);
-    const limitNum = parsedLimit === 10000 ? 10000 : Math.min(parsedLimit, 100);
-    const skip = (pageNum - 1) * limitNum;
+// Shared by GET / (the list) and GET /summary (count/value/breakdown for
+// whatever's currently filtered) — extracted so the two can never drift
+// apart on what a given querystring actually matches. Async because the
+// non-admin company-visibility lookup needs a DB round trip.
+async function buildAssetListWhere(req: Request): Promise<any> {
+    const { search, status, department, location, type, typeGroup, categoryId, cpu, ram, warrantyStatus, warrantyExpiringInDays, ownerName, exactOwnerName, screenSize, resolution, panelType, printerType, isColor, ipAddress, storage, osType, company, serialNo, purchaseDateFrom, purchaseDateTo } = req.query;
 
     const where: any = {};
     if (status) {
@@ -756,6 +758,18 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
       where.status = 'Available';
     }
 
+    return where;
+}
+
+router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { page = '1', limit = '50' } = req.query;
+    const pageNum = parseInt(page as string);
+    const parsedLimit = parseInt(limit as string);
+    const limitNum = parsedLimit === 10000 ? 10000 : Math.min(parsedLimit, 100);
+    const skip = (pageNum - 1) * limitNum;
+    const where = await buildAssetListWhere(req);
+
     const [assets, total] = await Promise.all([
       prisma.asset.findMany({
         where, skip, take: limitNum, orderBy: { createdAt: 'desc' },
@@ -853,6 +867,50 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
     res.json({ data: enriched, total, page: pageNum, totalPages: Math.ceil(total / limitNum) });
   } catch (err) { next(err); }
   });
+
+// Result count / total purchase value / breakdown-by-dimension for whatever
+// filters the list page currently has applied — same querystring as GET /,
+// run through the identical buildAssetListWhere() so this can never disagree
+// with what the table on screen is actually showing. Adapted from an
+// InvGate-style Explorer sidebar (docs/ITAM-V3's V3 explorer mockup).
+const ASSET_SUMMARY_DIMENSIONS = ['location', 'departmentId', 'status', 'type', 'company'] as const;
+router.get('/summary', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const where = await buildAssetListWhere(req);
+    const dimensionParam = String(req.query.dimension || 'location');
+    const dimension = (ASSET_SUMMARY_DIMENSIONS as readonly string[]).includes(dimensionParam)
+      ? dimensionParam as typeof ASSET_SUMMARY_DIMENSIONS[number]
+      : 'location';
+
+    const [total, valueAgg, groups] = await Promise.all([
+      prisma.asset.count({ where }),
+      prisma.asset.aggregate({ where, _sum: { purchasePrice: true } }),
+      // groupBy skips rows where the grouped column is null, so a count of
+      // "ไม่ระบุ" (unset) is added back below from `total - sum(breakdown)`
+      // rather than trying to coax Prisma into grouping NULLs as one bucket.
+      prisma.asset.groupBy({
+        by: [dimension] as any,
+        where,
+        _count: true,
+        orderBy: { _count: { [dimension]: 'desc' } } as any,
+      }),
+    ]);
+
+    const breakdown = (groups as any[])
+      .map((g) => ({ label: String(g[dimension] ?? '').trim(), count: g._count as number }))
+      .filter((g) => g.label);
+    const unassignedCount = total - breakdown.reduce((sum, g) => sum + g.count, 0);
+    if (unassignedCount > 0) breakdown.push({ label: 'ไม่ระบุ', count: unassignedCount });
+    breakdown.sort((a, b) => b.count - a.count);
+
+    res.json({
+      total,
+      totalValue: valueAgg._sum.purchasePrice != null ? Number(valueAgg._sum.purchasePrice) : 0,
+      dimension,
+      breakdown: breakdown.slice(0, 10),
+    });
+  } catch (err) { next(err); }
+});
 
 router.get('/filter-options', authenticate, async (_req: Request, res: Response, next: NextFunction) => {
   try {
@@ -2235,6 +2293,15 @@ router.get('/:id', authenticate, async (req: Request, res: Response, next: NextF
         pmRuns: { orderBy: { completedAt: 'desc' }, take: 20, include: { plan: true, performer: true, answers: { include: { item: true } } } },
         category: true,
         documents: { orderBy: { createdAt: 'desc' } },
+        catalogItem: { select: { id: true, name: true, jobRole: true } },
+        // สัญญาที่ผูกกับเครื่องนี้ (ประกัน/MA/เช่า) — สำหรับแท็บ "สัญญา" ใหม่
+        contractAssets: { include: { contract: true }, orderBy: { contract: { endDate: 'desc' } } },
+        // คำขอยืมที่เคยมีเครื่องนี้อยู่ในรายการ — สำหรับแท็บ "คำขอที่เกี่ยวข้อง" ใหม่
+        borrowRequestItems: {
+          orderBy: { id: 'desc' },
+          take: 15,
+          include: { request: { select: { requestNo: true, purpose: true, status: true, requester: { select: { displayName: true } } } } },
+        },
       },
     });
     if (!asset) throw new AppError('ไม่พบทรัพย์สิน', 404);
@@ -2413,6 +2480,9 @@ router.post('/agent/monitor-link', authenticate, authorize('IT_ADMIN', 'SUPERADM
       const exists = await prisma.assetLink.findFirst({ where: { parentId, childId } });
       if (exists) { skipped++; continue; }
       await prisma.assetLink.create({
+        data: { parentId, childId, linkType: 'MONITOR', note: 'ผูกจากข้อมูล Agent' },
+      });
+      await prisma.assetLinkHistory.create({
         data: { parentId, childId, linkType: 'MONITOR', note: 'ผูกจากข้อมูล Agent' },
       });
       await prisma.assetHistory.create({
@@ -2709,8 +2779,13 @@ router.put('/:id', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req
 
     const data = normalizeAssetPayload(assetData);
 
-    // Auto-clear ownerName if status becomes Retired or Disposed
-    if (data.status && (data.status === 'Retired' || data.status === 'Disposed')) {
+    // Auto-clear ownerName when status TRANSITIONS to Retired or Disposed —
+    // not merely whenever the request happens to carry that status. A quick
+    // inline-edit chip (AssetOverviewCard.tsx) resends every writable field
+    // including the current status on every save, so without the != old.status
+    // guard, editing e.g. the owner chip on an asset that's already Retired
+    // would silently null out the very value the request was trying to set.
+    if (data.status && data.status !== old.status && (data.status === 'Retired' || data.status === 'Disposed')) {
       data.ownerName = null;
     }
 
@@ -3087,6 +3162,45 @@ router.get('/:id/history', authenticate, async (req: Request, res: Response, nex
         hasMore: offset + limit < total,
       },
     });
+  } catch (err) { next(err); }
+});
+
+// จอ ↔ โน้ตบุ๊ก เคยเชื่อมต่อกับอะไรบ้าง — asset นี้อยู่ฝั่ง parent หรือ child ก็ได้
+// (โน้ตบุ๊กดูประวัติจอที่เคยต่อ, จอดูประวัติโน้ตบุ๊กที่เคยถูกเอาไปต่อ ใช้ endpoint เดียวกัน)
+router.get('/:id/link-history', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const asset = await prisma.asset.findUnique({ where: { id } });
+    if (!asset) throw new AppError('ไม่พบทรัพย์สิน', 404);
+
+    const assetSummary = { select: { id: true, assetCode: true, assetName: true, type: true } };
+    const [asParent, asChild] = await Promise.all([
+      prisma.assetLinkHistory.findMany({
+        where: { parentId: id },
+        include: { child: assetSummary },
+        orderBy: { connectedAt: 'desc' },
+      }),
+      prisma.assetLinkHistory.findMany({
+        where: { childId: id },
+        include: { parent: assetSummary },
+        orderBy: { connectedAt: 'desc' },
+      }),
+    ]);
+
+    // ทั้งสองฝั่งรวมเป็นรายการเดียว เรียงตามเวลาเชื่อมต่อ — ฝั่งหน้าเว็บไม่ต้องสนใจว่า
+    // asset นี้เป็น parent หรือ child ของคู่นั้น แค่รู้ว่า "เคยต่อกับอุปกรณ์ไหน ช่วงไหน"
+    const merged = [
+      ...asParent.map((h) => ({
+        id: h.id, linkType: h.linkType, connectedAt: h.connectedAt, disconnectedAt: h.disconnectedAt,
+        note: h.note, otherAsset: h.child,
+      })),
+      ...asChild.map((h) => ({
+        id: h.id, linkType: h.linkType, connectedAt: h.connectedAt, disconnectedAt: h.disconnectedAt,
+        note: h.note, otherAsset: h.parent,
+      })),
+    ].sort((a, b) => new Date(b.connectedAt).getTime() - new Date(a.connectedAt).getTime());
+
+    res.json(merged);
   } catch (err) { next(err); }
 });
 

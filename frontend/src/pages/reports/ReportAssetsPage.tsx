@@ -7,8 +7,11 @@ import { Boxes, CheckCircle2, AlertTriangle, Wrench, Download, Filter, Eye, File
 import { PieChart as ReChartsPieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 import ReportHeaderTabs from './ReportHeaderTabs';
 import { useNavigate } from 'react-router-dom';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+
+// jspdf ~382 KB โหลดตอนกดออก PDF จริงเท่านั้น
+const loadJsPdf = async () => (await import('jspdf')).default;
+// html2canvas ~198 KB ใช้คู่กับ jspdf ตอนออก PDF เท่านั้น
+const loadHtml2Canvas = async () => (await import('html2canvas')).default;
 
 const statusLabels: Record<string, string> = { Available: 'พร้อมใช้งาน', Borrowed: 'กำลังยืม', InUse: 'ใช้งานประจำ', Maintenance: 'ซ่อมบำรุง', Retired: 'ปลดระวาง', Lost: 'สูญหาย' };
 const CAT_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16', '#ec4899', '#14b8a6', '#f43f5e'];
@@ -37,6 +40,7 @@ export default function ReportAssetsPage() {
       setExportingPDF(true);
       const element = document.getElementById('report-content');
       if (!element) return;
+      const html2canvas = await loadHtml2Canvas();
       const canvas = await html2canvas(element, { 
         scale: 3, 
         useCORS: true, 
@@ -44,6 +48,7 @@ export default function ReportAssetsPage() {
         logging: false
       });
       const imgData = canvas.toDataURL('image/png');
+      const jsPDF = await loadJsPdf();
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;

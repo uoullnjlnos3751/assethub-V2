@@ -67,6 +67,7 @@ import ColumnPickerDialog from './components/ColumnPickerDialog';
 import ExtendBorrowDialog from './components/ExtendBorrowDialog';
 import AssetRowActionsMenu from './components/AssetRowActionsMenu';
 import AssetKpiStrip from './components/AssetKpiStrip';
+import { AssetSummarySidebar } from './components/AssetSummarySidebar';
 import { assetColumnMap } from './components/assetListColumns';
 import {
   ColumnConfig,
@@ -80,6 +81,8 @@ import {
   VIEW_MODE_KEY,
   DENSITY_KEY,
 } from './assetListConfig';
+import { useConfirm } from '../../contexts/ConfirmContext';
+import { PageHeader } from '../../components/PageHeader';
 
 export default function AssetListPage() {
   const { user } = useAuth();
@@ -170,6 +173,29 @@ export default function AssetListPage() {
   useEffect(() => { localStorage.setItem(VIEW_MODE_KEY, viewMode); }, [viewMode]);
   useEffect(() => { localStorage.setItem(DENSITY_KEY, density); }, [density]);
 
+  // Shared by fetchAssets and fetchSummary so the results-summary sidebar can
+  // never disagree with what the table is actually showing — same filters,
+  // same resolved __EMPTY__/typeGroup fallbacks, just without paging.
+  const buildFilterParams = (overrideSearch?: string) => {
+    const qSerialNo = searchParams.get('serialNo');
+    const qLocation = searchParams.get('location');
+    const qCompany = searchParams.has('company') ? searchParams.get('company') : null;
+    const qType = searchParams.has('type') ? searchParams.get('type') : null;
+    return {
+      search: overrideSearch !== undefined ? overrideSearch : search,
+      status: statuses.length > 0 ? statuses.join(',') : undefined,
+      type: qType !== null ? (qType === '' ? '__EMPTY__' : qType) : (type || undefined),
+      typeGroup: !type && typeGroup ? typeGroup : undefined,
+      categoryId: selectedCategoryId || undefined,
+      company: qCompany !== null ? (qCompany === '' ? '__EMPTY__' : qCompany) : (company || undefined),
+      serialNo: qSerialNo !== null ? (qSerialNo === '' ? '__EMPTY__' : qSerialNo) : undefined,
+      location: qLocation !== null ? (qLocation === '' ? '__EMPTY__' : qLocation) : undefined,
+      warrantyStatus: warrantyStatus || undefined,
+      purchaseDateFrom: purchaseDateFrom || undefined,
+      purchaseDateTo: purchaseDateTo || undefined,
+    };
+  };
+
   // Guards against out-of-order responses: rapid filter changes (e.g. debounced
   // search firing while a slower unfiltered request is still in flight) could
   // otherwise let an older response overwrite newer state.
@@ -178,23 +204,8 @@ export default function AssetListPage() {
     const seq = ++fetchSeq.current;
     setLoading(true);
     try {
-      const qSerialNo = searchParams.get('serialNo');
-      const qLocation = searchParams.get('location');
-      const qCompany = searchParams.has('company') ? searchParams.get('company') : null;
-      const qType = searchParams.has('type') ? searchParams.get('type') : null;
-
       const res = await assetAPI.list({
-        search: overrideSearch !== undefined ? overrideSearch : search,
-        status: statuses.length > 0 ? statuses.join(',') : undefined,
-        type: qType !== null ? (qType === '' ? '__EMPTY__' : qType) : (type || undefined),
-        typeGroup: !type && typeGroup ? typeGroup : undefined,
-        categoryId: selectedCategoryId || undefined,
-        company: qCompany !== null ? (qCompany === '' ? '__EMPTY__' : qCompany) : (company || undefined),
-        serialNo: qSerialNo !== null ? (qSerialNo === '' ? '__EMPTY__' : qSerialNo) : undefined,
-        location: qLocation !== null ? (qLocation === '' ? '__EMPTY__' : qLocation) : undefined,
-        warrantyStatus: warrantyStatus || undefined,
-        purchaseDateFrom: purchaseDateFrom || undefined,
-        purchaseDateTo: purchaseDateTo || undefined,
+        ...buildFilterParams(overrideSearch),
         page: page + 1,
         limit: pageSize,
       });
@@ -203,6 +214,29 @@ export default function AssetListPage() {
       setTotal(res.data.total);
     } finally {
       if (seq === fetchSeq.current) setLoading(false);
+    }
+  };
+
+  // Results-summary sidebar (count / total value / breakdown by dimension) —
+  // admin/viewer only, same spirit as the InvGate-style Explorer sidebar in
+  // docs/ITAM-V3's reference material.
+  const [summary, setSummary] = useState<{ total: number; totalValue: number; dimension: string; breakdown: { label: string; count: number }[] } | null>(null);
+  const [summaryDimension, setSummaryDimension] = useState('location');
+  const [summaryLoading, setSummaryLoading] = useState(true);
+  const showSummarySidebar = !isMobile && !isAvailableOnlyView;
+  const summarySeq = useRef(0);
+  const fetchSummary = async (overrideSearch?: string) => {
+    if (!showSummarySidebar) return;
+    const seq = ++summarySeq.current;
+    setSummaryLoading(true);
+    try {
+      const res = await assetAPI.summary({ ...buildFilterParams(overrideSearch), dimension: summaryDimension });
+      if (seq !== summarySeq.current) return;
+      setSummary(res.data);
+    } catch {
+      if (seq === summarySeq.current) setSummary(null);
+    } finally {
+      if (seq === summarySeq.current) setSummaryLoading(false);
     }
   };
 
@@ -228,23 +262,32 @@ export default function AssetListPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, pageSize, statuses, type, typeGroup, selectedCategoryId, company, warrantyStatus, purchaseDateFrom, purchaseDateTo]);
 
+  // Summary sidebar reacts to every filter EXCEPT paging (the total/breakdown
+  // describe the whole filtered set, not one page of it) plus its own
+  // dimension picker.
+  useEffect(() => {
+    fetchSummary();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statuses, type, typeGroup, selectedCategoryId, company, warrantyStatus, purchaseDateFrom, purchaseDateTo, summaryDimension, showSummarySidebar]);
+
   const urlSearch = searchParams.get('search');
   useEffect(() => {
     if (urlSearch !== null) {
       setSearch(urlSearch);
       setPage(0);
       fetchAssets(urlSearch);
+      fetchSummary(urlSearch);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlSearch]);
 
-  const handleSearch = () => { setPage(0); fetchAssets(); };
+  const handleSearch = () => { setPage(0); fetchAssets(); fetchSummary(); };
 
   // Debounced "search as you type" — the Enter key / button above still work instantly too.
   const isFirstSearchEffect = useRef(true);
   useEffect(() => {
     if (isFirstSearchEffect.current) { isFirstSearchEffect.current = false; return; }
-    const t = setTimeout(() => { setPage(0); fetchAssets(); }, 400);
+    const t = setTimeout(() => { setPage(0); fetchAssets(); fetchSummary(); }, 400);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
@@ -257,8 +300,13 @@ export default function AssetListPage() {
     }
   }, [isAvailableOnlyView, user]);
 
+  const confirm = useConfirm();
   const handleDelete = async (id: number) => {
-    if (window.confirm('ต้องการลบทรัพย์สินนี้ใช่หรือไม่?')) {
+    if (await confirm({
+      title: 'ลบทรัพย์สิน',
+      target: assets.find(a => a.id === id)?.assetCode || `#${id}`,
+      detail: 'ประวัติการยืม ประวัติ PM และเอกสารแนบของเครื่องนี้จะถูกลบไปด้วย',
+    })) {
       try {
         await assetAPI.delete(id);
         toast.success('ลบทรัพย์สินเรียบร้อย');
@@ -347,7 +395,7 @@ export default function AssetListPage() {
                 )
               ) : (
                 <Tooltip title="ดูรายละเอียด">
-                  <IconButton size="small" onClick={() => navigate(`/assets/${row.id}`)} color="primary">
+                  <IconButton aria-label="ดูรายละเอียด" size="small" onClick={() => navigate(`/assets/${row.id}`)} color="primary">
                     <PageviewIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
@@ -355,7 +403,7 @@ export default function AssetListPage() {
 
               {/* Secondary Actions (More Menu) */}
               <Tooltip title="จัดการเพิ่มเติม">
-                <IconButton
+                <IconButton aria-label="จัดการเพิ่มเติม"
                   size="small"
                   onClick={(e) => handleMenuOpen(e, row)}
                   sx={{
@@ -386,33 +434,13 @@ export default function AssetListPage() {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3, gap: 2, flexWrap: 'wrap' }}>
-        <Box>
-          <Typography variant="h4" fontWeight={800} sx={{ letterSpacing: '-0.02em', mb: 0.5 }}>
-            {isAvailableOnlyView ? 'รายการอุปกรณ์พร้อมยืม' : typeGroupLabels[typeGroup] || 'ทะเบียนทรัพย์สิน'}
-          </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="body2" color="text.secondary" fontWeight={500}>
-              {isAvailableOnlyView ? 'เลือกอุปกรณ์ที่ต้องการยืมเพื่อส่งคำขอ' : `จัดการและติดตามทรัพย์สินทั้งหมดในระบบ`}
-            </Typography>
-            {!isAvailableOnlyView && (
-              <Chip
-                label={`${total} รายการ`}
-                size="small"
-                sx={{
-                  height: 20,
-                  fontSize: '0.7rem',
-                  fontWeight: 700,
-                  bgcolor: alpha(theme.palette.primary.main, 0.1),
-                  color: theme.palette.primary.main
-                }}
-              />
-            )}
-          </Box>
-        </Box>
-        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: isMobile ? 1 : 0, width: isMobile ? '100%' : 'auto' }}>
+      <PageHeader
+        title={isAvailableOnlyView ? 'รายการอุปกรณ์พร้อมยืม' : typeGroupLabels[typeGroup] || 'ทะเบียนทรัพย์สิน'}
+        subtitle={isAvailableOnlyView ? 'เลือกอุปกรณ์ที่ต้องการยืมเพื่อส่งคำขอ' : 'จัดการและติดตามทรัพย์สินทั้งหมดในระบบ'}
+        count={isAvailableOnlyView ? undefined : total}
+        actions={<Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: isMobile ? 1 : 0, width: isMobile ? '100%' : 'auto' }}>
           {isAdmin && (
-            <IconButton
+            <IconButton aria-label="ตั้งค่า"
               onClick={(e) => handleMenuOpen(e, { isHeaderMenu: true })}
               sx={{
                 display: { xs: 'flex', sm: 'none' },
@@ -455,8 +483,8 @@ export default function AssetListPage() {
               เพิ่มทรัพย์สินใหม่
             </Button>
           )}
-        </Box>
-      </Box>
+        </Box>}
+      />
 
       <AssetKpiStrip
         isAvailableOnlyView={isAvailableOnlyView}
@@ -467,6 +495,12 @@ export default function AssetListPage() {
         setPage={setPage}
       />
 
+      {/* Table + results-summary sidebar side by side on desktop — the
+          sidebar hides itself below `lg` (AssetSummarySidebar's own
+          `display: { xs: 'none', lg: 'flex' }`), so this row collapses to a
+          single column on tablet/mobile without any extra logic here. */}
+      <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
       <Card sx={{
         p: 2,
         mb: 1.5,
@@ -617,7 +651,7 @@ export default function AssetListPage() {
         {savedViews.map((v) => (
           <MenuItem key={v.id} onClick={() => applySavedView(v)} sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
             <span>{v.name}</span>
-            <IconButton
+            <IconButton aria-label="ลบ"
               size="small"
               onClick={(e) => { e.stopPropagation(); setSavedViews(deleteFilterView(v.id)); }}
             >
@@ -932,6 +966,17 @@ export default function AssetListPage() {
           toast.success('อัปเดตข้อมูลสำเร็จ');
         }}
       />
+      </Box>
+
+      {showSummarySidebar && (
+        <AssetSummarySidebar
+          loading={summaryLoading}
+          summary={summary}
+          dimension={summaryDimension}
+          onDimensionChange={setSummaryDimension}
+        />
+      )}
+      </Box>
     </Box>
   );
 }

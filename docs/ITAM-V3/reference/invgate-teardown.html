@@ -1,0 +1,404 @@
+<title>InvGate Teardown</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anuphan:wght@500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --ground:#f4f6f8; --surface:#fff; --surface-2:#eaeef2; --surface-3:#f7f9fb;
+  --line:#dbe2e9; --line-soft:#e8edf2; --ink:#152029; --ink-2:#5b6b7a; --ink-3:#8496a6;
+  --accent:#0b6e80; --accent-tint:#e0f0f3; --brand:#0d3b47;
+  --good:#0a6b12; --good-bg:#e4f6e4; --warn:#8a5406; --warn-bg:#fbeedb;
+  --crit:#9c2626; --crit-bg:#fae5e5; --info:#1b5aa6; --info-bg:#e4eefb;
+  --shadow:0 1px 2px rgba(21,32,41,.05),0 10px 26px -14px rgba(21,32,41,.2);
+  --f-d:'Anuphan','IBM Plex Sans Thai',system-ui,sans-serif;
+  --f-b:'IBM Plex Sans Thai',system-ui,sans-serif;
+  --f-m:'IBM Plex Mono',ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --ground:#0d141a; --surface:#141d25; --surface-2:#1b2630; --surface-3:#111a21;
+  --line:#28353f; --line-soft:#1f2b34; --ink:#e6eef5; --ink-2:#93a5b5; --ink-3:#6d8091;
+  --accent:#3fb3c9; --accent-tint:#10333c; --brand:#0a2c36;
+  --good:#5fd45f; --good-bg:#0f2c16; --warn:#e9b45a; --warn-bg:#33260f;
+  --crit:#f08a8a; --crit-bg:#361a1a; --info:#79b4f2; --info-bg:#12263d;
+  --shadow:0 1px 2px rgba(0,0,0,.35),0 10px 26px -14px rgba(0,0,0,.7);
+}}
+:root[data-theme="dark"]{
+  --ground:#0d141a; --surface:#141d25; --surface-2:#1b2630; --surface-3:#111a21;
+  --line:#28353f; --line-soft:#1f2b34; --ink:#e6eef5; --ink-2:#93a5b5; --ink-3:#6d8091;
+  --accent:#3fb3c9; --accent-tint:#10333c; --brand:#0a2c36;
+  --good:#5fd45f; --good-bg:#0f2c16; --warn:#e9b45a; --warn-bg:#33260f;
+  --crit:#f08a8a; --crit-bg:#361a1a; --info:#79b4f2; --info-bg:#12263d;
+  --shadow:0 1px 2px rgba(0,0,0,.35),0 10px 26px -14px rgba(0,0,0,.7);
+}
+*,*::before,*::after{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{background:var(--ground);color:var(--ink);font-family:var(--f-b);font-size:15px;line-height:1.62;}
+h1,h2,h3,h4{font-family:var(--f-d);text-wrap:balance;letter-spacing:-.01em;}
+code,.mono{font-family:var(--f-m);font-size:.87em;}
+a{color:var(--accent);}
+
+.layout{display:grid;grid-template-columns:262px minmax(0,1fr);max-width:1280px;margin:0 auto;}
+.side{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;padding:26px 16px 40px 26px;border-right:1px solid var(--line);}
+.brand{font-family:var(--f-d);font-weight:700;font-size:1rem;letter-spacing:-.02em;}
+.brand span{display:block;font-family:var(--f-m);font-size:.68rem;font-weight:400;color:var(--ink-3);margin-top:2px;}
+.toc{list-style:none;margin:20px 0 0;padding:0;display:flex;flex-direction:column;gap:1px;}
+.toc a{display:flex;gap:9px;text-decoration:none;color:var(--ink-2);font-size:.87rem;padding:7px 10px;border-radius:8px;transition:background .14s,color .14s;}
+.toc a:hover{background:var(--accent-tint);color:var(--accent);}
+.toc .n{font-family:var(--f-m);font-size:.7rem;color:var(--accent);opacity:.7;width:1.5em;flex:none;}
+main{padding:38px 38px 100px;min-width:0;}
+
+.hero{padding-bottom:26px;margin-bottom:34px;border-bottom:1px solid var(--line);}
+.eyebrow{font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;color:var(--accent);font-weight:600;}
+h1{font-size:2.05rem;font-weight:800;margin:9px 0 10px;}
+.lede{color:var(--ink-2);max-width:66ch;margin:0 0 16px;}
+.chips{display:flex;flex-wrap:wrap;gap:9px;}
+.chip{background:var(--surface-2);border:1px solid var(--line);padding:5px 12px;border-radius:999px;font-size:.78rem;color:var(--ink-2);}
+.chip b{color:var(--ink);font-weight:600;}
+
+section{margin-bottom:42px;scroll-margin-top:20px;}
+.sh{display:flex;align-items:baseline;gap:11px;margin-bottom:5px;}
+.sh .n{font-family:var(--f-m);color:var(--accent);font-size:.92rem;}
+h2{font-size:1.3rem;font-weight:700;margin:0;}
+.note{color:var(--ink-2);font-size:.92rem;margin:5px 0 15px;max-width:72ch;}
+
+.wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface);box-shadow:var(--shadow);}
+table{width:100%;border-collapse:collapse;font-size:.87rem;}
+th{text-align:left;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);background:var(--surface-3);padding:10px 13px;border-bottom:1px solid var(--line);white-space:nowrap;}
+td{padding:10px 13px;border-bottom:1px solid var(--line-soft);vertical-align:top;}
+tr:last-child td{border-bottom:none;}
+td.m{font-family:var(--f-m);font-size:.79rem;color:var(--accent);white-space:nowrap;}
+td.d{color:var(--ink-2);}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow);}
+.card h4{margin:0 0 5px;font-size:.94rem;font-weight:600;}
+.card p{margin:0;font-size:.83rem;color:var(--ink-2);}
+
+.tree{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow);overflow-x:auto;}
+.tree pre{margin:0;font-family:var(--f-m);font-size:.79rem;line-height:1.75;color:var(--ink-2);white-space:pre;}
+.tree b{color:var(--ink);font-weight:600;}
+.tree i{color:var(--accent);font-style:normal;}
+
+.cal{display:flex;gap:11px;padding:13px 15px;border-radius:10px;border:1px solid var(--line);border-left:3px solid var(--accent);background:var(--surface);margin:14px 0;box-shadow:var(--shadow);}
+.cal.good{border-left-color:var(--good);}
+.cal.warn{border-left-color:var(--warn);}
+.cal.crit{border-left-color:var(--crit);}
+.cal-b b{display:block;font-size:.92rem;margin-bottom:2px;}
+.cal-b p{margin:0;font-size:.85rem;color:var(--ink-2);}
+
+.pill{display:inline-block;padding:1px 9px;border-radius:999px;font-size:.72rem;font-weight:600;white-space:nowrap;}
+.pill.g{background:var(--good-bg);color:var(--good);}
+.pill.w{background:var(--warn-bg);color:var(--warn);}
+.pill.c{background:var(--crit-bg);color:var(--crit);}
+.pill.i{background:var(--info-bg);color:var(--info);}
+.pill.n{background:var(--surface-2);color:var(--ink-2);}
+
+.foot{margin-top:52px;padding-top:20px;border-top:1px solid var(--line);color:var(--ink-2);font-size:.83rem;max-width:74ch;}
+@media (max-width:880px){
+  .layout{grid-template-columns:1fr;}
+  .side{position:relative;height:auto;border-right:none;border-bottom:1px solid var(--line);padding:20px;}
+  main{padding:24px 18px 80px;}
+}
+</style>
+
+<div class="layout">
+<nav class="side">
+  <div class="brand">InvGate Teardown<span>waddles.is.cloud.invgate.net</span></div>
+  <ul class="toc">
+    <li><a href="#s1"><span class="n">01</span> โมเดลข้อมูล (CI)</a></li>
+    <li><a href="#s2"><span class="n">02</span> ผังเมนูทั้งระบบ</a></li>
+    <li><a href="#s3"><span class="n">03</span> Explorer ทำงานอย่างไร</a></li>
+    <li><a href="#s4"><span class="n">04</span> เมนูคำสั่งรายแถว</a></li>
+    <li><a href="#s5"><span class="n">05</span> การทำงานแบบกลุ่ม</a></li>
+    <li><a href="#s6"><span class="n">06</span> หน้ารายละเอียด CI</a></li>
+    <li><a href="#s7"><span class="n">07</span> การสร้างรายการใหม่</a></li>
+    <li><a href="#s8"><span class="n">08</span> Settings 10 หมวด</a></li>
+    <li><a href="#s9"><span class="n">09</span> 8 กลไกที่ควรลอก</a></li>
+    <li><a href="#s10"><span class="n">10</span> ข้อจำกัดที่พบ</a></li>
+  </ul>
+</nav>
+
+<main>
+<div class="hero">
+  <div class="eyebrow">Functional Teardown · เก็บจากระบบจริง</div>
+  <h1>InvGate Asset Management ทำงานอย่างไร</h1>
+  <p class="lede">บันทึกโครงสร้างและพฤติกรรมการทำงานทั้งหมดจากการกดใช้งานจริงด้วยบัญชี superadmin เพื่อใช้เป็นแบบอ้างอิงในการออกแบบระบบ IT Asset Management ของ TRR Group</p>
+  <div class="chips">
+    <span class="chip">เวอร์ชัน <b>v3.20</b></span>
+    <span class="chip">CI Type <b>9 ชนิด</b></span>
+    <span class="chip">ประเภทอุปกรณ์ <b>16 ชนิด</b></span>
+    <span class="chip">เมนูหลัก <b>10</b></span>
+    <span class="chip">หมวดตั้งค่า <b>10</b></span>
+    <span class="chip">สำรวจเมื่อ <b>25 ส.ค. 2569</b></span>
+  </div>
+</div>
+
+<!-- ============ 01 ============ -->
+<section id="s1">
+  <div class="sh"><span class="n">01</span><h2>โมเดลข้อมูล — ทุกอย่างคือ CI</h2></div>
+  <p class="note">หัวใจของ InvGate คือทุกสิ่งในระบบเป็น <b>Configuration Item (CI)</b> ชนิดใดชนิดหนึ่ง ไม่ได้แยกเป็นตารางอิสระ หน้าจอ Create CI เผยรายการชนิดทั้งหมดไว้ชัดเจน</p>
+  <div class="wrap"><table>
+    <thead><tr><th>ชนิด CI</th><th>บทบาทในระบบ</th><th>สถานะ</th></tr></thead>
+    <tbody>
+      <tr><td><b>Assets</b></td><td class="d">อุปกรณ์ที่จับต้องได้ แตกย่อยได้อีก 16 ประเภท</td><td><span class="pill g">ใช้งานได้</span></td></tr>
+      <tr><td><b>Cloud Software</b></td><td class="d">บริการ SaaS / ทรัพยากรบนคลาวด์</td><td><span class="pill g">ใช้งานได้</span></td></tr>
+      <tr><td><b>User</b></td><td class="d">พนักงาน เป็นได้ทั้งผู้ครอบครองและผู้ใช้ระบบ</td><td><span class="pill g">ใช้งานได้</span></td></tr>
+      <tr><td><b>Business Application</b></td><td class="d">ระบบงานที่ประกอบจาก CI หลายตัว (นี่คือ CMDB)</td><td><span class="pill g">ใช้งานได้</span></td></tr>
+      <tr><td><b>Location</b></td><td class="d">สถานที่แบบลำดับชั้นหลายระดับ</td><td><span class="pill g">ใช้งานได้</span></td></tr>
+      <tr><td><b>Contract</b></td><td class="d">สัญญา MA / ประกัน / Subscription / License</td><td><span class="pill g">ใช้งานได้</span></td></tr>
+      <tr><td><b>Vendor</b></td><td class="d">ผู้ขายและผู้ให้บริการ</td><td><span class="pill g">ใช้งานได้</span></td></tr>
+      <tr><td><b>Purchase Order</b></td><td class="d">ใบสั่งซื้อ ผูกกลับไปยัง Asset ที่ได้มา</td><td><span class="pill w">BETA</span></td></tr>
+      <tr><td><b>Cost Center</b></td><td class="d">ศูนย์ต้นทุนสำหรับปันส่วนค่าใช้จ่าย</td><td><span class="pill w">BETA</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <p class="note" style="margin-top:16px">ประเภทย่อยของ Assets ทั้ง 16 ชนิด — เพิ่มได้เองจาก Settings › ทรัพย์สิน › ประเภททรัพย์สิน</p>
+  <div class="tree"><pre><b>Access Point</b>   <b>Chromebook</b>   <b>Computer</b>      <b>Firewall</b>
+<b>Headset</b>       <b>IP Camera</b>    <b>Monitor</b>       <b>Phone</b>
+<b>Printer</b>       <b>Projector</b>    <b>Router</b>        <b>Server</b>
+<b>Switch</b>        <b>Tablet</b>       <b>Videoconference</b> <b>VMware ESXi</b></pre></div>
+
+  <div class="cal good">
+    <div class="cal-b"><b>สิ่งที่ควรเรียนรู้</b>
+    <p>เพราะทุกอย่างเป็น CI ชนิดหนึ่ง การเพิ่ม “เครื่องสแกนลายนิ้วมือ” จึงเป็นแค่การเพิ่ม Record ในตารางประเภท ไม่ต้องสร้างตารางใหม่และไม่ต้องแก้หน้าจอ นี่คือจุดที่ระบบ In-house ส่วนใหญ่พังในปีที่สอง เพราะไปแยกตารางตามประเภทตั้งแต่แรก</p></div>
+  </div>
+</section>
+
+<!-- ============ 02 ============ -->
+<section id="s2">
+  <div class="sh"><span class="n">02</span><h2>ผังเมนูทั้งระบบ</h2></div>
+  <p class="note">แถบซ้ายเป็นไอคอนอย่างเดียว มี Tooltip เมื่อชี้ ส่วนเมนูย่อยอยู่เป็นแท็บแนวนอนใต้ช่องค้นหา</p>
+  <div class="tree"><pre><b>DASHBOARD</b>          <i>#/home/dashboard</i>
+  └ CI status · Operating system updates · (สร้างเพิ่มเองได้)
+
+<b>ASSETS</b>             <i>#/assets/explorer</i>
+  ├ Assets · Cloud Assets · Discovery
+
+<b>SOFTWARE</b>           <i>#/software/explorer</i>
+  ├ Software · Cloud software · Application services
+  ├ Application services discovery · Operating system updates
+  ├ Deployment  ├ Plans  └ Packages
+  ├ Databases   └ Authorization policies
+
+<b>CONTRACTS</b>          <i>#/contracts/explorer</i>
+  └ Contracts · Software Compliance
+
+<b>PROCUREMENT</b>        <i>#/procurement/purchase-orders</i>
+  └ Purchase Orders <i>(BETA)</i> · Vendors
+
+<b>CMDB</b>               <i>#/business/explorer</i>
+  └ Business Applications
+
+<b>OTHER CIS</b>          <i>#/others</i>
+  └ People · Locations · Vendors · Cost centers <i>(BETA)</i>
+
+<b>ACTIVITIES</b>         <i>#/global-activities/explorer</i>
+  └ Audit log ทั้งระบบ พร้อมค่าเดิม/ค่าใหม่
+
+<b>RECOMMENDATIONS</b>    <i>#/smart-recommendations</i>
+  └ คำแนะนำจาก AI
+
+<b>SETTINGS</b>           <i>#/settings/index</i>
+  └ 10 หมวด (ดูหัวข้อ 08)
+
+<b>Service Desk</b>       <i>waddles.sd.cloud.invgate.net</i>  ← คนละผลิตภัณฑ์</pre></div>
+
+  <div class="cal warn">
+    <div class="cal-b"><b>ระวังชื่อไม่ตรงกัน</b>
+    <p>ป้ายในเมนูกับชื่อหน้าจริงไม่ตรงกันหลายจุด — เมนู <b>Business</b> เปิดมาเป็นหน้า <b>CMDB</b>, เมนู <b>Others</b> เป็น <b>Other CIs</b>, และ <b>Global Activities</b> เป็น <b>Activities</b> ถ้าทำระบบเองควรใช้ชื่อเดียวกันตลอดเพื่อไม่ให้ผู้ใช้สับสน</p></div>
+  </div>
+</section>
+
+<!-- ============ 03 ============ -->
+<section id="s3">
+  <div class="sh"><span class="n">03</span><h2>Explorer — หน้าจอเดียวใช้ซ้ำทุกโมดูล</h2></div>
+  <p class="note">ทุกโมดูลใช้หน้าตารางแบบเดียวกันหมด ต่างกันแค่ชุดคอลัมน์ ผู้ใช้จึงเรียนรู้ครั้งเดียวใช้ได้ทั้งระบบ</p>
+  <div class="wrap"><table>
+    <thead><tr><th>ส่วนประกอบ</th><th>พฤติกรรมจริงที่ทดสอบแล้ว</th></tr></thead>
+    <tbody>
+      <tr><td><b>Saved views</b></td><td class="d">ปุ่มซ้ายสุดเปิดรายการมุมมองที่บันทึกไว้ แต่ละมุมมองจำ Filter และคอลัมน์ของตัวเอง มี <span class="pill n">PREDEFINED</span> ติดมาให้ และปักหมุดเป็นค่าเริ่มต้นได้</td></tr>
+      <tr><td><b>แถวกรอง</b></td><td class="d">อยู่ใต้หัวตาราง มีช่องกรองของทุกคอลัมน์ ไม่มีตัวสร้างเงื่อนไขซับซ้อนแยกต่างหาก ปุ่มรูปกรวยคือ “ล้างตัวกรองทั้งหมด”</td></tr>
+      <tr><td><b>เรียงลำดับ</b></td><td class="d">คลิกหัวคอลัมน์เพื่อสลับขึ้น-ลง มีลูกศรบอกทิศ</td></tr>
+      <tr><td><b>สลับมุมมอง</b></td><td class="d">ตาราง ↔ การ์ด การ์ดแสดง Chip สถานะ + Chip ประเภท + ไอคอน + ชื่อ + Inventory ID + คู่ป้าย/ค่า และแถบ “UPDATED A DAY AGO” ที่ท้ายการ์ด</td></tr>
+      <tr><td><b>แผงสรุปขวา</b></td><td class="d">แสดง Total Assets และ Current value เป็นตัวเลขใหญ่ พร้อม Pie ที่เลือกมิติได้ <b>ตัวเลขคำนวณจากผลลัพธ์ที่กรองอยู่ และเปลี่ยนทันทีเมื่อเลือกแถว</b></td></tr>
+      <tr><td><b>เมนู ⋮ มุมขวา</b></td><td class="d">คอลัมน์ในตาราง (badge บอกจำนวน 11) · Table size (Auto) · Results per page (50) · Export CSV/XLSX</td></tr>
+      <tr><td><b>Tag ในตาราง</b></td><td class="d">แสดงเป็น Chip สีคาสีตาม Tag ได้หลายอันต่อแถว</td></tr>
+      <tr><td><b>ค่าที่คลิกได้</b></td><td class="d">Manufacturer, Location, Owner, Model เป็นลิงก์ทั้งหมด กดแล้วไปหน้า Profile ของสิ่งนั้น</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============ 04 ============ -->
+<section id="s4">
+  <div class="sh"><span class="n">04</span><h2>เมนูคำสั่งรายแถว (⋮)</h2></div>
+  <p class="note">กดปุ่มสามจุดท้ายแถว จะได้คำสั่งที่ทำกับอุปกรณ์ชิ้นนั้นได้ทันทีโดยไม่ต้องเปิดหน้ารายละเอียด</p>
+  <div class="cards">
+    <div class="card"><h4>Profile</h4><p>เปิดหน้ารายละเอียดเต็ม</p></div>
+    <div class="card"><h4>Edit</h4><p>แก้ไขข้อมูลในฟอร์ม</p></div>
+    <div class="card"><h4>Add notes</h4><p>บันทึกโน้ตแนบกับอุปกรณ์</p></div>
+    <div class="card"><h4>Generate QR</h4><p>สร้าง QR สำหรับติดสติกเกอร์ที่ตัวเครื่อง</p></div>
+    <div class="card"><h4>Map related CIs</h4><p>ดูแผนผังความสัมพันธ์กับ CI อื่น</p></div>
+    <div class="card"><h4>Uninstall software</h4><p>สั่งถอนโปรแกรมผ่าน Agent</p></div>
+    <div class="card"><h4>Deployment options ▸</h4><p>เมนูย่อยสำหรับสั่งติดตั้ง</p></div>
+    <div class="card"><h4>Power actions ▸</h4><p>Reboot computer · Force shutdown</p></div>
+  </div>
+  <div class="cal">
+    <div class="cal-b"><b>Generate QR คือฟีเจอร์ที่คุ้มค่าที่สุดในเมนูนี้</b>
+    <p>ทำให้ตรวจนับทรัพย์สินประจำปีเร็วขึ้นมาก เพราะเดินสแกนแทนการไล่จดรหัส และเชื่อมกับฟิลด์ Inventory ID ที่รองรับ “Scan/Manual” ในฟอร์มสร้างอยู่แล้ว</p></div>
+  </div>
+</section>
+
+<!-- ============ 05 ============ -->
+<section id="s5">
+  <div class="sh"><span class="n">05</span><h2>การทำงานแบบกลุ่ม</h2></div>
+  <p class="note">ติ๊ก Checkbox แล้วแถบล่างจะเปลี่ยนเป็นแถบคำสั่ง พร้อมบอกจำนวนที่เลือกเทียบกับทั้งหมด เช่น <span class="mono">2 OF 140 ASSETS</span></p>
+  <div class="wrap"><table>
+    <thead><tr><th>คำสั่ง</th><th>รายละเอียด</th></tr></thead>
+    <tbody>
+      <tr><td><b>Edit</b></td><td class="d">แก้ไขค่าเดียวกันให้ทุกรายการที่เลือกพร้อมกัน</td></tr>
+      <tr><td><b>Tags</b></td><td class="d">ติดหรือถอด Tag เป็นกลุ่ม</td></tr>
+      <tr><td><b>Generate selected QR codes</b></td><td class="d">สร้าง QR ทีเดียวหลายชิ้น เหมาะกับตอนรับของเข้าคลัง</td></tr>
+      <tr><td><b>Convert to server</b></td><td class="d">เปลี่ยนประเภทอุปกรณ์เป็น Server</td></tr>
+      <tr><td><b>Merge</b> <span class="pill n">ปิดอยู่</span></td><td class="d">รวมรายการซ้ำ — ตอนปิดใช้งานจะอธิบายเหตุผลให้ด้วยว่าทำไมกดไม่ได้</td></tr>
+      <tr><td><b>Uninstall software</b></td><td class="d">ถอนโปรแกรมพร้อมกันหลายเครื่อง</td></tr>
+      <tr><td><b>Deployment options ▸ / Power actions ▸</b></td><td class="d">สั่งติดตั้งหรือสั่งรีบูตทีละหลายเครื่อง</td></tr>
+    </tbody>
+  </table></div>
+  <div class="cal good">
+    <div class="cal-b"><b>สองพฤติกรรมที่ออกแบบมาดี</b>
+    <p><b>หนึ่ง</b> — แผงสรุปด้านขวาคำนวณใหม่ตามสิ่งที่เลือกทันที เลือก 2 เครื่องก็เห็นมูลค่ารวมของ 2 เครื่องนั้นเลย <b>สอง</b> — ติ๊กหัวตารางเลือกได้แค่ “หน้าปัจจุบัน” (50 จาก 140) และบอกตัวเลขตรง ๆ ไม่หลอกว่าเลือกครบแล้ว</p></div>
+  </div>
+</section>
+
+<!-- ============ 06 ============ -->
+<section id="s6">
+  <div class="sh"><span class="n">06</span><h2>หน้ารายละเอียด CI — ลึกถึงสามชั้น</h2></div>
+  <p class="note">ส่วนหัวมีการ์ดแก้ไขเร็ว 3 ใบ (Status / Location / Owner) แต่ละใบมีดินสอกดแก้ในที่ได้เลยโดยไม่ต้องเข้าฟอร์ม</p>
+  <div class="tree"><pre><b>iMac-Adrian</b>  ·  Computer (Desktop) IMAC-ADRIAN  ·  Updated Aug 24 2026
+├─ <i>Home</i>        การ์ดสุขภาพ 4 ใบ · Software · Hardware · Network · Source
+│                 Custom fields · Requests · <b>Chain of custody</b> · Tags · OS Users · Attachments
+├─ <i>Hardware</i>    Manufacturer · Model · Processor · Motherboard · RAM · Graphics
+│                 Audio · Serial · Product Number · UUID · Warranty · End of Support
+├─ <i>Applications</i> ├─ Software  ├─ Installations  └─ Updates
+│                  ├─ Application services
+│                  └─ Discovered services
+├─ <i>Contracts</i>   สัญญาที่ผูกกับอุปกรณ์ชิ้นนี้
+├─ <i>Financials</i>  Price: Acquisition cost · Current value · Salvage value
+│                 Depreciation % · Cost center
+│                 Acquisition: date · type · Invoice · Part number
+│                 <b>Purchase order</b> และ <b>Vendor</b> เป็นลิงก์ไปหน้าของมันเอง
+├─ <i>Requests</i>    ใบแจ้งปัญหาจาก Service Desk
+├─ <i>Deployment</i>  ประวัติการติดตั้งซอฟต์แวร์ลงเครื่องนี้
+└─ <i>Activity</i>    ประวัติการเปลี่ยนแปลงเฉพาะเครื่องนี้</pre></div>
+
+  <p class="note" style="margin-top:18px">การ์ดสุขภาพและกฎที่อยู่เบื้องหลัง</p>
+  <div class="cal crit">
+    <div class="cal-b"><b>Health status: Critical — 4 of 9 conditions are not being met</b>
+    <p>ไล่เงื่อนไขที่ไม่ผ่านให้ดูทีละข้อ พร้อมแยกสีตามความรุนแรง: <span class="pill c">Warranty is expired</span> <span class="pill w">Antivirus is not installed</span> <span class="pill w">Firewall is deactivated</span> <span class="pill w">Warranty will expire in less than 45 days</span> และปิดท้ายด้วยบรรทัดว่า “Rule being applied is <b>Global Health Rule</b>” เพื่อให้รู้ว่ากฎไหนตัดสิน</p></div>
+  </div>
+  <div class="cal">
+    <div class="cal-b"><b>Chain of custody</b>
+    <p>InvGate ตั้งชื่อ Timeline การเปลี่ยนมือว่า “ห่วงโซ่การครอบครอง” ไม่ใช่แค่ Activity log ธรรมดา — เป็นคำที่ตรงกับงาน Audit ทรัพย์สินมาก และควรยืมมาใช้</p></div>
+  </div>
+</section>
+
+<!-- ============ 07 ============ -->
+<section id="s7">
+  <div class="sh"><span class="n">07</span><h2>การสร้างรายการใหม่ — 3 ขั้น</h2></div>
+  <p class="note">ปุ่ม NEW CI ไม่เปิดฟอร์มทันที แต่ให้เลือกชนิดก่อนเพื่อให้ได้ฟอร์มที่ตรงกับสิ่งนั้นจริง ๆ</p>
+  <div class="tree"><pre><b>ขั้น 1</b>  เลือกชนิด CI    → Assets · Cloud Software · User · Business Application
+                            Location · Contract · Vendor · Purchase Order · Cost Center
+<b>ขั้น 2</b>  เลือกประเภทย่อย → Computer · Switch · Printer · IP Camera · … (16 ชนิด)
+<b>ขั้น 3</b>  กรอกฟอร์ม       → <i>Create multiple CIs</i></pre></div>
+
+  <p class="note" style="margin-top:16px">ฟอร์มขั้นที่ 3 แบ่งเป็นกลุ่ม และรองรับการสร้างทีละหลายเครื่องในครั้งเดียว</p>
+  <div class="wrap"><table>
+    <thead><tr><th>กลุ่ม</th><th>ฟิลด์</th></tr></thead>
+    <tbody>
+      <tr><td><b>ข้อมูลหลัก</b></td><td class="d">Format <span class="pill c">บังคับ</span> · Status <span class="pill c">บังคับ</span> · Manufacturer <span class="pill c">บังคับ</span> · Location</td></tr>
+      <tr><td><b>Financials</b></td><td class="d">Invoice · Acquisition date · Acquisition type · Acquisition cost · Annual depreciation percentage · Cost center</td></tr>
+      <tr><td><b>List options</b></td><td class="d">Number of assets to create · Columns to enter · Inventory ID <span class="pill i">Scan/Manual</span></td></tr>
+      <tr><td><b>List</b></td><td class="d">ตารางย่อยกรอกเฉพาะค่าที่ต่างกันรายเครื่อง — Inventory ID · Name · Serial Number</td></tr>
+    </tbody>
+  </table></div>
+  <div class="cal good">
+    <div class="cal-b"><b>นี่คือกลไกที่ฉลาดที่สุดที่เจอในระบบนี้</b>
+    <p>กรอกค่าที่เหมือนกัน (ยี่ห้อ สถานที่ ราคา ค่าเสื่อม) ครั้งเดียว ระบุจำนวนเครื่อง แล้วเลือกว่ามีคอลัมน์ไหนบ้างที่ต่างกันรายเครื่อง จากนั้นพิมพ์เฉพาะคอลัมน์เหล่านั้น — ตอนรับ Notebook เข้ามา 10 เครื่องพร้อมกันจะเร็วขึ้นมหาศาล และช่อง Inventory ID รองรับเครื่องสแกนบาร์โค้ดโดยตรง</p></div>
+  </div>
+</section>
+
+<!-- ============ 08 ============ -->
+<section id="s8">
+  <div class="sh"><span class="n">08</span><h2>Settings — 10 หมวด 36 หน้าย่อย</h2></div>
+  <div class="tree"><pre><b>General</b>              Preferences · Locations · Tags · Documents
+<b>Users</b>                Users · Authentication · Directory services · Permissions
+<b>CIs</b>                  General · Fields · Asset Types · Health · Lifecycle
+                       Inventory ID · Automations · Software metering · Depreciation
+<b>Software Deployment</b>  Preferences · Security controls · Shared drives
+<b>Discovery</b>            Agent deployment · Proxies · Discovery sources
+                       SNMP Profiles · Printers
+<b>Tasks</b>                Tasks
+<b>Email</b>                Outgoing email
+<b>AI Hub</b> <i>(BETA)</i>        AI services · Features
+<b>Integrations</b>         Service Management · API · Remote Desktop · Warranty APIs
+<b>System</b>               System · Privacy · Events</pre></div>
+
+  <p class="note" style="margin-top:18px">หัวข้อที่มีผลกับการออกแบบระบบมากที่สุด</p>
+  <div class="wrap"><table>
+    <thead><tr><th>หน้า</th><th>ทำอะไร</th><th>ทำไมสำคัญ</th></tr></thead>
+    <tbody>
+      <tr><td><b>CIs › Fields</b></td><td class="d">เพิ่ม/แก้ฟิลด์ของ CI เอง</td><td class="d">ต่อยอดได้โดยไม่ต้องแก้โปรแกรม</td></tr>
+      <tr><td><b>CIs › Health</b></td><td class="d">ตั้งกฎประเมินสุขภาพอุปกรณ์</td><td class="d">เป็นที่มาของการ์ดแดง/เหลืองในหน้ารายละเอียด</td></tr>
+      <tr><td><b>CIs › Lifecycle</b></td><td class="d">กำหนดสถานะวงจรชีวิต</td><td class="d">แยกจาก Asset Status คนละมิติกัน</td></tr>
+      <tr><td><b>CIs › Inventory ID</b></td><td class="d">แม่แบบรหัสทรัพย์สิน</td><td class="d">กันข้อมูลเละเพราะคนพิมพ์เอง</td></tr>
+      <tr><td><b>CIs › Automations</b></td><td class="d">สั่งงานอัตโนมัติตาม Event</td><td class="d">แทนการนั่งเฝ้าและแจ้งเตือนเอง</td></tr>
+      <tr><td><b>CIs › Depreciation</b></td><td class="d">วิธีคิดค่าเสื่อม</td><td class="d">ทำให้ Current value ในแผงขวามีความหมาย</td></tr>
+      <tr><td><b>General › Preferences</b></td><td class="d">สลับหน้าตาระบบ Classic ↔ Veil</td><td class="d">Veil คือธีมใหม่ที่มี Dark mode</td></tr>
+      <tr><td><b>Integrations › API</b></td><td class="d">จัดการ API Key</td><td class="d">ทางเชื่อมกับ Power Automate / SharePoint</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============ 09 ============ -->
+<section id="s9">
+  <div class="sh"><span class="n">09</span><h2>8 กลไกที่ควรลอกไปใช้</h2></div>
+  <p class="note">เรียงตามผลกระทบต่อระบบจริง จากมากไปน้อย</p>
+  <div class="wrap"><table>
+    <thead><tr><th style="width:34px">#</th><th>กลไก</th><th>เหตุผล</th></tr></thead>
+    <tbody>
+      <tr><td class="m">1</td><td><b>CI เป็นฐานกลาง + ประเภทเป็น Config</b></td><td class="d">เพิ่มประเภทอุปกรณ์ใหม่โดยไม่ต้องรื้อระบบ เป็นเรื่องที่แก้ทีหลังไม่ได้</td></tr>
+      <tr><td class="m">2</td><td><b>Audit trail เก็บค่าเดิม/ค่าใหม่</b></td><td class="d">ระบบส่วนใหญ่เก็บแค่ “ใครแก้ตอนไหน” พอ Audit จริงตอบไม่ได้ ต้องออกแบบตั้งแต่วันแรก</td></tr>
+      <tr><td class="m">3</td><td><b>สร้างทีละหลายเครื่องด้วยฟอร์มเดียว</b></td><td class="d">ประหยัดเวลารับของเข้าคลังมากที่สุดในบรรดาฟีเจอร์ทั้งหมด</td></tr>
+      <tr><td class="m">4</td><td><b>ทุกค่า Lookup คลิกไปหน้า Profile ได้</b></td><td class="d">Manufacturer, Location, Vendor มีหน้าและสถิติของตัวเอง ทำให้ไล่ข้อมูลได้ลื่นโดยไม่ต้องกลับไปค้นใหม่</td></tr>
+      <tr><td class="m">5</td><td><b>Smart tag ที่ติดอัตโนมัติตามกฎ</b></td><td class="d">เป็นการจัดกลุ่มแบบไม่ต้องมีคนดูแล เช่น “อุปกรณ์ไม่มีผู้ครอบครอง”</td></tr>
+      <tr><td class="m">6</td><td><b>แผงสรุปที่คิดตามผลลัพธ์ที่กรอง</b></td><td class="d">กรองเสร็จเห็นยอดรวมกับมูลค่าทันที ไม่ต้องส่งออกไปรวมใน Excel</td></tr>
+      <tr><td class="m">7</td><td><b>Health rule ที่บอกด้วยว่ากฎไหนตัดสิน</b></td><td class="d">ผู้ใช้เชื่อถือผลได้เพราะตรวจสอบที่มาได้</td></tr>
+      <tr><td class="m">8</td><td><b>QR ต่อชิ้นและต่อกลุ่ม</b></td><td class="d">เปลี่ยนการตรวจนับประจำปีจากไล่จดเป็นเดินสแกน</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============ 10 ============ -->
+<section id="s10">
+  <div class="sh"><span class="n">10</span><h2>ข้อจำกัดและจุดที่ทำได้ดีกว่า</h2></div>
+  <div class="cal warn">
+    <div class="cal-b"><b>Pie chart ที่มี 12 ชิ้น</b>
+    <p>แผงสรุปด้านขวาใช้ Pie แบ่งตามสถานที่ซึ่งมีสิบกว่าค่า ทำให้อ่านค่าจริงไม่ได้เลย ต้องเอาเมาส์ชี้ทีละชิ้น — กรณีแบบนี้ Bar chart แนวนอนอ่านง่ายกว่ามาก และเป็นเหตุผลที่ Template ของ TRR เปลี่ยนไปใช้ Bar แทน</p></div>
+  </div>
+  <div class="cal warn">
+    <div class="cal-b"><b>ชื่อเมนูกับชื่อหน้าไม่ตรงกัน</b>
+    <p>Business/CMDB, Others/Other CIs, Global Activities/Activities — สามคู่ในระบบเดียว</p></div>
+  </div>
+  <div class="cal warn">
+    <div class="cal-b"><b>โมดูล BETA ที่ยังว่างเปล่า</b>
+    <p>Cloud Assets, Application services, Databases และ Application services discovery ไม่มีข้อมูลตัวอย่างแม้แต่รายการเดียวในระบบ Demo ของผู้ผลิตเอง ควรถือว่ายังไม่พร้อมใช้งานจริง</p></div>
+  </div>
+  <div class="cal crit">
+    <div class="cal-b"><b>ไม่มีโมดูลรับ-ส่งมอบและใบแจ้งซ่อม</b>
+    <p>เป็นช่องว่างที่ใหญ่ที่สุดสำหรับการใช้งานในไทย InvGate ผลักงานสองอย่างนี้ไปไว้ที่ผลิตภัณฑ์ Service Desk ซึ่งต้องซื้อแยก — ถ้าพัฒนาเองนี่คือจุดที่คุ้มค่าที่สุด เพราะเป็นงานที่ต้อง Fit กับกระบวนการของ TRR อยู่แล้ว</p></div>
+  </div>
+</section>
+
+<p class="foot">เอกสารนี้บันทึกจากการกดใช้งานระบบจริงบนบัญชี superadmin เมื่อวันที่ 25 สิงหาคม 2569 ทุกหัวข้อผ่านการเปิดดูหน้าจอจริง ไม่ได้อ้างอิงจากคู่มือหรือเอกสารการตลาด ส่วนที่ยังไม่ได้ทดสอบคือการบันทึกข้อมูลจริง การลบ และผลิตภัณฑ์ InvGate Service Desk ที่แยกออกไป</p>
+</main>
+</div>

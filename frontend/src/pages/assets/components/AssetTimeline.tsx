@@ -86,6 +86,15 @@ function buildEntries(asset: any, maintenance: any[]): Entry[] {
           tone: 'muted',
         });
         break;
+      // ตรวจจับอัตโนมัติจากการเทียบ RAM/ดิสก์ที่ Agent เห็นกับรอบก่อนหน้า — ไม่มี
+      // serial ให้ยืนยันว่าเป็นชิ้นเดียวกับที่หายไปจากเครื่องอื่นหรือเปล่า จึงบอก
+      // ได้แค่ว่า "เครื่องนี้เปลี่ยนแปลง" ไม่ใช่ "ของย้ายมาจากเครื่องไหน"
+      case 'COMPONENT_ADDED':
+        out.push({ at, title: h.note || 'ตรวจพบอุปกรณ์ใหม่', sub: fmt(new Date(at)), tone: 'primary' });
+        break;
+      case 'COMPONENT_REMOVED':
+        out.push({ at, title: h.note || 'ตรวจพบอุปกรณ์ถูกถอดออก', sub: fmt(new Date(at)), tone: 'warning' });
+        break;
       case 'UPDATE':
         out.push({
           at,

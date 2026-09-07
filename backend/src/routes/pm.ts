@@ -8,6 +8,7 @@ import { fetchGLPISpecBySerial } from '../services/glpi';
 import { nextDeviceCode, resolveDevicePrefix } from '../services/deviceCode';
 import { fetchAgentRecord, fetchAllAgentRecords } from '../services/externalAgent';
 import { buildAgentPmCheck } from '../services/agentPmCheck';
+import { buildAgentPmMonitors } from '../services/agentMonitors';
 import { buildProcurementReport } from '../services/pmProcurement';
 import { getCategoryIdByAssetType } from './assets';
 import * as fs from 'fs';
@@ -63,14 +64,93 @@ const PM_EXCLUDED_STATUSES: AssetStatus[] = ['Retired', 'Lost', 'Damaged', 'Main
 // Shown wherever an asset has no company / type / department recorded.
 const UNSPECIFIED = '(ไม่ระบุ)';
 
+// Company is matched exactly, site and department by prefix/substring.
+// The difference is deliberate: company codes share prefixes (TRR is its own
+// company, not a parent of TRRCORP/TRRT/TRRP/TRRL/TRRSK), so `contains` on
+// company swept five sibling companies into every TRR plan. Site and
+// department names, by contrast, do read as a hierarchy people search into.
 function buildPMAssetWhere(plan: { company?: string | null; site?: string | null; deptTask?: string | null; deviceType?: string | null }) {
   return {
     status: { notIn: PM_EXCLUDED_STATUSES },
-    ...(plan.company ? { company: { contains: plan.company } } : {}),
+    ...(plan.company ? { company: plan.company } : {}),
     ...(plan.site ? { location: { contains: plan.site } } : {}),
     ...(plan.deptTask ? { departmentId: { contains: plan.deptTask } } : {}),
     ...(plan.deviceType ? { type: plan.deviceType } : {}),
   };
+}
+
+/**
+ * ทรัพย์สินชิ้นนี้อยู่ในขอบเขตของแผนนี้ไหม — เวอร์ชันที่ตัดสินในหน่วยความจำ
+ *
+ * ต้องให้ผลตรงกับ buildPMAssetWhere ทุกเงื่อนไข ต่างกันแค่ตัวหนึ่งถามฐานข้อมูล
+ * อีกตัวถามอ็อบเจ็กต์ที่อ่านมาแล้ว (`contains` ของ Prisma ไม่ได้ตั้ง
+ * mode: 'insensitive' จึงเทียบตัวพิมพ์เล็กใหญ่เหมือน String.includes)
+ *
+ * มีไว้ให้หน้า "ขอบเขตที่ยังไม่มีแผน" ตัดสินด้วยเกณฑ์เดียวกับตอนสร้างงานจริง
+ * ของเดิมหน้านั้นเทียบด้วยกุญแจ `บริษัท|แผนก` เท่านั้น ซึ่งพลาดสองทาง:
+ * แผนกที่มีแผนโน้ตบุ๊กถูกนับว่าครอบคลุมจอกับเครื่องพิมพ์ไปด้วย (ซ่อนของที่
+ * ไม่มีแผนจริง 178 เครื่อง) ส่วนแผนที่เลือก "ทุกแผนก" เก็บแผนกเป็นค่าว่าง
+ * จึงไม่เคยจับคู่กับแผนกจริงของเครื่องไหนเลย
+ */
+function planCoversAsset(
+  plan: { company?: string | null; site?: string | null; deptTask?: string | null; deviceType?: string | null },
+  asset: { company?: string | null; location?: string | null; departmentId?: string | null; type?: string | null },
+): boolean {
+  if (plan.company && asset.company !== plan.company) return false;
+  if (plan.site && !(asset.location || '').includes(plan.site)) return false;
+  if (plan.deptTask && !(asset.departmentId || '').includes(plan.deptTask)) return false;
+  if (plan.deviceType && asset.type !== plan.deviceType) return false;
+  return true;
+}
+
+
+/**
+ * ประเภททรัพย์สินที่ถือว่าเป็นคอมพิวเตอร์ จึงมีสเปคให้ซิงก์
+ *
+ * ของเดิมเช็ค `type === 'Computer'` ตรง ๆ ซึ่งไม่มีทรัพย์สินสักชิ้นในระบบเป็น
+ * ค่านี้ (ของจริงคือ Notebook / PC Desktop / Macbook) บล็อกซิงก์สเปคจึงไม่เคย
+ * ทำงานเลยแม้แต่ครั้งเดียวนับตั้งแต่เขียนมา
+ */
+const COMPUTER_TYPES = ['notebook', 'pc desktop', 'desktop', 'macbook', 'computer', 'server', 'all in one'];
+const isComputerType = (type?: string | null) =>
+  !!type && COMPUTER_TYPES.includes(type.trim().toLowerCase());
+
+/**
+ * ช่องในเช็คลิสต์ -> ช่องใน ComputerDetail
+ *
+ * `fromNote` บอกว่าค่าที่ต้องการอยู่ครึ่งหลังของ "คำตอบ::หมายเหตุ" ไม่ใช่ครึ่งแรก
+ * — ข้อพวกนี้เป็นช่องติ๊กถูก/ผิด ส่วนสเปคจริงที่ดึงมาจาก GLPI/Agent ถูกเก็บไว้
+ * ในหมายเหตุ (ดู applyGLPISpecToAnswers ฝั่งหน้าเว็บ) ของเดิมหยิบครึ่งแรกเสมอ
+ * ซึ่งถ้าเงื่อนไขประเภทผ่าน จะได้คำว่า "yes" ไปเขียนทับเวอร์ชัน Windows
+ */
+const SPEC_FIELD_BY_KEY: Record<string, { field: string; fromNote?: boolean; licenseField?: string }> = {
+  cpu: { field: 'cpu' },
+  ram: { field: 'ram' },
+  storage: { field: 'storage1' },
+  computer_name: { field: 'domainName' },
+  os: { field: 'osVersion' },
+  // หมายเหตุของสองข้อนี้มีรูป "<ชื่อ/เวอร์ชัน> — <สถานะสิทธิ์>" (สร้างที่เดียวใน
+  // agentPmCheck.ts) แยกเก็บคนละช่องได้ ช่องเวอร์ชันจะได้ไม่ปนสถานะ activate
+  windows_version: { field: 'osVersion', fromNote: true, licenseField: 'windowsLicense' },
+  office_check: { field: 'officeLicense', fromNote: true },
+  antivirus: { field: 'antivirusStatus', fromNote: true },
+};
+
+const specValue = (raw: string, fromNote?: boolean) => {
+  const [answer, note] = raw.split('::');
+  return (fromNote ? note : answer)?.trim() || '';
+};
+
+/** แยก "เวอร์ชัน — สถานะสิทธิ์" ถ้าไม่มีตัวคั่นให้ถือว่าทั้งก้อนคือเวอร์ชัน */
+const splitLicense = (v: string): [string, string] => {
+  const i = v.indexOf(' — ');
+  return i < 0 ? [v, ''] : [v.slice(0, i).trim(), v.slice(i + 3).trim()];
+};
+
+/** เที่ยงคืนของวันนี้ตามเวลาไทย — วันนัดเก็บเป็นวัน ไม่ใช่เวลานาที */
+function bangkokMidnight(d: Date): Date {
+  const ymd = d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+  return new Date(`${ymd}T00:00:00+07:00`);
 }
 
 async function getPMEligibility(client: any, plan: { year: number; company?: string | null; site?: string | null; deptTask?: string | null; deviceType?: string | null; plannedDeviceCount?: number | string | null }) {
@@ -265,28 +345,78 @@ router.get('/plans', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (r
       orderBy: [{ year: 'desc' }, { site: 'asc' }],
     });
     const planIds = plans.map(p => p.id);
-    let runStats: any[] = [];
-    if (planIds.length > 0) {
-      runStats = await (prisma.pMRun.groupBy as any)({
-        by: ['planId', 'status'],
-        // Exclude runs whose asset has since left service (retired/lost/
-        // damaged/under maintenance) — same rule /pm/dashboard and /pm/runs
-        // already apply. Without it, a run stuck in DRAFT because nobody
-        // will ever perform PM on a retired device keeps the plan's count
-        // below 100% forever, showing "เกินกำหนด" even once every device
-        // still in service has actually been completed.
+    // Runs are read row-by-row rather than grouped in SQL because the
+    // per-department split below needs asset.departmentId, which Prisma's
+    // groupBy cannot reach across the relation. One year of runs is bounded
+    // by the fleet size (hundreds), so this stays a single cheap query that
+    // now produces the totals AND the breakdown instead of two passes.
+    //
+    // Excludes runs whose asset has since left service (retired/lost/
+    // damaged/under maintenance) — same rule /pm/dashboard and /pm/runs
+    // already apply. Without it, a run stuck in DRAFT because nobody
+    // will ever perform PM on a retired device keeps the plan's count
+    // below 100% forever, showing "เกินกำหนด" even once every device
+    // still in service has actually been completed.
+    const runRows = planIds.length > 0
+      ? await prisma.pMRun.findMany({
         where: { planId: { in: planIds }, asset: { status: { notIn: PM_EXCLUDED_STATUSES } } },
-        _count: { id: true },
-      });
+        select: {
+          planId: true, status: true, scheduledDate: true,
+          asset: { select: { departmentId: true } },
+        },
+      })
+      : [];
+
+    /* วันนัดจริงของกลุ่มงาน — ช่วงที่ทีมจองไว้ว่าจะลงหน้างานวันไหนถึงวันไหน
+       ต่างจาก startDate/endDate ของแผนซึ่งเป็นกรอบของทั้งแผนรวมกัน กราฟใน
+       หน้ากำหนดการวาดตามช่วงนี้เมื่อมีการนัดแล้ว และ `scheduled` บอกว่านัดไป
+       กี่เครื่องจากทั้งหมด เพื่อไม่ให้แท่งที่นัดไว้ 12 จาก 56 เครื่องอ่านเหมือน
+       ว่าทั้งแผนกจบในวันเดียว */
+    type Tally = { total: number; done: number; scheduled: number; schedStart: Date | null; schedEnd: Date | null };
+    const newTally = (): Tally => ({ total: 0, done: 0, scheduled: 0, schedStart: null, schedEnd: null });
+    const addRun = (t: Tally, done: boolean, sched: Date | null) => {
+      t.total++;
+      if (done) t.done++;
+      if (!sched) return;
+      t.scheduled++;
+      if (!t.schedStart || sched < t.schedStart) t.schedStart = sched;
+      if (!t.schedEnd || sched > t.schedEnd) t.schedEnd = sched;
+    };
+    // วันนัดถูกเก็บเป็นเที่ยงคืนเวลาไทย จึงต้องตัดเป็นสตริงวันที่ในโซนไทยด้วย
+    // ไม่งั้น toISOString() จะคายวันก่อนหน้าออกมา
+    const dayStr = (d: Date | null) => (d ? d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }) : null);
+
+    const perPlan = new Map<number, Tally & { depts: Map<string, Tally> }>();
+    for (const run of runRows) {
+      let entry = perPlan.get(run.planId);
+      if (!entry) { entry = { ...newTally(), depts: new Map() }; perPlan.set(run.planId, entry); }
+      const done = run.status === 'COMPLETED';
+      addRun(entry, done, run.scheduledDate);
+
+      const dept = run.asset?.departmentId || UNSPECIFIED;
+      let deptEntry = entry.depts.get(dept);
+      if (!deptEntry) { deptEntry = newTally(); entry.depts.set(dept, deptEntry); }
+      addRun(deptEntry, done, run.scheduledDate);
     }
+
     const plansWithCounts = plans.map(plan => {
-      const planStats = runStats.filter(s => s.planId === plan.id);
-      const totalCount = planStats.reduce((acc, curr) => acc + curr._count.id, 0);
-      const completedCount = planStats.filter(s => s.status === 'COMPLETED').reduce((acc, curr) => acc + curr._count.id, 0);
+      const entry = perPlan.get(plan.id);
       return {
         ...plan,
-        totalCount,
-        completedCount
+        totalCount: entry?.total ?? 0,
+        completedCount: entry?.done ?? 0,
+        scheduledCount: entry?.scheduled ?? 0,
+        schedStart: dayStr(entry?.schedStart ?? null),
+        schedEnd: dayStr(entry?.schedEnd ?? null),
+        /* แผนที่ไม่ได้ระบุแผนก (= ครอบคลุมทุกแผนก) มองจากตัวแผนอย่างเดียวจะไม่รู้ว่า
+           กินแผนกไหนบ้าง ต้องดูจากงานที่สร้างจริงเท่านั้น — หน้าตารางแผนงานใช้ค่านี้
+           กางแถว "ทุกแผนก" ออกเป็นรายแผนกจริง */
+        deptBreakdown: [...(entry?.depts ?? new Map<string, Tally>())]
+          .map(([dept, t]) => ({
+            dept, total: t.total, done: t.done,
+            scheduled: t.scheduled, schedStart: dayStr(t.schedStart), schedEnd: dayStr(t.schedEnd),
+          }))
+          .sort((a, b) => b.total - a.total),
       };
     });
     res.json(plansWithCounts);
@@ -332,10 +462,13 @@ router.get('/plans/gaps', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), asy
     const year = parseInt(String(req.query.year || new Date().getFullYear()));
 
     const [plans, assets, runs] = await Promise.all([
-      prisma.pMPlan.findMany({ where: { year }, select: { company: true, deptTask: true, isAdhoc: true } }),
+      prisma.pMPlan.findMany({
+        where: { year },
+        select: { company: true, site: true, deptTask: true, deviceType: true, isAdhoc: true },
+      }),
       prisma.asset.findMany({
         where: { status: { notIn: PM_EXCLUDED_STATUSES } },
-        select: { id: true, company: true, departmentId: true, type: true },
+        select: { id: true, company: true, departmentId: true, type: true, location: true },
       }),
       prisma.pMRun.findMany({ where: { year }, distinct: ['assetId'], select: { assetId: true } }),
     ]);
@@ -343,14 +476,12 @@ router.get('/plans/gaps', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), asy
     // Ad-hoc plans carry no company/department, so they cover nothing in the
     // scoping sense even though their machines do have runs — which the
     // per-asset `inRun` check below still accounts for.
-    const covered = new Set(
-      plans.filter(pl => !pl.isAdhoc).map(pl => (pl.company || '') + '|' + (pl.deptTask || '')),
-    );
+    const scopedPlans = plans.filter(pl => !pl.isAdhoc);
     const inRun = new Set(runs.map(r => r.assetId));
 
     const map = new Map<string, { company: string; dept: string; type: string; total: number; free: number }>();
     for (const a of assets) {
-      if (covered.has((a.company || '') + '|' + (a.departmentId || ''))) continue;
+      if (scopedPlans.some(pl => planCoversAsset(pl, a))) continue;
       const company = a.company || UNSPECIFIED;
       const dept = a.departmentId || UNSPECIFIED;
       const type = a.type || UNSPECIFIED;
@@ -658,7 +789,22 @@ async function processDeviceAnswers(tx: any, run: any, answers: any[], oldAnswer
                 const dev = devices[i];
                 let existingAsset = null;
                 if (dev.serialNo && dev.serialNo.trim() !== '') {
-                  existingAsset = await tx.asset.findFirst({ where: { serialNo: dev.serialNo.trim() } });
+                  const sNo = dev.serialNo.trim();
+                  // Match on snComputer too, same as buildAgentPmMonitors()'s
+                  // agent-check lookup — some registry rows carry the panel's
+                  // serial there instead of serialNo. Falling back to serialNo
+                  // only here (while agent-check matches both) meant a device
+                  // the agent had already linked would come back unmatched at
+                  // save time, drop out of newAssetIds, and get unlinked
+                  // (status: Available, ownerName cleared) on the run's next
+                  // save — while the monitor was still plugged in.
+                  existingAsset = await tx.asset.findFirst({ where: { OR: [{ serialNo: sNo }, { snComputer: sNo }] } });
+                }
+                // A match already resolved upstream (agent-check's OR lookup,
+                // surfaced to the client as dev._assetId) is authoritative even
+                // when the serial-based re-check above still can't confirm it.
+                if (!existingAsset && dev._assetId) {
+                  existingAsset = await tx.asset.findUnique({ where: { id: Number(dev._assetId) } });
                 }
 
                 if (!existingAsset) {
@@ -734,7 +880,7 @@ async function processDeviceAnswers(tx: any, run: any, answers: any[], oldAnswer
                           assetId: newAsset.id,
                           screenSize: dev.screenSize || null,
                           ports: dev.ports || null,
-                          hasSpeaker: !!dev.hasSpeaker,
+                          hasSpeaker: dev.hasSpeaker !== undefined ? !!dev.hasSpeaker : null,
                         }
                       });
                     }
@@ -777,19 +923,24 @@ async function processDeviceAnswers(tx: any, run: any, answers: any[], oldAnswer
 
                   // Upsert MonitorDetail if specs are present
                   if (!isPrinter && (dev.screenSize || dev.ports || dev.hasSpeaker !== undefined)) {
+                    /* เขียนเฉพาะช่องที่คราวนี้มีค่ามาจริง
+                       ของเดิมยัด `|| null` ทุกช่อง การบันทึก PM ที่ช่างกรอกแค่
+                       ขนาดจอจึงลบพอร์ตที่เคยบันทึกไว้ทิ้ง — เป็นเหตุผลที่จอ 194
+                       ตัวมีแถวรายละเอียด แต่เหลือสเปคจริงแค่ 52 ตัว */
+                    const monitorPatch: Record<string, string | boolean> = {};
+                    if (dev.screenSize) monitorPatch.screenSize = dev.screenSize;
+                    if (dev.ports) monitorPatch.ports = dev.ports;
+                    if (dev.hasSpeaker !== undefined) monitorPatch.hasSpeaker = !!dev.hasSpeaker;
+
                     await tx.monitorDetail.upsert({
                       where: { assetId: existingAsset.id },
                       create: {
                         assetId: existingAsset.id,
                         screenSize: dev.screenSize || null,
                         ports: dev.ports || null,
-                        hasSpeaker: !!dev.hasSpeaker,
+                        hasSpeaker: dev.hasSpeaker !== undefined ? !!dev.hasSpeaker : null,
                       },
-                      update: {
-                        screenSize: dev.screenSize || null,
-                        ports: dev.ports || null,
-                        hasSpeaker: !!dev.hasSpeaker,
-                      }
+                      update: monitorPatch
                     });
                   }
 
@@ -822,6 +973,12 @@ async function processDeviceAnswers(tx: any, run: any, answers: any[], oldAnswer
                   // ถอดสายใน CMDB ด้วย ไม่งั้นแท็บ 'อุปกรณ์ที่เชื่อมโยง' จะยังโชว์จอ
                   // ที่ช่างเพิ่งบอกว่าไม่ได้ต่ออยู่แล้ว
                   if (run.assetId) {
+                    // ปิดประวัติการเชื่อมต่อที่ยังเปิดอยู่ ก่อนลบ asset_links ทิ้ง —
+                    // ไม่งั้นจะไม่เหลือร่องรอยว่าเคยเชื่อมต่อกันมาก่อนเลย
+                    await tx.assetLinkHistory.updateMany({
+                      where: { parentId: run.assetId, childId: Number(oldDev._assetId), disconnectedAt: null },
+                      data: { disconnectedAt: new Date() },
+                    });
                     await tx.assetLink.deleteMany({
                       where: { parentId: run.assetId, childId: Number(oldDev._assetId) },
                     });
@@ -843,11 +1000,22 @@ async function processDeviceAnswers(tx: any, run: any, answers: any[], oldAnswer
             const linkType = itemTypeUpper === 'PRINTER_ARRAY' ? 'PRINTER' : 'MONITOR';
             for (const childId of newAssetIds) {
               if (childId === run.assetId) continue;   // กันเครื่องผูกกับตัวเอง
+              // เช็กว่ามี asset_links แถวนี้อยู่แล้วหรือไม่ ก่อน upsert — ใช้บอกว่า
+              // นี่คือการเชื่อมต่อครั้งใหม่จริงๆ (สร้างแถวประวัติ) หรือแค่ยืนยันซ้ำ
+              // ของที่เชื่อมต่ออยู่แล้ว (ไม่ต้องเปิดประวัติซ้ำ)
+              const existingLink = await tx.assetLink.findUnique({
+                where: { parentId_childId: { parentId: run.assetId, childId } },
+              });
               await tx.assetLink.upsert({
                 where: { parentId_childId: { parentId: run.assetId, childId } },
                 create: { parentId: run.assetId, childId, linkType, note: 'ยืนยันจากการทำ PM' },
                 update: { linkType },
               });
+              if (!existingLink) {
+                await tx.assetLinkHistory.create({
+                  data: { parentId: run.assetId, childId, linkType, note: 'ยืนยันจากการทำ PM' },
+                });
+              }
             }
           }
         }
@@ -903,18 +1071,24 @@ router.post('/runs/:id/perform', authenticate, authorize('IT_ADMIN', 'SUPERADMIN
         });
       }
 
-      // Auto-Sync PC Specs
-      if (run.assetId && run.asset?.type === 'Computer') {
-        const specUpdates: any = {};
+      // ── เขียนสเปคที่ตรวจได้กลับไปที่ทะเบียนทรัพย์สิน ──
+      if (run.assetId && isComputerType(run.asset?.type)) {
+        const specUpdates: Record<string, string> = {};
         for (const ans of cleanAnswers) {
           const itemDef = run.plan.template.templateItems.find((i) => i.id === Number(ans.itemId));
           if (!itemDef || !ans.value) continue;
-          const v = ans.value.split('::')[0];
-          if (itemDef.key === 'cpu') specUpdates.cpu = v;
-          else if (itemDef.key === 'ram') specUpdates.ram = v;
-          else if (itemDef.key === 'storage') specUpdates.storage1 = v;
-          else if (itemDef.key === 'windows_version' || itemDef.key === 'os') specUpdates.osVersion = v;
-          else if (itemDef.key === 'computer_name') specUpdates.domainName = v;
+          const target = SPEC_FIELD_BY_KEY[itemDef.key];
+          if (!target) continue;
+          const v = specValue(String(ans.value), target.fromNote);
+          // ไม่เขียนค่าว่างทับของเดิม — ช่างที่ข้ามข้อนั้นไม่ควรลบข้อมูลที่มีอยู่
+          if (!v) continue;
+          if (target.licenseField) {
+            const [ver, lic] = splitLicense(v);
+            if (ver) specUpdates[target.field] = ver;
+            if (lic) specUpdates[target.licenseField] = lic;
+          } else {
+            specUpdates[target.field] = v;
+          }
         }
 
         if (Object.keys(specUpdates).length > 0) {
@@ -926,6 +1100,13 @@ router.post('/runs/:id/perform', authenticate, authorize('IT_ADMIN', 'SUPERADMIN
         }
       }
 
+      /* วันนัดของงานที่ทำเสร็จโดยไม่เคยถูกจอง — ลงวันที่ทำจริงให้
+         หน้ากำหนดการวาดแท่งได้ตรงกับสิ่งที่เกิดขึ้นจริง ไม่ใช่กางเต็มกรอบแผน
+         ถ้าเคยจองวันไว้แล้วไม่แตะ เพราะต้องเหลือไว้เทียบว่าทำตรงนัดหรือไม่ */
+      const scheduledPatch = (nextStatus === 'COMPLETED' && !run.scheduledDate)
+        ? { scheduledDate: bangkokMidnight(new Date()) }
+        : {};
+
       await tx.pMRun.update({
         where: { id: runId },
         data: {
@@ -933,6 +1114,7 @@ router.post('/runs/:id/perform', authenticate, authorize('IT_ADMIN', 'SUPERADMIN
           performedBy: req.user!.userId,
           performedAt: run.performedAt || new Date(),
           completedAt: nextStatus === 'COMPLETED' ? (run.completedAt || new Date()) : null,
+          ...scheduledPatch,
         },
       });
     });
@@ -1176,7 +1358,7 @@ router.get('/runs/:id/agent-check', authenticate, authorize('IT_ADMIN', 'SUPERAD
   try {
     const run = await prisma.pMRun.findUnique({
       where: { id: parseInt(req.params.id) },
-      include: { asset: { select: { assetName: true, serialNo: true, snComputer: true } } },
+      include: { asset: { select: { assetName: true, serialNo: true, snComputer: true, company: true } } },
     });
     if (!run) throw new AppError('ไม่พบรายการ PM', 404);
     const asset = run.asset;
@@ -1195,7 +1377,11 @@ router.get('/runs/:id/agent-check', authenticate, authorize('IT_ADMIN', 'SUPERAD
       }
     }
 
-    res.json(buildAgentPmCheck(record));
+    // จอที่ต่ออยู่แยกออกมาจาก buildAgentPmCheck เพราะต้องอ่านทะเบียนเพื่อจับคู่
+    // ด้วย Serial ส่วนตัว buildAgentPmCheck ตั้งใจให้เป็นฟังก์ชันบริสุทธิ์ที่ไม่แตะ
+    // ฐานข้อมูล — รูปแบบที่ส่งออกไปตรงกับที่ฝั่ง GLPI ส่ง ฟอร์มจึงใช้ตัวเดิมรับได้
+    const monitors = record ? await buildAgentPmMonitors(prisma, record, asset.company) : [];
+    res.json({ ...buildAgentPmCheck(record), monitors });
   } catch (err) { next(err); }
 });
 
@@ -1246,6 +1432,70 @@ router.patch('/runs/:id/notes', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'
     if (!run) throw new AppError('ไม่พบงาน PM', 404);
     const updated = await prisma.pMRun.update({ where: { id }, data: { notes: notes || null } });
     res.json(updated);
+  } catch (err) { next(err); }
+});
+
+/**
+ * อ่านวันนัดที่ส่งมาเป็น 'YYYY-MM-DD' ให้เป็นเที่ยงคืนของวันนั้นตามเวลาไทย
+ *
+ * ต้องตรึงเวลาไว้ที่เที่ยงคืนเอง ไม่งั้น `new Date('2026-09-14')` จะได้
+ * เที่ยงคืน UTC ซึ่งคือ 07:00 ของวันเดียวกันในไทย แต่ถ้าเซิร์ฟเวอร์อยู่โซน
+ * ตะวันตกของ UTC มันจะกลายเป็นวันก่อนหน้า — วันนัดเลื่อนไปเองหนึ่งวัน
+ */
+function parseScheduledDate(input: any): Date | null {
+  const raw = String(input ?? '').trim();
+  if (!raw) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+  if (!m) throw new AppError('รูปแบบวันที่ไม่ถูกต้อง (ต้องเป็น YYYY-MM-DD)', 400);
+  const [, y, mo, d] = m;
+  const date = new Date(`${y}-${mo}-${d}T00:00:00+07:00`);
+  if (Number.isNaN(date.getTime())) throw new AppError('วันที่ไม่ถูกต้อง', 400);
+  return date;
+}
+
+// วันนัดลงหน้างานของงาน PM หนึ่งรายการ ส่ง scheduledDate เป็น null เพื่อล้างนัด
+router.patch('/runs/:id/schedule', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id);
+    const scheduledDate = parseScheduledDate(req.body.scheduledDate);
+    const run = await prisma.pMRun.findUnique({ where: { id } });
+    if (!run) throw new AppError('ไม่พบงาน PM', 404);
+    const updated = await prisma.pMRun.update({ where: { id }, data: { scheduledDate } });
+    res.json(updated);
+  } catch (err) { next(err); }
+});
+
+/**
+ * ตั้งวันนัดให้งาน PM หลายรายการพร้อมกัน
+ *
+ * นี่คือวิธีที่ใช้จริง: เลือกทั้งแผนกแล้วจองเป็นของวันหนึ่ง การไล่ตั้งทีละ
+ * เครื่องสำหรับแผนกที่มี 56 เครื่องไม่มีใครทำไหว
+ *
+ * งานที่ทำเสร็จแล้วถูกข้าม ไม่ใช่ปฏิเสธทั้งชุด — คนเลือกทั้งแผนกย่อมติดเครื่อง
+ * ที่ทำไปแล้วมาด้วยเป็นปกติ และการล้มทั้งคำขอเพราะเหตุนี้จะกลายเป็นว่าต้องมา
+ * ไล่เลือกใหม่ให้ถูกเอง
+ */
+router.post('/runs/bulk-schedule', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const runIds: number[] = Array.isArray(req.body.runIds)
+      ? req.body.runIds.map((n: any) => parseInt(String(n), 10)).filter((n: number) => Number.isFinite(n))
+      : [];
+    if (runIds.length === 0) throw new AppError('ไม่ได้เลือกงาน PM', 400);
+    const scheduledDate = parseScheduledDate(req.body.scheduledDate);
+
+    const result = await prisma.pMRun.updateMany({
+      where: { id: { in: runIds }, status: { not: 'COMPLETED' } },
+      data: { scheduledDate },
+    });
+
+    const skipped = runIds.length - result.count;
+    res.json({
+      updated: result.count,
+      skipped,
+      message: scheduledDate
+        ? `ตั้งวันนัด ${result.count} รายการ${skipped > 0 ? ` (ข้ามที่ทำเสร็จแล้ว ${skipped} รายการ)` : ''}`
+        : `ล้างวันนัด ${result.count} รายการ${skipped > 0 ? ` (ข้ามที่ทำเสร็จแล้ว ${skipped} รายการ)` : ''}`,
+    });
   } catch (err) { next(err); }
 });
 
@@ -1364,14 +1614,19 @@ router.post('/runs/adhoc', authenticate, authorize('IT_ADMIN', 'SUPERADMIN'), as
     if (!asset) throw new AppError('ไม่พบทรัพย์สิน', 404);
 
     const year = new Date().getFullYear();
+    // isAdhoc is what the rest of the app filters on (the coverage-gap map and
+    // the dashboard's per-source split both read it), so it is the flag that
+    // has to be set and matched on. The 'Ad-hoc' strings stay because they are
+    // what the schedule and plan list actually display for these rows.
     let plan = await prisma.pMPlan.findFirst({
-      where: { year, site: 'Ad-hoc', deptTask: 'Ad-hoc', company: 'Ad-hoc', deviceType: asset.type },
+      where: { year, isAdhoc: true, deviceType: asset.type },
     });
 
     if (!plan) {
       plan = await prisma.pMPlan.create({
         data: {
           year,
+          isAdhoc: true,
           site: 'Ad-hoc',
           deptTask: 'Ad-hoc',
           company: 'Ad-hoc',

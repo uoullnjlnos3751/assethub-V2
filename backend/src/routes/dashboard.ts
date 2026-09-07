@@ -12,6 +12,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { authenticate, authorize } from '../middleware/auth';
 import * as D from '../services/dashboardData';
+import { getMetricHistory } from '../services/dashboardHistory';
 
 const router = Router();
 
@@ -24,6 +25,7 @@ const send = (fn: (req: Request) => Promise<unknown>) =>
   };
 
 const yearOf = (req: Request) => parseInt(req.query.year as string) || new Date().getFullYear();
+const companyOf = (req: Request) => (req.query.company as string) || undefined;
 
 /**
  * ทุกก้อนในคำขอเดียว
@@ -34,6 +36,16 @@ const yearOf = (req: Request) => parseInt(req.query.year as string) || new Date(
 router.get('/overview', ...guard, send(req => D.dashboardOverview(prisma, {
   year: yearOf(req),
   warrantyDays: parseInt(req.query.warrantyDays as string) || 60,
+  company: companyOf(req),
+})));
+
+/** Trend chart data — see DailyMetricSnapshot / dashboardHistory.ts. */
+router.get('/history', ...guard, send(req => getMetricHistory(prisma, parseInt(req.query.days as string) || 90)));
+
+/** One level of the company → location → floor drill-down per click. */
+router.get('/location-breakdown', ...guard, send(req => D.locationBreakdown(prisma, {
+  company: companyOf(req),
+  location: (req.query.location as string) || undefined,
 })));
 
 router.get('/asset-summary', ...guard, send(() => D.assetSummary(prisma)));

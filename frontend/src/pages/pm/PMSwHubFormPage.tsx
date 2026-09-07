@@ -13,11 +13,14 @@ import {
   Chip,
   LinearProgress,
   Autocomplete,
+  Tooltip,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
 import imageCompression from 'browser-image-compression';
+import ZoomOutMapIcon from '@mui/icons-material/ZoomOutMap';
+import { ImageLightbox } from '../../components/ImageLightbox';
 import HubIcon from '@mui/icons-material/Hub';
 import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
 import DescriptionIcon from '@mui/icons-material/Description';
@@ -50,6 +53,7 @@ import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import PushPinIcon from '@mui/icons-material/PushPin';
 import { pmSwHubService, pmSwHubTemplateService, pmSwHubPlanService, PMSwHubTemplateItem } from '../../services/pmSwHub';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 /* ─────────────────────────────────────────────────────────────
    GROUP_INFO: Icon + Label per group key
@@ -153,6 +157,8 @@ export default function PMSwHubFormPage() {
   const [period, setPeriod] = useState(searchParams.get('period') || 'Monthly');
   const [remark, setRemark] = useState('');
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  /** key ของรายการตรวจที่กำลังเปิดดูรูปเต็มอยู่ — null คือไม่ได้เปิด */
+  const [photoZoom, setPhotoZoom] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [existingRecordId, setExistingRecordId] = useState<number | null>(null);
   const [dbFormId, setDbFormId] = useState<string | null>(null);
@@ -320,8 +326,13 @@ export default function PMSwHubFormPage() {
     setAnswers(newAns);
   };
 
-  const handleClear = () => {
-    if (window.confirm('ยืนยันการล้างข้อมูลทั้งหมด?')) {
+  const confirm = useConfirm();
+  const handleClear = async () => {
+    if (await confirm({
+      title: 'ล้างข้อมูลที่กรอกไว้ทั้งหมด',
+      detail: 'คำตอบและรูปถ่ายที่ยังไม่ได้บันทึกจะหายไป',
+      confirmLabel: 'ล้างข้อมูล',
+    })) {
       setAnswers({});
       setRemark('');
       setPhotoBeforeFile(null);
@@ -665,7 +676,7 @@ export default function PMSwHubFormPage() {
                             </Button>
                           );
                         })}
-                        <IconButton
+                        <IconButton aria-label="ถ่ายภาพหรืออัปโหลดรูป"
                           size="small"
                           component="label"
                           title="แนบรูปถ่าย"
@@ -696,7 +707,7 @@ export default function PMSwHubFormPage() {
                           />
                         </IconButton>
                         {item.key.startsWith('custom_') && (
-                          <IconButton size="small" color="error" title="ลบรายการนี้" onClick={() => handleRemoveCustomItem(item.key)}>
+                          <IconButton aria-label="ลบ" size="small" color="error" title="ลบรายการนี้" onClick={() => handleRemoveCustomItem(item.key)}>
                             <DeleteIcon fontSize="small" />
                           </IconButton>
                         )}
@@ -718,16 +729,33 @@ export default function PMSwHubFormPage() {
                           />
                         )}
                         {answers[`${item.key}_photo`] && (
-                          <Box sx={{ position: 'relative', width: 100, height: 100, borderRadius: 1.5, overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}>
-                            <Box component="img" src={resolveMediaUrl(answers[`${item.key}_photo`])} alt="Preview" sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            <IconButton
-                              size="small"
-                              onClick={() => { const n = { ...answers }; delete n[`${item.key}_photo`]; setAnswers(n); }}
-                              sx={{ position: 'absolute', top: 2, right: 2, bgcolor: 'error.main', color: '#fff', width: 20, height: 20, '&:hover': { bgcolor: 'error.dark' } }}
+                          /* รูปย่อ 100px ถูกครอบไว้ (objectFit: cover) จึงดูไม่ออกว่าถ่าย
+                             ติดครบหรือชัดพอ — คลิกเพื่อกางเต็มจอ */
+                          <Tooltip title="คลิกเพื่อดูรูปขนาดเต็ม">
+                            <Box
+                              onClick={() => setPhotoZoom(item.key)}
+                              sx={{
+                                position: 'relative', width: 100, height: 100, borderRadius: 1.5,
+                                overflow: 'hidden', border: '1px solid', borderColor: 'divider',
+                                cursor: 'zoom-in', '&:hover .zoom-hint': { opacity: 1 },
+                              }}
                             >
-                              <CloseIcon sx={{ fontSize: 12 }} />
-                            </IconButton>
-                          </Box>
+                              <Box component="img" src={resolveMediaUrl(answers[`${item.key}_photo`])} alt="Preview" sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              <Box className="zoom-hint" sx={{
+                                position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                bgcolor: 'rgba(0,0,0,0.45)', color: '#fff', opacity: 0, transition: 'opacity .15s',
+                              }}>
+                                <ZoomOutMapIcon sx={{ fontSize: 24 }} />
+                              </Box>
+                              <IconButton aria-label="ปิด"
+                                size="small"
+                                onClick={e => { e.stopPropagation(); const n = { ...answers }; delete n[`${item.key}_photo`]; setAnswers(n); }}
+                                sx={{ position: 'absolute', top: 2, right: 2, bgcolor: 'error.main', color: '#fff', width: 20, height: 20, zIndex: 1, '&:hover': { bgcolor: 'error.dark' } }}
+                              >
+                                <CloseIcon sx={{ fontSize: 12 }} />
+                              </IconButton>
+                            </Box>
+                          </Tooltip>
                         )}
                       </Box>
                     </Box>
@@ -795,7 +823,7 @@ export default function PMSwHubFormPage() {
                 {(slot.url || slot.file) ? (
                   <Box sx={{ position: 'relative', borderRadius: 1.5, overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}>
                     <Box component="img" src={slot.file ? URL.createObjectURL(slot.file) : resolveMediaUrl(slot.url)!} alt={slot.type} sx={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }} />
-                    <IconButton size="small" onClick={slot.onRemove} sx={{ position: 'absolute', top: 8, right: 8, bgcolor: 'error.main', color: '#fff', '&:hover': { bgcolor: 'error.dark' } }}>
+                    <IconButton aria-label="ปิด" size="small" onClick={slot.onRemove} sx={{ position: 'absolute', top: 8, right: 8, bgcolor: 'error.main', color: '#fff', '&:hover': { bgcolor: 'error.dark' } }}>
                       <CloseIcon sx={{ fontSize: 16 }} />
                     </IconButton>
                   </Box>
@@ -825,6 +853,21 @@ export default function PMSwHubFormPage() {
           />
         </Box>
       </Paper>
+
+      {/* หน้าดูรูปเต็มตัวเดียวใช้ร่วมกันทุกรายการตรวจ อ่านรูปจาก key ที่เปิดอยู่
+          ไม่มีปุ่มเปลี่ยนรูป เพราะปุ่มถ่าย/อัปโหลดของแต่ละข้ออยู่ติดกับรูปอยู่แล้ว */}
+      <ImageLightbox
+        open={photoZoom !== null}
+        onClose={() => setPhotoZoom(null)}
+        src={photoZoom ? resolveMediaUrl(answers[`${photoZoom}_photo`]) : null}
+        title="รูปถ่ายประกอบการตรวจ"
+        onDelete={photoZoom ? () => {
+          const n = { ...answers };
+          delete n[`${photoZoom}_photo`];
+          setAnswers(n);
+          setPhotoZoom(null);
+        } : undefined}
+      />
     </Box>
   );
 }

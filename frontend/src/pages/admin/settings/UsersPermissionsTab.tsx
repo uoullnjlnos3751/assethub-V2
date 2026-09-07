@@ -6,11 +6,14 @@ import {
   List, ListItem, ListItemButton, ListItemText, Divider, Tooltip,
   alpha, useTheme,
 } from '@mui/material';
-import { Users, Shield, ServerCog, Search, Download, Settings2, UserPlus, KeyRound, Trash2, Ban, CheckCircle2 } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import { Users, Shield, ServerCog, Search, Download, Settings2, UserPlus, KeyRound, Trash2, Ban, CheckCircle2, UserCog } from 'lucide-react';
 import debounce from 'lodash/debounce';
 import { adminAPI } from '../../../services/api';
 import { SectionCard } from '../../../components/SectionCard';
+import { useConfirm } from '../../../contexts/ConfirmContext';
+
+// xlsx ~419 KB โหลดตอนกดส่งออกจริงเท่านั้น ไม่ใช่ตอนเปิดหน้า
+const loadXlsx = () => import('xlsx');
 
 interface AppUser {
   id: number;
@@ -24,6 +27,8 @@ interface AppUser {
   isActive: boolean;
   authType: string;
   lastLoginAt?: string | null;
+  managerId?: number | null;
+  manager?: { id: number; displayName?: string | null; adUsername: string } | null;
 }
 
 const CANONICAL_ROLES = [
@@ -58,6 +63,8 @@ export default function UsersPermissionsTab() {
 
   const [roleDialog, setRoleDialog] = useState<{ open: boolean; user: AppUser | null }>({ open: false, user: null });
   const [newRole, setNewRole] = useState('');
+  const [managerDialog, setManagerDialog] = useState<{ open: boolean; user: AppUser | null }>({ open: false, user: null });
+  const [selectedManagerId, setSelectedManagerId] = useState<number | ''>('');
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ msg: string; severity: 'success' | 'error' } | null>(null);
 
@@ -112,6 +119,23 @@ export default function UsersPermissionsTab() {
 
   const handleOpenRoleDialog = (u: AppUser) => { setRoleDialog({ open: true, user: u }); setNewRole(u.role); };
 
+  const handleOpenManagerDialog = (u: AppUser) => { setManagerDialog({ open: true, user: u }); setSelectedManagerId(u.managerId ?? ''); };
+
+  const handleUpdateManager = async () => {
+    if (!managerDialog.user) return;
+    setSaving(true);
+    try {
+      await adminAPI.updateManager(managerDialog.user.id, selectedManagerId === '' ? null : Number(selectedManagerId));
+      setManagerDialog({ open: false, user: null });
+      setToast({ msg: `ตั้งหัวหน้างานของ ${managerDialog.user.displayName || managerDialog.user.adUsername} เรียบร้อยแล้ว`, severity: 'success' });
+      fetchUsers();
+    } catch (err: any) {
+      setToast({ msg: err.response?.data?.error || 'เกิดข้อผิดพลาด', severity: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleUpdateRole = async () => {
     if (!roleDialog.user) return;
     setSaving(true);
@@ -137,8 +161,13 @@ export default function UsersPermissionsTab() {
     }
   };
 
+  const confirm = useConfirm();
   const handleDeleteUser = async (u: AppUser) => {
-    if (!window.confirm(`ยืนยันการลบผู้ใช้งาน ${u.displayName} (${u.adUsername}) ใช่หรือไม่?\n\n*หมายเหตุ: จะลบไม่ได้หากมีประวัติการใช้งานในระบบ`)) return;
+    if (!await confirm({
+      title: 'ลบผู้ใช้งาน',
+      target: `${u.displayName || u.adUsername} (${u.adUsername})`,
+      detail: 'ลบไม่ได้หากผู้ใช้รายนี้มีประวัติการใช้งานในระบบอยู่แล้ว',
+    })) return;
     try {
       await adminAPI.deleteUser(u.id);
       setToast({ msg: `ลบผู้ใช้ ${u.displayName || u.adUsername} แล้ว`, severity: 'success' });
@@ -232,7 +261,8 @@ export default function UsersPermissionsTab() {
     }
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
+    const XLSX = await loadXlsx();
     const rows = filteredUsers.map(u => ({
       Username: u.adUsername,
       'ชื่อ - นามสกุล': u.displayName || '',
@@ -377,6 +407,7 @@ export default function UsersPermissionsTab() {
                   <TableCell>แผนก</TableCell>
                   <TableCell>บริษัท</TableCell>
                   <TableCell>บทบาท</TableCell>
+                  <TableCell>หัวหน้างาน</TableCell>
                   <TableCell>ที่มา</TableCell>
                   <TableCell>เข้าใช้ล่าสุด</TableCell>
                   <TableCell align="center">สถานะ</TableCell>
@@ -403,6 +434,9 @@ export default function UsersPermissionsTab() {
                       <Chip size="small" label={u.role} sx={{ fontSize: '0.65rem', fontFamily: 'monospace' }} />
                     </TableCell>
                     <TableCell>
+                      <Typography sx={{ fontSize: '0.72rem' }}>{u.manager?.displayName || u.manager?.adUsername || '—'}</Typography>
+                    </TableCell>
+                    <TableCell>
                       <Typography sx={{ fontSize: '0.7rem', color: theme.palette.text.secondary }}>
                         {u.authType === 'AD' ? '🔒 จาก AD' : 'Local'}
                       </Typography>
@@ -422,22 +456,27 @@ export default function UsersPermissionsTab() {
                     <TableCell align="right">
                       <Box sx={{ display: 'flex', gap: 0.4, justifyContent: 'flex-end' }}>
                         <Tooltip title="ตั้งค่าสิทธิ์">
-                          <IconButton size="small" onClick={() => handleOpenRoleDialog(u)} sx={{ color: 'text.secondary' }}>
+                          <IconButton aria-label="ตั้งค่าสิทธิ์" size="small" onClick={() => handleOpenRoleDialog(u)} sx={{ color: 'text.secondary' }}>
                             <Settings2 size={15} />
                           </IconButton>
                         </Tooltip>
+                        <Tooltip title="ตั้งหัวหน้างาน (สำหรับอนุมัติคำขอยืม)">
+                          <IconButton aria-label="ตั้งหัวหน้างาน (สำหรับอนุมัติคำขอยืม)" size="small" onClick={() => handleOpenManagerDialog(u)} sx={{ color: 'text.secondary' }}>
+                            <UserCog size={15} />
+                          </IconButton>
+                        </Tooltip>
                         <Tooltip title={u.authType === 'LOCAL' ? 'เปลี่ยนรหัสผ่าน' : 'ตั้งรหัสผ่าน Local'}>
-                          <IconButton size="small" onClick={() => { setPasswordDialog({ open: true, user: u }); setNewPassword(''); }} sx={{ color: 'text.secondary' }}>
+                          <IconButton aria-label="รีเซ็ตรหัสผ่าน" size="small" onClick={() => { setPasswordDialog({ open: true, user: u }); setNewPassword(''); }} sx={{ color: 'text.secondary' }}>
                             <KeyRound size={15} />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title={u.isActive ? 'ปิดการใช้งาน' : 'เปิดการใช้งาน'}>
-                          <IconButton size="small" onClick={() => handleToggleActive(u)} sx={{ color: u.isActive ? 'error.main' : 'success.main' }}>
+                          <IconButton aria-label="ระงับการใช้งาน" size="small" onClick={() => handleToggleActive(u)} sx={{ color: u.isActive ? 'error.main' : 'success.main' }}>
                             {u.isActive ? <Ban size={15} /> : <CheckCircle2 size={15} />}
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="ลบผู้ใช้">
-                          <IconButton size="small" onClick={() => handleDeleteUser(u)} sx={{ color: 'error.main' }}>
+                          <IconButton aria-label="ลบผู้ใช้" size="small" onClick={() => handleDeleteUser(u)} sx={{ color: 'error.main' }}>
                             <Trash2 size={15} />
                           </IconButton>
                         </Tooltip>
@@ -475,6 +514,44 @@ export default function UsersPermissionsTab() {
           <Button onClick={() => setRoleDialog({ open: false, user: null })} sx={{ borderRadius: '8px', textTransform: 'none' }}>ยกเลิก</Button>
           <Button
             variant="contained" onClick={handleUpdateRole} disabled={saving}
+            startIcon={saving ? <CircularProgress size={14} color="inherit" /> : undefined}
+            sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 600 }}
+          >
+            บันทึก
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Manager assignment dialog — drives the borrow-approval supervisor stage */}
+      <Dialog open={managerDialog.open} onClose={() => setManagerDialog({ open: false, user: null })} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: '12px' } }}>
+        <DialogTitle sx={{ fontWeight: 700, fontSize: '1rem' }}>
+          ตั้งหัวหน้างาน: {managerDialog.user?.displayName || managerDialog.user?.adUsername}
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontSize: '0.75rem', color: theme.palette.text.secondary, mb: 2 }}>
+            คำขอยืมทรัพย์สินของผู้ใช้นี้จะต้องผ่านการอนุมัติจากหัวหน้างานที่เลือกไว้ก่อน จึงจะเข้าคิวให้ IT Admin จ่ายของ
+            ถ้าไม่ตั้งหัวหน้างาน คำขอจะเข้าคิว IT Admin ทันทีเหมือนเดิม
+          </Typography>
+          <FormControl fullWidth>
+            <InputLabel>หัวหน้างาน</InputLabel>
+            <Select
+              value={selectedManagerId}
+              label="หัวหน้างาน"
+              onChange={e => setSelectedManagerId(e.target.value === '' ? '' : Number(e.target.value))}
+            >
+              <MenuItem value="">— ไม่มี (เข้าคิว IT Admin ทันที) —</MenuItem>
+              {/* ผู้ใช้ที่ปิดใช้งานล็อกอินไม่ได้อีกแล้ว — ตั้งเป็นหัวหน้างานไม่ได้จริง
+                  (backend ปฏิเสธด้วย) ตัดออกจากตัวเลือกไปเลยดีกว่าให้เลือกแล้วพัง */}
+              {users.filter(u => u.id !== managerDialog.user?.id && u.isActive !== false).map(u => (
+                <MenuItem key={u.id} value={u.id}>{u.displayName || u.adUsername} ({u.adUsername})</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setManagerDialog({ open: false, user: null })} sx={{ borderRadius: '8px', textTransform: 'none' }}>ยกเลิก</Button>
+          <Button
+            variant="contained" onClick={handleUpdateManager} disabled={saving}
             startIcon={saving ? <CircularProgress size={14} color="inherit" /> : undefined}
             sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 600 }}
           >
