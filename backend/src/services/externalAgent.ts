@@ -262,42 +262,62 @@ async function fillMonitorBlanksFromAgent(
   prisma: PrismaClient,
   records: { hostname: string }[],
 ): Promise<{ fieldsFilled: number; details: { assetId: number; assetCode: string | null; fields: string[] }[] }> {
-  const bySerial = new Map<string, string>();
+  const bySerial = new Map<string, { resolution?: string; year?: number }>();
   for (const summary of records) {
     const record: any = await fetchAgentRecord(summary.hostname);
     for (const m of (record?.monitors || [])) {
       const serial = String(m?.serial ?? '').trim();
+      if (!serial) continue;
       const w = Number(m?.width), h = Number(m?.height);
-      if (!serial || !(w > 0) || !(h > 0)) continue;
-      bySerial.set(serial, `${w}x${h}`);
+      const year = Number(m?.year);
+      const entry = bySerial.get(serial) ?? {};
+      if (w > 0 && h > 0) entry.resolution = `${w}x${h}`;
+      // ปีที่ผลิตต้องดูสมเหตุสมผล — EDID ที่อ่านเพี้ยนให้ปี 0 หรือ 2255 มาได้
+      if (year >= 1990 && year <= new Date().getFullYear()) entry.year = year;
+      bySerial.set(serial, entry);
     }
   }
 
   const details: { assetId: number; assetCode: string | null; fields: string[] }[] = [];
   let fieldsFilled = 0;
-  for (const [serial, resolution] of bySerial) {
+  for (const [serial, info] of bySerial) {
     const asset = await prisma.asset.findFirst({
       where: { OR: [{ serialNo: serial }, { computerDetail: { snComputer: serial } }] },
-      select: { id: true, assetCode: true, monitorDetail: { select: { resolution: true } } },
+      select: {
+        id: true, assetCode: true,
+        monitorDetail: { select: { resolution: true, manufactureYear: true } },
+      },
     });
+    if (!asset) continue;
+
     // ว่างเท่านั้นถึงเติม ถ้ามีค่าอยู่แล้ว (แม้จะต่างกัน) ปล่อยให้คนตัดสิน
-    if (!asset || asset.monitorDetail?.resolution) continue;
+    const patch: { resolution?: string; manufactureYear?: number } = {};
+    const labels: string[] = [];
+    if (info.resolution && !asset.monitorDetail?.resolution) {
+      patch.resolution = info.resolution;
+      labels.push(`ความละเอียดจอ (${info.resolution})`);
+    }
+    if (info.year && !asset.monitorDetail?.manufactureYear) {
+      patch.manufactureYear = info.year;
+      labels.push(`ปีที่ผลิตจอ (${info.year})`);
+    }
+    if (labels.length === 0) continue;
 
     await prisma.monitorDetail.upsert({
       where: { assetId: asset.id },
-      create: { assetId: asset.id, resolution },
-      update: { resolution },
+      create: { assetId: asset.id, ...patch },
+      update: patch,
     });
     await prisma.assetHistory.create({
       data: {
         assetId: asset.id,
         actionType: 'AGENT_SYNC',
         actorUserId: null,
-        note: `เติมข้อมูลที่ว่างจากระบบ Agent: ความละเอียดจอ (${resolution})`,
+        note: `เติมข้อมูลที่ว่างจากระบบ Agent: ${labels.join(', ')}`,
       },
     });
-    fieldsFilled++;
-    details.push({ assetId: asset.id, assetCode: asset.assetCode, fields: ['ความละเอียดจอ'] });
+    fieldsFilled += labels.length;
+    details.push({ assetId: asset.id, assetCode: asset.assetCode, fields: labels });
   }
   return { fieldsFilled, details };
 }

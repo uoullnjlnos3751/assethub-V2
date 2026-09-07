@@ -266,6 +266,9 @@ model MonitorDetail {
   ports       String? // HDMI, DisplayPort, USB-C
   hasSpeaker  Boolean?
   curved      Boolean?
+  // ปีที่ผลิตจาก EDID — Agent ส่งมาให้เกือบทุกจอที่เห็น (237 จาก 242) ใช้ดู
+  // อายุจอเพื่อวางแผนเปลี่ยน GLPI ไม่มีข้อมูลนี้
+  manufactureYear Int?
 
   @@map("monitor_details")
 }
